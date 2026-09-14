@@ -90,6 +90,7 @@ def project_files(
     has_splash: bool,
     has_debug_keystore: bool = False,
     include_release_job: bool = False,
+    project_subdir: str | None = None,
 ) -> dict[str, str]:
     """
     Return `{relative_path: contents}` for every *generated text* file
@@ -119,6 +120,9 @@ def project_files(
     `RELEASE_KEYSTORE_BASE64`/`RELEASE_KEYSTORE_PASSWORD`/
     `RELEASE_KEY_ALIAS`/`RELEASE_KEY_PASSWORD` repo secrets already
     configured.
+
+    `project_subdir` is forwarded as-is to `_github_ci_workflow_yml`
+    -- see that function's own docstring.
     """
     package_path = _package_path(package_id)
     java_dir = f"app/src/main/java/{package_path}"
@@ -143,7 +147,10 @@ def project_files(
         "app/src/main/res/values/themes.xml": _themes_xml(has_splash),
         "app/src/main/res/values-night/themes.xml": _themes_night_xml(has_splash),
         ".github/workflows/android-build.yml": _github_ci_workflow_yml(
-            app_name, package_id, include_release_job=include_release_job
+            app_name,
+            package_id,
+            include_release_job=include_release_job,
+            project_subdir=project_subdir,
         ),
         "README.md": _readme_md(app_name, package_id, has_debug_keystore),
     }
@@ -345,7 +352,11 @@ dependencies {{
 
 
 def _github_ci_workflow_yml(
-    app_name: str, package_id: str, *, include_release_job: bool = False
+    app_name: str,
+    package_id: str,
+    *,
+    include_release_job: bool = False,
+    project_subdir: str | None = None,
 ) -> str:
     """
     A GitHub Actions workflow, entirely on GitHub-hosted runners -- so
@@ -389,6 +400,20 @@ def _github_ci_workflow_yml(
       APK" section for the equivalent local `gradle assembleRelease`
       command and what the secrets need to contain.
 
+    `project_subdir`, if given, is the project's path relative to the
+    repo root the workflow will actually run from -- e.g. `"android"`
+    when `arklight android scaffold` wrote this project into an
+    existing repo's `android/` subdirectory rather than at that repo's
+    own root (see `arklight.cli.android._find_enclosing_git_root`).
+    When set, every `run: gradle ...` step gets a matching
+    `working-directory:`, and uploaded APK paths are prefixed with it
+    -- otherwise Gradle looks for `settings.gradle.kts` in the
+    checkout root and fails immediately with "does not contain a
+    Gradle build", since checkout always happens at the *repo* root,
+    not wherever this project was scaffolded into. `None` (the
+    default) means this project IS the repo root, matching the
+    original no-subdirectory behavior.
+
     Uses `gradle` directly (not `./gradlew`) since this scaffold does
     not template the wrapper's binary jar -- `gradle/actions/setup-
     gradle` installs the pinned `_GRADLE_VERSION` itself, so no
@@ -405,6 +430,14 @@ def _github_ci_workflow_yml(
     # cosmetic, so it's slugified defensively rather than validated
     # the way `package_id`/`app_name` are elsewhere in this module.
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", app_name).strip("-") or "arklight-app"
+    # Both jobs' `run: gradle ...` steps need a matching
+    # `working-directory:` and both `Upload APK` steps' artifact
+    # `path:` need the same prefix -- see this function's own
+    # docstring on `project_subdir`. Built once here so the two job
+    # templates below (and any future one) can't drift out of sync
+    # with each other.
+    working_directory_line = f"\n        working-directory: {project_subdir}" if project_subdir else ""
+    path_prefix = f"{project_subdir}/" if project_subdir else ""
     release_job = (
         f'''
 
@@ -446,14 +479,14 @@ def _github_ci_workflow_yml(
           RELEASE_KEYSTORE_PATH: ${{{{ runner.temp }}}}/release.keystore
           RELEASE_KEYSTORE_PASSWORD: ${{{{ secrets.RELEASE_KEYSTORE_PASSWORD }}}}
           RELEASE_KEY_ALIAS: ${{{{ secrets.RELEASE_KEY_ALIAS }}}}
-          RELEASE_KEY_PASSWORD: ${{{{ secrets.RELEASE_KEY_PASSWORD }}}}
+          RELEASE_KEY_PASSWORD: ${{{{ secrets.RELEASE_KEY_PASSWORD }}}}{working_directory_line}
         run: gradle assembleRelease --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: {slug}-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: {path_prefix}app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 '''
         if include_release_job
@@ -503,14 +536,14 @@ jobs:
         with:
           gradle-version: "{_GRADLE_VERSION}"
 
-      - name: Assemble debug APK
+      - name: Assemble debug APK{working_directory_line}
         run: gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: {slug}-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: {path_prefix}app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
   install-launch-smoke-test:

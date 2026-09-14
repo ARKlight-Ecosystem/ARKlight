@@ -497,6 +497,10 @@ def _cmd_android_scaffold(args: argparse.Namespace) -> int:
         print(f"  {result.project_dir}/.github/workflows/android-build.yml")
         print("to")
         print(f"  {result.enclosing_git_root}/.github/workflows/android-build.yml")
+        print(
+            "(already generated with the right working-directory/artifact paths "
+            "for this nested layout -- moving it is all that's needed)"
+        )
         print("or the workflow above will never run.")
         print()
     print("To build locally instead (needs a JDK -- see the generated project's own")
