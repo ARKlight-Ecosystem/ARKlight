@@ -74,6 +74,12 @@ callback also calls `renderModelBindings(store)`
 (`arklight/backend/js/runtime/model.py`), same `typeof`-guarded,
 only-shipped-when-used pattern as `wireWatchers` just above -- a page
 with no `bind_value=` anywhere never declares that function.
+
+`vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): the same callback
+also calls `renderRepeat(store)`/`renderShow(store)`
+(`arklight/backend/js/runtime/repeat.py`/`show.py`), same
+`typeof`-guarded, only-shipped-when-used pattern again -- a page with
+no `Repeat(...)`/`Show(...)` never declares one or the other.
 """
 
 from __future__ import annotations
@@ -128,6 +134,8 @@ INIT_STATE_JS = """  function initState() {
         renderBindings(store);
         renderClassBindings(store);
         if (typeof renderModelBindings === "function") { renderModelBindings(store); }
+        if (typeof renderRepeat === "function") { renderRepeat(store); }
+        if (typeof renderShow === "function") { renderShow(store); }
       });
       if (typeof wireWatchers === "function") { wireWatchers(store, watch); }
       return store;

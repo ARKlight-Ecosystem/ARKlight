@@ -63,6 +63,14 @@ page that actually declares `Watch(...)`, the same "only ship what's
 used" discipline `_actions_object_js`/`_behaviors_object_js`/
 `_derivations_object_js` already follow, rather than being part of
 the always-present reactive core every stateful page ships.
+
+`vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15) adds two more
+siblings the same way: `repeat.py` (`RENDER_REPEAT_JS` /
+`renderRepeat`) for `Repeat(name, template=...)`, and `show.py`
+(`RENDER_SHOW_JS` / `renderShow`) for `Show(predicate, ...)`. Neither
+is folded into `STATE_CORE_JS` either -- each ships only on a page that
+actually uses the corresponding construct (`has_repeat`/`has_show` in
+`arklight/backend/js/render.py`'s `_collect_usage`).
 """
 
 from __future__ import annotations
@@ -78,6 +86,8 @@ from arklight.backend.js.runtime.model import (
 )
 from arklight.backend.js.runtime.nav import NAV_HIGHLIGHT_JS
 from arklight.backend.js.runtime.notify import NOTIFY_JS
+from arklight.backend.js.runtime.repeat import RENDER_REPEAT_JS
+from arklight.backend.js.runtime.show import RENDER_SHOW_JS
 from arklight.backend.js.runtime.state import CREATE_STATE_JS, INIT_STATE_JS
 from arklight.backend.js.runtime.watch import WIRE_WATCHERS_JS
 
@@ -98,4 +108,6 @@ __all__ = [
     "WIRE_WATCHERS_JS",
     "RENDER_MODEL_BINDINGS_JS",
     "WIRE_MODEL_BINDING_JS",
+    "RENDER_REPEAT_JS",
+    "RENDER_SHOW_JS",
 ]

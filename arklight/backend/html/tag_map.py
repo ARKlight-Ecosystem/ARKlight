@@ -130,8 +130,18 @@ TAG_MAP: dict[str, str] = {
     "Area": "area",
     # v0.003 (second addendum): embeds.
     "IFrame": "iframe",
-    # v0.003 (second addendum): no-JS fallback.
+    # v0.003: no-JS fallback.
     "NoScript": "noscript",
+    # vdom-7 (docs/Backends/REFACTOR-INDEX.md row 15): both wrap
+    # arbitrary content in a plain, transparent container -- a
+    # `Repeat(...)`'s per-item elements/a `Show(...)`'s children carry
+    # their own real tags already; this is just the reactive anchor
+    # `data-ark-repeat`/`data-ark-show` lives on. Same as the `_tag_for`
+    # fallback below for any type not listed here -- spelled out
+    # explicitly since these two are otherwise easy to mistake for an
+    # oversight.
+    "Repeat": "div",
+    "Show": "div",
 }
 
 # Tags that never have a closing tag / children.

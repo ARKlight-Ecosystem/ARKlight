@@ -41,6 +41,7 @@ from __future__ import annotations
 import json
 from html import escape
 
+from arklight.ast.nodes import ActionRef, ItemIndexRef, PredicateRef
 from arklight.backend.css.render import STYLESHEET_PATH
 from arklight.backend.html.attrs import _attr_string
 from arklight.backend.html.head_meta import _render_head_meta
@@ -63,6 +64,156 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
     return f'<span data-ark-bind="{escape(str(name), quote=True)}">{escape(str(value))}</span>'
 
 
+def _evaluate_predicate(predicate: PredicateRef, *, page_state: dict) -> bool:
+    """`vdom-7`: the same truthy/falsy check `Predicate.*(...)`
+    describes, evaluated at build time against the page's initial
+    state -- see `arkEvalPredicate` in `arklight/backend/js/runtime/
+    show.py` for the client-side twin that re-runs this on every state
+    change."""
+    value = page_state.get(predicate.names[0])
+    return (not value) if predicate.kind == "falsy" else bool(value)
+
+
+def _render_show(
+    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict
+) -> str:
+    """
+    `vdom-7`: `Show(predicate, ...)` renders its children unconditionally
+    (a `Show` that started hidden still needs its real markup available
+    for `renderShow` to reveal later -- there's no way to "come back"
+    from omitted HTML), wrapped in a `data-ark-show="{...}"` anchor that
+    also carries a plain `hidden` attribute whenever `predicate`
+    evaluates false against the page's *initial* state. `hidden` is a
+    native HTML content-visibility attribute (removes the subtree from
+    the accessibility tree, needs no CSS or JS to take effect) rather
+    than a style toggle, so a JS-disabled visitor sees exactly the
+    right thing with zero client-side help -- `renderShow`
+    (`arklight/backend/js/runtime/show.py`) just keeps `hidden` in sync
+    with `predicate` after that.
+    """
+    predicate = node.props["predicate"]
+    predicate_json = escape(
+        json.dumps({"kind": predicate.kind, "names": list(predicate.names)}), quote=True
+    )
+    visible = _evaluate_predicate(predicate, page_state=page_state)
+    hidden_attr = "" if visible else " hidden"
+    inner = _render_children(
+        node.children, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+    )
+    return f'<div data-ark-show="{predicate_json}"{hidden_attr}>{inner}</div>'
+
+
+def _substitute_item_refs(node: IRNode, *, item, index: int) -> IRNode:
+    """`vdom-7`: returns a copy of a `Repeat(...)` template `IRNode`
+    with every `ItemBind` child replaced by the literal current-item
+    text and every `ItemIndexRef` (`RepeatItem.index()`) inside an
+    `on_click=Action.*(...)`'s args replaced by the literal current
+    index -- both are only ever resolved dynamically client-side (see
+    `_repeat_template_spec` below); server-rendered per-item HTML has
+    no reactivity of its own, so a literal value is exactly right
+    here."""
+    props = dict(node.props)
+    on_click = props.get("on_click")
+    if isinstance(on_click, ActionRef):
+        props["on_click"] = ActionRef(
+            action=on_click.action,
+            state=on_click.state,
+            args={k: (index if isinstance(v, ItemIndexRef) else v) for k, v in on_click.args.items()},
+            modifiers=on_click.modifiers,
+        )
+    new_children: list = []
+    for child in node.children:
+        if isinstance(child, IRNode):
+            if child.type == "ItemBind":
+                new_children.append(str(item))
+            else:
+                new_children.append(_substitute_item_refs(child, item=item, index=index))
+        else:
+            new_children.append(child)
+    return IRNode(type=node.type, props=props, children=new_children)
+
+
+def _repeat_template_spec(node: IRNode) -> dict:
+    """`vdom-7`: converts a `Repeat(...)` template `IRNode` into a
+    JSON-safe tree the client-side runtime (`arklight/backend/js/
+    runtime/repeat.py`) can build brand-new items from after an
+    `Action.append(...)` -- server-rendered items instead go through
+    `_substitute_item_refs` + the normal `_render_node`, since they
+    need no client-side construction at all. Deliberately narrower
+    than full node rendering: only `class_name`/`id` and a single
+    `on_click=Action.*(...)` per node are carried over (a real,
+    documented limitation of this stage -- other props render
+    correctly for the items the server already produced, but won't be
+    reproduced for one added purely client-side; see
+    docs/Backends/REFACTOR-INDEX.md row 15 for what's left for a
+    future version).
+    """
+    tag = _tag_for(node)
+    attrs: dict[str, str] = {}
+    class_name = node.props.get("class_name")
+    if class_name:
+        attrs["class"] = str(class_name)
+    node_id = node.props.get("id")
+    if node_id:
+        attrs["id"] = str(node_id)
+    on_click_spec = None
+    on_click = node.props.get("on_click")
+    if isinstance(on_click, ActionRef):
+        on_click_spec = {
+            "action": on_click.action,
+            "state": on_click.state,
+            "args": {
+                key: ({"__item_index__": True} if isinstance(value, ItemIndexRef) else value)
+                for key, value in on_click.args.items()
+            },
+        }
+    text = None
+    children_specs: list[dict] = []
+    for child in node.children:
+        if isinstance(child, IRNode):
+            if child.type == "ItemBind":
+                text = {"item_value": True}
+            else:
+                children_specs.append(_repeat_template_spec(child))
+        else:
+            text = str(child)
+    return {"tag": tag, "attrs": attrs, "on_click": on_click_spec, "text": text, "children": children_specs}
+
+
+def _render_repeat(
+    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict
+) -> str:
+    """
+    `vdom-7`: `Repeat(name, template=...)` renders one real copy of its
+    template per element of `name`'s current (build-time) list value --
+    exactly like `Bind(...)`, this means a JS-disabled visitor sees the
+    genuine current list, not an empty placeholder. The container also
+    carries `data-ark-repeat-template` -- the same template compiled to
+    a JSON spec (`_repeat_template_spec`) -- so `renderRepeat`
+    (`arklight/backend/js/runtime/repeat.py`) can both keep these exact
+    elements (rather than re-creating and duplicating them -- see that
+    module's docstring) and build genuinely new ones after a later
+    `Action.append(...)`.
+    """
+    name = node.props["name"]
+    template = node.children[0]
+    items = page_state.get(name) or []
+    spec_json = escape(json.dumps(_repeat_template_spec(template)), quote=True)
+    rendered_items = "".join(
+        _render_node(
+            _substitute_item_refs(template, item=item, index=index),
+            current_route=current_route,
+            route_to_path=route_to_path,
+            page_state=page_state,
+        )
+        for index, item in enumerate(items)
+    )
+    return (
+        f'<div data-ark-repeat="{escape(str(name), quote=True)}" '
+        f'data-ark-repeat-template="{spec_json}">{rendered_items}</div>'
+    )
+
+
 def _render_children(
     children: list, *, current_route: str, route_to_path: dict[str, str], page_state: dict
 ) -> str:
@@ -82,6 +233,16 @@ def _render_children(
 def _render_node(node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict) -> str:
     if node.type == "Bind":
         return _render_bind(node, page_state=page_state)
+
+    if node.type == "Repeat":
+        return _render_repeat(
+            node, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+        )
+
+    if node.type == "Show":
+        return _render_show(
+            node, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+        )
 
     tag = _tag_for(node)
     attrs = _attr_string(
