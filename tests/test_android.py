@@ -152,9 +152,22 @@ def test_scaffold_github_actions_workflow_includes_install_launch_smoke_test(tmp
     assert "needs: assemble-debug" in contents
     assert "actions/download-artifact@v4" in contents
     assert "reactivecircus/android-emulator-runner@v2" in contents
-    assert "adb install" in contents
-    assert "am start -n com.arklight.app/com.arklight.app.MainActivity" in contents
-    assert "adb shell pidof com.arklight.app" in contents
+    # The install/launch/liveness-check logic itself lives in its own
+    # script file, not inline in this step's `script:` block -- see
+    # `_android_smoke_test_sh`'s docstring for why (the action runs
+    # each line of a multi-line `script:` as its own separate `sh -c`,
+    # which breaks both variable assignment across lines and any
+    # multi-line construct like `if`/`fi`).
+    assert "script: bash .github/scripts/android-smoke-test.sh" in contents
+    # And that script needs to actually exist on the runner, which
+    # means this job needs its own checkout -- it previously only
+    # downloaded the APK artifact.
+    assert "actions/checkout@v4" in contents
+
+    script = (project_dir / ".github/scripts/android-smoke-test.sh").read_text()
+    assert "adb install" in script
+    assert "am start -n com.arklight.app/com.arklight.app.MainActivity" in script
+    assert "adb shell pidof com.arklight.app" in script
 
 
 def test_scaffold_github_actions_workflow_smoke_test_uses_configured_package_id(tmp_path):
@@ -164,9 +177,9 @@ def test_scaffold_github_actions_workflow_smoke_test_uses_configured_package_id(
 
     scaffold_project(out_dir, output_dir=project_dir)
 
-    contents = (project_dir / ".github/workflows/android-build.yml").read_text()
-    assert "am start -n com.example.cool/com.example.cool.MainActivity" in contents
-    assert "adb shell pidof com.example.cool" in contents
+    script = (project_dir / ".github/scripts/android-smoke-test.sh").read_text()
+    assert "am start -n com.example.cool/com.example.cool.MainActivity" in script
+    assert "adb shell pidof com.example.cool" in script
 
 
 def test_scaffold_github_actions_workflow_has_no_release_job(tmp_path):

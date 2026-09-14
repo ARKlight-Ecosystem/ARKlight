@@ -152,6 +152,7 @@ def project_files(
             include_release_job=include_release_job,
             project_subdir=project_subdir,
         ),
+        ".github/scripts/android-smoke-test.sh": _android_smoke_test_sh(package_id),
         "README.md": _readme_md(app_name, package_id, has_debug_keystore),
     }
 
@@ -349,6 +350,62 @@ dependencies {{
 # ---------------------------------------------------------------------------
 # CI (Stages 2, 3, and 4 of ANDROID-BACKEND-IMPLEMENTATION.md)
 # ---------------------------------------------------------------------------
+
+
+def _android_smoke_test_sh(package_id: str) -> str:
+    """
+    The `install-launch-smoke-test` job's install/launch/liveness-check
+    logic, as a real script file rather than inline in
+    `_github_ci_workflow_yml`'s `script:` block.
+
+    It has to live here rather than inline: `reactivecircus/android-
+    emulator-runner`'s `script:` input runs each line of a multi-line
+    value as its own separate `sh -c` invocation instead of as one
+    combined script -- so a variable assigned on one line (`APK=...`)
+    is gone again by the next, and any multi-line construct (an
+    `if`/`fi`, in particular) becomes a bare, unterminated fragment in
+    its own subshell:
+
+        [command]/usr/bin/sh -c APK="$(find apk -name '*.apk' | head -n 1)"
+        [command]/usr/bin/sh -c adb install -r "$APK"
+        adb: filename doesn't end .apk or .apex:
+
+    Keeping this logic in its own file and having `script:` invoke
+    `bash .github/scripts/android-smoke-test.sh` (a single line) sidesteps
+    that entirely -- there's only one line for the action to run, and
+    bash executes the whole file as the single script it actually is.
+    """
+    return f'''\
+#!/usr/bin/env bash
+# Installs the debug APK on the emulator started by
+# reactivecircus/android-emulator-runner, launches MainActivity, and
+# fails the job if the process isn't still running a few seconds
+# later (i.e. it crashed on startup). See this file's own generator,
+# `_android_smoke_test_sh` in arklight/backend/android/runtime.py, for
+# why this logic lives in its own script rather than inline in
+# android-build.yml's `script:` block.
+set -euo pipefail
+
+APK="$(find apk -name '*.apk' | head -n 1)"
+if [ -z "$APK" ]; then
+  echo "::error::No .apk file found under apk/ -- listing what's actually there:"
+  find apk -type f
+  exit 1
+fi
+
+echo "Installing $APK"
+adb install -r "$APK"
+adb shell am start -n {package_id}/{package_id}.MainActivity
+sleep 5
+
+if ! adb shell pidof {package_id}; then
+  echo "::error::App process not found a few seconds after launch -- it likely crashed on startup. See logcat below."
+  adb logcat -d "*:E"
+  exit 1
+fi
+
+echo "App launched and is still running -- smoke test passed."
+'''
 
 
 def _github_ci_workflow_yml(
@@ -552,6 +609,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Check out the project
+        # Needed so .github/scripts/android-smoke-test.sh (see the
+        # "Install and launch on an emulator" step below) actually
+        # exists on the runner -- this job previously only downloaded
+        # the APK artifact, which was fine while that logic lived
+        # inline in this step's own `script:` block.
+        uses: actions/checkout@v4
+
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
@@ -572,17 +637,16 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            APK="$(find apk -name '*.apk' | head -n 1)"
-            adb install -r "$APK"
-            adb shell am start -n {package_id}/{package_id}.MainActivity
-            sleep 5
-            if ! adb shell pidof {package_id}; then
-              echo "::error::App process not found a few seconds after launch -- it likely crashed on startup. See logcat below."
-              adb logcat -d "*:E"
-              exit 1
-            fi
-            echo "App launched and is still running -- smoke test passed."
+          # A single line, not a multi-line block: this action runs
+          # each line of a multi-line `script:` input as its own
+          # separate `sh -c` invocation rather than as one combined
+          # script, which breaks any multi-line construct (variables
+          # set on one line are gone by the next; an `if`/`fi` split
+          # across lines becomes a bare, unterminated `if` on its
+          # own). See .github/scripts/android-smoke-test.sh (generated
+          # by `_android_smoke_test_sh`) for the actual logic and a
+          # fuller explanation.
+          script: bash .github/scripts/android-smoke-test.sh
 {release_job}'''
 
 
