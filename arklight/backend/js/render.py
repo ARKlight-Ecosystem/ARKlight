@@ -280,6 +280,8 @@ from arklight.backend.js.runtime import CLICK_INTERCEPTOR_JS as _CLICK_INTERCEPT
 from arklight.backend.js.runtime import NAV_HIGHLIGHT_JS as _NAV_HIGHLIGHT_JS
 from arklight.backend.js.runtime import NOTIFY_JS as _NOTIFY_JS
 from arklight.backend.js.runtime import RENDER_MODEL_BINDINGS_JS as _RENDER_MODEL_BINDINGS_JS
+from arklight.backend.js.runtime import RENDER_REPEAT_JS as _RENDER_REPEAT_JS
+from arklight.backend.js.runtime import RENDER_SHOW_JS as _RENDER_SHOW_JS
 from arklight.backend.js.runtime import STATE_CORE_JS as _STATE_CORE_JS
 from arklight.backend.js.runtime import WIRE_MODEL_BINDING_JS as _WIRE_MODEL_BINDING_JS
 from arklight.backend.js.runtime import WIRE_WATCHERS_JS as _WIRE_WATCHERS_JS
@@ -308,7 +310,7 @@ def _walk(node: IRNode):
 
 def _collect_usage(
     ir: WebsiteIR,
-) -> tuple[set[str], set[str], set[str], bool, set[str], bool, bool, bool]:
+) -> tuple[set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool]:
     """
     Inspect the site's IR for what the runtime actually needs to ship:
     which named behaviors are referenced, which actions are referenced
@@ -321,9 +323,16 @@ def _collect_usage(
     referenced by a `Computed(...)` (`vdom-4`, docs/Backends/
     REFACTOR-INDEX.md row 12), whether any page declares a
     `Computed(...)` at all, whether any page declares a `Watch(...)` at
-    all (`vdom-5`, docs/Backends/REFACTOR-INDEX.md row 13), and whether
-    any node anywhere uses `bind_value=` (`vdom-6`, docs/Backends/
-    REFACTOR-INDEX.md row 14).
+    all (`vdom-5`, docs/Backends/REFACTOR-INDEX.md row 13), whether any
+    node anywhere uses `bind_value=` (`vdom-6`, docs/Backends/
+    REFACTOR-INDEX.md row 14), and whether any page uses `Repeat(...)`/
+    `Show(...)` at all (`vdom-7`, docs/Backends/REFACTOR-INDEX.md row
+    15) -- an `on_click=Action.*(...)` nested inside a `Repeat(...)`'s
+    template is still a normal `IRNode` in the tree (it's the compiled
+    template `IRNode`, not a separate declaration pulled out like
+    `Computed`/`Watch` are), so the `_walk` loop below already picks it
+    up into `used_on_click_actions`/`used_actions` without any special
+    case.
     """
     used_behaviors: set[str] = set()
     used_on_click_actions: set[str] = set()
@@ -334,6 +343,8 @@ def _collect_usage(
     has_computed = any(page.computed for page in ir.pages)
     has_watch = any(page.watch for page in ir.pages)
     has_model_binding = False
+    has_repeat = False
+    has_show = False
 
     for page in ir.pages:
         for node in _walk(page.root):
@@ -344,6 +355,10 @@ def _collect_usage(
                 used_on_click_actions.add(on_click.action)
             if isinstance(node.props.get("bind_value"), str) and node.props.get("bind_value"):
                 has_model_binding = True
+            if node.type == "Repeat":
+                has_repeat = True
+            elif node.type == "Show":
+                has_show = True
 
     # vdom-5: a Watch(...)'s `then=` reuses the exact same
     # ACTION_REGISTRY dispatcher an on_click=Action.*(...) does (see
@@ -367,6 +382,8 @@ def _collect_usage(
         has_computed,
         has_watch,
         has_model_binding,
+        has_repeat,
+        has_show,
     )
 
 
@@ -451,6 +468,8 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         has_computed,
         has_watch,
         has_model_binding,
+        has_repeat,
+        has_show,
     ) = _collect_usage(ir)
 
     # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): the click
@@ -556,6 +575,17 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
             # shipped when at least one node actually uses it, same
             # "only ship what's used" discipline as WIRE_WATCHERS_JS.
             parts.append(_RENDER_MODEL_BINDINGS_JS)
+        if has_repeat:
+            # vdom-7: `renderRepeat` is only ever meaningful on a
+            # stateful page (`Repeat(...)`'s `name` is validated
+            # against a `State(...)`/`Computed(...)` name), and only
+            # shipped when at least one page actually uses it, same
+            # "only ship what's used" discipline as the two above.
+            parts.append(_RENDER_REPEAT_JS)
+        if has_show:
+            # vdom-7: same reasoning as has_repeat above, for
+            # `Show(...)`/`renderShow`.
+            parts.append(_RENDER_SHOW_JS)
 
     # vdom-5: `actions` ships whenever the click interceptor needs it
     # (unchanged) or whenever any page declares a `Watch(...)` --
@@ -600,6 +630,10 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         render_calls = "renderBindings(arkStore); renderClassBindings(arkStore);"
         if has_model_binding:
             render_calls += " renderModelBindings(arkStore);"
+        if has_repeat:
+            render_calls += " renderRepeat(arkStore);"
+        if has_show:
+            render_calls += " renderShow(arkStore);"
         init_body.append(f"    if (arkStore) {{ {render_calls} }}")
 
     parts.append("  function arkInitPage() {")

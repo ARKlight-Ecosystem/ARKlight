@@ -197,6 +197,20 @@ SCHEMA: dict[str, NodeSpec] = {
     # anything gated behind a `toggle`/`copy`/`dismiss` behavior can
     # have a `NoScript` sibling explaining what's missing.
     "NoScript": NodeSpec(),
+    # vdom-7 (docs/Backends/REFACTOR-INDEX.md row 15): per-item list
+    # rendering + conditional show/hide. Both are real, renderable
+    # content -- unlike `State`/`Computed`/`Watch` below, which are
+    # page-scoped declarations Validation/IR-build pull out of the tree
+    # entirely, `Repeat`/`Show` stay in place and go through the normal
+    # recursive node conversion, so they need SCHEMA entries the same
+    # as any other component. Their one/many children are validated by
+    # dedicated logic in `arklight.ir.validate` rather than the generic
+    # per-child loop below (a `Repeat`'s child is a *template*, not
+    # ordinary content -- see `_validate_repeat_declaration`), but still
+    # need an entry here so unrelated generic lookups (e.g. tag mapping)
+    # find them like any other node type.
+    "Repeat": NodeSpec(required_props=("name",)),
+    "Show": NodeSpec(required_props=("predicate",)),
 }
 
 # Types whose raw string children should stay raw strings during
@@ -380,3 +394,22 @@ KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
 # raw operator string executed as code -- mirrors why `on_click`/
 # `action` are closed vocabularies rather than arbitrary strings.
 COMPARE_OPS = frozenset({"eq", "ne", "gt", "lt", "gte", "lte"})
+
+
+# `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): `Show(...)`'s
+# closed-vocabulary predicate, the same shape discipline as
+# `DERIVATION_REGISTRY` above but scaled down -- both current kinds
+# take exactly one state/computed name, so a plain `names: int` arity
+# is enough (no need for `DerivationSpec`'s min/max split, since
+# nothing here is variadic yet).
+@dataclass
+class PredicateSpec:
+    names: int = 1
+
+
+PREDICATE_REGISTRY: dict[str, PredicateSpec] = {
+    "truthy": PredicateSpec(names=1),
+    "falsy": PredicateSpec(names=1),
+}
+
+KNOWN_PREDICATES = frozenset(PREDICATE_REGISTRY)

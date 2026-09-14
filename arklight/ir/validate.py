@@ -87,17 +87,35 @@ Checks performed:
     valid the same way an `on_click=Action.*(...)` value already is --
     reusing `_validate_action` -- so `then` may only target a real
     `State(...)` on the page, never a `Computed(...)`.
+15. `Repeat(...)`/`Show(...)` (`vdom-7`, see
+    docs/Backends/REFACTOR-INDEX.md row 15) are, unlike 13/14 above,
+    real renderable content -- they may appear anywhere ordinary
+    content can, not just as a direct `Page(...)` child.
+    `Repeat(name, template=...)` needs a non-empty `name` resolving to
+    a `State(...)`/`Computed(...)` declared on the same page, and
+    exactly one child (its per-item template, built by calling
+    `template()` once at compile time in `arklight.api.Repeat`) --
+    that template is checked by a dedicated recursive validator
+    (`_validate_repeat_template`) rather than the generic per-child
+    loop below, since it's the only place an `ItemBind` node
+    (`RepeatItem.value()`) is valid. `Show(predicate, ...)` needs a
+    `Predicate.*(...)` reference (`arklight.ast.nodes.PredicateRef`)
+    whose `kind` is known (`arklight.ir.schema.PREDICATE_REGISTRY`)
+    and whose `names` resolve to `State(...)`/`Computed(...)` declared
+    on the same page; its children are ordinary content, validated the
+    same way any other component's children are.
 """
 
 from __future__ import annotations
 
-from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, DerivationRef
+from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, DerivationRef, PredicateRef
 from arklight.ir.schema import (
     ACTION_REGISTRY,
     COMPARE_OPS,
     DERIVATION_REGISTRY,
     KNOWN_BEHAVIORS,
     MODIFIER_REGISTRY,
+    PREDICATE_REGISTRY,
     SCHEMA,
 )
 
@@ -529,6 +547,145 @@ def _validate_watch_declaration(
     _validate_action(then, path=path, mutable_state=mutable_state)
 
 
+def _validate_predicate_ref(
+    predicate: PredicateRef | None, *, path: str, page_state: frozenset[str]
+) -> None:
+    """`vdom-7`: checks for a `Show(...)`'s `predicate=Predicate.*(...)`
+    reference -- mirrors `_validate_derive_ref`'s registry-driven
+    arity check, scaled down to `PREDICATE_REGISTRY`'s simpler
+    fixed-arity predicates."""
+    if not isinstance(predicate, PredicateRef):
+        raise ValidationError(
+            f"Show(...) at {path} needs predicate=Predicate.truthy(...)/"
+            f"Predicate.falsy(...), got {predicate!r}."
+        )
+    spec = PREDICATE_REGISTRY.get(predicate.kind)
+    if spec is None:
+        known = ", ".join(sorted(PREDICATE_REGISTRY))
+        raise ValidationError(
+            f"Show(...) at {path} uses unknown predicate {predicate.kind!r}. "
+            f"Known predicates are: {known}."
+        )
+    if len(predicate.names) != spec.names:
+        raise ValidationError(
+            f"Show(...) at {path} uses Predicate.{predicate.kind}(...) with "
+            f"{len(predicate.names)} name(s); it takes exactly {spec.names}."
+        )
+    for name in predicate.names:
+        if name not in page_state:
+            known = ", ".join(sorted(page_state)) or "(none declared)"
+            raise ValidationError(
+                f"Show(...) at {path} references state {name!r}, which isn't "
+                f"declared on this page. State/Computed declared on this "
+                f"page: {known}."
+            )
+
+
+def _validate_show_declaration(
+    node: ARKNode,
+    *,
+    path: str,
+    page_state: frozenset[str],
+    mutable_state: frozenset[str],
+) -> None:
+    """`vdom-7`: unlike `Computed`/`Watch` above, `Show(...)` is real
+    content, so -- after checking its own `predicate=` -- this still
+    recurses into its children exactly the way `validate_node`'s
+    generic tail does for any other component."""
+    _validate_predicate_ref(node.props.get("predicate"), path=path, page_state=page_state)
+    for i, child in enumerate(node.children):
+        if isinstance(child, ARKNode):
+            validate_node(
+                child,
+                path=f"{path}/{child.type}[{i}]",
+                page_state=page_state,
+                mutable_state=mutable_state,
+                parent_is_page=False,
+            )
+        elif not isinstance(child, str):
+            raise ValidationError(
+                f"Show(...) at {path} has an unexpected child of type "
+                f"{type(child).__name__!r}."
+            )
+
+
+def _validate_repeat_template(node: ARKNode, *, path: str, mutable_state: frozenset[str]) -> None:
+    """`vdom-7`: validates a `Repeat(...)`'s per-item template --
+    structurally the same as `validate_node`'s generic path (unknown
+    types/missing required props/`on_click` still get checked), except
+    an `ItemBind` node (`RepeatItem.value()`) is recognized here
+    instead of rejected as an unknown component, since it's only
+    meaningful inside this one context. `RepeatItem.index()`
+    (`arklight.ast.nodes.ItemIndexRef`) isn't separately checked here:
+    it can only ever appear as an `Action.*(...)` arg value, which
+    `_validate_action` doesn't inspect the *values* of -- same as a
+    literal int index wouldn't be."""
+    if node.type == "ItemBind":
+        return
+    spec = SCHEMA.get(node.type)
+    if spec is None:
+        known = ", ".join(sorted(SCHEMA))
+        raise ValidationError(
+            f"Unknown component type {node.type!r} at {path} (inside a "
+            f"Repeat(...) template). Known component types are: {known}."
+        )
+    for prop_name in spec.required_props:
+        if prop_name not in node.props:
+            raise ValidationError(
+                f"{node.type!r} at {path} is missing required prop {prop_name!r}."
+            )
+    on_click = node.props.get("on_click")
+    if isinstance(on_click, ActionRef):
+        _validate_action(on_click, path=path, mutable_state=mutable_state)
+    elif isinstance(on_click, str) and on_click not in KNOWN_BEHAVIORS:
+        known = ", ".join(sorted(KNOWN_BEHAVIORS))
+        raise ValidationError(
+            f"on_click at {path} uses unknown behavior {on_click!r}. "
+            f"Known behaviors are: {known}."
+        )
+    if not spec.allow_children and node.children:
+        raise ValidationError(f"{node.type!r} at {path} must not have children.")
+    for i, child in enumerate(node.children):
+        if isinstance(child, ARKNode):
+            _validate_repeat_template(
+                child, path=f"{path}/{child.type}[{i}]", mutable_state=mutable_state
+            )
+        elif not isinstance(child, str):
+            raise ValidationError(
+                f"{node.type!r} at {path} has an unexpected child of type "
+                f"{type(child).__name__!r}."
+            )
+
+
+def _validate_repeat_declaration(
+    node: ARKNode,
+    *,
+    path: str,
+    page_state: frozenset[str],
+    mutable_state: frozenset[str],
+) -> None:
+    """`vdom-7`: structural checks for `Repeat(name, template=...)`,
+    then hands its one child (the compiled template, built by calling
+    `template()` once in `arklight.api.Repeat`) to
+    `_validate_repeat_template` rather than the generic per-child loop
+    in `validate_node`."""
+    name = node.props.get("name")
+    if not isinstance(name, str) or not name:
+        raise ValidationError(f"Repeat(...) at {path} needs a non-empty string name.")
+    if name not in page_state:
+        known = ", ".join(sorted(page_state)) or "(none declared)"
+        raise ValidationError(
+            f"Repeat({name!r}) at {path} references state that isn't declared "
+            f"on this page. State/Computed declared on this page: {known}."
+        )
+    if len(node.children) != 1 or not isinstance(node.children[0], ARKNode):
+        raise ValidationError(
+            f"Repeat({name!r}) at {path} needs exactly one item template -- "
+            f"pass template=lambda: ... to Repeat(...)."
+        )
+    _validate_repeat_template(node.children[0], path=f"{path}/template", mutable_state=mutable_state)
+
+
 def validate_node(
     node: ARKNode,
     *,
@@ -564,6 +721,18 @@ def validate_node(
             parent_is_page=parent_is_page,
             page_state=page_state,
             mutable_state=mutable_state,
+        )
+        return
+
+    if node.type == "Repeat":
+        _validate_repeat_declaration(
+            node, path=path, page_state=page_state, mutable_state=mutable_state
+        )
+        return
+
+    if node.type == "Show":
+        _validate_show_declaration(
+            node, path=path, page_state=page_state, mutable_state=mutable_state
         )
         return
 
