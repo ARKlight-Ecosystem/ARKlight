@@ -5,6 +5,115 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- `vdom-7`: per-item list rendering (`Repeat`) + conditional show/hide (`Show`)
+
+**Scope:** `docs/Backends/REFACTOR-INDEX.md` row 15. Adds the two
+remaining reactive-content primitives: `Repeat(name, template=...)`
+renders one copy of `template()` per element of a list-valued
+`State(...)`/`Computed(...)`, kept in sync through the vendored
+snabbdom `patch()`; `Show(predicate, ...)` mounts/hides its children
+based on a closed-vocabulary `Predicate.truthy(...)`/`falsy(...)`
+check against page state. Unlike `Computed`/`Watch`, both are real,
+renderable content -- they stay exactly where they're placed in the
+tree rather than being pulled out as page-scoped declarations.
+
+**API (`arklight/api.py`):**
+
+- `Repeat(name, *, template)` -- `template` is called once at compile
+  time; reference the current item inside it via `RepeatItem.value()`
+  (an `ItemBind` marker node) and `RepeatItem.index()` (an
+  `ItemIndexRef`, re-resolved on every render so an `Action.remove(...)`
+  inside the template keeps removing the right item even after an
+  earlier removal shifted later items' positions).
+- `Show(predicate, *children)` -- `predicate` is a `Predicate.truthy(name)`/
+  `Predicate.falsy(name)` reference (`PredicateRef`), never a raw
+  string or expression.
+
+**AST (`arklight/ast/nodes.py`):** new `PredicateRef` and `ItemIndexRef`
+dataclasses, mirroring `DerivationRef`'s "small structured object,
+validated at compile time" shape.
+
+**IR (`arklight/ir/schema.py`, `arklight/ir/validate.py`):**
+
+- `SCHEMA["Repeat"]`/`SCHEMA["Show"]` plus a new `PREDICATE_REGISTRY`
+  (`truthy`/`falsy`, both fixed-arity 1).
+- `_validate_repeat_template` (the only place an `ItemBind` node is
+  valid) and `_validate_show_declaration`/`_validate_predicate_ref`
+  (predicate `kind` must be known, `names` must resolve to
+  `State(...)`/`Computed(...)` declared on the same page). Both, unlike
+  `_validate_watch_declaration`, still recurse into ordinary children.
+
+**HTML backend (`arklight/backend/html/page_render.py`,
+`tag_map.py`):**
+
+- `_render_repeat` renders a `Repeat`'s *current* items as real,
+  unrestricted markup (so a JS-disabled visitor sees the genuine list),
+  alongside a JSON `data-ark-repeat-template` spec
+  (`_repeat_template_spec`) the client uses to build new items after
+  an `Action.append(...)` -- narrower than full rendering (`class`/`id`
+  plus one `on_click=` per node), a documented limitation for this
+  stage.
+- `_render_show` always renders `Show`'s children, toggling the native
+  `hidden` attribute (a content-visibility semantic, not a style
+  decision) rather than omitting markup -- so there's real content for
+  the client to reveal, and a JS-disabled visitor sees exactly
+  `predicate`'s initial-state evaluation.
+- `Repeat`/`Show` both map to a plain `div` in `TAG_MAP` -- transparent
+  anchors for `data-ark-repeat`/`data-ark-show`, not tags of their own.
+
+**JS backend (`arklight/backend/js/runtime/repeat.py` (new),
+`show.py` (new), `state.py`, `render.py`):**
+
+- `renderRepeat(store)` -- keys each item's vnode by
+  `JSON.stringify(item)`, not index (an index-keyed diff would make
+  `Action.remove(name, i)` misdiagnose every later item as changed).
+  Its first call for a given container doesn't call `patch()` at all:
+  the vendored core has no hydration pass, so it instead "adopts" the
+  server-rendered DOM into a matching vnode tree (`arkAdoptVnode`),
+  and only real `patch()` diffs happen from the second call on.
+- `renderShow(store)` -- deliberately does **not** route through
+  `patch()` the way `docs/new js backend proposal/ARCHITECTURE-VDOM.md`
+  §6.3 proposes (a vnode-swap between real content and a comment
+  placeholder): the same missing-hydration-pass problem would either
+  leave stale server content next to an empty vnode, or destroy the
+  anchor element on the first real toggle. Uses the `hidden` attribute
+  instead.
+- `_collect_usage`/`_build_runtime_js` gained `has_repeat`/`has_show`
+  flags -- `RENDER_REPEAT_JS`/`RENDER_SHOW_JS` ship only on a page that
+  actually uses one or the other, same "only ship what's used"
+  discipline as `vdom-6`'s `has_model_binding`.
+
+**Tests:** `tests/test_vdom_7.py` (21 tests, new) -- API, Validation,
+HTML backend, JS backend coverage. Full suite: 970 passed, no
+regressions.
+
+## [Unreleased] -- Android CI: nested-repo `working-directory`/artifact-path fix
+
+**Scope:** follow-up to the Android CI workflow `arklight android
+scaffold` generates. When `output_dir` lands inside an *already
+existing* enclosing git repo (rather than at that repo's own root),
+the generated `.github/workflows/android-build.yml` now carries the
+right `working-directory:`/artifact `path:` for that nested layout
+from the start, instead of requiring a manual edit after moving the
+file up to the enclosing root.
+
+**CLI (`arklight/cli/android.py`):** `_find_enclosing_git_root` now
+runs *before* file generation (not just at the end for
+`ScaffoldResult`), and the resolved `project_subdir` (the project's
+path relative to that enclosing root) is threaded through to
+`runtime.project_files`.
+
+**Android backend (`arklight/backend/android/runtime.py`):**
+`project_files`/`_github_ci_workflow_yml` gain a `project_subdir`
+parameter -- when set, every `run: gradle ...` step gets a matching
+`working-directory:` and both jobs' uploaded APK `path:` get the same
+prefix; `None` (the default) keeps the original no-subdirectory
+behavior.
+
+**CLI output (`arklight/cli/main.py`):** the "move this workflow file"
+warning now also notes the moved file is already generated with the
+correct paths for its new location.
+
 ## [Unreleased] -- `vdom-6`: two-way input binding (`bind_value=`)
 
 **Scope:** `docs/Backends/REFACTOR-INDEX.md` row 14. Adds two-way

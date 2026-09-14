@@ -29,6 +29,7 @@ table, see [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 | vdom-4   | Computed/derived state (`Computed`/`Derive.*`/`DERIVATION_REGISTRY`) -- docs/Backends/REFACTOR-INDEX.md row 12 | DONE |
 | vdom-5   | Watch effects (`Watch(...)`, reuses the action dispatcher) -- docs/Backends/REFACTOR-INDEX.md row 13 | DONE |
 | vdom-6   | Two-way input binding (`bind_value=Bind.model(...)` -> `data-ark-model`) -- docs/Backends/REFACTOR-INDEX.md row 14 | DONE |
+| vdom-7   | Per-item list rendering (`Repeat`) + conditional show/hide (`Show`) -- docs/Backends/REFACTOR-INDEX.md row 15 | DONE |
 | v0.0431  | Emergency patch: build-time warning for unrouted `srcset`/`poster`/`action`/`formaction` | DONE |
 | v0.048   | CSS `@media` queries + `<head>`/`<header>` extension (Stage A of 2: `meta`/`links` DONE; Stage B of 2: `responsive_style` + `@media` compilation DONE) | DONE |
 | v0.054   | JS backend capability expansion (reactive core parity with Vue 3) -- renumbered from v0.044 now that v0.048 has shipped | PLANNED |
@@ -50,14 +51,18 @@ go-ahead before implementation starts on any of these:
   `app_shell=True` navigation stage the packaging backends
   (Android/KaiOS/Desktop) all implicitly need, and names -- without
   scoping -- a later, explicitly opt-in server-backed state-streaming
-  milestone informed by an external reference prototype. 14 of 16
+  milestone informed by an external reference prototype. 15 of 16
   merged stages done as of this session (see
   `docs/Backends/REFACTOR-INDEX.md`'s table for the full, current
-  per-row status) -- most recently `vdom-6` (two-way input binding,
-  `bind_value=Bind.model("name")` -> `data-ark-model="name"` --
-  `renderModelBindings`/`wireModelBinding` mirror the existing
-  `bind_class`/`renderClassBindings` render-pass-plus-delegated-
-  listener split).
+  per-row status) -- most recently `vdom-7` (per-item list rendering
+  `Repeat(name, template=...)` + conditional `Show(predicate, ...)`;
+  `Repeat` keys its vnode diff by each item's own value and routes
+  through the vendored snabbdom `patch()` as originally scoped, `Show`
+  deliberately doesn't and toggles the native `hidden` attribute
+  instead -- both for hydration-safety reasons the vendored core's
+  lack of a dedicated hydration pass forces; see
+  `docs/Backends/REFACTOR-INDEX.md` row 15). Only `vdom-8`
+  (`localStorage` persistence) remains.
 - **KaiOS backend.** Design complete --
   `docs/Far Future Concern/KAIOS-BACKEND-IMPLEMENTATION.md` (plus the
   constraint-gathering doc in the same directory,
@@ -70,6 +75,49 @@ go-ahead before implementation starts on any of these:
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
+
+## vdom-7 -- Per-item list rendering (`Repeat`) + conditional show/hide (`Show`) (DONE)
+
+Closes docs/Backends/REFACTOR-INDEX.md row 15, the last of the
+"content" reactive-core stages -- unlike `Computed`/`Watch`, `Repeat`
+and `Show` are real renderable content that stays exactly where it's
+placed in the tree.
+
+- **`arklight/api.py`** -- `Repeat(name, *, template)` calls `template`
+  once at compile time; the current item is referenced inside it via
+  `RepeatItem.value()`/`RepeatItem.index()`, never passed in directly
+  (there's no such thing at compile time). `Show(predicate, *children)`
+  takes a `Predicate.truthy(name)`/`Predicate.falsy(name)` reference,
+  a closed vocabulary the same way `Derive.*` is for `Computed(...)`.
+- **`arklight/ast/nodes.py`** -- new `PredicateRef`/`ItemIndexRef`
+  dataclasses, same "small structured object, not a string" shape as
+  `DerivationRef`.
+- **`arklight/ir/schema.py`/`validate.py`** -- `PREDICATE_REGISTRY`
+  (`truthy`/`falsy`); dedicated recursive validators
+  (`_validate_repeat_template`, `_validate_show_declaration`) rather
+  than the page-scoped-declaration path `Watch` uses, since both stay
+  in the tree and recurse into ordinary children.
+- **`arklight/backend/html/page_render.py`** -- `_render_repeat` emits
+  the *actual current* items as full markup (a JS-disabled visitor
+  sees the real list) plus a JSON `data-ark-repeat-template` spec for
+  the client to build new items from later; `_render_show` always
+  renders its children, toggling the native `hidden` attribute rather
+  than omitting markup.
+- **`arklight/backend/js/runtime/repeat.py`/`show.py`** (new) --
+  `renderRepeat` routes through the vendored snabbdom `patch()`, keyed
+  by each item's own value (not index, so a removal doesn't cause
+  every later item to be misdiagnosed as changed); its first call per
+  container "adopts" the server-rendered DOM into a matching vnode
+  tree instead of patching, since the vendored core has no dedicated
+  hydration pass and would otherwise duplicate every item. `renderShow`
+  deliberately does **not** route through `patch()` -- the same missing
+  hydration pass makes a vnode-swap toggle either leave stale content
+  next to an empty vnode or destroy the anchor element outright on the
+  first real toggle -- so it uses `hidden` instead. Both ship only on
+  pages that actually use them (`has_repeat`/`has_show` in
+  `render.py`'s `_collect_usage`).
+- **Tests:** `tests/test_vdom_7.py` (21 tests, new). Full suite: 970
+  passed, no regressions.
 
 ## vdom-6 -- Two-way input binding (DONE)
 
