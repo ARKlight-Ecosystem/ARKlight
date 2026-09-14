@@ -48,10 +48,18 @@ a subdirectory of an existing repo (in which case it isn't, and the
 workflow silently never runs). Rather than guess -- or write files
 outside the `output_dir` the caller explicitly asked for -- `scaffold_
 project` walks upward from `output_dir` looking for an *already
-existing* enclosing `.git` (one that isn't `output_dir` itself) and
-surfaces it on `ScaffoldResult.enclosing_git_root` so the CLI layer
-(`arklight.cli.main._cmd_android_scaffold`) can warn the user and name
-the exact path the workflow file should move to.
+existing* enclosing `.git` (one that isn't `output_dir` itself),
+before generating any files. When found, `output_dir`'s path relative
+to that enclosing root is threaded through to `runtime.project_files`
+as `project_subdir`, so the generated workflow's Gradle steps already
+carry the right `working-directory:` and artifact `path:` for that
+layout -- it doesn't just build once moved, no manual editing needed.
+The enclosing root itself is also surfaced on
+`ScaffoldResult.enclosing_git_root` so the CLI layer
+(`arklight.cli.main._cmd_android_scaffold`) can still tell the user
+the workflow file needs to physically *move* there (the one thing
+this function can't safely do for them, since `output_dir` is the
+only place it's been told it may write).
 """
 
 from __future__ import annotations
@@ -336,6 +344,20 @@ def scaffold_project(
         if not debug_keystore_path.is_file():
             raise AndroidError(f"--debug-keystore file not found: {debug_keystore_path}")
 
+    # Resolved *before* generating files (not just at the end for
+    # `ScaffoldResult`, as before) so the workflow template itself can
+    # be told whether it's landing at a repo root or a subdirectory of
+    # one -- see `runtime._github_ci_workflow_yml`'s `project_subdir`.
+    # Safe to call this early: it only walks *already existing*
+    # ancestors of `project_dir`, never `project_dir` itself, which is
+    # written below and may not exist yet.
+    enclosing_git_root = _find_enclosing_git_root(project_dir)
+    project_subdir = (
+        project_dir.resolve().relative_to(enclosing_git_root).as_posix()
+        if enclosing_git_root is not None
+        else None
+    )
+
     files = runtime.project_files(
         app_name=app_name,
         package_id=package_id,
@@ -347,6 +369,7 @@ def scaffold_project(
         has_splash=splash_path is not None,
         has_debug_keystore=debug_keystore_path is not None,
         include_release_job=include_release_job,
+        project_subdir=project_subdir,
     )
 
     written: list[Path] = []
@@ -382,5 +405,5 @@ def scaffold_project(
         app_name=app_name,
         package_id=package_id,
         has_debug_keystore=debug_keystore_path is not None,
-        enclosing_git_root=_find_enclosing_git_root(project_dir),
+        enclosing_git_root=enclosing_git_root,
     )
