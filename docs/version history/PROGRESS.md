@@ -8,7 +8,7 @@ Detail sections below are kept in reverse-chronological order (newest
 first) and are the narrative record -- what was tried, what was
 rejected, what broke. For the plain version history, see
 [`CHANGELOG.md`](./CHANGELOG.md); for the architecture-level roadmap
-table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md).
+table, see [`docs/Foundational/ARCHITECTURE.md`](../Foundational/ARCHITECTURE.md).
 
 ## Snapshot
 
@@ -592,7 +592,7 @@ The other two pieces of the old "v0.004" heading, renumbered to their
 own milestone since they didn't land with the scaffolding above and
 are now the next scheduled release. Design is complete and unchanged;
 implementation has not started. Full writeup in
-[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
+[`docs/Foundational/DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
 queries + `<head>` extension").
 
 - [ ] `responsive_style={...}` prop -> real `@media` blocks in the CSS
@@ -758,6 +758,6 @@ actions.
 ## Milestone checklist
 
 See the "Snapshot" table at the top of this file for current status,
-and [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the canonical
+and [`docs/Foundational/ARCHITECTURE.md`](../Foundational/ARCHITECTURE.md) for the canonical
 milestone roadmap (kept in sync with this file as the single source of
 truth, rather than a third copy of the same list).

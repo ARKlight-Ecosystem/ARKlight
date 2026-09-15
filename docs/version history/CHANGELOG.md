@@ -43,7 +43,7 @@ silently drift apart again.
 
 Next up is **v0.048** (CSS `@media` queries + structured
 `<head>`/`<header>` extension) -- see the "Planned" section of
-[`PROGRESS.md`](./PROGRESS.md) and [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
+[`PROGRESS.md`](./PROGRESS.md) and [`docs/Foundational/DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md)
 ("v0.048: CSS media queries + `<head>` extension") for the design.
 Custom CSS class authoring and an `arklight --search <name>` schema
 lookup are sketched but not yet scheduled to a version -- also in
