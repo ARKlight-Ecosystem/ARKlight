@@ -37,7 +37,18 @@ def test_js_runtime_includes_only_the_behavior_actually_used():
     pages = {"/": Page(Button("Show", on_click="toggle", behavior_target="#panel"))}
     js = JSBackend().render(_ir(pages))[SCRIPT_PATH]
     assert "toggle:" in js
-    assert "data-ark-on-click" in js
+    # htmx-5: behaviors dispatch through the same delegated click
+    # interceptor Action.*(...) already used (htmx-3), reading a plain
+    # local `behaviors` object -- not through arkBehaviors/
+    # arkRunBehavior exposed on window for HTMX's hx-on:click to call,
+    # which htmx-1 originally set up and htmx-5 removed (see
+    # tests/test_htmx_5.py for the eval-avoidance rationale, and
+    # arklight/backend/js/runtime/dispatch.py's module docstring for
+    # the full audit finding).
+    assert "var behaviors = {" in js
+    assert "wireClickInterceptor" in js
+    assert "arkBehaviors" not in js
+    assert "arkRunBehavior" not in js
     assert "data-ark-target" in js
     assert "data-ark-toggle-class" in js
     # Behaviors that aren't referenced on this site don't ship.
@@ -79,7 +90,7 @@ def test_js_runtime_omits_state_core_when_no_page_declares_state():
     js = JSBackend().render(_plain_ir())[SCRIPT_PATH]
     assert "createState" not in js
     assert "data-ark-state" not in js
-    assert "wireActions" not in js
+    assert "wireActionInterceptor" not in js
 
 
 def test_js_runtime_includes_state_core_and_used_actions_only():
@@ -96,8 +107,16 @@ def test_js_runtime_includes_state_core_and_used_actions_only():
     # `set` / `toggle_bool` weren't referenced on this site.
     assert "toggle_bool:" not in js
     assert "\n    set: function (store, key, args) {" not in js
-    assert "eval(" not in js
-    assert "new Function(" not in js
+    # htmx-1: this page ships vendored HTMX (state is present), which
+    # -- like any general-purpose library -- has its own internal
+    # eval/new Function uses unrelated to ARKlight's own "no eval, no
+    # new Function" guarantee about its own authored code. Scope the
+    # check to what ARKlight itself generated.
+    from arklight.backend.js.htmx import HTMX_JS
+
+    ark_authored_js = js.replace(HTMX_JS, "")
+    assert "eval(" not in ark_authored_js
+    assert "new Function(" not in ark_authored_js
 
 
 def test_action_ref_targets_survive_into_ir():
