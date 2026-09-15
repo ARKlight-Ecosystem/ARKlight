@@ -534,7 +534,29 @@ def _cmd_desktop_scaffold(args: argparse.Namespace) -> int:
     print("loads the packaged site straight from memory through an in-process 'ark:'")
     print("resource scheme. See the generated README.md for the system packages")
     print("(libgtk-3-dev / libwebkit2gtk-4.1-dev, or your distro's equivalents) and")
-    print("build instructions:")
+    print("build instructions.")
+    print()
+    print("Includes a GitHub Actions workflow (.github/workflows/desktop-build.yml)")
+    print("that builds the project on a GitHub-hosted Linux runner and uploads the")
+    print("binary as a downloadable artifact on push/PR -- no local toolchain needed")
+    print("for that.")
+    if result.enclosing_git_root is not None:
+        print()
+        print(
+            f"NOTE: {result.project_dir}/ is nested inside the existing git repo "
+            f"at {result.enclosing_git_root}/ -- GitHub Actions only discovers "
+            f"workflows at a repo's root, so move"
+        )
+        print(f"  {result.project_dir}/.github/workflows/desktop-build.yml")
+        print("to")
+        print(f"  {result.enclosing_git_root}/.github/workflows/desktop-build.yml")
+        print(
+            "(already generated with the right working-directory/artifact path "
+            "for this nested layout -- moving it is all that's needed)"
+        )
+        print("or the workflow above will never run.")
+    print()
+    print("To build locally instead:")
     print(f"  cd {result.project_dir}")
     print("  make")
     print(f"  ./bin/{result.binary_name}")

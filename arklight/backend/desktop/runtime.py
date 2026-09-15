@@ -13,10 +13,13 @@ directory's bytes and writes anything to disk.
 Two things get generated:
 
 - **The native host itself** (`main.c`, `Makefile`, `.gitignore`, a
-  freedesktop `.desktop` launcher entry, `README.md`) -- a small
-  GTK3 + WebKit2GTK program, per the proposal's "native host
-  responsibilities" (section 4): create the window, initialize the
-  platform WebView, register an in-process `ark:` resource scheme
+  freedesktop `.desktop` launcher entry, a GitHub Actions workflow at
+  `.github/workflows/desktop-build.yml` (see `_github_ci_workflow_yml`
+  -- mirrors the Android backend's own generated workflow, see
+  `arklight.backend.android.runtime`'s module docstring), `README.md`)
+  -- a small GTK3 + WebKit2GTK program, per the proposal's "native
+  host responsibilities" (section 4): create the window, initialize
+  the platform WebView, register an in-process `ark:` resource scheme
   backed by an in-memory asset store, load the entry document, and
   enforce a navigation policy that opens anything outside that scheme
   in the user's default external handler instead of navigating the
@@ -88,6 +91,7 @@ def project_files(
     width: int,
     height: int,
     resizable: bool,
+    project_subdir: str | None = None,
 ) -> dict[str, str]:
     """
     Return `{relative_path: contents}` for every *generated text* file
@@ -101,6 +105,11 @@ def project_files(
     and the window's program name (`g_set_prgname`, which GTK uses to
     derive `WM_CLASS`) -- not a Python/Java package, just a stable,
     namespaced identifier for this one app.
+
+    `project_subdir` is forwarded as-is to `_github_ci_workflow_yml`
+    -- see that function's own docstring, and `arklight.backend.
+    android.runtime.project_files`'s identical parameter, which this
+    mirrors.
     """
     name = binary_name(app_name)
     return {
@@ -108,6 +117,9 @@ def project_files(
         "Makefile": _makefile(name),
         ".gitignore": _GITIGNORE,
         f"{app_id}.desktop": _desktop_entry(app_name, app_id, name),
+        ".github/workflows/desktop-build.yml": _github_ci_workflow_yml(
+            app_name, name, project_subdir=project_subdir
+        ),
         "README.md": _readme_md(app_name, app_id, name),
     }
 
@@ -325,6 +337,96 @@ _GITIGNORE = """\
 """
 
 
+# ---------------------------------------------------------------------------
+# CI
+# ---------------------------------------------------------------------------
+
+
+def _github_ci_workflow_yml(
+    app_name: str,
+    binary: str,
+    *,
+    project_subdir: str | None = None,
+) -> str:
+    """
+    A GitHub Actions workflow, entirely on a GitHub-hosted Linux
+    runner -- so a scaffolded project gets an automated build the
+    moment it's generated, no local C toolchain or GTK3/WebKit2GTK
+    dev headers required on the *user's own* machine. Mirrors
+    `arklight.backend.android.runtime._github_ci_workflow_yml`'s single
+    `assemble-debug` job: install the same apt packages this project's
+    own README.md's "Building" section already tells a human to run,
+    `make`, then upload `bin/<binary>` as a downloadable artifact.
+
+    No install/launch smoke-test job (the Android workflow's Stage-3
+    equivalent) here -- unlike an Android emulator, there's no
+    throwaway, GitHub-hosted-runner-friendly way to launch a GTK3 +
+    WebKit2GTK window and confirm it doesn't crash immediately, so
+    this workflow only verifies the build compiles and links, not that
+    it runs. Revisit if a headless-display (Xvfb) smoke test is ever
+    worth the added flakiness for a first Linux-only target.
+
+    `project_subdir`, if given, is the project's path relative to the
+    repo root the workflow will actually run from -- e.g. `"desktop"`
+    when `arklight desktop scaffold` wrote this project into an
+    existing repo's `desktop/` subdirectory rather than at that repo's
+    own root (see `arklight.cli.desktop._find_enclosing_git_root`,
+    itself mirroring `arklight.cli.android._find_enclosing_git_root`).
+    When set, the `make` step gets a matching `working-directory:`,
+    and the uploaded binary's path is prefixed with it -- otherwise
+    `make` looks for a `Makefile` in the checkout root and fails
+    immediately, since checkout always happens at the *repo* root, not
+    wherever this project was scaffolded into. `None` (the default)
+    means this project IS the repo root, matching the original
+    no-subdirectory behavior.
+    """
+    # Used only in the uploaded artifact's display name -- purely
+    # cosmetic, so it's slugified defensively rather than validated
+    # the way `app_id`/`app_name` are elsewhere in this module. Same
+    # reasoning as the Android workflow generator's own `slug`.
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", app_name).strip("-") or "arklight-app"
+    working_directory_line = f"\n        working-directory: {project_subdir}" if project_subdir else ""
+    path_prefix = f"{project_subdir}/" if project_subdir else ""
+    return f'''\
+name: Desktop build
+
+# Builds the native GTK3 + WebKit2GTK host on a GitHub-hosted Linux
+# runner on every push/PR, so a build regression is caught without any
+# of the dev headers below needing to exist on a contributor's own
+# machine. No install/launch smoke test -- see this file's own
+# generator, `_github_ci_workflow_yml` in
+# arklight/backend/desktop/runtime.py, for why.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v4
+
+      - name: Install GTK3 + WebKit2GTK dev headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Build{working_directory_line}
+        run: make
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: {slug}-linux
+          path: {path_prefix}bin/{binary}
+          if-no-files-found: error
+'''
+
+
 def _desktop_entry(app_name: str, app_id: str, binary: str) -> str:
     # Freedesktop Desktop Entry format -- see
     # https://specifications.freedesktop.org/desktop-entry-spec/latest/.
@@ -397,6 +499,7 @@ make
 | `assets.gen.c` / `assets.gen.h` | The packaged site (every file from the `arklight build` output directory this was scaffolded from), embedded as C byte arrays. Regenerated fresh on every `arklight desktop scaffold` run -- don't hand-edit. |
 | `Makefile` | Builds `bin/{binary}` from the two files above. |
 | `{app_id}.desktop` | A [freedesktop Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/latest/) launcher. Edit `Exec=` to an absolute path (or put `bin/{binary}` on your `PATH`) and copy it to `~/.local/share/applications/` to add a launcher-menu entry. |
+| `.github/workflows/desktop-build.yml` | A GitHub Actions workflow that builds this project on a GitHub-hosted Linux runner on every push/PR and uploads `bin/{binary}` as a downloadable artifact -- no local toolchain needed for that. Regenerated fresh on every `arklight desktop scaffold` run; it's a normal, hand-editable workflow file, not something only this tool may touch. **Note:** this workflow only fires on GitHub if `.github/workflows/` sits at your repository's *root* -- if `arklight desktop scaffold` told you this project is nested inside an existing repo, move this file there first (see that command's own terminal output for the exact paths). |
 
 ## Updating the packaged site
 
@@ -411,7 +514,8 @@ app/window icons, a sealed `.ark` bundle as the embedded payload
 (this scaffold embeds the unpacked build directory instead -- see
 `arklight.backend.desktop.runtime`'s module docstring for why),
 a local `arklight desktop build` command that runs this `Makefile` for
-you, a GitHub Actions CI build, and Windows/macOS targets.
+you, and Windows/macOS targets. A GitHub Actions CI build is already
+included -- see `.github/workflows/desktop-build.yml` above.
 """
 
 
