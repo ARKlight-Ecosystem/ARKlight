@@ -5,6 +5,65 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- User-defined components, Stage 2 (default styling hook)
+
+**What:** `component(..., default_style={...})` (`arklight/api.py`) lets
+a registered component ship default CSS under its own name -- a
+`{css-property: value}` dict, the same shape and syntax `Site.style(...)`
+already accepts (pseudo-class shorthand like `":hover:color"`
+included), validated at registration time with the exact same rules.
+When a build actually calls the component, its rules are folded into
+the generated stylesheet under a `.{ComponentName}` class, and that
+class is folded onto the rendered subtree's own root `class_name`
+automatically -- so a component can ship with sane default styling
+without forcing every caller to pass `class_name=` by hand, closing
+the gap `docs/Foundational/user-defined-components.md`'s "styling
+hook" requirement called out. See
+`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
+2 implementation notes for the full design.
+
+**Implementation:** `arklight/ir/components.py` --
+`ComponentSpec.default_style`, `register_component(...,
+default_style=...)`, `_apply_default_class` (merges the class onto a
+rendered `ARKNode` root, a no-op for any other return shape),
+`used=`/`collect_default_styles` (usage-keyed, not registry-keyed --
+only components a build actually expands contribute CSS, so an
+unrelated site's registrations in the same process never leak in).
+`arklight/api.py` -- `component(..., default_style=...)`, plus a new
+free function `_check_css_syntax` extracted from
+`Site._validate_css_syntax` (now a thin wrapper around it) so
+`_validate_component_default_style` can reuse the exact same syntax
+rules without a `Site` instance to call a method on.
+`arklight/compiler/pipeline.py` -- `expand_ark_ast(..., used=...)`
+collects the components a build actually uses; `compile_site_file`
+merges `{**component_default_styles, **site.custom_styles}` into
+`custom_styles=` before building the Website IR, so an explicit
+`site.style(name, ...)` registration always wins over a same-named
+component default. No changes to `arklight/ir/schema.py`,
+`tag_map.py`, `arklight/backend/css/custom_styles.py`, or any
+backend's rendering code -- Stage 2 reuses `render_custom_styles(...)`
+completely unchanged.
+
+**Tests:** `tests/test_user_defined_components_stage2.py` (20 tests,
+new) -- `default_style` validation (empty dict, non-string value,
+unsupported pseudo-class, injection characters, pseudo-class
+shorthand accepted), `_apply_default_class` behavior (adds the class,
+appends to an existing `class_name`, doesn't duplicate an
+already-present one, no-ops on a non-`ARKNode` render result),
+`collect_default_styles` (usage-keyed, skips components without
+`default_style`, returns independent copies), `expand_ark_ast(...,
+used=...)` recording transitively-used components, and three
+end-to-end compiles asserting the class/CSS actually land in rendered
+HTML/stylesheet output, an unused component's styling is never
+emitted, and an explicit `site.style(...)` call wins over a
+component's own default. Full suite: 1088 passed, no regressions.
+
+**Not done this stage:** Option B's actual per-backend rendering
+differentiator (Stage 3), component-owned state (Stage 4). There is no
+way to opt a call site *out* of its component's default class once
+`default_style` is registered -- see the implementation doc's Stage 2
+"Explicitly out of scope" note.
+
 ## [Unreleased] -- User-defined components, Stage 0 (registration + Option A macro expansion)
 
 **What:** opens the `v0.060` milestone. `component(*, props=None,

@@ -1,6 +1,6 @@
 # User-Defined Components Implementation: Staged Order
 
-Status: **Stages 0-1 done**, Stages 2-4 not started. This file does not
+Status: **Stages 0-2 done**, Stages 3-4 not started. This file does not
 restate the design already written in
 [`docs/Foundational/user-defined-components.md`](./user-defined-components.md)
 -- it exists only to turn that design's Option A / Option B discussion
@@ -78,7 +78,7 @@ statement of intent, tracked for Stage 3, not a working feature.
 |---|---|---|---|---|
 | 0 | Registration, props contract, macro expansion | `component(...)`/`Prop` in `arklight/api.py`; `arklight/ir/components.py` (`COMPONENT_REGISTRY`, `ComponentSpec`, `expand_ark_ast`/`expand_node`); wired into `arklight.compiler.pipeline.compile_site_file` as a new stage between ARK-AST construction and Normalization; props contract enforcement (unknown/missing/mistyped props all fail with a `ComponentError`, not a raw Python `TypeError`); cycle detection + a recursion-depth ceiling (mirrors `validate.py` check #13's `Computed`/`Derive` self-reference guard); the `mode=` selector described above. | `user-defined-components.md`'s Option A design | **Done** -- `tests/test_user_defined_components_stage0.py` |
 | 1 | Typo diagnostics | Extend `arklight/search/feedback.py`'s `parse_undefined_component_name` path so a typo'd call to a *registered user* component gets the same "did you mean...?" treatment a typo'd `Headign(...)` already gets -- today a typo'd user-component call is just a plain Python `NameError` with no ARKlight-specific help, since it was never in the closed built-in vocabulary `arklight search` already knows. | Stage 0 | **Done** -- `tests/test_user_defined_components_stage1.py` |
-| 2 | Default styling hook | An optional default `Site.style(...)` block attached at `component(..., default_style={...})` registration time, expanded into the site's CSS output the same way built-in defaults are -- lets a user component ship with sane default styling instead of forcing every caller to pass `class_name=`. | Stage 0 | Not started |
+| 2 | Default styling hook | An optional default `Site.style(...)` block attached at `component(..., default_style={...})` registration time, expanded into the site's CSS output the same way built-in defaults are -- lets a user component ship with sane default styling instead of forcing every caller to pass `class_name=`. | Stage 0 | **Done** -- `tests/test_user_defined_components_stage2.py` |
 | 3 | Option B's real differentiator: per-backend render dispatch | The actual "registry-based late binding" `user-defined-components.md` describes: a `mode="registry"` component's identity survives expansion (or is preserved via a different mechanism -- open design question, not pre-decided here) far enough that the HTML backend, and eventually Android/Desktop, can each supply their own render function for the same component name, falling back to a shared default when a backend doesn't define one. This is the stage that makes Option B a real alternative outcome instead of today's same-as-Option-A placeholder. | Stage 0 (the `mode=` selector already exists to build on) | Not started |
 | 4 | Component-owned state | Explicitly **out of scope** until `v0.054`'s reactive-core IR semantics have something for it to hook into (`user-defined-components.md` Section 4 already calls this out as its own, later milestone -- listed here only so this ladder doesn't silently drop it). A component today may *consume* `Bind(...)`/`ActionRef` values passed in as props from a page that already declares `State(...)`, exactly like `Container`/`Button` already do -- it just can't declare new state of its own yet. | `v0.054` (already DONE) + Stages 0-3 | Not started |
 
@@ -211,3 +211,96 @@ component yet (a `ComponentSpec` isn't a `NodeSpec`), so an exact-name
 `arklight search Heading` does -- only the *typo* path
 (`_suggest`/the Stage 8 feedback hook) was in Stage 1's scope, per the
 table above.
+
+## Stage 2 implementation notes
+
+`component(..., default_style={...})` (`arklight/api.py`) validates the
+`rules` dict with the exact same rule set `Site.style(name, rules)`
+already enforces -- non-empty dict, non-empty string values, the same
+CSS-property/pseudo-class-shorthand syntax check, the same
+`CSSSyntaxError`. That shared check used to live only as a `Site`
+method (`_validate_css_syntax`); Stage 2 pulled its body out into a
+free function, `_check_css_syntax(context, prop, value)`, that both
+`Site._validate_css_syntax` (now a one-line wrapper) and the new
+`_validate_component_default_style(component_name, rules)` call --
+`component(...)` registers independently of any `Site` instance, so it
+has no `self` to call a method on. Validation happens once, at
+registration/import time, not on every build.
+
+- **Two effects from one registration, both mode-independent.**
+  `ComponentSpec.default_style` feeds two separate things, both wired
+  into `_render_once` right after a component's render function runs
+  (outside the `mode="macro"`/`"registry"` `if`/`elif`, since neither
+  branch does anything different here -- default styling isn't part of
+  the Option A/B split):
+  1. **The rendered subtree's root gets `.{ComponentName}` folded into
+     its `class_name`** (`_apply_default_class`), merged with -- not
+     overwriting -- any `class_name` the render function already set,
+     and skipped entirely if that class is already present (so
+     re-expansion can't duplicate it). A component whose render
+     function returns something other than a single `ARKNode` (a bare
+     list of siblings, a string, `None`) has no single root to attach
+     a class to -- `_apply_default_class` is a no-op for those shapes,
+     same as any other prop that only makes sense on one node.
+  2. **The rules are folded into the site's stylesheet** under that
+     same `.{ComponentName}` class, exactly like a `site.style(name,
+     rules)` registration -- reusing `render_custom_styles` completely
+     unchanged; Stage 2 needed zero new CSS-rendering code.
+- **Usage-keyed, not registry-keyed.** `COMPONENT_REGISTRY` is a
+  process-global dict -- several unrelated site files can register
+  components in the same test run or long-lived process. Emitting
+  every *registered* component's `default_style` would leak one
+  site's component CSS into an unrelated build's stylesheet. Instead,
+  `expand_ark_ast(pages, used=...)`/`expand_node(..., used=...)` now
+  optionally collect the name of every component *actually expanded*
+  into a `set[str]`, and `arklight.compiler.pipeline.compile_site_file`
+  passes that set to the new `collect_default_styles(used)`, which
+  only returns `default_style` for names in it. A component that's
+  registered but never called in a given build contributes nothing to
+  that build's CSS -- see
+  `test_end_to_end_unused_component_default_style_is_not_emitted`.
+- **An explicit `site.style(name, ...)` wins on a name collision.**
+  `compile_site_file` merges `{**component_default_styles,
+  **site.custom_styles}` before handing the result to
+  `build_website_ir` as `custom_styles=` -- dict-literal unpacking
+  means a key present in both wins from the *second* dict, so a site
+  author who explicitly calls `site.style("NavBar", {...})` (matching
+  a component's own name) always overrides that component's own
+  default, the same "more specific/explicit wins" cascade reasoning
+  the rest of the CSS backend's ordering already follows (see
+  `arklight/backend/css/render.py`'s own comment on cascade order).
+  This is also, incidentally, the only realistic way a name collision
+  happens at all: a component's default class is always named after
+  the component itself, and component names are PascalCase Python
+  identifiers by convention, same charset `Site.style(...)` class
+  names already accept.
+- **No class-name validation needed for the class itself.** Unlike
+  `Site.style(name, rules)`, which validates `name` against
+  `_CSS_CLASS_NAME_RE`, `_validate_component_default_style` doesn't
+  re-check the component's own name -- it's already a valid Python
+  identifier (it's a decorated function's `__name__`), and every valid
+  Python identifier ARKlight would see here already matches
+  `_CSS_CLASS_NAME_RE`.
+- **`register_component(..., default_style=...)` stores, doesn't
+  validate.** Same division of labor Stage 0 already established for
+  `props`/`mode`: `arklight.api.component` is the validating,
+  user-facing entry point; `arklight.ir.components.register_component`
+  is the lower-level registry function that trusts its caller. A test
+  or internal caller that goes around `component(...)` and calls
+  `register_component` directly with an unvalidated `default_style`
+  gets exactly that -- stored verbatim, checked nowhere.
+
+## Explicitly out of scope for Stage 2
+
+The per-backend render dispatch that gives `mode="registry"` its real
+differentiator (Stage 3) and component-owned reactive state (Stage 4)
+-- neither touched by this stage. Also out of scope, deliberately: any
+way to opt a component *out* of its own default class once
+`default_style` is set (there isn't one -- if a component registers a
+`default_style`, every call site gets the class; a caller who doesn't
+want it should register the component without `default_style` and
+apply a class manually via its own `class_name=` prop plumbing
+instead), and any interaction with `responsive_style={...}`/`@media`
+-- a component's `default_style` is always a flat, non-responsive
+`{property: value}` dict, the same shape `Site.style(...)` accepts,
+not the richer per-node `responsive_style` shape from v0.048 Stage B.

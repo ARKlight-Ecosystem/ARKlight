@@ -44,7 +44,7 @@ record for the project, updated in place rather than removed.
 | [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`user-defined-components.md`](Foundational/user-defined-components.md) | Design for user-defined, reusable components (v0.060). |
-| [`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`](Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md) | Staged implementation ladder for v0.060, and the Option A (default) / Option B (experimental) hybrid decision. Stage 0 done. |
+| [`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`](Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md) | Staged implementation ladder for v0.060, and the Option A (default) / Option B (experimental) hybrid decision. Stages 0-2 done. |
 
 ### [`docs/Backends/`](Backends/README.md) — working reference
 

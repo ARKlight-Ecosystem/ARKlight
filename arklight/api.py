@@ -296,18 +296,23 @@ from arklight.ir.components import Prop, register_component  # noqa: E402
 
 
 def component(
-    *, props: dict[str, Prop] | None = None, mode: str = "macro"
+    *,
+    props: dict[str, Prop] | None = None,
+    mode: str = "macro",
+    default_style: dict[str, str] | None = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., ARKNode]]:
     """
     Decorator that registers a render function as a named, reusable
     component:
 
-        @component(props={"active": Prop(default=None)})
+        @component(
+            props={"active": Prop(default=None)},
+            default_style={"display": "flex", "gap": "1rem"},
+        )
         def NavBar(active=None):
             return Container(
                 Link("Home", href="/"),
                 Link("About", href="/about"),
-                class_name="nav",
             )
 
     The decorated name (`NavBar`) becomes callable exactly like a
@@ -324,11 +329,31 @@ def component(
     distinct rendering behavior today. `mode="registry"` (Option B) is
     EXPERIMENTAL -- see `arklight.ir.components`'s module docstring and
     the implementation doc for what it does and doesn't do yet.
-    """
 
+    `default_style`, if given (v0.060, Stage 2), is a `{css-property:
+    value}` dict -- the same shape and syntax `Site.style(...)` accepts
+    (pseudo-class shorthand like `":hover:background"` included),
+    validated here up front so a bad rule fails at *registration* time
+    (import time), not buried inside a later build. When the build
+    actually uses this component, its rules are folded into the site's
+    stylesheet under a `.{ComponentName}` class, and that class is
+    folded onto the rendered subtree's own root `class_name`
+    automatically -- see `arklight.ir.components.
+    _apply_default_class`/`collect_default_styles`. A component that
+    never sets `default_style` behaves exactly as it did in Stage 0/1:
+    no class is added, nothing is emitted for it, `class_name=` (if the
+    render function sets one itself) is left completely alone.
+    """
     def decorator(render_fn: Callable[..., Any]) -> Callable[..., ARKNode]:
         name = render_fn.__name__
-        register_component(name, render_fn, props=props, mode=mode)
+        validated_default_style = (
+            _validate_component_default_style(name, default_style)
+            if default_style is not None
+            else None
+        )
+        register_component(
+            name, render_fn, props=props, mode=mode, default_style=validated_default_style
+        )
 
         def marker(**call_props: Any) -> ARKNode:
             return ARKNode(type=name, props=call_props, children=[])
@@ -842,6 +867,89 @@ BUILTIN_COMPONENTS = {
 }
 
 
+def _check_css_syntax(context: str, prop: str, value: str) -> None:
+    """
+    Free-function core of `Site._validate_css_syntax` -- syntax-checks
+    one (property, value) pair against the same rules `site.style(...)`
+    has always enforced. `context` is the human-readable prefix an
+    error message opens with (e.g. `"site.style('nav', ...)"`); it's
+    never re-validated itself. Split out (v0.060 Stage 2) so
+    `component(..., default_style=...)` -- registered independently of
+    any `Site` instance, so it has no `self` to call a method on -- can
+    share this exact validation instead of a second, easily-drifting
+    copy of it. `Site._validate_css_syntax` is now a thin wrapper
+    around this.
+    """
+    if prop.startswith(":"):
+        match = _CSS_PSEUDO_RULE_RE.match(prop)
+        if not match:
+            raise CSSSyntaxError(
+                f"{context} has an invalid pseudo-class "
+                f"rule key {prop!r} -- expected the form "
+                f"':pseudo:property', e.g. ':hover:background'."
+            )
+        pseudo = match.group("pseudo")
+        if pseudo not in ALLOWED_PSEUDO_CLASSES:
+            raise CSSSyntaxError(
+                f"{context} uses unsupported pseudo-class "
+                f"{pseudo!r} in {prop!r}. Supported: "
+                f"{', '.join(sorted(ALLOWED_PSEUDO_CLASSES))}."
+            )
+    elif not _CSS_PROPERTY_NAME_RE.match(prop):
+        raise CSSSyntaxError(
+            f"{context} has an invalid CSS property name "
+            f"{prop!r} -- letters, digits, and hyphens only (or a "
+            f"'--custom-property'), and it can't start with a digit."
+        )
+
+    if any(ch in value for ch in _CSS_VALUE_INJECTION_CHARS):
+        raise CSSSyntaxError(
+            f"{context} property {prop!r} has a value "
+            f"{value!r} containing '{{', '}}', or a newline -- that would "
+            f"break out of its declaration. Use one property/value pair "
+            f"per key instead of a raw CSS block."
+        )
+
+
+def _validate_component_default_style(
+    component_name: str, default_style: dict[str, str]
+) -> dict[str, str]:
+    """
+    v0.060, Stage 2: validate `component(..., default_style={...})` the
+    same way `Site.style(name, rules)` validates its own `rules` --
+    same non-empty-dict/non-empty-string-value checks, same
+    `_check_css_syntax` (pseudo-class shorthand included), same
+    `CSSSyntaxError` on a bad pair. Returns a clean, plain `dict` copy
+    on success (never the caller's own dict by reference); raises
+    `ValueError`/`CSSSyntaxError` otherwise. There's no class-name
+    check here the way `Site.style(name, ...)` checks `name` -- a
+    component's name is already a valid Python identifier (it's a
+    function name), and `_CSS_CLASS_NAME_RE` accepts every valid
+    Python identifier ARKlight would ever see here.
+    """
+    if not isinstance(default_style, dict) or not default_style:
+        raise ValueError(
+            f"component {component_name!r}: default_style needs a "
+            f"non-empty dict of {{css-property: value}}, e.g. "
+            f"{{'color': 'red'}}, got {default_style!r}."
+        )
+    clean: dict[str, str] = {}
+    for prop, value in default_style.items():
+        if not isinstance(prop, str) or not prop.strip():
+            raise ValueError(
+                f"component {component_name!r}: default_style has a "
+                f"non-string or empty CSS property name: {prop!r}."
+            )
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"component {component_name!r}: default_style property "
+                f"{prop!r} needs a non-empty string value, got {value!r}."
+            )
+        _check_css_syntax(f"component {component_name!r}: default_style", prop, value)
+        clean[prop] = value
+    return clean
+
+
 class Site:
     """
     The application object.
@@ -1135,36 +1243,16 @@ class Site:
         strings here. Raises `CSSSyntaxError` (a `ValueError` subclass)
         on anything that isn't valid CSS syntax for the shape ARKlight
         accepts; returns `None` on a valid pair.
-        """
-        if prop.startswith(":"):
-            match = _CSS_PSEUDO_RULE_RE.match(prop)
-            if not match:
-                raise CSSSyntaxError(
-                    f"site.style({name!r}, ...) has an invalid pseudo-class "
-                    f"rule key {prop!r} -- expected the form "
-                    f"':pseudo:property', e.g. ':hover:background'."
-                )
-            pseudo = match.group("pseudo")
-            if pseudo not in ALLOWED_PSEUDO_CLASSES:
-                raise CSSSyntaxError(
-                    f"site.style({name!r}, ...) uses unsupported pseudo-class "
-                    f"{pseudo!r} in {prop!r}. Supported: "
-                    f"{', '.join(sorted(ALLOWED_PSEUDO_CLASSES))}."
-                )
-        elif not _CSS_PROPERTY_NAME_RE.match(prop):
-            raise CSSSyntaxError(
-                f"site.style({name!r}, ...) has an invalid CSS property name "
-                f"{prop!r} -- letters, digits, and hyphens only (or a "
-                f"'--custom-property'), and it can't start with a digit."
-            )
 
-        if any(ch in value for ch in _CSS_VALUE_INJECTION_CHARS):
-            raise CSSSyntaxError(
-                f"site.style({name!r}, ...) property {prop!r} has a value "
-                f"{value!r} containing '{{', '}}', or a newline -- that would "
-                f"break out of its declaration. Use one property/value pair "
-                f"per key instead of a raw CSS block."
-            )
+        Thin wrapper around the free function `_check_css_syntax` below
+        -- kept as a method (rather than inlined) so every existing
+        `self._validate_css_syntax(...)` call site in this class is
+        unaffected; the free function exists so `component(...,
+        default_style=...)` (registered independently of any `Site`
+        instance) can reuse the exact same rules -- see
+        `_validate_component_default_style`.
+        """
+        _check_css_syntax(f"site.style({name!r}, ...)", prop, value)
 
     def _validate_plain_rules(self, context: str, rules: dict[str, str]) -> dict[str, str]:
         """

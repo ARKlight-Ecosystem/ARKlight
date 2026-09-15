@@ -43,7 +43,7 @@ from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
 from arklight.ir.build import WebsiteIR, build_website_ir
-from arklight.ir.components import ComponentError, expand_ark_ast
+from arklight.ir.components import ComponentError, collect_default_styles, expand_ark_ast
 from arklight.ir.normalize import normalize_ark_ast
 from arklight.ir.validate import ValidationError, validate_ark_ast
 from arklight.parser.loader import SiteLoadError, load_site
@@ -170,10 +170,23 @@ def compile_site_file(
         raise CompileError(f"Error while building page(s): {exc}") from exc
 
     log("Expanding user-defined components...")
+    used_components: set[str] = set()
     try:
-        ark_ast = expand_ark_ast(ark_ast)
+        ark_ast = expand_ark_ast(ark_ast, used=used_components)
     except ComponentError as exc:
         raise CompileError(str(exc)) from exc
+
+    # v0.060, Stage 2 ("Default styling hook"): only components this
+    # build actually expanded get their `default_style` folded into
+    # the stylesheet -- see `collect_default_styles`'s own docstring
+    # for why that's keyed on usage rather than on the whole (process-
+    # global) `COMPONENT_REGISTRY`. An explicit `site.style(name, ...)`
+    # registration for the same name wins over a component's own
+    # default (the merge below, keyed by `site.custom_styles` applied
+    # last) -- same "the more specific/explicit thing wins" cascade
+    # reasoning every other CSS-generating layer in this pipeline
+    # already follows.
+    component_default_styles = collect_default_styles(used_components)
 
     log("Normalizing AST...")
     try:
@@ -208,7 +221,7 @@ def compile_site_file(
     return build_website_ir(
         site.name,
         normalized,
-        custom_styles=site.custom_styles,
+        custom_styles={**component_default_styles, **site.custom_styles},
         media_queries=site.custom_media_queries,
         experimental_usages=site.experimental_usages,
         css_var_overrides=merged_css_var_overrides,
