@@ -32,69 +32,21 @@ produces `ARK/index.html` -- plain, dependency-free HTML.
 
 ## Status
 
-**Current release: v0.048 -- CSS `@media` queries + `<head>` extension
-(both stages DONE).** Stage A adds optional, structured `meta`/`links`
-props to `Page(...)` (no raw HTML string escape hatch, see "Head
-metadata" below); Stage B adds a `responsive_style` prop compiled by
-`CSSBackend` into real `@media` rules. Landed ahead of v0.054 (JS
-backend capability expansion, renumbered from v0.044) in the
-previously announced order. See
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.048: CSS media
-queries + `<head>` extension") for the design and
-[`PROGRESS.md`](./PROGRESS.md) ("v0.048 -- Stage A" / "Stage B") for
-each stage's implementation record.
+ARKlight is in active alpha development. Status, by design, lives in
+exactly one place per kind of record, not here as a second copy that
+can drift out of sync:
 
-**Previous release: v0.0431 -- emergency patch, build-time warning for
-unrouted `srcset`/`poster`/`action`/`formaction`.** Alpha maintenance
-release: those four attributes aren't route-rewritten yet (only
-`href`/`src` are), so a route-shaped value now gets a clear, non-fatal
-build warning instead of silently 404ing when the site is deployed
-outside the domain root -- the build still succeeds and the site still
-gets written either way. Full write-up, including what was checked and
-found *not* to be a problem, in [`CHANGELOG.md`](./CHANGELOG.md) and
-[`PROGRESS.md`](./PROGRESS.md) ("v0.0431 -- Emergency patch").
+- [`CHANGELOG.md`](./CHANGELOG.md) -- plain, version-by-version history
+  of what shipped.
+- [`PROGRESS.md`](./PROGRESS.md) -- the canonical **Snapshot** table
+  (what's DONE / IN PROGRESS / PLANNED, including what's next) plus the
+  narrative decision log behind each entry.
+- [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md)
+  -- the canonical milestone roadmap table.
 
-**Before that: v0.043 -- optional `<head>` metadata props +
-backend `postprocess` hook.** `Page(...)` gains five optional props
-beyond the existing `title`: `description`, `favicon`, `og_title`,
-`og_description`, `og_image` (see "Head metadata" below) -- all
-additive, so a page using none of them renders byte-for-byte
-unchanged. Separately, every `Backend` now has an optional
-`postprocess(output_files)` hook, called after all backends'
-`render()` finish, so a *new* backend can transform the combined
-output of `HTMLBackend`/`CSSBackend`/`JSBackend` (build stamps,
-sitemaps, injected analytics, ...) without editing any of their
-source (see "Compiler pipeline" below). v0.042 (extra CSS features +
-CLI discoverability) shipped just before this -- full detail in
-[`CHANGELOG.md`](./CHANGELOG.md); narrative/decision log in
-[`PROGRESS.md`](./PROGRESS.md).
-
-**Next up: v0.054 -- JS backend capability expansion.** (Renumbered
-from v0.044 now that v0.048 has shipped -- see
-[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full
-renumbering.) Computed/derived state, watch effects, two-way input
-binding, per-item list rendering, conditional show/hide, event
-modifiers, and reactive class binding -- all via closed, described
-registries (no arbitrary JS, no `eval`), same discipline as the
-existing `State`/`Bind`/`Action.*` system. Design complete,
-implementation not started. See
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.044: JS backend
-capability expansion -- reactive core parity with Vue 3").
-
-**In progress alongside it: reactive-core vdom staging (Stage 3 of
-8).** A narrower, separately-tracked initiative on the *mechanism*
-under `State`/`Bind` rather than new page-facing capability -- Stage 1
-(vendoring a real diff/patch engine, [snabbdom](https://github.com/snabbdom/snabbdom)'s
-bare core, in place of the old `textContent`-overwrite re-render pass),
-Stage 2 (`Bind.when(...)`/`bind_class=` reactive class binding), and
-Stage 3 (event modifiers) are done; Stages 4-7 (computed state, watch
-effects, two-way binding, list rendering, conditional show/hide) are
-next, feeding into `v0.054` above. See
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("Reactive-core vdom
-staging").
-
-See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full
-milestone roadmap.
+Check `PROGRESS.md`'s Snapshot table first for "what's the current
+state and what's next" -- it's updated at the end of every work
+session, which the sections that used to live in this README were not.
 
 ## Install
 
@@ -460,9 +412,12 @@ can't reach `body`'s own box: a CSS custom property only cascades
 downward, and `body` already resolved its rule from `:root` before any
 site-authored element exists in the tree. `Site(max_width=...,
 bg=...)` sets the variable at `:root` scope instead, which *is* an
-ancestor of `body`, so it's picked up correctly. See
-`docs/CONTAINER-WIDTH-BUG.md` for the full history of why this needed
-its own dedicated kwargs rather than reusing `site.style(...)`.
+ancestor of `body`, so it's picked up correctly. `docs/CONTAINER-WIDTH-BUG.md`
+was cited here historically but never actually made it into the repo
+-- see [`CHANGELOG.md`](./CHANGELOG.md) ("Documentation fix: the
+container-width bug fix itself was never documented") for the full
+history of why this needed its own dedicated kwargs rather than
+reusing `site.style(...)`.
 
 ### Styling components
 
@@ -506,7 +461,7 @@ name overwrites its rules (last call wins).
 ### Responsive layout, without `@media` (platform-independent by construction)
 
 `Page` never gets a `<head>` hook (see
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md)), so a generated site
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)), so a generated site
 has no `@media`/`@container` query available to it at all -- there is
 no "desktop breakpoint" or "mobile breakpoint" to hand-tune, and
 nothing keyed to a specific screen width, device, or platform. Layouts
@@ -579,7 +534,7 @@ Validation stage -- an unknown behavior name (or a missing
 `behavior_target`) fails the build with a clear message rather than
 silently doing nothing in the browser. There is deliberately no way to
 pass arbitrary JavaScript: see
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) for why that boundary
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) for why that boundary
 is a design choice, not a gap.
 
 The current page's nav link is also highlighted automatically (an
@@ -693,7 +648,7 @@ packages that output as a single `.ark` file:
   currently looking at was never in scope to hide. Sealing protects the
   *other* pages/assets bundled alongside it, not the one on screen.
 
-See [`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.036: ARK
+See [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.036: ARK
 Bundle spec v1" and "v0.037: sealed bundles") for the full byte layout,
 packing algorithm, cipher construction, and known caveats.
 
@@ -771,7 +726,7 @@ arklight-framework/
     compiler/          Pipeline orchestration
     cli/               `arklight` command-line entry point
       templates/       `simple`/`production` scaffolds for
-                        `arklight new` (v0.004a; see docs/DESIGN-NOTES.md)
+                        `arklight new` (v0.004a; see docs/Foundational/DESIGN-NOTES.md)
     packer/            `arklight pack` -- ARK Bundle (.ark) packaging,
                         reads already-built output only, never touches
                         the compiler pipeline
@@ -799,23 +754,8 @@ pytest
 
 ## Roadmap
 
-Full milestone table (with status) lives in
-[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) -- kept as the single
-canonical copy rather than duplicated here, in `PROGRESS.md`, and in
-`CHANGELOG.md`. Short version: v0.001 through v0.048 (CSS `@media` +
-`<head>`/`<header>` extension, both stages) are done; v0.054 (JS
-backend capability expansion, renumbered from v0.044) is queued next;
-v0.060 (user-defined components), v0.080 (Android backend), and v0.100
-(Desktop backend) are planned further out. Those three numbers were
-reassigned when v0.048 shipped, and the Desktop/Android slots were
-swapped a second time afterward -- the Android backend moves ahead of
-Desktop because it can build on an existing external project
-(`ARKlight-Viewer-for-Android-Devices`) as its runtime instead of
-starting from scratch, while the Desktop backend's design is still
-pending. A KaiOS backend was briefly given its own numbered slot
-(`v0.120`) in the first reshuffle -- design is complete, but it's
-since been pulled back out to unscheduled future work, the same
-"designed, no roadmap commitment" tier
-`docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows Phone/UWP
-backend already sits at. See `docs/ARCHITECTURE.md` for the full
-renumbering-and-amendment history.
+Full milestone table, current status, and the renumbering/amendment
+history behind it live in
+[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md)
+-- kept as the single canonical copy rather than duplicated here, in
+`PROGRESS.md`, or in `CHANGELOG.md`.
