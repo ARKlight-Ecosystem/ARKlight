@@ -27,25 +27,30 @@ produces `ARK/index.html` -- plain, dependency-free HTML.
 
 ## Status
 
-**Current release: v0.041 -- CLI, pipeline & JS runtime hardening.**
-`main()` now wraps subcommand dispatch in a catch-all so unhandled
-errors print a clear message and exit `1` instead of a raw traceback;
-`build()`'s file writes/asset copy are guarded against filesystem
-failures; and the generated `arklight.js` runtime gained an
-`arkNotify()` on-page notice plus `try`/`catch` guards throughout, so
-one bad element or a clipboard failure can't take the rest of a page's
-interactivity down with it. This release also folds in the stateful-JS
-vocabulary addenda (`Action.decrement`, `Action.reset`,
-`Action.append`, `Action.remove`). Full detail in
+**Current release: 0.42.0 -- alpha catch-up.** Brings `main` up to
+parity with `alpha`'s CSS `@media`/`<head>` extension, an HTML backend
+refactor, a reactive JS core (computed state, watch effects, two-way
+binding, list rendering, show/hide, `localStorage` persistence), a
+search engine (`arklight search`), and a live-streaming dev server +
+CCTV tooling (`arklight live-streaming`) -- Android excluded
+throughout. This release also folds in v0.041's CLI/pipeline/JS
+runtime hardening (catch-all error handling, `arkNotify()`, guarded
+file writes) and the stateful-JS vocabulary addenda
+(`Action.decrement`, `Action.reset`, `Action.append`, `Action.remove`)
+from before. Note the version-number format change: from this release
+on, versions are `MAJOR.MINOR.PATCH` rather than the old
+`0.0NN`-as-decimal-fraction milestone numbers -- the old scheme is a
+real [PEP 440](https://peps.python.org/pep-0440/) hazard (`0.100`
+normalizes to `0.1`, sorting *below* `0.048`'s `0.48`) and PyPI's own
+version-comparison rules made the old milestone bookkeeping
+unworkable going forward. Full detail in
 [`CHANGELOG.md`](./CHANGELOG.md); narrative/decision log in
 [`PROGRESS.md`](./PROGRESS.md).
 
-**Next up: v0.048 -- CSS `@media` queries + `<head>`/`<header>`
-extension.** Design complete, implementation not started. See
-[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
-queries + `<head>` extension"). Custom CSS class authoring and an
+**Next up:** custom CSS class authoring and an
 `arklight --search <name>` schema lookup are sketched but not yet
-scheduled to a version.
+scheduled to a version -- see "Planned, not yet scheduled" in
+[`PROGRESS.md`](./PROGRESS.md).
 
 See [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the full
 milestone roadmap.
@@ -205,16 +210,13 @@ is rendered as an inline `style` attribute. Built-in utility classes
 from the default stylesheet: `.nav`, `.card`, `.muted`, `.page`,
 `.hidden` (pairs with the `toggle` behavior below).
 
-### Responsive layout, without `@media` (platform-independent by construction)
+### Responsive layout, intrinsic by default (`@media` is opt-in)
 
-`Page` never gets a `<head>` hook (see
-[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)), so a generated site
-has no `@media`/`@container` query available to it at all -- there is
-no "desktop breakpoint" or "mobile breakpoint" to hand-tune, and
-nothing keyed to a specific screen width, device, or platform. Layouts
-still adapt, but from the *content's own* available width using plain
-flexbox/grid sizing keywords (`minmax`, `auto-fit`, `flex-wrap`,
-`clamp`) -- the same technique goes by "intrinsic web design." Opt in
+Layouts adapt from the *content's own* available width by default,
+using plain flexbox/grid sizing keywords (`minmax`, `auto-fit`,
+`flex-wrap`, `clamp`) -- the same technique goes by "intrinsic web
+design." No "desktop breakpoint" or "mobile breakpoint" to hand-tune,
+nothing keyed to a specific screen width, device, or platform. Opt in
 with `class_name`, same mechanism as `.nav`/`.card` above:
 
 | Class             | What it does                                                                 |
@@ -254,6 +256,14 @@ rather than a fixed three (a card feed, a tag list), auto-filling as
 many `minmax()`-wide columns as the available width allows. All
 `--ark-*` custom properties above (space, thresholds, widths) can be
 overridden per-instance via the `style` prop shown earlier.
+
+Real `@media` queries are available too, as an explicit opt-in on top
+of the intrinsic defaults above -- not a replacement for them:
+`Site.media_query(condition, class_name, rules)` (experimental, gated
+under `css-media-queries` in `docs/EXPERIMENTAL-APIS.md`) renders a
+real `@media (condition) { .class_name { ... } } ` block. See
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
+("v0.048: CSS media queries + `<head>` extension") for the full design.
 
 ### Behaviors (client-side interactivity, no JS written by hand)
 

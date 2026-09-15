@@ -25,7 +25,7 @@ for the architecture-level roadmap table, see
 | v0.036   | ARK Bundle spec v1 (`arklight pack`)                         | DONE    |
 | v0.037   | Sealed ARK Bundles (encrypted by default, `arklight unpack`) | DONE    |
 | v0.041   | CLI/pipeline/JS runtime hardening + stateful JS addenda I/II | DONE    |
-| v0.048   | CSS `@media` queries + `<head>`/`<header>` extension         | PLANNED |
+| 0.42.0   | Alpha catch-up: CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV -- see below | DONE |
 | v0.010   | User-defined components                                     | PLANNED |
 | v0.100   | Alternate backends (Vue, Svelte)                             | PLANNED |
 | v1.0     | Stable compiler                                              | PLANNED |
@@ -75,23 +75,35 @@ root metadata -- had already landed in the preceding seven commits):
   Android imports/wiring in `cli/main.py`, `config.py`'s
   `_KNOWN_SECTIONS` has `"live_streaming"` but not `"android"`, no
   `tests/test_android.py`, no `arklight android` mentions in
-  `README.md`. One checklist item doesn't hold yet, flagged rather
-  than silently marked done: the plan expects `CHANGELOG.md`/
-  `PROGRESS.md` to already carry alpha's historical Android prose
-  (55/16 mentions) as part of the Stages 1-7 catch-up, but that
-  catch-up was scoped to code + tests only -- these two files (and
-  `README.md`) were never actually synced with alpha's content for
-  the Stage 2-6 features, so they still only document up through
-  v0.041 and say almost nothing about the CSS rewrite, JS vdom work,
-  search engine, or live-streaming/CCTV that's now sitting in the
-  tree. Not fixed here -- flagged as a real gap, since backfilling
-  accurate entries for six stages of ported work is its own
-  significant task, not a side effect of a docs-location fix.
+  `README.md`.
 - **Stage 9 (full verification).** `pytest` run in full: 833 passed,
   0 failed. Doc-link check re-run clean (0 broken links across all
-  21 Markdown files in the tree). The alpha-vs-main tree diff this
-  stage also calls for was intentionally skipped this session --
-  alpha was explicitly set aside.
+  21 Markdown files in the tree).
+
+## Docs sync, closing the Stage 8/9 gap above (DONE)
+
+The previous entry's Stage 8 pass flagged one real gap rather than
+silently marking it done: `CHANGELOG.md`/`PROGRESS.md`/`README.md`
+had never actually been synced with the Stage 2-6 catch-up (CSS
+rewrite, HTML backend refactor, JS vdom work, search engine,
+live-streaming/CCTV) -- those files still only documented up through
+v0.041 even though the code and tests for all six stages had already
+landed in the tree. Closed now: `CHANGELOG.md` gained a `[0.42.0]`
+release entry (one consolidated paragraph per subsystem, in `main`'s
+own voice rather than reproducing `alpha`'s per-sub-stage commit
+history verbatim -- see the sync plan doc if that level of detail is
+wanted), the snapshot table above marks the same work `DONE`, and
+`README.md`'s "Status" section and "Responsive layout" section were
+updated to match (the latter no longer claims `@media` is unavailable
+at all -- it's opt-in now, intrinsic design stays the default). Also
+completed the version-scheme bump `pyproject.toml` had been due for
+since the "real version-drift bug" fix below was designed but never
+actually applied: `version` now reads `0.42.0` instead of the stale
+`0.048`. `alpha`'s own historical Android prose in `CHANGELOG.md`/
+`PROGRESS.md` (55/16 mentions) is left as narrative record, per the
+sync plan -- those entries describe what happened on `alpha`, not
+`main`'s feature surface, and Android itself is confirmed absent from
+the code by Stage 8 above.
 
 
 

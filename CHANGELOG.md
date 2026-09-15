@@ -7,23 +7,104 @@ SemVer.
 
 ## [Unreleased]
 
-**Fixed a docs-location mistake from the "v0.041 docs reorg" commit,
-and ran Stage 8/9 verification.** `CHANGELOG.md` had been moved into
-`docs/version history/`, conflating the internal changelog with the
-user-facing version-history docs. Moved `CHANGELOG.md` and
-`PROGRESS.md` back to the repo root; `docs/version history/` now
-holds one short overview doc per shipped version (`v0.001.md` through
-`v0.041.md`) plus an index `README.md`, per that README's own
-previously-stated "Future direction". All cross-references repo-wide
-fixed and verified with a link checker (0 broken links). Also ran the
-Stage 8 (Android-exclusion) and Stage 9 (full verification) checks
-from `docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md`:
-Stage 8 passes except one item flagged as not-yet-true (`CHANGELOG.md`/
-`PROGRESS.md`/`README.md` were never synced with alpha's Stage 2-6
-narrative content, so they undercount what's actually landed in the
-tree); Stage 9's test suite passed in full (833/833). See
-`PROGRESS.md` ("Docs reorg fix + Stage 8/9 verification") for the
-full detail.
+Custom CSS class authoring and an `arklight --search <name>` schema
+lookup are sketched but not yet scheduled to a version -- see
+"Planned, not yet scheduled" in [`PROGRESS.md`](./PROGRESS.md).
+
+## [0.42.0] -- Alpha catch-up: CSS media queries, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV
+
+Bulk catch-up release, porting `alpha`'s Stages 1-7 onto `main` per
+`docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md`, Android
+excluded throughout (Stage 8, below). `alpha`'s individual sub-stage
+commits (`htmx-1`..`htmx-5`, `vdom-4`..`vdom-8`, and similar) are
+folded into one entry per subsystem here rather than reproduced
+one-for-one -- see the sync plan doc if you want that level of detail.
+
+**CSS backend: `@media` queries + structured `<head>`/`<header>`
+extension (the long-planned v0.048 milestone, now shipped).** New
+`arklight/backend/css/{at_rules,base_stylesheet,custom_styles,
+design_tokens,selectors}.py`; `render.py` wires them in. Adds
+`Site.media_query(condition, class_name, rules)` (experimental, gated
+under `css-media-queries` in `docs/EXPERIMENTAL-APIS.md`) plus
+per-node media conditions, both rendered as real
+`@media (condition) { .class_name { ... } }` blocks -- ARKlight's
+first departure from "no `@media` at all, intrinsic design only" as
+an absolute rule. That intrinsic-first stance is still the *default*;
+`@media` is now an explicit, opt-in escape hatch on top of it, not a
+replacement for it (see README's "Responsive layout" section, updated
+below). Also new: `@keyframes`, `@font-face`, container queries,
+`@supports`, `@page`, and `@import` rendering, plus arbitrary
+selector-based rules via `Site.style_selector(...)`. Test files:
+`test_css_backend.py`, `test_css_selectors.py`,
+`test_css_structural_addendum.py`, `test_responsive_style.py`.
+
+**HTML backend refactor.** `render.py` split into
+`attrs.py`/`head_meta.py`/`page_render.py`/`routing.py`/`tag_map.py`
+-- pure extraction, no behavior change, but head/meta and routing
+logic that used to live inline in one file are now independently
+testable. Test files: `test_html_attrs.py`, `test_html_head_meta.py`,
+`test_html_page_render.py`, `test_html_routing.py`,
+`test_html_tag_map.py`, `test_html_backend.py` (expanded).
+
+**JS backend: reactive core (HTMX + vdom).** New
+`backend/js/{htmx,vdom}.py`, `backend/js/runtime/{bindings,dispatch,
+model,nav,notify,repeat,show,state,watch}.py`,
+`backend/js/derivations/{compare,count,format,join,multiply,sum}.py`.
+Adds computed/derived state, `Watch(...)` effects, two-way input
+binding (`bind_value=`), per-item list rendering (`Repeat`),
+conditional show/hide (`Show`), event modifiers, and `localStorage`
+persistence via `State(..., persist=True)`. Test files:
+`test_refactor_0.py`, `test_htmx_{3,4,5}.py`, `test_vdom_{4,5,6,7,8}.py`,
+`test_event_modifiers.py`, `test_js_backend.py` /
+`test_js_error_handling.py` (expanded),
+`test_stateful_js_vocabulary_addendum.py` (expanded).
+
+**Search engine.** New `arklight/search/{_tokenize,endpoint,engine,
+feedback,graph,knowledge,ranking,retrieval,stats}.py` and
+`arklight/cli/search.py` (`arklight search`, wired into `cli/main.py`).
+Test files: `test_search*.py` (8 files), `test_search_endpoint.py`,
+`test_search_engine_facade.py`.
+
+**Live-streaming dev server, CCTV, `--upgrade-alpha`.** New
+`arklight/cli/live_streaming.py` (`arklight live-streaming`, auto
+rebuild + browser auto-reload on file change), `arklight/cli/cctv.py`,
+`arklight/cli/upgrade.py` (`arklight --upgrade-alpha`, switches a
+git-checkout install over to the `alpha` branch in place), and
+`cli/templates/_common.py`. `config.py`'s `_KNOWN_SECTIONS` gains
+`"live_streaming"`. Test files: `test_live_streaming.py`,
+`test_config.py` (new), `test_cli.py` (expanded).
+
+**Root metadata: completed the version-scheme bump.**
+`pyproject.toml`'s `version` moves from `0.048` to `0.42.0`. The
+scheme change itself was designed and written up two entries below
+("Fixed a real version-drift bug...") but the actual `pyproject.toml`
+edit never landed with it -- exactly the kind of drift
+`tests/test_version.py` exists to catch, and exactly what Stage 9
+verification (below) flagged.
+
+**Android-exclusion pass (Stage 8) -- verification, no code change.**
+Confirmed: no `arklight/backend/android/`, no `arklight/cli/android.py`,
+no Android imports/wiring in `cli/main.py`, `config.py`'s
+`_KNOWN_SECTIONS` has `"live_streaming"` but not `"android"`, no
+`tests/test_android.py`, no `arklight android` mentions in `README.md`'s
+usage section.
+
+**Docs sync (Stage 9) -- this release closes the gap the previous
+entry flagged.** `CHANGELOG.md` (this entry), `PROGRESS.md`'s snapshot
+table, and `README.md`'s "Status" section now reflect what Stages 1-7
+actually landed instead of undercounting it against the code. Full
+test suite: 833/833 passing.
+
+**Fixed a docs-location mistake from the "v0.041 docs reorg" commit.**
+`CHANGELOG.md` had been moved into `docs/version history/`, conflating
+the internal changelog with the user-facing version-history docs.
+Moved `CHANGELOG.md` and `PROGRESS.md` back to the repo root;
+`docs/version history/` now holds one short overview doc per shipped
+version (`v0.001.md` through `v0.041.md`) plus an index `README.md`,
+per that README's own previously-stated "Future direction". All
+cross-references repo-wide fixed and verified with a link checker (0
+broken links). See `PROGRESS.md` ("Docs reorg fix + Stage 8/9
+verification") for the full detail.
 
 **Added `arklight.CHANNEL`, a static per-branch identity constant.**
 Ground work for tooling that needs to run against both `main` and
@@ -38,7 +119,8 @@ rationale. New regression tests in `tests/test_version.py` lock the
 value and its `__all__` export the same way `__version__` is locked.
 
 **Fixed a real version-drift bug from the published PyPI release, and
-bumped to `0.42.0`.** The shipped `0.37`/`0.038`-internal release had
+designed the replacement scheme (bump completed above, in "Root
+metadata").** The shipped `0.37`/`0.038`-internal release had
 `pyproject.toml`'s version and `arklight.__version__` disagreeing --
 two hardcoded copies of the same number, nothing keeping them in
 sync, and they'd drifted apart by release time. `arklight/__init__.py`
@@ -58,14 +140,6 @@ actually reaches that milestone, not a general "looks more mature"
 bump. New regression test (`tests/test_version.py`) locks
 `arklight.__version__` to installed package metadata so this can't
 silently drift apart again.
-
-Next up is **v0.048** (CSS `@media` queries + structured
-`<head>`/`<header>` extension) -- see the "Planned" section of
-[`PROGRESS.md`](./PROGRESS.md) and [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
-("v0.048: CSS media queries + `<head>` extension") for the design.
-Custom CSS class authoring and an `arklight --search <name>` schema
-lookup are sketched but not yet scheduled to a version -- also in
-`PROGRESS.md`.
 
 ## [0.041] -- CLI, pipeline & JS runtime hardening + stateful JS vocabulary addenda
 
