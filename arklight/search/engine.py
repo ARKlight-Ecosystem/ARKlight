@@ -19,8 +19,9 @@ import functools
 import sqlite3
 from pathlib import Path
 
+from arklight.ir.components import COMPONENT_REGISTRY
 from arklight.search.graph import build_usage_graph, pagerank, personalized_pagerank
-from arklight.search.knowledge import SymbolFact, build_knowledge_base
+from arklight.search.knowledge import SymbolFact, build_knowledge_base, component_symbol_fact
 from arklight.search.ranking import RankedResult, rank
 from arklight.search.retrieval import retrieve_candidates
 from arklight.search.stats import open_store, record_acceptance, record_confusion
@@ -52,6 +53,24 @@ class SearchEngine:
     The cache is cleared by anything that changes what a future
     ranking call would produce: `.accept()` (usage stats changed) and
     `.record_confusion()` (Stage 8's confusion table changed).
+
+    Stage 1 addendum: `.knowledge` also folds in whatever's currently
+    registered in `arklight.ir.components.COMPONENT_REGISTRY` (a
+    project's own user components) on every access -- see `.knowledge`
+    below for why that part deliberately isn't cached the same way the
+    built-in `SCHEMA` scan is. One consequence worth naming: the
+    `functools.lru_cache` above is keyed on `(query, limit, near,
+    now)` only, not on registry contents, so a long-lived engine (the
+    Stage 9 endpoint) that answers the exact same query again after a
+    *different* site's components have since been registered could
+    still return a result cached from before that registration. A
+    one-shot CLI/build process -- everything `compile_site_file`
+    itself drives -- never repeats a query against a changing registry
+    within its own lifetime, so this doesn't affect the real, live
+    typo-feedback path Stage 1 exists for; it's a latent staleness
+    window for the long-lived case only, no worse than the same
+    lru_cache already accepts for wall-clock usage-score decay
+    (`now=None`, see above).
     """
 
     def __init__(
@@ -67,7 +86,7 @@ class SearchEngine:
         self._roots = roots
         self._db_path = db_path
 
-        self._knowledge: dict[str, SymbolFact] | None = None
+        self._builtin_knowledge: dict[str, SymbolFact] | None = None
         self._graph: dict[str, dict[str, int]] | None = None
         self._pagerank: dict[str, float] | None = None
         self._stats_conn: sqlite3.Connection | None = None
@@ -82,9 +101,31 @@ class SearchEngine:
 
     @property
     def knowledge(self) -> dict[str, SymbolFact]:
-        if self._knowledge is None:
-            self._knowledge = build_knowledge_base()
-        return self._knowledge
+        """Built-in `SCHEMA` facts (scanned once, then cached exactly
+        as before Stage 1) merged with whatever user components are
+        *currently* sitting in `COMPONENT_REGISTRY`. The merge itself
+        runs on every access rather than being cached alongside the
+        built-in half: registration is a live, mutating global (a
+        project's own `@component(...)`-decorated functions register
+        themselves as their module executes, which for the real
+        `compile_site_file` -> `NameError` path happens *before* the
+        error this exists to diagnose is even raised -- see
+        `arklight.compiler.pipeline`), so caching a merged snapshot
+        the first time `.knowledge` was ever accessed could freeze out
+        every component registered afterward. The merge itself is
+        cheap (a dict copy over however many components one project
+        registers -- never the expensive part, which stays the
+        one-time `SCHEMA` scan `build_knowledge_base()` already did
+        before Stage 1)."""
+        if self._builtin_knowledge is None:
+            self._builtin_knowledge = build_knowledge_base()
+        if not COMPONENT_REGISTRY:
+            return self._builtin_knowledge
+        merged = dict(self._builtin_knowledge)
+        for name, spec in COMPONENT_REGISTRY.items():
+            if name not in merged:
+                merged[name] = component_symbol_fact(spec)
+        return merged
 
     @property
     def graph(self) -> dict[str, dict[str, int]]:
