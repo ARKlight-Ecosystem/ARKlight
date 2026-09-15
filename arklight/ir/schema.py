@@ -197,6 +197,20 @@ SCHEMA: dict[str, NodeSpec] = {
     # anything gated behind a `toggle`/`copy`/`dismiss` behavior can
     # have a `NoScript` sibling explaining what's missing.
     "NoScript": NodeSpec(),
+    # vdom-7 (docs/Backends/REFACTOR-INDEX.md row 15): per-item list
+    # rendering + conditional show/hide. Both are real, renderable
+    # content -- unlike `State`/`Computed`/`Watch` below, which are
+    # page-scoped declarations Validation/IR-build pull out of the tree
+    # entirely, `Repeat`/`Show` stay in place and go through the normal
+    # recursive node conversion, so they need SCHEMA entries the same
+    # as any other component. Their one/many children are validated by
+    # dedicated logic in `arklight.ir.validate` rather than the generic
+    # per-child loop below (a `Repeat`'s child is a *template*, not
+    # ordinary content -- see `_validate_repeat_declaration`), but still
+    # need an entry here so unrelated generic lookups (e.g. tag mapping)
+    # find them like any other node type.
+    "Repeat": NodeSpec(required_props=("name",)),
+    "Show": NodeSpec(required_props=("predicate",)),
 }
 
 # Types whose raw string children should stay raw strings during
@@ -304,3 +318,98 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
 }
 
 KNOWN_ACTIONS = frozenset(ACTION_REGISTRY)
+
+
+# Stage 3 of "Reactive-core vdom staging" (see docs/DESIGN-NOTES.md):
+# event modifiers -- a timing/dispatch concern orthogonal to what an
+# action does, so it's solved once as a wrapper around the click
+# dispatcher rather than duplicated into every `ACTION_REGISTRY` entry.
+# `Action.set(...).with_modifiers("prevent", "stop", "once")` and
+# `Action.set(...).debounce(300)` / `.throttle(300)` attach these to an
+# `ActionRef` (see `ActionRef.modifiers` in arklight.ast.nodes); the
+# Validation stage checks each token here the same way it checks
+# `action.action` against `ACTION_REGISTRY` above.
+#
+# `has_param` distinguishes plain boolean modifiers (`prevent`, `stop`,
+# `once`) from ones that carry a millisecond value serialized as
+# `"<name>:<ms>"` (`debounce`, `throttle`) -- same shape distinction
+# `ActionSpec.args` draws for actions, just for the modifier token
+# itself rather than the action's argument dict.
+@dataclass
+class ModifierSpec:
+    has_param: bool = False
+
+
+MODIFIER_REGISTRY: dict[str, ModifierSpec] = {
+    "prevent": ModifierSpec(),
+    "stop": ModifierSpec(),
+    "once": ModifierSpec(),
+    "debounce": ModifierSpec(has_param=True),
+    "throttle": ModifierSpec(has_param=True),
+}
+
+KNOWN_MODIFIERS = frozenset(MODIFIER_REGISTRY)
+
+
+# `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12; docs/Foundational/
+# DESIGN-NOTES.md "Computed/derived state"): closed-vocabulary derived
+# state, the same shape discipline as `ACTION_REGISTRY`/
+# `BEHAVIOR_REGISTRY` above -- a new `*Spec` dataclass, a new
+# `*_REGISTRY` dict, and `arklight.api.Derive.*` producing structured
+# `DerivationRef` objects (arklight.ast.nodes), never a parsed/executed
+# expression string.
+#
+#     State("price", 9.99)
+#     State("qty", 3)
+#     Computed("total", deps=("price", "qty"), derive=Derive.multiply("price", "qty"))
+#     Text(Bind("total"))
+#
+# `min_names`/`max_names` bound how many state/computed names a given
+# `kind` accepts (`None` for `max_names` means unlimited) -- e.g.
+# `count` takes exactly one, `compare` takes exactly two, `sum`/
+# `multiply`/`join`/`format` take one or more. `extra_args` documents
+# the closed set of extra keyword data (beyond `names`) a `kind`'s
+# `DerivationRef.args` dict is expected to carry, the same role
+# `ActionSpec.args` plays for actions -- `join`'s `sep`, `format`'s
+# `template`/`names_map`, `compare`'s `op`.
+@dataclass
+class DerivationSpec:
+    min_names: int = 1
+    max_names: int | None = None
+    extra_args: tuple[str, ...] = field(default_factory=tuple)
+
+
+DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
+    "sum": DerivationSpec(min_names=1, max_names=None),
+    "multiply": DerivationSpec(min_names=1, max_names=None),
+    "join": DerivationSpec(min_names=1, max_names=None, extra_args=("sep",)),
+    "count": DerivationSpec(min_names=1, max_names=1),
+    "format": DerivationSpec(min_names=1, max_names=None, extra_args=("template", "names_map")),
+    "compare": DerivationSpec(min_names=2, max_names=2, extra_args=("op",)),
+}
+
+KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
+
+# `Derive.compare(a, b, op)`'s `op` is itself a closed choice, never a
+# raw operator string executed as code -- mirrors why `on_click`/
+# `action` are closed vocabularies rather than arbitrary strings.
+COMPARE_OPS = frozenset({"eq", "ne", "gt", "lt", "gte", "lte"})
+
+
+# `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): `Show(...)`'s
+# closed-vocabulary predicate, the same shape discipline as
+# `DERIVATION_REGISTRY` above but scaled down -- both current kinds
+# take exactly one state/computed name, so a plain `names: int` arity
+# is enough (no need for `DerivationSpec`'s min/max split, since
+# nothing here is variadic yet).
+@dataclass
+class PredicateSpec:
+    names: int = 1
+
+
+PREDICATE_REGISTRY: dict[str, PredicateSpec] = {
+    "truthy": PredicateSpec(names=1),
+    "falsy": PredicateSpec(names=1),
+}
+
+KNOWN_PREDICATES = frozenset(PREDICATE_REGISTRY)

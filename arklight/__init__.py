@@ -149,15 +149,16 @@ except PackageNotFoundError:  # pragma: no cover -- only when running from
 # (or lie) for the common case of a real `pip install arklight`, which
 # has no `.git` directory at all -- fragile for something call sites
 # may treat as authoritative. `main` and `alpha` diverge enough in
-# available subsystems (search engine, PWA, license gate, JS reactive
-# core, ...) that a tool wired into both trees -- e.g. a live-reload
-# dev server -- needs a reliable, install-method-independent way to ask
-# "which feature set do I actually have here", without maintaining a
-# parallel list of per-subsystem capability flags. This is that answer.
-# Bump/change this value only when cutting the string over to a
-# different branch's checkout -- same one-line-per-branch discipline as
-# every other branch-specific constant in this file.
-CHANNEL = "main"
+# available subsystems (search engine, PWA, license gate, live-
+# streaming dev server, ...) that a tool wired into both trees needs a
+# reliable, install-method-independent way to ask "which feature set
+# do I actually have here", without maintaining a parallel list of
+# per-subsystem capability flags. This is that answer. Bump/change
+# this value only when cutting the string over to a different branch's
+# checkout -- same one-line-per-branch discipline as every other
+# branch-specific constant in this file (mirrors `main`'s copy, set to
+# `"main"` there).
+CHANNEL = "alpha"
 
 __all__ = [
     "Site",
