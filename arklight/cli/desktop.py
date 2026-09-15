@@ -15,16 +15,28 @@ disk), this module owns everything that leaves out -- reading
 against defaults, reading the build directory's own bytes to embed,
 and writing every generated file to disk.
 
-Building the generated project (`make`) is left to the user (see the
-generated `README.md`) -- a local `arklight desktop build` that shells
-out to `make` for them, mirroring `arklight android build`'s relationship
-to `arklight android scaffold`, is later, not-yet-implemented work
-(DESKTOP-BACKEND-IMPLEMENTATION.md's Stage 2).
+`arklight desktop build <project-dir>` -- Stage 2. Shells out to the
+scaffolded project's own `make` (locally, on *this* machine) so the
+user doesn't have to `cd` into it themselves; mirrors `arklight
+android build`'s not-yet-implemented relationship to `arklight
+android scaffold` (same "scaffold owns templating, build owns
+shelling out to the real toolchain" split, just not blocked on a
+JDK/Android SDK the way that one is -- only a C compiler + `pkg-config`
++ GTK3/WebKit2GTK dev headers, see the generated project's own
+README.md). A missing toolchain (no `make`, no `gcc`, no dev headers)
+is caught and reported as an actionable message rather than a raw
+`FileNotFoundError`/`CalledProcessError` traceback -- this command
+has no business installing any of that for the user, only explaining
+what's missing. `--run` additionally launches the freshly built
+binary (`bin/<binary>`) once `make` succeeds, the same "build, then
+immediately try it" convenience `make run` already offers from
+inside the project directory -- this just saves the `cd`.
 """
 
 from __future__ import annotations
 
 import re
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -214,3 +226,114 @@ def scaffold_project(
         binary_name=runtime.binary_name(app_name),
         target=target,
     )
+
+
+@dataclass
+class BuildResult:
+    project_dir: Path
+    binary_path: Path
+    # Whether `--run` was passed *and* the binary was actually
+    # launched -- distinct from `--run` merely being requested, since
+    # a failed `make` never reaches the run step at all (see
+    # `build_project`'s early raise on a nonzero `make` exit).
+    ran: bool = False
+
+
+def _find_built_binary(project_dir: Path) -> Path:
+    """
+    Locate the single binary `make` just produced under `project_dir/
+    bin/`. Scaffolded Makefiles always build exactly one `BIN :=
+    bin/<binary>` target (see `runtime._makefile`), so rather than
+    re-deriving `<binary>` from `arklight.config.py` a second time
+    here (and risking it disagreeing with what the Makefile actually
+    used, e.g. after a hand-edited Makefile), this just looks at what
+    `bin/` actually contains.
+    """
+    bin_dir = project_dir / "bin"
+    candidates = sorted(p for p in bin_dir.glob("*") if p.is_file())
+    if not candidates:
+        raise DesktopError(
+            f"`make` reported success but no binary was found in {bin_dir}/ -- "
+            f"the project's Makefile may have been hand-edited to build "
+            f"somewhere else. Check its `BIN :=` line."
+        )
+    if len(candidates) > 1:
+        names = ", ".join(p.name for p in candidates)
+        raise DesktopError(
+            f"Found more than one file in {bin_dir}/ ({names}) -- expected "
+            f"exactly one build output. Clear {bin_dir}/ (e.g. `make clean`) "
+            f"and try again."
+        )
+    return candidates[0]
+
+
+def build_project(project_dir: str | Path, *, run: bool = False) -> BuildResult:
+    """
+    Build an already-scaffolded (`arklight desktop scaffold`) project
+    by shelling out to its own `make`, then (if `run` is True) launch
+    the resulting `bin/<binary>`.
+
+    Raises DesktopError for a missing `project_dir`/`Makefile` (i.e.
+    not actually a scaffolded project), a missing `make`/C toolchain
+    on this machine, or a `make` invocation that exits nonzero (its
+    own stderr -- streamed straight through, not captured -- carries
+    the real reason, e.g. a missing GTK3/WebKit2GTK dev package; this
+    just adds the toolchain-not-found case `make` itself can't
+    explain, since that failure happens before `make` even starts).
+    """
+    project_dir = Path(project_dir)
+    if not project_dir.is_dir():
+        raise DesktopError(f"Project directory not found: {project_dir}")
+    if not (project_dir / "Makefile").is_file():
+        raise DesktopError(
+            f"{project_dir} has no Makefile -- run `arklight desktop scaffold` "
+            f"first, then build its output directory."
+        )
+
+    try:
+        # stdout/stderr deliberately left to inherit the caller's (not
+        # captured) -- `make`'s own compiler errors/warnings are the
+        # actionable content on a failure, and buffering them behind a
+        # captured-then-reprinted round-trip would only delay a build
+        # that itself already streams progress as it goes.
+        subprocess.run(["make"], cwd=project_dir, check=True)
+    except FileNotFoundError as exc:
+        raise DesktopError(
+            "`make` was not found on this machine. Install a C toolchain "
+            "(build-essential/base-devel/\"Development Tools\", pkg-config, "
+            "and the GTK3 + WebKit2GTK dev headers) -- see this project's own "
+            "README.md for the exact packages per distro -- then try again."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        raise DesktopError(
+            f"`make` failed (exit code {exc.returncode}) -- see its output "
+            f"above for the reason (commonly a missing GTK3/WebKit2GTK dev "
+            f"package; see this project's README.md for the exact packages "
+            f"per distro)."
+        ) from exc
+
+    binary_path = _find_built_binary(project_dir)
+
+    ran = False
+    if run:
+        # Same "let it inherit stdout/stderr" reasoning as the `make`
+        # call above -- a GUI app's own diagnostics (GTK/WebKit
+        # warnings, an ark: scheme handler error, ...) are exactly
+        # what a user reaching for `--run` wants to see, not a
+        # captured buffer they'd have to go dig up separately.
+        try:
+            subprocess.run([str(binary_path)], cwd=project_dir, check=True)
+        except FileNotFoundError as exc:
+            raise DesktopError(
+                f"Built {binary_path}, but couldn't launch it -- the binary "
+                f"itself is missing or not executable."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            raise DesktopError(
+                f"{binary_path} exited with code {exc.returncode} -- see its "
+                f"own output above for why (commonly no display available, "
+                f"e.g. running --run over SSH with no X11/Wayland forwarding)."
+            ) from exc
+        ran = True
+
+    return BuildResult(project_dir=project_dir, binary_path=binary_path, ran=ran)

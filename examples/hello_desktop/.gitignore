@@ -1,0 +1,8 @@
+# Everything in this directory except README.md, arklight.config.py,
+# and this file is generated on demand by the commands in README.md
+# (`arklight build`, `arklight desktop scaffold`, `arklight android
+# scaffold`) -- never committed, regenerate locally instead.
+*
+!.gitignore
+!README.md
+!arklight.config.py

@@ -542,6 +542,25 @@ def _cmd_desktop_scaffold(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_desktop_build(args: argparse.Namespace) -> int:
+    try:
+        result = desktop.build_project(args.project_dir, run=args.run)
+    except DesktopError as exc:
+        print(f"ARKlight desktop build failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"ARKlight v{__version__} built {result.binary_path}")
+    if result.ran:
+        print(f"Ran {result.binary_path} -- exited normally.")
+    else:
+        print(f"Run it with: {result.binary_path}")
+    print()
+    print("ARKlight supports cross-platform targets as well -- try it with this cmd:")
+    print("  arklight android scaffold <build-dir> -o <project-dir>")
+
+    return 0
+
+
 def _cmd_new(args: argparse.Namespace) -> int:
     # `--explain-architecture` is informational and doesn't require a
     # project name -- `arklight new --explain-architecture` alone just
@@ -897,8 +916,9 @@ def main(argv: list[str] | None = None) -> int:
         "scaffold",
         help="Generate a native GTK3 + WebKit2GTK host project from a build directory. "
         "Templating + asset-embedding only -- no C toolchain required to run this "
-        "command itself (Stage 1 of the design doc's staged plan); building the "
-        "generated project (`make`) is on you for now, see the generated README.md.",
+        "command itself (Stage 1 of the design doc's staged plan). Build the "
+        "generated project with `arklight desktop build <project-dir>` (Stage 2), "
+        "or `cd` in and run `make` yourself -- see the generated README.md.",
     )
     desktop_scaffold_parser.add_argument(
         "build_dir", help="An `arklight build` output directory (e.g. ARK)."
@@ -919,6 +939,23 @@ def main(argv: list[str] | None = None) -> int:
         "Windows/macOS status.",
     )
     desktop_scaffold_parser.set_defaults(func=_cmd_desktop_scaffold)
+
+    desktop_build_parser = desktop_subparsers.add_parser(
+        "build",
+        help="Build an already-scaffolded desktop project by shelling out to its own "
+        "`make` (Stage 2 -- the local counterpart to `arklight desktop scaffold`). "
+        "Needs a C compiler, pkg-config, and the GTK3/WebKit2GTK dev headers on "
+        "this machine -- see the scaffolded project's own README.md.",
+    )
+    desktop_build_parser.add_argument(
+        "project_dir", help="An `arklight desktop scaffold` output directory."
+    )
+    desktop_build_parser.add_argument(
+        "--run",
+        action="store_true",
+        help="Launch the built binary once `make` succeeds.",
+    )
+    desktop_build_parser.set_defaults(func=_cmd_desktop_build)
 
     new_parser = subparsers.add_parser(
         "new", help="Scaffold a new ARKlight project from a built-in template."
