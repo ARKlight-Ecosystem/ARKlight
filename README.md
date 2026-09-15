@@ -260,7 +260,7 @@ overridden per-instance via the `style` prop shown earlier.
 Real `@media` queries are available too, as an explicit opt-in on top
 of the intrinsic defaults above -- not a replacement for them:
 `Site.media_query(condition, class_name, rules)` (experimental, gated
-under `css-media-queries` in `docs/EXPERIMENTAL-APIS.md`) renders a
+under `css-media-queries` in `docs/Foundational/EXPERIMENTAL-APIS.md`) renders a
 real `@media (condition) { .class_name { ... } } ` block. See
 [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
 ("v0.048: CSS media queries + `<head>` extension") for the full design.

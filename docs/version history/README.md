@@ -31,9 +31,12 @@ table itself, independent of what's landed so far), see
 | [`v0.002.md`](./v0.002.md) | CSS -- default stylesheet backend. |
 | [`v0.003.md`](./v0.003.md) | JavaScript helpers + two vocabulary addenda -- closed-behavior JS backend, ~79 new components. |
 | [`v0.0035.md`](./v0.0035.md) | Stateful JS -- `State`/`Bind`/`Action` primitives. |
+| [`v0.004a.md`](./v0.004a.md) | CLI scaffolding -- `arklight new <name> --template simple\|production`. |
 | [`v0.036.md`](./v0.036.md) | ARK Bundle spec v1 -- `arklight pack`. |
 | [`v0.037.md`](./v0.037.md) | Sealed ARK Bundles -- encrypted by default, `arklight unpack`. |
 | [`v0.041.md`](./v0.041.md) | CLI/pipeline/JS runtime hardening + stateful JS vocabulary addenda I & II. |
+| [`v0.042.md`](./v0.042.md) | Extra CSS features -- `Site.style(...)` custom classes, `arklight search`, `arklight --help`. |
+| [`v0.043.md`](./v0.043.md) | Optional `<head>` metadata props on `Page(...)` + `Backend.postprocess(...)` hook. |
 | [`v0.54.0.md`](./v0.54.0.md) | Alpha catch-up -- CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV. First release on the new `MAJOR.MINOR.PATCH` version format. |
 
 ## Adding a new version
