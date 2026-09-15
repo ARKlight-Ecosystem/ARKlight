@@ -1,0 +1,1 @@
+here for every new version. it creates a new doc with an overview feature sets and other informations so it doesn't clutter the other docs. this readme is an overview plus an index.
