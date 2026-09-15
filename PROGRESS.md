@@ -6,9 +6,12 @@ every work session, not just at milestone boundaries.
 
 Detail sections below are kept in reverse-chronological order (newest
 first) and are the narrative record -- what was tried, what was
-rejected, what broke. For the plain version history, see
-[`CHANGELOG.md`](./CHANGELOG.md); for the architecture-level roadmap
-table, see [`docs/Foundational/ARCHITECTURE.md`](../Foundational/ARCHITECTURE.md).
+rejected, what broke. For the plain, internal version log, see
+[`CHANGELOG.md`](./CHANGELOG.md), also at the repo root; for a short,
+user-facing overview of each shipped version, see
+[`docs/version history/README.md`](./docs/version%20history/README.md);
+for the architecture-level roadmap table, see
+[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md).
 
 ## Snapshot
 
@@ -45,14 +48,59 @@ go-ahead before implementation starts on any of these:
   stage already reads from. Read-only reflection, no new data format.
 - **`arklight --help`** -- standard CLI usage/help text.
 
-## v0.041 -- JS runtime error-handling hardening (DONE)
+## Docs reorg fix + Stage 8/9 verification (DONE)
+
+The v0.041 "docs reorg" commit had moved `CHANGELOG.md` into
+`docs/version history/`, conflating it with the version-history docs
+-- a changelog is an internal, dev-facing record; version history is
+meant for users. Fixed: `CHANGELOG.md` and `PROGRESS.md` both moved
+back to the repo root (their original location, and the natural home
+for internal/dev-facing docs), and `docs/version history/` now holds
+one short, user-facing overview doc per shipped version (`v0.001.md`
+through `v0.041.md`), with its `README.md` acting purely as an index
+-- exactly the "Future direction" this README had already sketched
+for itself. Every cross-reference across `README.md`, `CHANGELOG.md`,
+`PROGRESS.md`, and `docs/Foundational/{ARCHITECTURE,DESIGN-NOTES}.md`
+that pointed at the old path was updated; a repo-wide link checker
+confirms every relative Markdown link in the tree resolves.
+
+Also ran the Stage 8 and 9 checks from
+`docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md` (the
+Stages 1-7 code-porting work itself -- CSS backend rewrite, HTML
+backend refactor, JS backend/vdom, search engine, live-streaming/CCTV,
+root metadata -- had already landed in the preceding seven commits):
+
+- **Stage 8 (Android-exclusion pass).** All clear: no
+  `arklight/backend/android/`, no `arklight/cli/android.py`, no
+  Android imports/wiring in `cli/main.py`, `config.py`'s
+  `_KNOWN_SECTIONS` has `"live_streaming"` but not `"android"`, no
+  `tests/test_android.py`, no `arklight android` mentions in
+  `README.md`. One checklist item doesn't hold yet, flagged rather
+  than silently marked done: the plan expects `CHANGELOG.md`/
+  `PROGRESS.md` to already carry alpha's historical Android prose
+  (55/16 mentions) as part of the Stages 1-7 catch-up, but that
+  catch-up was scoped to code + tests only -- these two files (and
+  `README.md`) were never actually synced with alpha's content for
+  the Stage 2-6 features, so they still only document up through
+  v0.041 and say almost nothing about the CSS rewrite, JS vdom work,
+  search engine, or live-streaming/CCTV that's now sitting in the
+  tree. Not fixed here -- flagged as a real gap, since backfilling
+  accurate entries for six stages of ported work is its own
+  significant task, not a side effect of a docs-location fix.
+- **Stage 9 (full verification).** `pytest` run in full: 833 passed,
+  0 failed. Doc-link check re-run clean (0 broken links across all
+  21 Markdown files in the tree). The alpha-vs-main tree diff this
+  stage also calls for was intentionally skipped this session --
+  alpha was explicitly set aside.
+
+
 
 **Status: DONE**, version number not yet assigned. Follow-up to "CLI &
 pipeline error-handling hardening" directly below -- that pass covered
 the Python/CLI side and explicitly deferred the generated client-side
 `arklight.js` runtime, which had **zero** `try`/`catch` anywhere in it
 (confirmed by reading `arklight/backend/js/render.py` and every
-behavior/action fragment directly). Full detail in `CHANGELOG.md`
+behavior/action fragment directly). Full detail in the root `CHANGELOG.md`
 ("JS runtime error-handling hardening"). Short version:
 
 - [x] New `arkNotify(message)` helper (`arklight/backend/js/render.py`)
@@ -93,7 +141,7 @@ have no plausible runtime failure mode given their inputs
 **Status: DONE**, version number not yet assigned. Prompted by a UX
 audit comparing the CLI's error handling against how the generated
 client-side JS runtime handles (or rather, doesn't handle) failures.
-Full detail in `CHANGELOG.md` ("CLI & pipeline error-handling
+Full detail in the root `CHANGELOG.md` ("CLI & pipeline error-handling
 hardening"). Short version:
 
 - [x] `arklight/cli/main.py::main()` -- top-level `try/except` around
@@ -139,7 +187,7 @@ error-handling hardening" milestone directly above.
 
 ## v0.0035 -- Stateful JS (DONE)
 
-**Status: DONE.** This entry was missing from PROGRESS.md/CHANGELOG.md
+**Status: DONE.** This entry was missing from PROGRESS.md / the root CHANGELOG.md
 even though the code shipped -- `pyproject.toml` and
 `arklight/__init__.py` both already read `0.0035`, and the README
 "Status" section already described this milestone in the present
@@ -592,7 +640,7 @@ The other two pieces of the old "v0.004" heading, renumbered to their
 own milestone since they didn't land with the scaffolding above and
 are now the next scheduled release. Design is complete and unchanged;
 implementation has not started. Full writeup in
-[`docs/Foundational/DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
 queries + `<head>` extension").
 
 - [ ] `responsive_style={...}` prop -> real `@media` blocks in the CSS
@@ -645,7 +693,7 @@ tables, media) and two more closed JS behaviors (`copy`, `dismiss`) on
 top of the original v0.003 JavaScript-helpers work, entirely as data
 in `arklight.ir.schema.SCHEMA` / `arklight.ir.schema.KNOWN_BEHAVIORS`
 -- no changes to normalize.py, validate.py, or build.py. See
-`CHANGELOG.md` for the full list and `docs/Foundational/DESIGN-NOTES.md` ("v0.003:
+the root `CHANGELOG.md` for the full list and `docs/Foundational/DESIGN-NOTES.md` ("v0.003:
 closing the vocabulary gap, not the structural ceiling") for what this
 does and doesn't change about the ceiling (still no
 `@media`/`@container`, still a closed JS vocabulary).
@@ -673,9 +721,9 @@ bidi (`Bdi`/`Bdo`) and ruby (`Ruby`/`Rt`/`Rp`) annotations, table
 column grouping, video/audio caption tracks, image maps, `IFrame`
 embeds, and a `NoScript` fallback. 22 new tests in
 `tests/test_vocabulary_addendum_2.py` (109 total). Full list and
-per-group rationale in `CHANGELOG.md`.
+per-group rationale in the root `CHANGELOG.md`.
 
-Deliberately left out (see CHANGELOG.md "Notes" for why):
+Deliberately left out (see the root CHANGELOG.md "Notes" for why):
 `<canvas>`/`<template>` (meaningless without JS driving them, out of
 scope for the closed-behavior model), the new `<search>` landmark
 (too new/unsettled), `<object>`/`<embed>` (redundant with `IFrame`
@@ -758,6 +806,6 @@ actions.
 ## Milestone checklist
 
 See the "Snapshot" table at the top of this file for current status,
-and [`docs/Foundational/ARCHITECTURE.md`](../Foundational/ARCHITECTURE.md) for the canonical
+and [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the canonical
 milestone roadmap (kept in sync with this file as the single source of
 truth, rather than a third copy of the same list).

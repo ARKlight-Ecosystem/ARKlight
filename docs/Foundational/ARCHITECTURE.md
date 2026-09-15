@@ -217,5 +217,6 @@ change.
 
 ---
 
-See `docs/version history/PROGRESS.md` for implementation status and
-`docs/version history/CHANGELOG.md` for version history.
+See `docs/version history/PROGRESS.md` for implementation status,
+`docs/version history/` for a per-version user-facing overview, and
+the root `CHANGELOG.md` for the plain, internal version log.

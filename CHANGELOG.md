@@ -7,6 +7,24 @@ SemVer.
 
 ## [Unreleased]
 
+**Fixed a docs-location mistake from the "v0.041 docs reorg" commit,
+and ran Stage 8/9 verification.** `CHANGELOG.md` had been moved into
+`docs/version history/`, conflating the internal changelog with the
+user-facing version-history docs. Moved `CHANGELOG.md` and
+`PROGRESS.md` back to the repo root; `docs/version history/` now
+holds one short overview doc per shipped version (`v0.001.md` through
+`v0.041.md`) plus an index `README.md`, per that README's own
+previously-stated "Future direction". All cross-references repo-wide
+fixed and verified with a link checker (0 broken links). Also ran the
+Stage 8 (Android-exclusion) and Stage 9 (full verification) checks
+from `docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md`:
+Stage 8 passes except one item flagged as not-yet-true (`CHANGELOG.md`/
+`PROGRESS.md`/`README.md` were never synced with alpha's Stage 2-6
+narrative content, so they undercount what's actually landed in the
+tree); Stage 9's test suite passed in full (833/833). See
+`PROGRESS.md` ("Docs reorg fix + Stage 8/9 verification") for the
+full detail.
+
 **Added `arklight.CHANNEL`, a static per-branch identity constant.**
 Ground work for tooling that needs to run against both `main` and
 `alpha` and behave correctly on either -- e.g. a planned live-reload
@@ -43,7 +61,7 @@ silently drift apart again.
 
 Next up is **v0.048** (CSS `@media` queries + structured
 `<head>`/`<header>` extension) -- see the "Planned" section of
-[`PROGRESS.md`](./PROGRESS.md) and [`docs/Foundational/DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md)
+[`PROGRESS.md`](./PROGRESS.md) and [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
 ("v0.048: CSS media queries + `<head>` extension") for the design.
 Custom CSS class authoring and an `arklight --search <name>` schema
 lookup are sketched but not yet scheduled to a version -- also in

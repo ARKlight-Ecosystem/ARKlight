@@ -37,8 +37,8 @@ one bad element or a clipboard failure can't take the rest of a page's
 interactivity down with it. This release also folds in the stateful-JS
 vocabulary addenda (`Action.decrement`, `Action.reset`,
 `Action.append`, `Action.remove`). Full detail in
-[`CHANGELOG.md`](./docs/version%20history/CHANGELOG.md); narrative/decision log in
-[`PROGRESS.md`](./docs/version%20history/PROGRESS.md).
+[`CHANGELOG.md`](./CHANGELOG.md); narrative/decision log in
+[`PROGRESS.md`](./PROGRESS.md).
 
 **Next up: v0.048 -- CSS `@media` queries + `<head>`/`<header>`
 extension.** Design complete, implementation not started. See
@@ -309,7 +309,7 @@ returns an `ARKNode`:
 components -- this is enforced by the Validation stage.
 
 The table above is the original v0.001 core. Two vocabulary
-addenda (still v0.003, no new pipeline stage -- see CHANGELOG.md) add
+addenda (still v0.003, no new pipeline stage -- see `CHANGELOG.md`) add
 ~79 more components on top of it, purely as data in
 `arklight.ir.schema.SCHEMA` (the single source of truth every stage
 reads from):
@@ -334,7 +334,7 @@ reads from):
   (`ColGroup`, `Col`), video/audio captions (`Track`), image maps
   (`Map`, `Area`), `IFrame` embeds, and a `NoScript` fallback.
 
-See [`CHANGELOG.md`](./docs/version%20history/CHANGELOG.md) for the rationale behind each
+See [`CHANGELOG.md`](./CHANGELOG.md) for the rationale behind each
 group and `arklight.ir.schema.SCHEMA` for the authoritative list of
 every component's required props, text-only-children rule, and
 whether it allows children at all.
@@ -403,6 +403,8 @@ packing algorithm, cipher construction, and known caveats.
 
 ```
 arklight-framework/
+  CHANGELOG.md        Plain version log, internal/dev-facing
+  PROGRESS.md         Narrative log of what's next, internal/dev-facing
   arklight/
     api.py            Public component functions + Site class
     ast/               ARK AST node type (ARKNode)
@@ -429,8 +431,7 @@ arklight-framework/
     hello_site/        Example site matching this README
   tests/               Unit + end-to-end tests for every pipeline stage
   docs/                Additional design notes
-    version history/   What's done, what's next (PROGRESS.md);
-                        version history (CHANGELOG.md)
+    version history/   User-facing overview per shipped version
 ```
 
 ## Running tests
@@ -452,7 +453,7 @@ pytest
 Full milestone table (with status) lives in
 [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) -- kept as the single
 canonical copy rather than duplicated here, in
-[`docs/version history/PROGRESS.md`](./docs/version%20history/PROGRESS.md), and in
-[`docs/version history/CHANGELOG.md`](./docs/version%20history/CHANGELOG.md). Short version: v0.001 through v0.041 are done; v0.048
+[`PROGRESS.md`](./PROGRESS.md), and in
+[`CHANGELOG.md`](./CHANGELOG.md). Short version: v0.001 through v0.041 are done; v0.048
 (CSS `@media` + `<head>`/`<header>` extension) is next; v0.010
 (components) and v0.100 (alternate backends) are further out.
