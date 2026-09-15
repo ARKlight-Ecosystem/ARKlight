@@ -1,6 +1,6 @@
 # User-Defined Components Implementation: Staged Order
 
-Status: **Stage 0 done**, Stages 1-4 not started. This file does not
+Status: **Stages 0-1 done**, Stages 2-4 not started. This file does not
 restate the design already written in
 [`docs/Foundational/user-defined-components.md`](./user-defined-components.md)
 -- it exists only to turn that design's Option A / Option B discussion
@@ -77,7 +77,7 @@ statement of intent, tracked for Stage 3, not a working feature.
 | # | Stage | What | Depends on | Status |
 |---|---|---|---|---|
 | 0 | Registration, props contract, macro expansion | `component(...)`/`Prop` in `arklight/api.py`; `arklight/ir/components.py` (`COMPONENT_REGISTRY`, `ComponentSpec`, `expand_ark_ast`/`expand_node`); wired into `arklight.compiler.pipeline.compile_site_file` as a new stage between ARK-AST construction and Normalization; props contract enforcement (unknown/missing/mistyped props all fail with a `ComponentError`, not a raw Python `TypeError`); cycle detection + a recursion-depth ceiling (mirrors `validate.py` check #13's `Computed`/`Derive` self-reference guard); the `mode=` selector described above. | `user-defined-components.md`'s Option A design | **Done** -- `tests/test_user_defined_components_stage0.py` |
-| 1 | Typo diagnostics | Extend `arklight/search/feedback.py`'s `parse_undefined_component_name` path so a typo'd call to a *registered user* component gets the same "did you mean...?" treatment a typo'd `Headign(...)` already gets -- today a typo'd user-component call is just a plain Python `NameError` with no ARKlight-specific help, since it was never in the closed built-in vocabulary `arklight search` already knows. | Stage 0 | Not started |
+| 1 | Typo diagnostics | Extend `arklight/search/feedback.py`'s `parse_undefined_component_name` path so a typo'd call to a *registered user* component gets the same "did you mean...?" treatment a typo'd `Headign(...)` already gets -- today a typo'd user-component call is just a plain Python `NameError` with no ARKlight-specific help, since it was never in the closed built-in vocabulary `arklight search` already knows. | Stage 0 | **Done** -- `tests/test_user_defined_components_stage1.py` |
 | 2 | Default styling hook | An optional default `Site.style(...)` block attached at `component(..., default_style={...})` registration time, expanded into the site's CSS output the same way built-in defaults are -- lets a user component ship with sane default styling instead of forcing every caller to pass `class_name=`. | Stage 0 | Not started |
 | 3 | Option B's real differentiator: per-backend render dispatch | The actual "registry-based late binding" `user-defined-components.md` describes: a `mode="registry"` component's identity survives expansion (or is preserved via a different mechanism -- open design question, not pre-decided here) far enough that the HTML backend, and eventually Android/Desktop, can each supply their own render function for the same component name, falling back to a shared default when a backend doesn't define one. This is the stage that makes Option B a real alternative outcome instead of today's same-as-Option-A placeholder. | Stage 0 (the `mode=` selector already exists to build on) | Not started |
 | 4 | Component-owned state | Explicitly **out of scope** until `v0.054`'s reactive-core IR semantics have something for it to hook into (`user-defined-components.md` Section 4 already calls this out as its own, later milestone -- listed here only so this ladder doesn't silently drop it). A component today may *consume* `Bind(...)`/`ActionRef` values passed in as props from a page that already declares `State(...)`, exactly like `Container`/`Button` already do -- it just can't declare new state of its own yet. | `v0.054` (already DONE) + Stages 0-3 | Not started |
@@ -139,3 +139,75 @@ nothing further from `v0.054`'s side but still a materially separate
 problem). No change to `arklight/ir/schema.py`, `tag_map.py`, or any
 backend was needed for Stage 0 -- exactly the "zero changes required"
 property Option A promised.
+
+## Stage 1 implementation notes
+
+`arklight/search/feedback.py` itself needed **no changes** --
+`parse_undefined_component_name`/`record_name_error_feedback` already
+did exactly the right thing; they just never had a registered user
+component to find, because `SearchEngine.knowledge` was built purely
+from `arklight.ir.schema.SCHEMA`. Stage 1 is entirely a knowledge-base
+change:
+
+- **`arklight/search/knowledge.py`.** `build_knowledge_base()` gained
+  an optional `components:` parameter (default `None`, so every
+  pre-Stage-1 caller is unaffected) that merges a
+  `{name: SymbolFact}` entry per registered `ComponentSpec` alongside
+  the built-in `SCHEMA` facts, via the new `component_symbol_fact`.
+- **Built-ins always win a name collision.** If a user component ever
+  reuses a built-in's name, `build_knowledge_base` silently keeps
+  `SCHEMA`'s own facts for that name rather than letting the user
+  registration shadow them -- `SCHEMA` stays the one closed, canonical
+  vocabulary every other compiler stage already agrees on; this only
+  concerns what the search/typo-feedback layer sees, not the registry
+  itself (`arklight.ir.components.expand_node` still looks a call's
+  `node.type` up in `COMPONENT_REGISTRY` exactly as before, unchanged
+  by anything in this file).
+- **A user component's `SymbolFact` always has `allow_children=False`,
+  `text_only_children=False`.** Reflects Stage 0's "no children slot
+  on a component call, yet" decision (see above) -- there's no
+  children position for a "did you mean...?" hint to describe, unlike
+  a built-in `Container`/`Heading`.
+- **`SearchEngine.knowledge` merges live, not once.** The built-in
+  `SCHEMA` scan is still cached exactly as before Stage 1
+  (`self._builtin_knowledge`, built once per engine instance) --  but
+  the *merge* with `arklight.ir.components.COMPONENT_REGISTRY` runs on
+  every `.knowledge` access instead of being folded into that same
+  cached snapshot. Registration is a live global mutated as a site
+  module executes (`@component(...)`'s decorator runs at import time,
+  before `Site.build_ark_ast()` -- and therefore before the `NameError`
+  a *typo'd* call raises -- ever runs), so caching a merged snapshot
+  from whenever `.knowledge` first happened to be accessed could
+  permanently miss components registered afterward. See
+  `SearchEngine.knowledge`'s own docstring for the one known
+  consequence this trades away: `_search_uncached`'s
+  `functools.lru_cache` is keyed on `(query, limit, near, now)`, not
+  on registry contents, so a long-lived engine (the Stage 9 endpoint)
+  answering the exact same query twice, with a registration in
+  between, could still return a stale cached result the second time.
+  Doesn't affect the real path this stage exists for -- a one-shot
+  `compile_site_file` call never repeats a query against a changing
+  registry within its own process lifetime.
+- **The usage graph/PageRank importance signal is untouched.**
+  `SearchEngine.graph`/`._importance` still build off `set(self.
+  knowledge)` (now including user components) the same way they
+  always did, and `arklight.search.ranking._normalized_importance`
+  already defaults any name absent from the PageRank dict to `0.0` --
+  so a user component that was registered *after* `.graph` was first
+  computed and cached just ranks with no structural-importance boost
+  rather than erroring, exactly like any other guaranteed-to-be-0
+  candidate that has never appeared in a scanned usage example.
+
+## Explicitly out of scope for Stage 1
+
+Default component styling (Stage 2), the per-backend render dispatch
+that gives `mode="registry"` its real differentiator (Stage 3), and
+component-owned reactive state (Stage 4) -- none of them touched by
+this stage. `arklight/cli/search.py`'s `_format_spec` (the *exact-match*
+schema-summary printer for `arklight search <name>`) also still reads
+`SCHEMA` directly and was left alone: it has no equivalent for a user
+component yet (a `ComponentSpec` isn't a `NodeSpec`), so an exact-name
+`arklight search NavBar` still won't print a schema summary the way
+`arklight search Heading` does -- only the *typo* path
+(`_suggest`/the Stage 8 feedback hook) was in Stage 1's scope, per the
+table above.
