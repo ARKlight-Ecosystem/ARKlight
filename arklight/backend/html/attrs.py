@@ -1,0 +1,384 @@
+"""
+HTML Backend refactor, Stage 3 (see
+docs/Backends/HTML-BACKEND-REFACTOR.md / docs/Backends/REFACTOR-INDEX.md
+row 3, `html-3`): the third of the six staged extractions splitting
+`arklight/backend/html/render.py`'s five unrelated jobs into their own
+modules.
+
+This module owns attribute rendering -- logic that runs once per node,
+answering "given this node's props, what HTML attribute string does it
+actually emit." It depends on `routing.py` (Stage 2) for the
+route/asset-path resolution `_attr_string` delegates to for
+`href`/`src`/`srcset`-shaped values, and on nothing from `head_meta.py`
+or `page_render.py` (Stages 4-5) -- those depend on this module, not
+the other way around, matching the target shape's stated dependency
+direction.
+
+Sequenced ahead of `htmx-1` (see `docs/Backends/REFACTOR-INDEX.md`)
+deliberately: the HTMX attribute-emission rewrite
+(`data-ark-on-click`/`data-ark-modifiers` -> `hx-on:click`/
+`hx-trigger`) lands directly in this module once it starts, rather
+than in the 460-line `render.py` a few commits before being moved out
+from under it.
+
+Zero behavior change: same attribute names, same resolution order,
+same generated HTML byte-for-byte as before this module existed.
+`render.py` re-exports `PASSTHROUGH_ATTRS`/`PROP_ALIASES`/
+`BEHAVIOR_PROP_ATTRS`/`_style_dict_to_css`/`_attr_string` for backward
+compatibility with anything that already imported them from there,
+same as Stages 1-2.
+
+`htmx-1` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 1 --
+Behaviors" / `docs/Backends/REFACTOR-INDEX.md` row 4) originally
+landed here as promised above: a plain string `on_click` (a named
+behavior -- `"toggle"`, `"scroll-to"`, `"copy"`, `"dismiss"`) emitted
+`hx-on:click="arkRunBehavior('<name>', this)"` instead of
+`data-ark-on-click="<name>"`, so HTMX's own attribute-processing pass
+did the wiring that `arklight/backend/js/render.py`'s then-deleted
+`wireBehaviors()` used to do by hand. **`htmx-5` reverts this specific
+shape** -- see the `data-ark-on-click="behavior:<name>"` comment on
+`on_click`'s string branch below and `arklight/backend/js/runtime/
+dispatch.py`'s module docstring for why: HTMX's `hx-on:click`
+processing turned out to construct a function from the attribute's
+string value internally, which this project's own "no eval, no new
+Function" invariant doesn't permit. `behavior_target`/`toggle_class`
+were never affected by either change -- they still compile to
+`data-ark-target`/`data-ark-toggle-class`, which the behavior
+fragments in `arklight/backend/js/behaviors/` read off the clicked
+element exactly as before; only *how the click gets wired* has ever
+changed, not what a behavior does once it runs. `on_click=Action.*(...)`
+(an `ActionRef`) was untouched by `htmx-1` and remains untouched by
+`htmx-5` -- it emits `data-ark-on-click="action:..."` both before and
+after this stage, matched-pair with `dispatch.py`'s wiring (`htmx-3`
+renamed that wiring from `wireActions()` to `wireActionInterceptor()`;
+`htmx-5` renamed it again, to `wireClickInterceptor()`, when it also
+took over dispatching the `"behavior:..."` shape below -- see that
+module's docstring). Everything about
+`data-ark-on-click`/`data-ark-action-state`/`data-ark-action-args` for
+the `ActionRef` case is unaffected by any of this and still current.
+
+`htmx-2` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 2 --
+Modifiers" / `docs/Backends/REFACTOR-INDEX.md` row 5) changes one more
+piece of an `ActionRef`'s attribute shape: `.with_modifiers(...)` /
+`.debounce(...)` / `.throttle(...)` tokens no longer render as the
+`data-ark-modifiers="prevent,debounce:300"` attribute the now-deleted
+`arkApplyModifiers()` runtime parser used to read. Instead
+`_modifiers_to_hx_trigger` below compiles those tokens into HTMX's own
+`hx-trigger` modifier syntax (`click debounce:300ms`) at build time --
+see that function's docstring for the token-by-token mapping, and why
+`"prevent"` never produces an `hx-trigger` token at all.
+`data-ark-on-click="action:..."`/`data-ark-action-state`/
+`data-ark-action-args` are unchanged -- `wireActions()` still reads
+those directly (that's `htmx-3` scope); only the modifier attribute's
+shape changed this stage.
+"""
+
+from __future__ import annotations
+
+import json
+from html import escape
+
+from arklight.ast.nodes import ActionRef, ClassBindSpec
+from arklight.backend.html.routing import (
+    ASSET_OR_ROUTE_AWARE_ATTRS,
+    ROUTE_AWARE_ATTRS,
+    SRCSET_ATTRS,
+    _is_internal_route_ref,
+    _resolve_route_ref,
+    _resolve_src_ref,
+    _resolve_srcset_ref,
+)
+
+# Prop names that map straight through to HTML attributes.
+PASSTHROUGH_ATTRS = {
+    "id", "class", "style", "href", "src", "alt", "title", "target", "name", "type",
+    # v0.003: forms.
+    "value", "placeholder", "required", "disabled", "checked", "readonly",
+    "min", "max", "step", "pattern", "rows", "cols", "for", "multiple",
+    "selected", "maxlength", "minlength", "autocomplete", "accept", "action",
+    "method", "enctype", "novalidate", "label", "size", "autofocus", "form",
+    # Stage 2 (docs/Backends/HTML-BACKEND-REFACTOR.md) discovery: `formaction`
+    # was missing here entirely, so it always rendered as `data-formaction`
+    # instead of a real HTML attribute, independent of the routing question
+    # -- see routing.py's module docstring, "A separate, pre-existing bug".
+    "formaction",
+    # v0.003: tables.
+    "colspan", "rowspan", "scope", "headers",
+    # v0.003: media.
+    "controls", "autoplay", "loop", "muted", "poster", "preload",
+    # v0.003: <details>, <blockquote>/<q>, <time>.
+    "open", "cite", "datetime", "download",
+    # v0.003: accessibility (beyond the generic aria_* -> aria-* mapping
+    # below, `role` is common enough to spell out explicitly).
+    "role", "tabindex",
+    # v0.003 (second addendum): lists (<ol>).
+    "start", "reversed",
+    # v0.003 (second addendum): responsive images (<picture><source>)
+    # and native lazy-loading/decoding hints on <img>/<iframe>.
+    "srcset", "sizes", "media", "loading", "decoding",
+    # v0.003 (second addendum): native widgets (<meter>).
+    "low", "high", "optimum",
+    # v0.003 (second addendum): bidi text (<bdo>, and <bdi> where
+    # explicit direction is needed) plus generic `dir` support.
+    "dir",
+    # v0.003 (second addendum): table column grouping (<col span>).
+    "span",
+    # v0.003 (second addendum): <track> (video/audio captions).
+    "kind", "srclang", "default",
+    # v0.003 (second addendum): image maps (<area>).
+    "shape", "coords",
+    # v0.003 (second addendum): <iframe> embeds.
+    "allow", "allowfullscreen", "sandbox", "referrerpolicy",
+}
+
+# Props whose HTML attribute name differs from the prop's Python name
+# (needed because `class` and `for` are Python keywords/awkward as kwargs).
+PROP_ALIASES = {"class_name": "class", "for_": "for", "html_for": "for"}
+
+# v0.003 behavior props (arklight.ir.schema.KNOWN_BEHAVIORS) -> the
+# data-ark-* attribute the JS runtime actually reads. Kept separate
+# from PROP_ALIASES/the generic data-* fallback so the attribute names
+# are exact and documented in one place, matching what
+# arklight/backend/js/render.py's RUNTIME_JS expects.
+#
+# `on_click` itself is deliberately absent as of `htmx-1`: a plain
+# string `on_click` no longer maps through this generic dict at all --
+# `_attr_string` below special-cases it (same way it already
+# special-cased `on_click=Action.*(...)`/`ActionRef` before this
+# stage), now (as of `htmx-5`) to emit `data-ark-on-click="behavior:
+# <name>"` -- back to a bespoke `data-ark-*` attribute, not an HTMX
+# one, for the eval-avoidance reason documented on that branch below.
+# The two props that describe what a behavior does once wired --
+# `behavior_target`/`toggle_class` -- are unaffected and stay here.
+BEHAVIOR_PROP_ATTRS = {
+    "behavior_target": "data-ark-target",
+    "toggle_class": "data-ark-toggle-class",
+}
+
+
+# htmx-2 (docs/Backends/HTMX-INTEGRATION.md "Stage 2 -- Modifiers"):
+# ARKlight modifier token -> HTMX hx-trigger modifier token. Only
+# covers the two boolean modifiers that have a real HTMX equivalent --
+# "once" maps straight across, "stop" maps to HTMX's "consume" (which
+# stops the event triggering other htmx-wired listeners on ancestor
+# elements, the closest built-in equivalent to stopPropagation HTMX
+# offers). "prevent" is deliberately absent: it has no hx-trigger
+# equivalent and needs none -- see _modifiers_to_hx_trigger below.
+_HX_TRIGGER_MODIFIER_MAP = {"once": "once", "stop": "consume"}
+
+
+def _modifiers_to_hx_trigger(modifiers: tuple[str, ...]) -> str | None:
+    """
+    Compile an `ActionRef.modifiers` tuple into an HTMX `hx-trigger`
+    value, replacing the `data-ark-modifiers` attribute /
+    `arkApplyModifiers()` runtime parser `htmx-2` removes.
+
+    | `MODIFIER_REGISTRY` token | `hx-trigger` token |
+    |---------------------------|---------------------|
+    | `once`                    | `once`              |
+    | `debounce:<ms>`           | `debounce:<ms>ms`   |
+    | `throttle:<ms>`           | `throttle:<ms>ms`   |
+    | `stop`                    | `consume`           |
+    | `prevent`                 | (none)              |
+
+    `"prevent"` produces no token: `wireActions()`'s click listener
+    already calls `event.preventDefault()` unconditionally on every
+    dispatch (unchanged, pre-`htmx-2` behavior), so the modifier is
+    "honored by construction" the same way it already was before this
+    stage -- there's nothing left for `hx-trigger` to additionally
+    encode.
+
+    Returns `None` when there is nothing left to say after that (no
+    modifiers at all, or a tuple containing only `"prevent"`), so the
+    caller can omit the attribute entirely -- same "only ship what's
+    used" discipline as everywhere else in this file.
+    """
+    tokens = []
+    for token in modifiers:
+        name, _, param = token.partition(":")
+        if name == "prevent":
+            continue
+        elif name in _HX_TRIGGER_MODIFIER_MAP:
+            tokens.append(_HX_TRIGGER_MODIFIER_MAP[name])
+        elif name in ("debounce", "throttle"):
+            tokens.append(f"{name}:{param}ms")
+    if not tokens:
+        return None
+    return "click " + " ".join(tokens)
+
+
+def _style_dict_to_css(style: dict) -> str:
+    parts = []
+    for prop, value in style.items():
+        if value is None or value is False:
+            continue
+        css_prop = prop.replace("_", "-")
+        parts.append(f"{css_prop}: {value}")
+    return "; ".join(parts)
+
+
+def _attr_string(
+    props: dict,
+    *,
+    current_route: str,
+    route_to_path: dict[str, str],
+    page_state: dict | None = None,
+    # `node_type` is no longer read here: its only use was
+    # `_warn_unrouted_reference`'s message, removed by the
+    # `UNROUTED_REFERENCE_ATTRS` fix (see routing.py's module
+    # docstring). Kept as an accepted-but-unused kwarg rather than
+    # removed, since `_render_node` already passes it and a future
+    # attribute-shape warning is a plausible enough reason to want it
+    # again that dropping and later re-adding the parameter isn't
+    # worth the churn.
+    node_type: str = "node",
+) -> str:
+    props = dict(props)  # local copy -- may splice the initial bound class in below
+
+    bind_class = props.get("bind_class")
+    if isinstance(bind_class, ClassBindSpec) and page_state is not None:
+        # Stage 2 ("Reactive-core vdom staging"): pre-fill the class the
+        # same way `_render_bind` pre-fills bound text, so the page
+        # reflects its initial state correctly with JS disabled -- the
+        # shipped runtime just keeps this in sync after that.
+        if page_state.get(bind_class.state):
+            existing = props.get("class_name")
+            classes = existing.split() if isinstance(existing, str) and existing else []
+            if bind_class.class_name not in classes:
+                classes.append(bind_class.class_name)
+            props["class_name"] = " ".join(classes)
+
+    bind_value = props.get("bind_value")
+    if isinstance(bind_value, str) and bind_value and page_state is not None:
+        # vdom-6: pre-fill `value` from state the same way bind_class
+        # pre-fills `class_name` above, so the page reflects its
+        # initial state correctly with JS disabled -- the shipped
+        # runtime keeps it in sync (both directions) after that. An
+        # explicit `value=` prop, if also given, wins -- bind_value
+        # only fills the gap, it doesn't override.
+        if "value" not in props and bind_value in page_state:
+            props["value"] = page_state.get(bind_value)
+
+    parts = []
+    for key, value in props.items():
+        if key == "level":
+            continue  # handled specially for Heading
+        if value is None or value is False:
+            continue
+
+        if key == "on_click" and isinstance(value, ActionRef):
+            # v0.0035: Action.*(...) values carry their own attribute
+            # shape (action name + target state + JSON args) instead of
+            # the plain data-ark-on-click="<behavior name>" a string
+            # on_click gets below.
+            parts.append(f' data-ark-on-click="action:{escape(value.action, quote=True)}"')
+            parts.append(f' data-ark-action-state="{escape(value.state, quote=True)}"')
+            if value.args:
+                parts.append(f' data-ark-action-args="{escape(json.dumps(value.args), quote=True)}"')
+            if value.modifiers:
+                # htmx-2: compiled into HTMX's own hx-trigger modifier
+                # syntax at build time instead of the deleted
+                # data-ark-modifiers / arkApplyModifiers() pair -- see
+                # _modifiers_to_hx_trigger above.
+                hx_trigger = _modifiers_to_hx_trigger(value.modifiers)
+                if hx_trigger:
+                    parts.append(f' hx-trigger="{escape(hx_trigger, quote=True)}"')
+            continue
+
+        if key == "on_click" and isinstance(value, str):
+            # htmx-1 originally wired a named behavior through HTMX's
+            # `hx-on:click="arkRunBehavior('<name>', this)"`. `htmx-5`
+            # (docs/Backends/HTMX-INTEGRATION.md "Stage 4 -- Audit and
+            # remove remaining hand-rolled plumbing" / docs/Backends/
+            # REFACTOR-INDEX.md row 10) reverts the attribute shape
+            # back to `data-ark-on-click`, matched-pair with the
+            # `"action:..."` shape `on_click=Action.*(...)` already
+            # gets below -- both are now read by the same delegated
+            # `wireClickInterceptor` click listener
+            # (`arklight/backend/js/runtime/dispatch.py`) rather than
+            # HTMX's own attribute processing. The reason isn't a
+            # style reversal: HTMX's `hx-on:click` handling builds a
+            # new function from the attribute's *string value* with
+            # the `Function` constructor before calling it -- an
+            # eval-equivalent operation this project's own "no eval,
+            # no new Function" invariant (see
+            # `arklight/backend/js/render.py`'s module docstring)
+            # doesn't permit, vendored dependency or not. See
+            # `dispatch.py`'s module docstring for the full audit
+            # finding. The behavior name is escaped, not validated
+            # here -- the Validation stage (`arklight.ir.validate`)
+            # already rejects anything not in `KNOWN_BEHAVIORS` before
+            # this code runs.
+            parts.append(f' data-ark-on-click="behavior:{escape(value, quote=True)}"')
+            continue
+
+        if key == "shell_persistent":
+            # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): a bool
+            # prop that compiles to htmx's own `hx-preserve="true"` --
+            # the built-in mechanism for keeping an element (matched
+            # by `id`, which Validation already requires alongside
+            # this prop -- see arklight.ir.validate) untouched across
+            # an app-shell boosted swap, instead of being replaced by
+            # whatever the newly-fetched page's markup has in its
+            # place. This is the actual fix for the "shell-persistent
+            # regions (nav/header) survive a boosted swap" half of
+            # `Site(app_shell=True)` -- see `page_render.py` for the
+            # `hx-boost="true"` half. Inert (compiles to the same
+            # attribute either way) on a site that never sets
+            # `app_shell=True`; htmx simply never looks for it there.
+            if value:
+                parts.append(' hx-preserve="true"')
+            continue
+
+        if key == "bind_class" and isinstance(value, ClassBindSpec):
+            # Stage 2: the runtime reads these two to know which class
+            # to toggle and which state key drives it -- the initial
+            # value (if any) was already folded into `class_name` above.
+            parts.append(f' data-ark-bind-class="{escape(value.class_name, quote=True)}"')
+            parts.append(f' data-ark-bind-class-state="{escape(value.state, quote=True)}"')
+            continue
+
+        if key == "bind_value" and isinstance(value, str) and value:
+            # vdom-6: the runtime reads this to know which state key
+            # to keep this element's `value` synced with, in both
+            # directions -- the initial value (if any) was already
+            # folded into `value` above.
+            parts.append(f' data-ark-model="{escape(value, quote=True)}"')
+            continue
+
+        if key in BEHAVIOR_PROP_ATTRS:
+            attr_name = BEHAVIOR_PROP_ATTRS[key]
+        elif key.startswith("aria_"):
+            # v0.003: generic accessibility convention -- `aria_label`,
+            # `aria_hidden`, `aria_expanded`, etc. all map straight to
+            # their real `aria-*` attribute without needing an entry
+            # per attribute name (there are dozens in the ARIA spec).
+            attr_name = "aria-" + key[len("aria_"):].replace("_", "-")
+        else:
+            attr_name = PROP_ALIASES.get(key, key)
+
+            if attr_name == "style" and isinstance(value, dict):
+                value = _style_dict_to_css(value)
+
+            if attr_name in ROUTE_AWARE_ATTRS and isinstance(value, str) and _is_internal_route_ref(value):
+                value = _resolve_route_ref(value, current_route=current_route, route_to_path=route_to_path)
+            elif attr_name in ASSET_OR_ROUTE_AWARE_ATTRS and isinstance(value, str) and value:
+                value = _resolve_src_ref(value, current_route=current_route, route_to_path=route_to_path)
+            elif attr_name in SRCSET_ATTRS and isinstance(value, str) and value:
+                # UNROUTED_REFERENCE_ATTRS fix (docs/Backends/HTML-BACKEND-REFACTOR.md
+                # audit / docs/Backends/REFACTOR-INDEX.md row 1): `srcset`
+                # packs multiple URLs into one value, so it gets its own
+                # resolver rather than reusing _resolve_route_ref/_resolve_src_ref
+                # directly -- see routing.py's module docstring.
+                value = _resolve_srcset_ref(value, current_route=current_route, route_to_path=route_to_path)
+
+            if attr_name not in PASSTHROUGH_ATTRS and not attr_name.startswith("data-"):
+                # Unknown props are still emitted as data-* attributes rather
+                # than silently dropped, so nothing a user writes disappears.
+                attr_name = f"data-{attr_name}"
+
+        if value is True:
+            parts.append(f" {attr_name}")
+        else:
+            parts.append(f' {attr_name}="{escape(str(value), quote=True)}"')
+    return "".join(parts)

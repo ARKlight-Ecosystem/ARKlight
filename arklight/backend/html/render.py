@@ -15,10 +15,17 @@ Three things beyond basic tag rendering are handled here:
    a domain root; opening the file directly (`file://.../index.html`)
    or serving it from a subdirectory would send the browser to
    `/about` on the local filesystem or wrong origin, not
-   `ARK/about.html`. So any href/src starting with "/" (and matching
-   a known route) is rewritten to the correct relative path from the
+   `ARK/about.html`. So any `href` starting with "/" (and matching a
+   known route) is rewritten to the correct relative path from the
    *current* page's output location. External URLs, `#fragments`,
    `mailto:`, and unrecognized paths are left untouched.
+
+   `src` (Image/Source/Track/IFrame) gets the same route treatment
+   *if* it matches a known route, but most `src` values are static
+   assets rather than page routes -- e.g. `Image(src="sprites/25.png")`
+   -- so any other `src` is instead rewritten as a root-relative asset
+   path, the same way the built-in `styles.css`/`arklight.js`/favicon/
+   `og_image` references already are. See `_resolve_src_ref`.
 
 2. **A stylesheet link and behavior-runtime script are always
    included**, pointing (relatively) at the CSS/JS backends' output --
@@ -41,381 +48,105 @@ Three things beyond basic tag rendering are handled here:
    `data-ark-action-state`/`data-ark-action-args`, which the JS
    backend's reactive core (only shipped for pages that declare state)
    reads to wire up the click.
+
+5. **`.with_modifiers(...)` / `.debounce(...)` / `.throttle(...)` on an
+   `ActionRef` render as an `hx-trigger="click debounce:300ms"`
+   attribute** alongside the `data-ark-on-click` hooks above. At Stage
+   3 ("Reactive-core vdom staging") this was a comma-joined
+   `data-ark-modifiers` attribute instead; `htmx-2` (see
+   `arklight.backend.html.attrs._modifiers_to_hx_trigger`) replaced it
+   with HTMX's own trigger-modifier syntax. Omitted entirely for an
+   `ActionRef` with no modifiers attached, or one carrying only
+   `"prevent"` (which has no `hx-trigger` equivalent).
+
+6. **htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): `Site(app_shell=
+   True)` emits `hx-boost="true"` on `<body>`**, turning same-origin
+   link clicks into an in-place AJAX swap instead of a full document
+   reload -- see `page_render.py`'s `_render_page` docstring for the
+   full reasoning, including why a state page's `data-ark-state` blob
+   moves off `<body>` and into the swapped content when this is set.
+   A node carrying `shell_persistent=True` (and, per Validation, a
+   matching `id`) compiles to `hx-preserve="true"`, htmx's mechanism
+   for keeping that element untouched across a boosted swap -- the
+   fix for the "shell-persistent regions (nav/header) survive a
+   boosted swap" half of the same design doc. Defaults to `False`;
+   every existing site's output is unaffected.
+
+## HTML Backend refactor -- module map
+
+This file used to hold all five of the HTML backend's unrelated jobs
+in one ~580-line module; `docs/Backends/HTML-BACKEND-REFACTOR.md`
+splits them across sibling modules, staged one concern per commit:
+
+- **Stage 1** -- `tag_map.py`: IR-node-type -> HTML-tag-name mapping
+  (`TAG_MAP`, `VOID_TAGS`, `_tag_for`).
+- **Stage 2** -- `routing.py`: route/asset-path resolution
+  (`ROUTE_AWARE_ATTRS`, `_output_path_for_route`,
+  `_is_internal_route_ref`, `_resolve_route_ref`, `_resolve_src_ref`,
+  `_resolve_srcset_ref`, `_relative_asset_path`), including the
+  `UNROUTED_REFERENCE_ATTRS` reachability fix.
+- **Stage 3** -- `attrs.py`: attribute rendering (`PASSTHROUGH_ATTRS`,
+  `PROP_ALIASES`, `BEHAVIOR_PROP_ATTRS`, `_style_dict_to_css`,
+  `_attr_string`).
+- **Stage 4** -- `head_meta.py`: per-page `<head>` metadata assembly
+  (`_render_head_meta`).
+- **Stage 5** -- `page_render.py`: per-page composition
+  (`_render_bind`, `_render_children`, `_render_node`, `_render_page`).
+
+With Stage 5 done, this file holds only `HTMLBackend`, whose
+`render()` is a short composition of the sibling modules above --
+the target shape's stated end state. Every name from Stages 1-5 is
+still re-exported here (`from arklight.backend.html.render import ...`
+keeps working for anything that imported them from their old
+location), so this docstring is the map for "where does X actually
+live now," not a list of what's still defined in this file.
+
+**Stage 6** (confirming whether `README.md`'s "Compiler pipeline" HTML
+Backend line still describes only external behavior) is a check
+against the finished state of this split, not a code change, and is
+not yet done.
 """
 
 from __future__ import annotations
 
-import json
-import posixpath
-from html import escape
-
-from arklight.ast.nodes import ActionRef
 from arklight.backend.base import Backend
-from arklight.backend.css.render import STYLESHEET_PATH
-from arklight.backend.js.render import SCRIPT_PATH
-from arklight.ir.build import IRNode, IRPage, WebsiteIR
+from arklight.backend.html.attrs import (
+    BEHAVIOR_PROP_ATTRS,
+    PASSTHROUGH_ATTRS,
+    PROP_ALIASES,
+    _attr_string,
+    _style_dict_to_css,
+)
+from arklight.backend.html.head_meta import _render_head_meta
+from arklight.backend.html.page_render import (
+    _render_bind,
+    _render_children,
+    _render_node,
+    _render_page,
+)
+from arklight.backend.html.routing import (
+    ASSET_OR_ROUTE_AWARE_ATTRS,
+    ROUTE_AWARE_ATTRS,
+    SRC_ATTRS,
+    SRCSET_ATTRS,
+    _is_internal_route_ref,
+    _output_path_for_route,
+    _relative_asset_path,
+    _resolve_route_ref,
+    _resolve_src_ref,
+    _resolve_srcset_ref,
+)
+from arklight.backend.html.tag_map import TAG_MAP, VOID_TAGS, _tag_for
+from arklight.ir.build import WebsiteIR
 
-# Maps an IR node type to an HTML tag name.
-TAG_MAP: dict[str, str] = {
-    "Page": "body",  # Page's children become <body> content; see _render_page
-    "Container": "div",
-    "Heading": "h1",  # level overridden via `level` prop, see _tag_for
-    "Text": "p",
-    "Button": "button",
-    "Link": "a",
-    "Image": "img",
-    "List": "ul",
-    "Item": "li",
-    # v0.003: semantic layout.
-    "Header": "header",
-    "Footer": "footer",
-    "Main": "main",
-    "Nav": "nav",
-    "Section": "section",
-    "Article": "article",
-    "Aside": "aside",
-    "Figure": "figure",
-    "FigCaption": "figcaption",
-    "Details": "details",
-    "Summary": "summary",
-    # v0.003: text-level semantics.
-    "Strong": "strong",
-    "Em": "em",
-    "Small": "small",
-    "Mark": "mark",
-    "Code": "code",
-    "Cite": "cite",
-    "Abbr": "abbr",
-    "Sub": "sub",
-    "Sup": "sup",
-    "Span": "span",
-    "Time": "time",
-    "HorizontalRule": "hr",
-    "LineBreak": "br",
-    "Pre": "pre",
-    "Blockquote": "blockquote",
-    # v0.003: forms.
-    "Form": "form",
-    "Input": "input",
-    "Textarea": "textarea",
-    "Select": "select",
-    "Option": "option",
-    "OptGroup": "optgroup",
-    "Label": "label",
-    "FieldSet": "fieldset",
-    "Legend": "legend",
-    # v0.003: tables.
-    "Table": "table",
-    "TableHead": "thead",
-    "TableBody": "tbody",
-    "TableFoot": "tfoot",
-    "TableRow": "tr",
-    "TableHeaderCell": "th",
-    "TableCell": "td",
-    "Caption": "caption",
-    # v0.003: media.
-    "Video": "video",
-    "Audio": "audio",
-    "Source": "source",
-    # v0.003 (second addendum): lists.
-    "OrderedList": "ol",
-    "DescriptionList": "dl",
-    "DescriptionTerm": "dt",
-    "DescriptionDetails": "dd",
-    # v0.003 (second addendum): responsive images.
-    "Picture": "picture",
-    "PictureSource": "source",
-    # v0.003 (second addendum): native widgets.
-    "Progress": "progress",
-    "Meter": "meter",
-    "Datalist": "datalist",
-    "Output": "output",
-    # v0.003 (second addendum): dialog.
-    "Dialog": "dialog",
-    # v0.003 (second addendum): more text-level semantics.
-    "Kbd": "kbd",
-    "Samp": "samp",
-    "Var": "var",
-    "Data": "data",
-    "Ins": "ins",
-    "Del": "del",
-    "Q": "q",
-    "Dfn": "dfn",
-    "Address": "address",
-    "Wbr": "wbr",
-    "Bdi": "bdi",
-    "Bdo": "bdo",
-    # v0.003 (second addendum): ruby annotations.
-    "Ruby": "ruby",
-    "Rt": "rt",
-    "Rp": "rp",
-    # v0.003 (second addendum): table extras.
-    "ColGroup": "colgroup",
-    "Col": "col",
-    # v0.003 (second addendum): media.
-    "Track": "track",
-    # v0.003 (second addendum): image maps.
-    "Map": "map",
-    "Area": "area",
-    # v0.003 (second addendum): embeds.
-    "IFrame": "iframe",
-    # v0.003 (second addendum): no-JS fallback.
-    "NoScript": "noscript",
-}
-
-# Prop names that map straight through to HTML attributes.
-PASSTHROUGH_ATTRS = {
-    "id", "class", "style", "href", "src", "alt", "title", "target", "name", "type",
-    # v0.003: forms.
-    "value", "placeholder", "required", "disabled", "checked", "readonly",
-    "min", "max", "step", "pattern", "rows", "cols", "for", "multiple",
-    "selected", "maxlength", "minlength", "autocomplete", "accept", "action",
-    "method", "enctype", "novalidate", "label", "size", "autofocus", "form",
-    # v0.003: tables.
-    "colspan", "rowspan", "scope", "headers",
-    # v0.003: media.
-    "controls", "autoplay", "loop", "muted", "poster", "preload",
-    # v0.003: <details>, <blockquote>/<q>, <time>.
-    "open", "cite", "datetime", "download",
-    # v0.003: accessibility (beyond the generic aria_* -> aria-* mapping
-    # below, `role` is common enough to spell out explicitly).
-    "role", "tabindex",
-    # v0.003 (second addendum): lists (<ol>).
-    "start", "reversed",
-    # v0.003 (second addendum): responsive images (<picture><source>)
-    # and native lazy-loading/decoding hints on <img>/<iframe>.
-    "srcset", "sizes", "media", "loading", "decoding",
-    # v0.003 (second addendum): native widgets (<meter>).
-    "low", "high", "optimum",
-    # v0.003 (second addendum): bidi text (<bdo>, and <bdi> where
-    # explicit direction is needed) plus generic `dir` support.
-    "dir",
-    # v0.003 (second addendum): table column grouping (<col span>).
-    "span",
-    # v0.003 (second addendum): <track> (video/audio captions).
-    "kind", "srclang", "default",
-    # v0.003 (second addendum): image maps (<area>).
-    "shape", "coords",
-    # v0.003 (second addendum): <iframe> embeds.
-    "allow", "allowfullscreen", "sandbox", "referrerpolicy",
-}
-
-# Props whose HTML attribute name differs from the prop's Python name
-# (needed because `class` and `for` are Python keywords/awkward as kwargs).
-PROP_ALIASES = {"class_name": "class", "for_": "for", "html_for": "for"}
-
-# v0.003 behavior props (arklight.ir.schema.KNOWN_BEHAVIORS) -> the
-# data-ark-* attribute the JS runtime actually reads. Kept separate
-# from PROP_ALIASES/the generic data-* fallback so the attribute names
-# are exact and documented in one place, matching what
-# arklight/backend/js/render.py's RUNTIME_JS expects.
-BEHAVIOR_PROP_ATTRS = {
-    "on_click": "data-ark-on-click",
-    "behavior_target": "data-ark-target",
-    "toggle_class": "data-ark-toggle-class",
-}
-
-# Attribute names whose value may be resolved relative to the current
-# page ("/", "/about", ...) instead of emitted verbatim.
-ROUTE_AWARE_ATTRS = {"href", "src"}
-
-# Tags that never have a closing tag / children.
-VOID_TAGS = {
-    "img", "hr", "br", "input", "source",
-    # v0.003 (second addendum).
-    "wbr", "col", "area", "track",
-}
-
-
-def _style_dict_to_css(style: dict) -> str:
-    parts = []
-    for prop, value in style.items():
-        if value is None or value is False:
-            continue
-        css_prop = prop.replace("_", "-")
-        parts.append(f"{css_prop}: {value}")
-    return "; ".join(parts)
-
-
-def _output_path_for_route(route: str) -> str:
-    """
-    Maps a route to a static output file path.
-
-    "/"          -> index.html
-    "/about"     -> about.html
-    "/blog/post" -> blog/post.html
-    """
-    trimmed = route.strip("/")
-    if trimmed == "":
-        return "index.html"
-    return f"{trimmed}.html"
-
-
-def _is_internal_route_ref(value: str) -> bool:
-    """True for values that look like an ARKlight route (`/`, `/about`),
-    as opposed to an external/absolute URL, protocol-relative URL,
-    fragment, or mailto/tel link."""
-    if not value.startswith("/"):
-        return False
-    if value.startswith("//"):
-        return False  # protocol-relative external URL
-    return True
-
-
-def _resolve_route_ref(value: str, *, current_route: str, route_to_path: dict[str, str]) -> str:
-    """Rewrite an internal route reference into a relative file path
-    from the current page's output location. Unknown routes are left
-    as-is (better a working absolute link than a silently broken one)."""
-    route, _, fragment = value.partition("#")
-    target_path = route_to_path.get(route)
-    if target_path is None:
-        return value  # not a known route -- leave untouched
-
-    current_path = route_to_path[current_route]
-    current_dir = posixpath.dirname(current_path) or "."
-    relative = posixpath.relpath(target_path, current_dir)
-    return f"{relative}#{fragment}" if fragment else relative
-
-
-def _relative_asset_path(asset_path: str, *, current_route: str, route_to_path: dict[str, str]) -> str:
-    """Like `_resolve_route_ref`, but for a fixed root-level asset
-    (e.g. styles.css) rather than a page route."""
-    current_path = route_to_path[current_route]
-    current_dir = posixpath.dirname(current_path) or "."
-    return posixpath.relpath(asset_path, current_dir)
-
-
-def _attr_string(props: dict, *, current_route: str, route_to_path: dict[str, str]) -> str:
-    parts = []
-    for key, value in props.items():
-        if key == "level":
-            continue  # handled specially for Heading
-        if value is None or value is False:
-            continue
-
-        if key == "on_click" and isinstance(value, ActionRef):
-            # v0.0035: Action.*(...) values carry their own attribute
-            # shape (action name + target state + JSON args) instead of
-            # the plain data-ark-on-click="<behavior name>" a string
-            # on_click gets below.
-            parts.append(f' data-ark-on-click="action:{escape(value.action, quote=True)}"')
-            parts.append(f' data-ark-action-state="{escape(value.state, quote=True)}"')
-            if value.args:
-                parts.append(f' data-ark-action-args="{escape(json.dumps(value.args), quote=True)}"')
-            continue
-
-        if key in BEHAVIOR_PROP_ATTRS:
-            attr_name = BEHAVIOR_PROP_ATTRS[key]
-        elif key.startswith("aria_"):
-            # v0.003: generic accessibility convention -- `aria_label`,
-            # `aria_hidden`, `aria_expanded`, etc. all map straight to
-            # their real `aria-*` attribute without needing an entry
-            # per attribute name (there are dozens in the ARIA spec).
-            attr_name = "aria-" + key[len("aria_"):].replace("_", "-")
-        else:
-            attr_name = PROP_ALIASES.get(key, key)
-
-            if attr_name == "style" and isinstance(value, dict):
-                value = _style_dict_to_css(value)
-
-            if attr_name in ROUTE_AWARE_ATTRS and isinstance(value, str) and _is_internal_route_ref(value):
-                value = _resolve_route_ref(value, current_route=current_route, route_to_path=route_to_path)
-
-            if attr_name not in PASSTHROUGH_ATTRS and not attr_name.startswith("data-"):
-                # Unknown props are still emitted as data-* attributes rather
-                # than silently dropped, so nothing a user writes disappears.
-                attr_name = f"data-{attr_name}"
-
-        if value is True:
-            parts.append(f" {attr_name}")
-        else:
-            parts.append(f' {attr_name}="{escape(str(value), quote=True)}"')
-    return "".join(parts)
-
-
-def _tag_for(node: IRNode) -> str:
-    if node.type == "Heading":
-        level = node.props.get("level", 1)
-        if not isinstance(level, int) or not (1 <= level <= 6):
-            level = 1
-        return f"h{level}"
-    return TAG_MAP.get(node.type, "div")
-
-
-def _render_bind(node: IRNode, *, page_state: dict) -> str:
-    """
-    v0.0035: `Bind("count")` renders as a `<span data-ark-bind="count">`
-    pre-filled with the page's current (build-time) state value, so the
-    page is fully readable with JS disabled -- the shipped reactive
-    core just keeps this element's text in sync with client-side state
-    changes after that.
-    """
-    name = node.props.get("name")
-    value = page_state.get(name, "")
-    return f'<span data-ark-bind="{escape(str(name), quote=True)}">{escape(str(value))}</span>'
-
-
-def _render_children(
-    children: list, *, current_route: str, route_to_path: dict[str, str], page_state: dict
-) -> str:
-    rendered = []
-    for child in children:
-        if isinstance(child, IRNode):
-            rendered.append(
-                _render_node(
-                    child, current_route=current_route, route_to_path=route_to_path, page_state=page_state
-                )
-            )
-        else:
-            rendered.append(escape(str(child)))
-    return "".join(rendered)
-
-
-def _render_node(node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict) -> str:
-    if node.type == "Bind":
-        return _render_bind(node, page_state=page_state)
-
-    tag = _tag_for(node)
-    attrs = _attr_string(node.props, current_route=current_route, route_to_path=route_to_path)
-
-    if tag in VOID_TAGS:
-        return f"<{tag}{attrs} />"
-
-    inner = _render_children(
-        node.children, current_route=current_route, route_to_path=route_to_path, page_state=page_state
-    )
-    return f"<{tag}{attrs}>{inner}</{tag}>"
-
-
-def _render_page(page: IRPage, site_name: str, route_to_path: dict[str, str]) -> str:
-    title = page.root.props.get("title", site_name)
-    body_inner = _render_children(
-        page.root.children, current_route=page.route, route_to_path=route_to_path, page_state=page.state
-    )
-    stylesheet_href = _relative_asset_path(
-        STYLESHEET_PATH, current_route=page.route, route_to_path=route_to_path
-    )
-    script_src = _relative_asset_path(SCRIPT_PATH, current_route=page.route, route_to_path=route_to_path)
-    # v0.0035: pages that declare State(...) hydrate the client-side
-    # store from here -- a JSON blob of the same initial values the
-    # page was rendered with, so client and server never disagree.
-    body_attrs = ""
-    if page.state:
-        body_attrs = f' data-ark-state="{escape(json.dumps(page.state), quote=True)}"'
-    return (
-        "<!DOCTYPE html>\n"
-        '<html lang="en">\n'
-        "<head>\n"
-        '  <meta charset="utf-8">\n'
-        '  <meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f"  <title>{escape(str(title))}</title>\n"
-        f'  <link rel="stylesheet" href="{escape(stylesheet_href, quote=True)}">\n'
-        "</head>\n"
-        f"<body{body_attrs}>\n{body_inner}\n"
-        f'<script src="{escape(script_src, quote=True)}" defer></script>\n'
-        "</body>\n"
-        "</html>\n"
-    )
+# All of the re-exported names above (Stages 1-5) exist purely for
+# backward compatibility with anything already doing
+# `from arklight.backend.html.render import <name>` -- see the module
+# docstring's "module map" section for where each one is actually
+# defined and maintained now. Zero behavior change from any stage:
+# same tag names, same route/asset resolution, same attribute
+# strings, same <head> tags, same per-page composition, same
+# generated HTML byte-for-byte as before this split started.
 
 
 class HTMLBackend(Backend):
@@ -426,5 +157,7 @@ class HTMLBackend(Backend):
         output: dict[str, str] = {}
         for page in ir.pages:
             path = route_to_path[page.route]
-            output[path] = _render_page(page, ir.site_name, route_to_path)
+            output[path] = _render_page(
+                page, ir.site_name, route_to_path, site_lang=ir.lang, app_shell=ir.app_shell
+            )
         return output

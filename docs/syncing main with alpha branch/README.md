@@ -27,7 +27,7 @@ tracking doc for a job that's finished.
 | 0 | Foundational docs sync | Done |
 | 1 | Shared plumbing (18 files) + `config.py`/`experimental.py` | Done |
 | 2 | CSS backend rewrite | Done |
-| 3 | HTML backend refactor | Not started |
+| 3 | HTML backend refactor | Done |
 | 4 | JS backend: HTMX + reactive core (vdom) | Not started |
 | 5 | Search engine | Not started |
 | 6 | Live-streaming, CCTV, upgrade, scaffold extras | Not started |
