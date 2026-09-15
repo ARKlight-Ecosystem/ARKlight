@@ -43,7 +43,7 @@ silently drift apart again.
 
 Next up is **v0.048** (CSS `@media` queries + structured
 `<head>`/`<header>` extension) -- see the "Planned" section of
-[`PROGRESS.md`](./PROGRESS.md) and [`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md)
+[`PROGRESS.md`](./PROGRESS.md) and [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
 ("v0.048: CSS media queries + `<head>` extension") for the design.
 Custom CSS class authoring and an `arklight --search <name>` schema
 lookup are sketched but not yet scheduled to a version -- also in
@@ -178,7 +178,7 @@ than a raw traceback" -- `arklight/cli/main.py` module docstring).
 
 ## [0.041] -- Stateful JS vocabulary addendum II
 
-Full writeup in `docs/DESIGN-NOTES.md` ("v0.0035: stateful-JS
+Full writeup in `docs/Foundational/DESIGN-NOTES.md` ("v0.0035: stateful-JS
 vocabulary addendum II"). Second growth pass on `ACTION_REGISTRY`,
 same "additive data" discipline as addendum I directly below -- this
 batch is the first to assume a **list-valued** `State(...)` rather
@@ -210,7 +210,7 @@ than a scalar one.
 
 ### Deliberately deferred to a future version
 
-Still not an exhaustive vocabulary pass -- see `docs/DESIGN-NOTES.md`:
+Still not an exhaustive vocabulary pass -- see `docs/Foundational/DESIGN-NOTES.md`:
 
 - Per-item list rendering/templating (see note above).
 - Derived/computed state.
@@ -219,7 +219,7 @@ Still not an exhaustive vocabulary pass -- see `docs/DESIGN-NOTES.md`:
 
 ## [0.041] -- Stateful JS vocabulary addendum I
 
-Full writeup in `docs/DESIGN-NOTES.md` ("v0.0035: stateful-JS
+Full writeup in `docs/Foundational/DESIGN-NOTES.md` ("v0.0035: stateful-JS
 vocabulary addendum"). Grows `ACTION_REGISTRY` (added in v0.0035) with
 the two most commonly needed actions real usage hits right away,
 following the same "additive data, not a compiler change" discipline
@@ -242,7 +242,7 @@ the v0.0035 registry refactor was built for.
 
 ### Deliberately deferred to a future version
 
-Not an exhaustive vocabulary pass -- see `docs/DESIGN-NOTES.md` for
+Not an exhaustive vocabulary pass -- see `docs/Foundational/DESIGN-NOTES.md` for
 the reasoning behind leaving these out of this addendum:
 
 - List actions (`Action.append` / `Action.remove`) -- addressed in
@@ -253,7 +253,7 @@ the reasoning behind leaving these out of this addendum:
 
 ## [0.037] -- Sealed ARK Bundles
 
-Full writeup in `docs/DESIGN-NOTES.md` ("v0.037: sealed bundles").
+Full writeup in `docs/Foundational/DESIGN-NOTES.md` ("v0.037: sealed bundles").
 
 ### Added
 
@@ -284,7 +284,7 @@ Full writeup in `docs/DESIGN-NOTES.md` ("v0.037: sealed bundles").
 ### Changed
 
 - **`assets/` (and any other non-html/css/js file) is now carried into
-  the archive**, closing the v1 scope gap `docs/DESIGN-NOTES.md`
+  the archive**, closing the v1 scope gap `docs/Foundational/DESIGN-NOTES.md`
   explicitly flagged as deferred. `PackResult.skipped_paths` is always
   empty now; kept on the dataclass for backward compatibility rather
   than removed.
@@ -296,7 +296,7 @@ Full writeup in `docs/DESIGN-NOTES.md` ("v0.037: sealed bundles").
 
 ## [0.036] -- ARK Bundle spec v1
 
-Full writeup in `docs/DESIGN-NOTES.md` ("v0.036: ARK Bundle spec v1").
+Full writeup in `docs/Foundational/DESIGN-NOTES.md` ("v0.036: ARK Bundle spec v1").
 
 ### Added
 
@@ -342,7 +342,7 @@ This entry documents what actually shipped in the commits titled "v0.0035
 is done" -- it was missing from this file even though
 `pyproject.toml`/`arklight/__init__.py` already read `0.0035` and the
 README's "Status" section already described it. See
-`docs/DESIGN-NOTES.md` ("v0.0035: stateful JS -- capability, not
+`docs/Foundational/DESIGN-NOTES.md` ("v0.0035: stateful JS -- capability, not
 vocabulary") for the full design rationale.
 
 ### Added
@@ -525,7 +525,7 @@ normalize.py, validate.py, or build.py at all.
   `.center`, `.reel`, `.fluid-heading` -- built entirely from flexbox/
   grid sizing keywords (`minmax`, `auto-fit`, `clamp`, `flex-basis`
   math), with **no `@media`/`@container` query anywhere**, addressing
-  the structural ceiling recorded in `docs/DESIGN-NOTES.md`: `Page`
+  the structural ceiling recorded in `docs/Foundational/DESIGN-NOTES.md`: `Page`
   still has no `<head>` hook for a breakpoint-based rule, so
   responsiveness has to come from the browser reflowing content from
   available width alone.
@@ -563,7 +563,7 @@ normalize.py, validate.py, or build.py at all.
 - `default_backends()` now returns `[HTMLBackend(), CSSBackend(),
   JSBackend()]`.
 - `.nav a.is-active` and `.hidden` added to the default stylesheet.
-- `docs/DESIGN-NOTES.md`: styling ceiling, audience positioning,
+- `docs/Foundational/DESIGN-NOTES.md`: styling ceiling, audience positioning,
   Svelte-comparison, and Mitosis-reframe (state/event semantics as the
   real prerequisite for v0.100) writeups.
 - 9 new tests (66 total): JS backend content, behavior validation, and
