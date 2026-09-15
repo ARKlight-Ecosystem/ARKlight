@@ -29,16 +29,25 @@ tracking doc for a job that's finished.
 | 2 | CSS backend rewrite | Done |
 | 3 | HTML backend refactor | Done |
 | 4 | JS backend: HTMX + reactive core (vdom) | Done |
-| 5 | Search engine | Not started |
+| 5 | Search engine | Done |
 | 6 | Live-streaming, CCTV, upgrade, scaffold extras | Not started |
 | 7 | Root metadata (`pyproject.toml`, `.gitignore`) | Not started |
 | 8 | Android-exclusion verification pass | Not started |
 | 9 | Full test-suite verification | Not started |
 
-**Known gap until Stage 5 and Stage 6 land:** `arklight` itself now
-imports cleanly (Stage 2 satisfied the one top-level import Stage 1
-was missing), but the full test suite still can't collect --
-`arklight.compiler.pipeline` (Stage 1) imports `arklight.search.engine`
-(Stage 5) at module level, and `arklight.cli.templates.production`/
-`simple` (Stage 1) import `arklight.cli.templates._common` (Stage 6).
-Both are expected and tracked, not regressions from Stage 2.
+**Known gap until Stage 6 lands:** with Stage 5 in, the full suite runs
+714 tests clean (0 failures) under a proper `pip install -e .`. Only 4
+files still fail to *collect*: `test_cli.py`, `test_pack.py`,
+`test_scaffold.py`, `test_search.py` -- all for the same single reason,
+`arklight.cli.templates.production`/`simple` (Stage 1) importing
+`arklight.cli.templates._common` (Stage 6, not yet landed). Expected
+and tracked, not a regression.
+
+**Bug found and fixed during Stage 5 verification:** `arklight/__init__.py`
+(ported verbatim in Stage 1) still had `CHANNEL = "alpha"` -- the
+per-branch constant the module's own docstring says should read
+`"main"` on this branch. Caught by `test_channel_is_the_static_per_branch_string`
+once a real `pip install -e .` (with `ARKLIGHT_ACCEPT_LICENSE=1`) was
+run instead of a bare `PYTHONPATH=.` invocation. Fixed as part of this
+patch, not deferred -- it's a one-line correction to a file Stage 1
+already introduced, not new Stage 5 scope.
