@@ -1,4 +1,26 @@
-# Main → Alpha (v0.054) Sync Plan
+# Main → Alpha (v0.054) Sync Plan -- ✅ COMPLETE
+
+**Status: all stages (0-9) done.** `main`'s code and Foundational docs
+are caught up to `alpha`'s v0.054-equivalent state. Verified directly
+against the working tree, not just this plan's checklist: `main`'s
+`pyproject.toml` is at `version = "0.54.0"`; `arklight/backend/js/`
+carries `htmx.py`, `vdom.py`, the full `runtime/` and `derivations/`
+module sets; the CSS and HTML backends carry their split modules
+(`at_rules.py`, `selectors.py`, `attrs.py`, `head_meta.py`,
+`page_render.py`, `routing.py`, `tag_map.py`, etc.); `arklight/search/`
+exists in full; `cli/live_streaming.py` and `cli/cctv.py` are present;
+and every test file named in Stages 2-6 below (`test_vdom_4.py`
+through `test_vdom_8.py`, `test_htmx_3/4/5.py`, `test_refactor_0.py`,
+`test_css_backend.py`/`test_css_selectors.py`/
+`test_css_structural_addendum.py`/`test_responsive_style.py`,
+`test_html_attrs.py`/`test_html_head_meta.py`/`test_html_page_render.py`/
+`test_html_routing.py`/`test_html_tag_map.py`, the `test_search*.py`
+suite, `test_live_streaming.py`, `test_event_modifiers.py`) exists in
+`main`'s `tests/`. The Stage 8 Android-exclusion checklist below is
+fully satisfied -- no `arklight/backend/android/`, no
+`arklight/cli/android.py`, no Android wiring in `cli/main.py`, no
+`"android"` in `config.py`'s `_KNOWN_SECTIONS`, no `test_android.py`,
+and zero `arklight android …` mentions in `main`'s `README.md`.
 
 **Goal:** bring `main`'s code and Foundational docs in line with `alpha`
 at its current v0.054-equivalent state (reactive-core JS backend, CSS
@@ -35,13 +57,13 @@ copies of `alpha`'s `docs/Foundational/*.md` (6 files + README), and
 repointed every internal link in `README.md` / `PROGRESS.md` /
 `CHANGELOG.md` to the new path. Verified every resulting link resolves.
 
-## Stages 1–7 — code, in dependency order
+## Stages 1–7 — code, in dependency order ✅ done
 
 Each stage below is scoped to land and pass its own tests before the
 next starts, mirroring the order the features actually landed in
 `alpha` so later stages can assume earlier ones are already in place.
 
-### Stage 1 — Shared plumbing
+### Stage 1 — Shared plumbing ✅ done
 
 The 18 files modified on both branches that everything else builds on
 top of, ported first so later stages apply cleanly:
@@ -61,7 +83,7 @@ stages).
 files everything else depends on, so this is where import-order or
 signature-mismatch problems would surface first.
 
-### Stage 2 — CSS backend rewrite
+### Stage 2 — CSS backend rewrite ✅ done
 
 New: `backend/css/{at_rules,base_stylesheet,custom_styles,
 design_tokens,selectors}.py`. Modified: `backend/css/render.py`.
@@ -71,7 +93,7 @@ extension). Test files: `test_css_backend.py`, `test_css_selectors.py`,
 
 *Risk:* low. Self-contained backend, no Android touchpoints.
 
-### Stage 3 — HTML backend refactor
+### Stage 3 — HTML backend refactor ✅ done
 
 New: `backend/html/{attrs,head_meta,page_render,routing,tag_map}.py`.
 Modified: `backend/html/render.py`. This is the `html-2`…`html-6`
@@ -85,7 +107,7 @@ staging rationale). Test files: `test_html_attrs.py`,
 *Risk:* low-medium. Pure extraction/refactor per alpha's own docs, but
 touches the most heavily-used render path in the codebase.
 
-### Stage 4 — JS backend: HTMX + reactive core (vdom)
+### Stage 4 — JS backend: HTMX + reactive core (vdom) ✅ done
 
 New: `backend/js/{htmx,vdom}.py`, `backend/js/runtime/{__init__,
 bindings,dispatch,model,nav,notify,repeat,show,state,watch}.py`,
@@ -108,7 +130,7 @@ the previous one landing first — see dependency column of the old
 as sub-steps within this stage rather than one large diff, so a
 regression is traceable to a specific sub-stage.
 
-### Stage 5 — Search engine
+### Stage 5 — Search engine ✅ done
 
 New: `arklight/search/{__init__,_tokenize,endpoint,engine,feedback,
 graph,knowledge,ranking,retrieval,stats}.py`, `cli/search.py`. Test
@@ -118,7 +140,7 @@ files: `test_search*.py` (8 files), `test_search_endpoint.py`,
 *Risk:* low. Fully independent subsystem, no shared-file overlap with
 Stages 2–4 beyond the Stage-1 plumbing.
 
-### Stage 6 — Live-streaming, CCTV, upgrade, scaffold extras
+### Stage 6 — Live-streaming, CCTV, upgrade, scaffold extras ✅ done
 
 New: `cli/live_streaming.py`, `cli/cctv.py`, `cli/upgrade.py`,
 `cli/templates/_common.py`. Modified: `cli/scaffold.py` (test-only
@@ -133,36 +155,38 @@ Test files: `test_live_streaming.py`, `test_config.py`
 `cli/main.py` gets its non-Android wiring — see the Android-exclusion
 checklist below for exactly what to leave out of that file.
 
-### Stage 7 — Root metadata
+### Stage 7 — Root metadata ✅ done
 
 `pyproject.toml` version bump (`0.42.3` → alpha's current version),
 `.gitignore` diff (3 lines).
 
 *Risk:* trivial.
 
-## Stage 8 — Android-exclusion pass (verification, not new work)
+## Stage 8 — Android-exclusion pass (verification, not new work) ✅ done, all checks pass
 
 Not a porting stage — a checklist run after Stages 1–7 to confirm
 Android never made it in:
 
-- [ ] `arklight/backend/android/` does not exist in `main`.
-- [ ] `arklight/cli/android.py` does not exist in `main`.
-- [ ] `cli/main.py` has no `from arklight.cli import android` / `from
+- [x] `arklight/backend/android/` does not exist in `main`.
+- [x] `arklight/cli/android.py` does not exist in `main`.
+- [x] `cli/main.py` has no `from arklight.cli import android` / `from
       arklight.cli.android import AndroidError`, no `android_parser`
-      subcommand block, no `_cmd_android_scaffold`.
-- [ ] `config.py`'s `_KNOWN_SECTIONS` contains `"live_streaming"` but
+      subcommand block, no `_cmd_android_scaffold`. Verified: no
+      "android" string appears anywhere in `cli/main.py`.
+- [x] `config.py`'s `_KNOWN_SECTIONS` contains `"live_streaming"` but
       not `"android"`; the adjacent comment referencing
-      `arklight.cli.android` is removed.
-- [ ] `tests/test_android.py` is not carried over.
-- [ ] `README.md`'s user-facing usage section has no `arklight
+      `arklight.cli.android` is removed. Verified:
+      `_KNOWN_SECTIONS = {"live_streaming"}`.
+- [x] `tests/test_android.py` is not carried over.
+- [x] `README.md`'s user-facing usage section has no `arklight
       android …` examples (the 5 mentions found in `alpha`'s
-      `README.md`).
-- [ ] `CHANGELOG.md` / `PROGRESS.md` retain their historical Android
+      `README.md`). Verified: zero matches in `main`'s `README.md`.
+- [x] `CHANGELOG.md` / `PROGRESS.md` retain their historical Android
       prose as-is (55 / 16 mentions) — these are narrative records of
       what happened on `alpha`, not `main`'s feature surface, so they
       are **not** scrubbed.
 
-## Stage 9 — Full verification
+## Stage 9 — Full verification ✅ done
 
 - Run `main`'s full test suite (all ported + pre-existing tests)
   together — first real point where cross-stage interaction bugs would
