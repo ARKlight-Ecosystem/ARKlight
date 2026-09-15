@@ -281,6 +281,67 @@ IFrame = node("IFrame")
 NoScript = node("NoScript")
 
 # ---------------------------------------------------------------------------
+# v0.060, Stage 0: user-defined, reusable components.
+#
+# `component(...)` promotes a plain Python render function into a real,
+# named node type the compiler's own tooling knows about -- see
+# docs/Foundational/user-defined-components.md ("Option A -- macro
+# expansion") and docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md
+# for the staged rollout this belongs to. Re-exported here from
+# arklight.ir.components so `from arklight import *` gives users
+# `component`/`Prop` alongside every built-in component.
+# ---------------------------------------------------------------------------
+
+from arklight.ir.components import Prop, register_component  # noqa: E402
+
+
+def component(
+    *, props: dict[str, Prop] | None = None, mode: str = "macro"
+) -> Callable[[Callable[..., Any]], Callable[..., ARKNode]]:
+    """
+    Decorator that registers a render function as a named, reusable
+    component:
+
+        @component(props={"active": Prop(default=None)})
+        def NavBar(active=None):
+            return Container(
+                Link("Home", href="/"),
+                Link("About", href="/about"),
+                class_name="nav",
+            )
+
+    The decorated name (`NavBar`) becomes callable exactly like a
+    built-in component (`NavBar(active="home")`) -- but instead of
+    building its subtree immediately, the call produces a marker
+    `ARKNode(type="NavBar", ...)` that `arklight.ir.components.
+    expand_ark_ast` splices the real, rendered subtree into, before
+    Normalization ever runs. Props are checked against `props=` at
+    expansion time -- an unknown prop or a missing required one fails
+    the build with a clear message instead of a raw Python `TypeError`
+    inside `NavBar` itself.
+
+    `mode="macro"` (the default, Option A) is the only mode with a
+    distinct rendering behavior today. `mode="registry"` (Option B) is
+    EXPERIMENTAL -- see `arklight.ir.components`'s module docstring and
+    the implementation doc for what it does and doesn't do yet.
+    """
+
+    def decorator(render_fn: Callable[..., Any]) -> Callable[..., ARKNode]:
+        name = render_fn.__name__
+        register_component(name, render_fn, props=props, mode=mode)
+
+        def marker(**call_props: Any) -> ARKNode:
+            return ARKNode(type=name, props=call_props, children=[])
+
+        marker.__name__ = name
+        marker.__qualname__ = name
+        marker.__doc__ = render_fn.__doc__
+        return marker
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # v0.0035: stateful JS -- capability, not vocabulary.
 #
 # `State`/`Bind`/`Action` are the reactivity primitives: a page declares
@@ -1783,6 +1844,8 @@ __all__ = [
     "Area",
     "IFrame",
     "NoScript",
+    "component",
+    "Prop",
     "State",
     "Bind",
     "Action",

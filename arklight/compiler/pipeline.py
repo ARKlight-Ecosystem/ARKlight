@@ -7,6 +7,11 @@ Ties every stage together, matching the architecture doc exactly:
         -> Python AST         (arklight.parser.discover, static analysis)
         -> ARK AST            (arklight.parser.loader executes the module;
                                  Site.build_ark_ast() calls each page fn)
+        -> Component expansion (arklight.ir.components, v0.060 Stage 0 --
+                                 user-defined component markers are
+                                 spliced out here, before Normalization
+                                 ever sees them; a no-op for a site that
+                                 never registers one)
         -> Normalization      (arklight.ir.normalize)
         -> Validation         (arklight.ir.validate)
         -> Website IR         (arklight.ir.build)
@@ -38,6 +43,7 @@ from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
 from arklight.ir.build import WebsiteIR, build_website_ir
+from arklight.ir.components import ComponentError, expand_ark_ast
 from arklight.ir.normalize import normalize_ark_ast
 from arklight.ir.validate import ValidationError, validate_ark_ast
 from arklight.parser.loader import SiteLoadError, load_site
@@ -162,6 +168,12 @@ def compile_site_file(
         raise CompileError(f"Error while building page(s): {exc}") from exc
     except Exception as exc:  # noqa: BLE001 -- surface page-function errors clearly
         raise CompileError(f"Error while building page(s): {exc}") from exc
+
+    log("Expanding user-defined components...")
+    try:
+        ark_ast = expand_ark_ast(ark_ast)
+    except ComponentError as exc:
+        raise CompileError(str(exc)) from exc
 
     log("Normalizing AST...")
     try:

@@ -34,12 +34,24 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.0431  | Emergency patch: build-time warning for unrouted `srcset`/`poster`/`action`/`formaction` | DONE |
 | v0.048   | CSS `@media` queries + `<head>`/`<header>` extension (Stage A of 2: `meta`/`links` DONE; Stage B of 2: `responsive_style` + `@media` compilation DONE) | DONE |
 | v0.054   | JS backend capability expansion (reactive core parity with Vue 3) -- renumbered from v0.044 now that v0.048 has shipped; all 8 vdom-staging stages above are now DONE | DONE |
-| v0.060   | User-defined, reusable components -- renumbered from v0.100     | PLANNED |
+| v0.060   | User-defined, reusable components -- renumbered from v0.100     | IN PROGRESS |
+| v0.060-stage0 | User-defined components, Stage 0 of 4: registration API (`component`/`Prop`), props contract, Option A macro expansion pass, cycle/depth guards, experimental `mode="registry"` selector -- `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` | DONE |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v1.0     | Stable compiler                                              | PLANNED |
 
 ### Planned, not yet scheduled to a version
+
+- **User-defined functions.** Next up after `v0.060` (user-defined
+  *components*) finishes its staged ladder -- distinct from
+  components: reusable *logic* a project can register and have the
+  compiler treat as a first-class name (parallel to how `Derive.*`/
+  `Action.*` are each a closed, described vocabulary rather than an
+  arbitrary expression string), as opposed to reusable *markup*. No
+  design doc yet -- noted here only so the direction isn't lost before
+  one exists. Not to be confused with a page function
+  (`@site.page("/")`) or a component's own `render_fn`, both of which
+  are already "user-defined functions" in the plain Python sense.
 
 Design-sketched in `docs/DESIGN-NOTES.md`, explicitly waiting on a
 go-ahead before implementation starts on any of these:
@@ -57,7 +69,75 @@ go-ahead before implementation starts on any of these:
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
 
-## vdom-7 -- Per-item list rendering (`Repeat`) + conditional show/hide (`Show`) (DONE)
+## v0.060-stage0 -- User-defined components, Stage 0 of 4 (DONE)
+
+Opens the `v0.060` milestone: promotes a plain Python render function
+into a real, named node type via `component(...)`, per the **hybrid**
+design `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`
+pins down (Option A -- macro expansion -- as the default and the only
+mode with distinct behavior yet; Option B -- registry-based late
+binding -- selectable today via `mode="registry"` as an explicit
+EXPERIMENTAL opt-in, not yet a different rendering outcome).
+
+- **`arklight/ir/components.py`** (new) -- `Prop` (a component's
+  per-prop declaration: optional `type`, optional `default`, required
+  when no default is given), `ComponentSpec` (name/render_fn/props/mode,
+  validates `mode` against a closed `{"macro", "registry"}` vocabulary
+  at construction), `COMPONENT_REGISTRY` (a plain module-level dict,
+  last-registration-wins, same rule `Site.style(...)` already uses),
+  `register_component(...)`, and the expansion pass itself:
+  `expand_node`/`expand_child`/`expand_ark_ast`. The hybrid dispatch
+  lives in `_render_once` as a literal `if spec.mode == "macro": ...
+  elif spec.mode == "registry": ...` ladder -- both branches currently
+  do the same thing (see the implementation doc for why that's
+  deliberate at this stage). Cycle detection via a stack of in-progress
+  component type names (mirrors `validate.py` check #13's
+  `Computed`/`Derive` self-reference guard) plus a
+  `MAX_COMPONENT_EXPANSION_DEPTH = 64` ceiling as cheap insurance
+  alongside it. `ComponentError` is the one exception type for every
+  failure mode here (missing/unknown/mistyped prop, cycle, depth
+  ceiling, invalid `mode`).
+- **`arklight/api.py`** -- `component(*, props=None, mode="macro")`
+  decorator: registers the render function, returns a marker-node
+  factory with the same call shape a built-in's `node("...")`-produced
+  factory has, so `NavBar(active="home")` reads identically to
+  `Heading("...")` at the call site even though it's building a marker
+  instead of a final node. Re-exported (`component`, `Prop`) from
+  `arklight/__init__.py` alongside every built-in.
+- **`arklight/compiler/pipeline.py`** -- new stage,
+  `"Expanding user-defined components..."`, between
+  `site.build_ark_ast()` and `normalize_ark_ast(...)` --
+  `expand_ark_ast(...)` runs before Normalization ever sees the tree,
+  exactly as Option A's design requires. A `ComponentError` here is
+  wrapped into the same `CompileError` every other pipeline-stage
+  failure already produces. No changes anywhere else in the pipeline,
+  `arklight/ir/schema.py`, `tag_map.py`, or any backend -- the "zero
+  changes required downstream" property Option A promised held in
+  practice, not just on paper.
+- **No children slot on a component call this stage** -- only keyword
+  props, matching every example in the original design doc; a
+  component that needs to accept nested content takes it as a prop
+  value (`Card(body=Container(...))`), the same way it would take any
+  other `ARKNode`-valued prop.
+- **Tests:** `tests/test_user_defined_components_stage0.py` (17 tests,
+  new) -- registration, marker-factory shape, macro expansion
+  (including nested/recursive component-in-component cases), props
+  contract (missing/unknown/mistyped), cycle detection (direct and
+  indirect/mutual), the depth ceiling's non-cyclical-deep-chain
+  negative case, and confirming an expanded tree passes
+  Normalization/Validation completely unchanged. Also updated two
+  existing `tests/test_pipeline_end_to_end.py` stage-order assertions
+  to include the new `"Expanding user-defined components..."` line.
+  Full suite: 1057 passed, no regressions.
+- **Not done this stage** (see the implementation doc's staged
+  ladder): `arklight search` typo-suggestion integration for user
+  component names (Stage 1), a default-styling registration hook
+  (Stage 2), Option B's actual per-backend rendering differentiator
+  (Stage 3), and component-owned reactive state (Stage 4, blocked on
+  nothing further from `v0.054`'s side but a materially separate
+  problem in its own right).
+
+
 
 Closes docs/Backends/REFACTOR-INDEX.md row 15, the last of the
 "content" reactive-core stages -- unlike `Computed`/`Watch`, `Repeat`
