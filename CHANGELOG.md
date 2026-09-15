@@ -5,6 +5,68 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- Desktop backend, Stage 1 (`arklight desktop scaffold`, Linux only)
+
+**What:** `arklight desktop scaffold <build-dir> -o <project-dir>
+[--target linux]` -- the first CLI-facing rung of the staged desktop
+backend (see `docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`, which
+also replaces `ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`'s "proposal"
+status with an actual staged/tracked plan). Templating +
+asset-embedding only, no C toolchain required to run the command
+itself: turns an existing `arklight build` output directory into a
+small native GTK3 + WebKit2GTK host project -- one window, an
+in-process `ark:` resource scheme backed by every build-dir file
+embedded as indexed C byte arrays (`assets.gen.c`/`assets.gen.h`), and
+a navigation policy that hands anything outside that scheme to the
+platform's default external handler instead of following it in the
+app's own window. No custom native JavaScript API, per the proposal's
+"zero native API surface" design constraint. Linux only for now --
+`--target` is explicit and validated (`SUPPORTED_TARGETS`) so
+Windows/macOS hosts are additive later work, not a breaking rename.
+App identity -- name, app ID, window title, width, height, resizable
+-- comes from `arklight.config.py`'s `"desktop"` section, read the
+same way `arklight android scaffold` already reads its own
+`"android"` section, with a built-in default for every key.
+
+**Implementation:** `arklight/backend/desktop/runtime.py` (new) --
+pure `(...) -> str`/`(...) -> dict[path, str]` template builders for
+`main.c`/`Makefile`/`.gitignore`/a freedesktop `.desktop` launcher
+entry/`README.md`, plus `generate_assets_source()` (embeds a
+`{build-relative path: bytes}` dict as C byte arrays with MIME types
+via `mimetypes.guess_type`). `arklight/cli/desktop.py` (new) --
+`DesktopError`, `ScaffoldResult`, `scaffold_project()`, the same
+"template builders never touch disk, the CLI module owns filesystem
+writes and config resolution" split the Android backend already
+established; validates `app_id` (dotted reverse-DNS identifier, same
+shape as Android's `package_id`), `width`/`height` (positive ints, not
+`bool`s), and `resizable` (an actual `bool`), each with an actionable
+`DesktopError`. Wired into `arklight/cli/main.py` as a nested
+`desktop scaffold` subcommand and into `arklight/config.py`'s
+`_KNOWN_SECTIONS`.
+
+**Verification beyond the test suite:** the generated project was
+actually compiled (`libgtk-3-dev`/`libwebkit2gtk-4.1-dev` on Ubuntu
+24.04) and run under a headless `Xvfb` while landing this stage --
+caught and fixed a deprecated `WebKit2GTK` navigation-action call and
+a `&&`/`||` operator-precedence bug in the generated `Makefile`'s
+`pkg-config` probe (a chained `A && echo X || B && echo Y` prints
+*both* candidates whenever the first matches, since `&&`/`||` share
+precedence and left-associate) that a read-through alone wouldn't have
+surfaced.
+
+**Tests (`tests/test_desktop.py`):** default-config scaffolding (every
+generated file present), build-dir -> embedded-asset-table coverage
+(every file present, asset count matches, MIME-type guessing, exact
+byte embedding), config-driven identity (app name/ID/window
+title/width/height/resizable, including C-string escaping for names
+containing quotes/backslashes), `binary_name()`'s slugging, target
+validation, every scaffold-time validation error path (missing/
+malformed build dir, non-empty output dir, invalid/single-segment app
+ID, non-int/bool/zero width or height, non-bool resizable, empty app
+name, malformed config file), and the CLI wiring (success/failure exit
+codes and messages, missing subcommand, required `-o`, `--target`
+choices enforcement).
+
 ## [Unreleased] -- `vdom-8`: `localStorage` persistence for `State(..., persist=True)`
 
 **Scope:** `docs/Backends/REFACTOR-INDEX.md` row 16. The last stage of

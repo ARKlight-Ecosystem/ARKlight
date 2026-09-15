@@ -1,0 +1,138 @@
+# Desktop Backend Implementation: Staged Order
+
+Status: **Stage 1 done** (Linux only), Stages 2-7 not started. This
+file plays the same role for the desktop backend that
+`ANDROID-BACKEND-IMPLEMENTATION.md` plays for the Android one: it
+doesn't restate the architecture already decided in
+`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md` (native host, in-memory asset
+store, `ark:` resource scheme, zero custom JS API), it exists to turn
+that proposal into a trackable table, mirroring the Android backend's
+own CI-first-then-local staging shape (Stages 2-4 are CI-only, no
+local toolchain required; Stages 5-7 are their `subprocess`-shelling-
+out local counterparts).
+
+`NEUTRALINO-INTEGRATION.md` describes an earlier, superseded plan
+(Neutralino.js as the canonical desktop backend) -- see the proposal's
+section 11 for why that direction was dropped. Nothing in this table
+depends on it.
+
+## Platform scope
+
+**Linux only for now.** The proposal's architecture (native host +
+platform WebView + in-process resource scheme) is platform-neutral by
+design, but Stage 1 below only implements the Linux host: GTK3 +
+WebKit2GTK, the WebView every mainstream Linux desktop already has
+available via distro packages. Windows (WebView2) and macOS
+(WKWebView) hosts are later, not-yet-started work -- see "Explicitly
+out of scope" below. `arklight desktop scaffold --target linux` is
+explicit (not just an implied default) precisely so a future
+`--target windows`/`--target macos` is additive, not a breaking
+rename.
+
+## Staged order
+
+| # | Stage | What | Toolchain required | Depends on | Status |
+|---|---|---|---|---|---|
+| 1 | `arklight desktop scaffold <build-dir> -o <project-dir> [--target linux]` | Templating + asset-embedding only: generate the native host project (`main.c`, `Makefile`, `.gitignore`, a freedesktop `.desktop` launcher entry, `README.md`) plus the embedded asset store (`assets.gen.c`/`assets.gen.h` -- every file under `<build-dir>`, embedded as indexed C byte arrays; see `arklight.backend.desktop.runtime`'s module docstring for why an unpacked tree rather than a `.ark` bundle is this stage's default). Reads app identity from `arklight.config.py`'s `"desktop"` section (`app_name`/`app_id`/`window_title`/`width`/`height`/`resizable` -- see "App identity metadata" below for the full key list and defaults). | None to run the scaffold itself -- pure Python, no C toolchain touched. Building the generated project (`make`) needs a C compiler, `pkg-config`, and the GTK3 + WebKit2GTK dev headers on the user's own machine (see the generated `README.md`). | none | **Done** -- `arklight.cli.desktop.scaffold_project`, wired up as `arklight desktop scaffold`; see `tests/test_desktop.py`. Compiled and smoke-run (Xvfb, stays up / doesn't crash on launch) against `libgtk-3-dev`/`libwebkit2gtk-4.1-dev` while landing this stage. |
+| 2 | GitHub Actions CI build | `arklight desktop scaffold`'s output additionally includes `.github/workflows/desktop-build.yml`: pushing (or opening a PR against) the scaffolded project installs the GTK3/WebKit2GTK dev packages on a Linux runner, runs `make`, and attaches `bin/<binary>` as a workflow artifact. No local toolchain required, mirroring the Android backend's Stage 2. | None on the user's machine -- the compiler/dev headers live entirely on GitHub's runner | Stage 1 | Not started |
+| 3 | Launch smoke test (CI) | The same workflow Stage 2 added also runs the built binary under a headless `Xvfb` on the runner itself and fails the job if the process doesn't stay up for a few seconds (crash-on-launch detection) -- the same check this stage's own Stage-1 landing did by hand (see the Stage 1 status note above), just automated into CI. Mirrors the Android backend's Stage 3. | None on the user's machine -- `Xvfb` and the WebKit2GTK runtime libs live on the runner, same as Stage 2 | Stage 2 | Not started |
+| 4 | Packaging (CI) | A distributable artifact shape beyond a bare `bin/<binary>` -- at minimum a tarball carrying the binary plus its `.desktop` entry; a real distro package (`.deb`, etc.) is a stretch goal for this stage, not a requirement of it. Mirrors the Android backend's Stage 4 (release build) in staging position, though the desktop target has no keystore-signing equivalent to gate behind an opt-in flag. | None on the user's machine -- same as Stages 2 and 3 | Stage 2 | Not started |
+| 5 | `arklight desktop build <build-dir> -o <project-dir>` | Runs Stage 1, then shells out to the generated project's `make` (locally, on the *user's own* machine) via `subprocess`; catches a missing-toolchain `FileNotFoundError`/`OSError` specifically and prints an actionable message (missing `gcc`/`pkg-config`/dev headers) rather than a raw traceback -- the same "graceful failure when no toolchain is present" shape `ANDROID-BACKEND-IMPLEMENTATION.md`'s Stage 5 note describes for a missing JDK. The local counterpart to Stage 2. | C compiler + `pkg-config` + GTK3/WebKit2GTK dev headers -- on the *user's* machine, not ARKlight's own install | Stage 1 | Not started |
+| 6 | `arklight desktop build --run` | Stage 5, then launches the built binary directly (`subprocess.Popen`, not waited on) so a user can see their site running without a second manual command. The local counterpart to Stage 3's CI launch check -- same "does it start and stay up" question, asked interactively on the user's own machine instead of a runner. | Stage 5's toolchain + a display server (X11/Wayland) to actually show the window | Stage 5 | Not started |
+| 7 | `arklight desktop build --package` | Stage 5, then produces the same distributable artifact shape Stage 4 generates in CI, locally. The local counterpart to Stage 4. | Stage 5's toolchain + whatever packaging tool the chosen artifact shape needs (e.g. `dpkg-deb` for a `.deb`) | Stage 5 | Not started |
+
+Each rung is independently useful and additive, same
+"`arklight pack` runs after `build`, never touching the compiler
+internals" shape `arklight.packer` already established, and the same
+"CI-only stages ship before their local-toolchain counterparts"
+ordering the Android backend's own table uses -- `arklight desktop`
+reads an existing `build-dir` and never imports the parser/ir/HTML/
+CSS/JS backend internals it's packaging.
+
+## App identity metadata
+
+`arklight.config.py`'s `"desktop"` section, read by
+`arklight.cli.desktop.scaffold_project` (mirrors `arklight.cli.
+android`'s own `"android"` section):
+
+```python
+CONFIG = {
+    "desktop": {
+        "app_name": "My Site",          # str, default "ARKlight App"
+        "app_id": "com.example.mysite", # dotted reverse-DNS id, default "com.arklight.app"
+        "window_title": None,           # str or None; None -> falls back to app_name
+        "width": 1024,                  # positive int, default 1024
+        "height": 768,                  # positive int, default 768
+        "resizable": True,              # bool, default True
+    },
+}
+```
+
+`app_id` is the same dotted, reverse-DNS-style identifier shape the
+Android backend's `package_id` already uses (not a Python/Java
+package here -- just a stable, namespaced identifier), reused as the
+generated `.desktop` launcher entry's filename and the window's
+program name (`g_set_prgname`, which GTK derives `WM_CLASS` from). No
+`icon`/`splash` keys yet -- see "Explicitly out of scope" below.
+
+## Stage 1 implementation notes
+
+Decisions made while landing `arklight.cli.desktop`/
+`arklight.backend.desktop.runtime` that weren't already pinned down by
+the proposal:
+
+- **Unpacked tree, not a `.ark` bundle, is what gets embedded.** The
+  proposal's section 5 describes the `.ark` bundle as the eventual
+  application payload, but parsing its zip/sealing format from C is a
+  real dependency (a zip library at minimum, a crypto one for sealed
+  bundles) this first Linux target doesn't need to take on yet. Same
+  call the Android backend's Stage 1 made for the same reason (see
+  ANDROID-BACKEND-IMPLEMENTATION.md's "Open questions for Stage 0" --
+  "an unpacked tree skips `ArkBundle`/`ArkSeal` entirely for the
+  common case"). Packing a real `.ark` bundle as the embedded payload
+  is future work, not ruled out, just not Stage 1's problem.
+- **Byte arrays, not a linker trick.** `assets.gen.c` embeds each
+  file's bytes as a plain C array literal rather than `ld -r -b
+  binary`/`objcopy`/C23's `#embed` -- portable across whatever C
+  toolchain the user's distro ships, at the cost of a large generated
+  source file for a big site. Acceptable for a first target; revisit
+  if that ever becomes the actual bottleneck a real site hits.
+- **`ark:///path` (empty authority), not `ark://site/path`.** Simpler
+  to resolve from `webkit_uri_scheme_request_get_path()` without
+  reasoning about the scheme's authority component, and ARKlight's
+  HTML backend already emits page-relative links, so relative
+  resolution against `ark:///index.html` lands on `ark:///about.html`,
+  `ark:///assets/logo.svg`, etc. with no rewriting needed on this
+  side.
+- **Zero custom native JavaScript API**, per the proposal's section
+  10 -- the generated page's JS runs directly in WebKit2GTK's own
+  engine, nothing crosses into `main.c`.
+- **Navigation policy**: anything not on the `ark:` scheme (http(s),
+  mailto, ...) is handed to `g_app_info_launch_default_for_uri` (the
+  user's default external handler) and blocked from navigating the
+  app's own window there, per the proposal's section 9.
+- **`-o`/`--output` is required** (unlike `arklight new`), same
+  reasoning `arklight android scaffold` already gives: a scaffolded
+  desktop project sitting anonymously in an already-multi-purpose
+  project directory is more likely to be a mistake than a plain site
+  scaffold is.
+- **`--target` is explicit and validated even though only one value
+  exists yet** (`SUPPORTED_TARGETS = ("linux",)` in
+  `arklight.cli.desktop`) -- adding Windows/macOS later only means
+  extending that tuple plus whichever platform-specific runtime module
+  backs it, not renaming an implicit default out from under existing
+  scripts.
+
+## Explicitly out of scope (for now)
+
+Same spirit as the Android backend's own "Explicitly out of scope"
+list -- repeated here so this table doesn't imply any of it is
+Stage-1 work: Windows/macOS hosts, app/window icons (`desktop.icon` /
+`desktop.splash` config keys don't exist yet -- deliberately, rather
+than half-wired), a sealed `.ark` bundle as the embedded payload (see
+"Stage 1 implementation notes" above), any native JavaScript bridge
+beyond serving assets, an application updater, a distro-native
+installer/package beyond Stage 4/7's plain artifact, and any change to
+the HTML/CSS/JS backends themselves -- this is a packaging backend
+that consumes an existing `build-dir` as opaque input, the same way
+`arklight.packer` and the Android backend already do.

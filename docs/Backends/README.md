@@ -17,5 +17,6 @@ documentation.
 | File | Covers |
 | --- | --- |
 | [`ANDROID-BACKEND-IMPLEMENTATION.md`](ANDROID-BACKEND-IMPLEMENTATION.md) | Staged implementation plan for the Android packaging backend. |
-| [`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`](ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md) | Proposal for a purpose-built native desktop host/packager (replacing Neutralino.js as the canonical desktop backend). |
-| [`NEUTRALINO-INTEGRATION.md`](NEUTRALINO-INTEGRATION.md) | Neutralino.js desktop-app integration (current desktop backend). |
+| [`DESKTOP-BACKEND-IMPLEMENTATION.md`](DESKTOP-BACKEND-IMPLEMENTATION.md) | Staged implementation plan for the desktop packaging backend (Linux only so far). |
+| [`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`](ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md) | Proposal for a purpose-built native desktop host/packager (replacing Neutralino.js as the canonical desktop backend) -- now Stage 1 of `DESKTOP-BACKEND-IMPLEMENTATION.md`. |
+| [`NEUTRALINO-INTEGRATION.md`](NEUTRALINO-INTEGRATION.md) | Neutralino.js desktop-app integration -- superseded plan, kept for reference only. |
