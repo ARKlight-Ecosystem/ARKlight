@@ -50,7 +50,11 @@ CONFIG_FILENAME = "arklight.config.py"
 # scaffold`) -- see docs/Foundational/DESIGN-NOTES.md's "v0.0438:
 # Android backend" section, "App identity metadata" subsection, for
 # the full key list and defaults.
-_KNOWN_SECTIONS = {"live_streaming", "android"}
+#
+# "desktop" is read by `arklight.cli.desktop` (`arklight desktop
+# scaffold`) -- see docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md
+# for the full key list and defaults.
+_KNOWN_SECTIONS = {"live_streaming", "android", "desktop"}
 
 
 class ConfigError(Exception):
