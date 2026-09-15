@@ -359,12 +359,14 @@ def _github_ci_workflow_yml(
     `make`, then upload `bin/<binary>` as a downloadable artifact.
 
     No install/launch smoke-test job (the Android workflow's Stage-3
-    equivalent) here -- unlike an Android emulator, there's no
-    throwaway, GitHub-hosted-runner-friendly way to launch a GTK3 +
-    WebKit2GTK window and confirm it doesn't crash immediately, so
-    this workflow only verifies the build compiles and links, not that
-    it runs. Revisit if a headless-display (Xvfb) smoke test is ever
-    worth the added flakiness for a first Linux-only target.
+    equivalent) here yet -- that's DESKTOP-BACKEND-IMPLEMENTATION.md's
+    own Stage 3, tracked separately rather than folded into this
+    function, since it needs a headless `Xvfb` display plus the
+    WebKit2GTK runtime libs on the runner (distinct from the `-dev`
+    headers this job already installs to *build*), not just this
+    job's existing steps. This function only verifies the build
+    compiles and links; Stage 3 will add the "does it also launch
+    without crashing" check on top of what it produces.
 
     `project_subdir`, if given, is the project's path relative to the
     repo root the workflow will actually run from -- e.g. `"desktop"`
@@ -393,9 +395,8 @@ name: Desktop build
 # Builds the native GTK3 + WebKit2GTK host on a GitHub-hosted Linux
 # runner on every push/PR, so a build regression is caught without any
 # of the dev headers below needing to exist on a contributor's own
-# machine. No install/launch smoke test -- see this file's own
-# generator, `_github_ci_workflow_yml` in
-# arklight/backend/desktop/runtime.py, for why.
+# machine. No install/launch smoke test yet -- see
+# DESKTOP-BACKEND-IMPLEMENTATION.md's Stage 3.
 on:
   push:
     branches: [main]
