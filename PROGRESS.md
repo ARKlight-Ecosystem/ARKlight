@@ -25,7 +25,7 @@ for the architecture-level roadmap table, see
 | v0.036   | ARK Bundle spec v1 (`arklight pack`)                         | DONE    |
 | v0.037   | Sealed ARK Bundles (encrypted by default, `arklight unpack`) | DONE    |
 | v0.041   | CLI/pipeline/JS runtime hardening + stateful JS addenda I/II | DONE    |
-| 0.42.0   | Alpha catch-up: CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV -- see below | DONE |
+| 0.54.0   | Alpha catch-up: CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV -- see below | DONE |
 | v0.010   | User-defined components                                     | PLANNED |
 | v0.100   | Alternate backends (Vue, Svelte)                             | PLANNED |
 | v1.0     | Stable compiler                                              | PLANNED |
@@ -88,7 +88,7 @@ had never actually been synced with the Stage 2-6 catch-up (CSS
 rewrite, HTML backend refactor, JS vdom work, search engine,
 live-streaming/CCTV) -- those files still only documented up through
 v0.041 even though the code and tests for all six stages had already
-landed in the tree. Closed now: `CHANGELOG.md` gained a `[0.42.0]`
+landed in the tree. Closed now: `CHANGELOG.md` gained a `[0.54.0]`
 release entry (one consolidated paragraph per subsystem, in `main`'s
 own voice rather than reproducing `alpha`'s per-sub-stage commit
 history verbatim -- see the sync plan doc if that level of detail is
@@ -98,7 +98,7 @@ updated to match (the latter no longer claims `@media` is unavailable
 at all -- it's opt-in now, intrinsic design stays the default). Also
 completed the version-scheme bump `pyproject.toml` had been due for
 since the "real version-drift bug" fix below was designed but never
-actually applied: `version` now reads `0.42.0` instead of the stale
+actually applied: `version` now reads `0.54.0` instead of the stale
 `0.048`. `alpha`'s own historical Android prose in `CHANGELOG.md`/
 `PROGRESS.md` (55/16 mentions) is left as narrative record, per the
 sync plan -- those entries describe what happened on `alpha`, not

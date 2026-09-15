@@ -11,7 +11,7 @@ Custom CSS class authoring and an `arklight --search <name>` schema
 lookup are sketched but not yet scheduled to a version -- see
 "Planned, not yet scheduled" in [`PROGRESS.md`](./PROGRESS.md).
 
-## [0.42.0] -- Alpha catch-up: CSS media queries, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV
+## [0.54.0] -- Alpha catch-up: CSS media queries, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV
 
 Bulk catch-up release, porting `alpha`'s Stages 1-7 onto `main` per
 `docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md`, Android
@@ -75,7 +75,7 @@ git-checkout install over to the `alpha` branch in place), and
 `test_config.py` (new), `test_cli.py` (expanded).
 
 **Root metadata: completed the version-scheme bump.**
-`pyproject.toml`'s `version` moves from `0.048` to `0.42.0`. The
+`pyproject.toml`'s `version` moves from `0.048` to `0.54.0`. The
 scheme change itself was designed and written up two entries below
 ("Fixed a real version-drift bug...") but the actual `pyproject.toml`
 edit never landed with it -- exactly the kind of drift
