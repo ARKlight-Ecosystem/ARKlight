@@ -80,6 +80,41 @@ also calls `renderRepeat(store)`/`renderShow(store)`
 (`arklight/backend/js/runtime/repeat.py`/`show.py`), same
 `typeof`-guarded, only-shipped-when-used pattern again -- a page with
 no `Repeat(...)`/`Show(...)` never declares one or the other.
+
+`vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): `initState()` also
+reads a sibling `data-ark-persist` attribute (`IRPage.persist`, the
+same marker/`<body>`-attribute duality every other `data-ark-*` piece
+of hydration state already uses) -- a plain list of `State(...)` names
+declared with `persist=True`. Unlike `computed`/`watch`, this doesn't
+get passed into `createState` or a separate `runtime/*.py` module:
+it's two small, self-contained steps, both scoped to their own
+`try`/`catch` so a `localStorage` failure (private browsing, quota, a
+hand-edited non-JSON value) degrades to "this key just doesn't
+persist" rather than the page-wide "state couldn't be loaded" failure
+the outer `try`/`catch` below produces.
+
+1. *Read*, before `createState` is called: for each persisted key,
+   look up `localStorage["ark:<location.pathname>:<key>"]` and, if
+   present and JSON-parseable, use it to override that key's
+   server-rendered initial value -- so a value survives a reload.
+   `location.pathname` (not `page.route` from the build) is
+   deliberate: this runtime file (`arklight.js`) is one shared file
+   across every page (`SCRIPT_PATH`), so there is no page-specific
+   build-time value to close over here -- the browser's own current
+   URL is the only "which page is this" signal available at the point
+   `initState()` runs, and it's already stable per page.
+2. *Write*, as one more `store.subscribe` listener (registered only
+   when `persist.length`, so a page with no persisted keys doesn't pay
+   for an empty forEach on every state change): on every change,
+   `JSON.stringify` each persisted key's current value back out to the
+   same `localStorage` key the read step used.
+
+Deliberately not plumbed through `createState`/a `derivations`-style
+closed-vocabulary object, unlike `computed`: there's no dependency
+graph, no derivation kind to look up, and no other module needs to
+read `persist` -- it's purely "override on init, write on change,"
+both of which `initState()` already touches every other piece of
+hydration state at.
 """
 
 from __future__ import annotations
@@ -126,10 +161,25 @@ INIT_STATE_JS = """  function initState() {
     var rawWatch = marker
       ? marker.getAttribute("data-ark-watch")
       : document.body.getAttribute("data-ark-watch");
+    var rawPersist = marker
+      ? marker.getAttribute("data-ark-persist")
+      : document.body.getAttribute("data-ark-persist");
     try {
       var computed = rawComputed ? JSON.parse(rawComputed) : [];
       var watch = rawWatch ? JSON.parse(rawWatch) : [];
-      var store = createState(JSON.parse(raw), computed);
+      var persist = rawPersist ? JSON.parse(rawPersist) : [];
+      var initial = JSON.parse(raw);
+      persist.forEach(function (key) {
+        try {
+          var saved = localStorage.getItem("ark:" + location.pathname + ":" + key);
+          if (saved !== null) { initial[key] = JSON.parse(saved); }
+        } catch (err) {
+          // Private browsing, quota, or a hand-edited non-JSON value:
+          // fall back to the server-rendered initial value for this
+          // key alone -- never a page-wide failure.
+        }
+      });
+      var store = createState(initial, computed);
       store.subscribe(function () {
         renderBindings(store);
         renderClassBindings(store);
@@ -137,6 +187,19 @@ INIT_STATE_JS = """  function initState() {
         if (typeof renderRepeat === "function") { renderRepeat(store); }
         if (typeof renderShow === "function") { renderShow(store); }
       });
+      if (persist.length) {
+        store.subscribe(function () {
+          persist.forEach(function (key) {
+            try {
+              localStorage.setItem("ark:" + location.pathname + ":" + key, JSON.stringify(store.get(key)));
+            } catch (err) {
+              // Private browsing or quota exceeded: this key just
+              // doesn't persist, same degrade-quietly discipline as
+              // the read side above.
+            }
+          });
+        });
+      }
       if (typeof wireWatchers === "function") { wireWatchers(store, watch); }
       return store;
     } catch (err) {

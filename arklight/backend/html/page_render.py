@@ -357,13 +357,29 @@ def _render_page(
         if page.watch:
             watch_json = escape(json.dumps(page.watch), quote=True)
             watch_attr = f' data-ark-watch="{watch_json}"'
+        # `vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): `page.persist`
+        # rides along as its own `data-ark-persist` attribute, same
+        # reasoning as `data-ark-watch`/`data-ark-computed` above -- a
+        # plain list of `State(...)` names, no value of its own, read
+        # by `initState()` (`arklight/backend/js/runtime/state.py`) to
+        # decide which keys get a `localStorage` override/write-back.
+        # A page can only ever have `page.persist` non-empty when
+        # `page.state` is too (`persist=True` only exists as a prop on
+        # a `State(...)` node), so it's always safe to place all four
+        # attributes on the same marker.
+        persist_attr = ""
+        if page.persist:
+            persist_json = escape(json.dumps(page.persist), quote=True)
+            persist_attr = f' data-ark-persist="{persist_json}"'
         if app_shell:
             state_marker = (
                 f'<div id="ark-state" data-ark-state="{state_json}"'
-                f"{computed_attr}{watch_attr} hidden></div>\n"
+                f"{computed_attr}{watch_attr}{persist_attr} hidden></div>\n"
             )
         else:
-            body_attr_parts.append(f' data-ark-state="{state_json}"{computed_attr}{watch_attr}')
+            body_attr_parts.append(
+                f' data-ark-state="{state_json}"{computed_attr}{watch_attr}{persist_attr}'
+            )
     if app_shell:
         body_attr_parts.append(' hx-boost="true"')
     body_attrs = "".join(body_attr_parts)

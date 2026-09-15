@@ -292,7 +292,7 @@ NoScript = node("NoScript")
 # ---------------------------------------------------------------------------
 
 
-def State(name: str, initial: Any = None) -> ARKNode:
+def State(name: str, initial: Any = None, persist: bool = False) -> ARKNode:
     """
     Declare page-scoped reactive state: `State("count", 0)`.
 
@@ -301,8 +301,18 @@ def State(name: str, initial: Any = None) -> ARKNode:
     Website IR's `IRPage.state`, never rendered as an HTML element
     itself. Validation checks every `Bind(...)`/`Action.*(...)` on the
     page references a `name` declared here.
+
+    `persist=True` (`vdom-8`, docs/Backends/REFACTOR-INDEX.md row 16)
+    opts this one key into `localStorage` persistence: the shipped
+    runtime overrides the server-rendered initial value with whatever
+    was last saved under `localStorage["ark:<page-path>:<name>"]` (if
+    present and JSON-parseable), and saves the current value back out
+    under that key on every change. Read/write failures (private
+    browsing, quota, a hand-edited non-JSON value) degrade to "this key
+    just doesn't persist" -- never a page-breaking error. Off by
+    default, unchanged behavior for existing `State(...)` calls.
     """
-    return ARKNode(type="State", props={"name": name, "initial": initial}, children=[])
+    return ARKNode(type="State", props={"name": name, "initial": initial, "persist": persist}, children=[])
 
 
 def Bind(name: str) -> ARKNode:
