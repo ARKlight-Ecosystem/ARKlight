@@ -2,8 +2,11 @@ from pathlib import Path
 
 import pytest
 
+import os
+import stat
+
 from arklight.backend.desktop import runtime
-from arklight.cli.desktop import DesktopError, scaffold_project
+from arklight.cli.desktop import DesktopError, build_project, scaffold_project
 from arklight.cli.main import main
 from arklight.compiler.pipeline import build
 
@@ -364,3 +367,168 @@ def test_cli_desktop_scaffold_rejects_unsupported_target(tmp_path, monkeypatch):
     out_dir = build_dir(tmp_path)
     with pytest.raises(SystemExit):
         main(["desktop", "scaffold", str(out_dir), "-o", "desktop-project", "--target", "macos"])
+
+
+# --------------------------------------------------------------------
+# `arklight desktop build` (Stage 2)
+# --------------------------------------------------------------------
+#
+# These exercise `build_project`'s own control flow -- toolchain
+# discovery, `make` invocation, binary lookup, `--run` -- against a
+# fake, GTK/WebKit-free Makefile rather than a real scaffolded
+# project's, since no C toolchain or GTK3/WebKit2GTK dev headers are
+# assumed to be present wherever the test suite runs (the same reason
+# `scaffold_project`'s own tests never actually invoke `make` either).
+
+
+def write_fake_project(tmp_path: Path, *, binary_name: str = "hello", make_body: str = None) -> Path:
+    """A minimal stand-in for an `arklight desktop scaffold` output --
+    just enough (a `Makefile` producing `bin/<binary_name>`) for
+    `build_project` to operate on, without needing a real C
+    toolchain."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    if make_body is None:
+        make_body = f"""\
+all: bin/{binary_name}
+
+bin/{binary_name}:
+\tmkdir -p bin
+\tprintf '#!/bin/sh\\necho ran-ok\\n' > bin/{binary_name}
+\tchmod +x bin/{binary_name}
+"""
+    (project_dir / "Makefile").write_text(make_body)
+    return project_dir
+
+
+def test_build_missing_project_dir_raises(tmp_path):
+    with pytest.raises(DesktopError, match="not found"):
+        build_project(tmp_path / "does-not-exist")
+
+
+def test_build_missing_makefile_raises(tmp_path):
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    with pytest.raises(DesktopError, match="no Makefile"):
+        build_project(project_dir)
+
+
+def test_build_success_finds_binary(tmp_path):
+    project_dir = write_fake_project(tmp_path, binary_name="hello")
+
+    result = build_project(project_dir)
+
+    assert result.binary_path == project_dir / "bin" / "hello"
+    assert result.binary_path.is_file()
+    assert result.ran is False
+
+
+def test_build_make_failure_raises(tmp_path):
+    project_dir = write_fake_project(
+        tmp_path, make_body="all:\n\tfalse\n"
+    )
+    with pytest.raises(DesktopError, match="make.*failed"):
+        build_project(project_dir)
+
+
+def test_build_missing_make_raises(tmp_path, monkeypatch):
+    project_dir = write_fake_project(tmp_path)
+    monkeypatch.setenv("PATH", "")
+    with pytest.raises(DesktopError, match="not found on this machine"):
+        build_project(project_dir)
+
+
+def test_build_no_binary_produced_raises(tmp_path):
+    # `all:` succeeds but never actually writes anything under bin/.
+    project_dir = write_fake_project(tmp_path, make_body="all:\n\ttrue\n")
+    with pytest.raises(DesktopError, match="no binary was found"):
+        build_project(project_dir)
+
+
+def test_build_multiple_binaries_raises(tmp_path):
+    project_dir = write_fake_project(
+        tmp_path,
+        make_body=(
+            "all:\n"
+            "\tmkdir -p bin\n"
+            "\tprintf '#!/bin/sh\\n' > bin/one\n"
+            "\tprintf '#!/bin/sh\\n' > bin/two\n"
+        ),
+    )
+    with pytest.raises(DesktopError, match="more than one file"):
+        build_project(project_dir)
+
+
+def test_build_run_launches_binary(tmp_path, capfd):
+    project_dir = write_fake_project(tmp_path, binary_name="hello")
+
+    result = build_project(project_dir, run=True)
+
+    assert result.ran is True
+    captured = capfd.readouterr()
+    assert "ran-ok" in captured.out
+
+
+def test_build_run_failure_raises(tmp_path):
+    project_dir = write_fake_project(
+        tmp_path,
+        binary_name="hello",
+        make_body=(
+            "all: bin/hello\n"
+            "bin/hello:\n"
+            "\tmkdir -p bin\n"
+            "\tprintf '#!/bin/sh\\nexit 1\\n' > bin/hello\n"
+            "\tchmod +x bin/hello\n"
+        ),
+    )
+    with pytest.raises(DesktopError, match="exited with code"):
+        build_project(project_dir, run=True)
+
+
+# --------------------------------------------------------------------
+# `arklight desktop build` -- CLI-level
+# --------------------------------------------------------------------
+
+
+def test_cli_desktop_build_reports_success(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    project_dir = write_fake_project(tmp_path, binary_name="hello")
+
+    exit_code = main(["desktop", "build", str(project_dir)])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "built" in captured.out
+    assert "cross-platform" in captured.out
+    assert "arklight android scaffold" in captured.out
+
+
+def test_cli_desktop_build_with_run_flag(tmp_path, capfd, monkeypatch):
+    # capfd, not capsys: `make` and the launched binary write straight
+    # to the inherited file descriptors (see build_project's "let it
+    # inherit stdout/stderr" subprocess calls), which capsys can't see.
+    monkeypatch.chdir(tmp_path)
+    project_dir = write_fake_project(tmp_path, binary_name="hello")
+
+    exit_code = main(["desktop", "build", str(project_dir), "--run"])
+
+    assert exit_code == 0
+    captured = capfd.readouterr()
+    assert "ran-ok" in captured.out
+    assert "exited normally" in captured.out
+
+
+def test_cli_desktop_build_failure_returns_nonzero(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    exit_code = main(["desktop", "build", "does-not-exist"])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "ARKlight desktop build failed" in captured.err
+
+
+def test_cli_desktop_build_requires_project_dir(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit):
+        main(["desktop", "build"])
