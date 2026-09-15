@@ -1,0 +1,88 @@
+name: Android build
+
+# Builds a debug APK on GitHub-hosted runners on every push/PR, then
+# installs and launches it on a throwaway emulator on the same runner
+# to confirm it doesn't crash immediately -- see
+# ANDROID-BACKEND-IMPLEMENTATION.md, Stages 2 and 3. Requires no JDK,
+# Android SDK, or emulator/device on your own machine for either job;
+# all of it lives on the runner. No release-build job here -- see this project's README ("Building a release APK") for that, since it needs a keystore only you should hold, or re-run `arklight android scaffold --release` once you've set up signing.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  assemble-debug:
+    name: Assemble debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Assemble debug APK
+        working-directory: examples/hello_site_android
+        run: gradle assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARKlight-App-debug-apk
+          path: examples/hello_site_android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  install-launch-smoke-test:
+    name: Install + launch on an emulator
+    needs: assemble-debug
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the project
+        # Needed so .github/scripts/android-smoke-test.sh (see the
+        # "Install and launch on an emulator" step below) actually
+        # exists on the runner -- this job previously only downloaded
+        # the APK artifact, which was fine while that logic lived
+        # inline in this step's own `script:` block.
+        uses: actions/checkout@v4
+
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: ARKlight-App-debug-apk
+          path: apk
+
+      - name: Enable KVM (hardware-accelerated emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install and launch on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # A single line, not a multi-line block: this action runs
+          # each line of a multi-line `script:` input as its own
+          # separate `sh -c` invocation rather than as one combined
+          # script, which breaks any multi-line construct (variables
+          # set on one line are gone by the next; an `if`/`fi` split
+          # across lines becomes a bare, unterminated `if` on its
+          # own). See .github/scripts/android-smoke-test.sh (generated
+          # by `_android_smoke_test_sh`) for the actual logic and a
+          # fuller explanation.
+          script: bash .github/scripts/android-smoke-test.sh

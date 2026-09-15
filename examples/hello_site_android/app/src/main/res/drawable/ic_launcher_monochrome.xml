@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Single-tone mark for Android 13+ themed icons; the system
+     recolors this to match the user's wallpaper/theme, so it must be
+     flat, not gradient. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,24 L78,78 L66,78 L61,66 L47,66 L42,78 L30,78 Z M54,42 L47.5,58 L60.5,58 Z" />
+</vector>
