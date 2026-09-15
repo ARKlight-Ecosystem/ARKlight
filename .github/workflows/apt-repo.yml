@@ -1,0 +1,76 @@
+name: Publish apt repo
+
+# `publish.yml` only ever publishes the Python package to PyPI -- it
+# never touches the apt repo the README's "New another way to install
+# ARKlight" section documents (https://rae-ark.github.io/ARKlight/,
+# served from the `gh-pages` branch). Until now that branch was only
+# ever updated by hand (see its own commit history: "Add files via
+# upload", "Add signed package", ...), so a new installer release
+# never actually reached the documented apt repo on its own. This
+# workflow closes that gap: once `installer-build.yml` (on the
+# `installer` branch) attaches a `.deb` to a GitHub Release tagged
+# `installer-vX.Y.Z`, this job adds it to the `reprepro`-managed repo
+# already checked into `gh-pages` (`conf/distributions`) and pushes
+# the updated repo back.
+#
+# Requires a repo secret `APT_GPG_PRIVATE_KEY` holding the ASCII-
+# armored private key matching `conf/distributions`' pinned
+# `SignWith: 270C873705374ECE` -- reprepro refuses to sign with
+# anything else.
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  publish-apt-repo:
+    if: startsWith(github.event.release.tag_name, 'installer-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages (apt repo working copy)
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Install reprepro + gnupg
+        run: sudo apt-get update && sudo apt-get install -y reprepro gnupg
+
+      - name: Import signing key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: echo "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+
+      - name: Download the .deb attached to this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/deb
+          gh release download "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" \
+            --pattern '*.deb' \
+            --dir /tmp/deb
+
+      - name: Add package(s) to the stable component
+        run: |
+          shopt -s nullglob
+          debs=(/tmp/deb/*.deb)
+          if [ "${#debs[@]}" -eq 0 ]; then
+            echo "No .deb asset found on ${{ github.event.release.tag_name }} -- nothing to publish." >&2
+            exit 1
+          fi
+          for deb in "${debs[@]}"; do
+            reprepro includedeb stable "$deb"
+          done
+
+      - name: Refresh exported public key
+        run: gpg --armor --export 270C873705374ECE > pubkey.gpg
+
+      - name: Commit and push updated repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add conf db dists pool pubkey.gpg
+          git diff --cached --quiet && echo "Nothing changed" && exit 0
+          git commit -m "Publish ${{ github.event.release.tag_name }} to apt repo"
+          git push origin gh-pages
