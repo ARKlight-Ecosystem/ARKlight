@@ -5,6 +5,52 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- `vdom-8`: `localStorage` persistence for `State(..., persist=True)`
+
+**Scope:** `docs/Backends/REFACTOR-INDEX.md` row 16. The last stage of
+the combined reactive-core refactor: an opt-in per `State(...)` key
+that survives a page reload via `localStorage`, rather than resetting
+to its server-rendered initial value every time.
+
+**API (`arklight/api.py`):**
+
+- `State(name, initial=None, persist=False)` -- a third, optional bool
+  prop. Off by default; unchanged output for every existing
+  `State(...)` call.
+
+**Validation (`arklight/ir/validate.py`):** `_validate_state_declaration`
+now also checks a provided `persist` is actually a bool.
+
+**IR (`arklight/ir/build.py`):** new `IRPage.persist` -- the `name` of
+every `State(...)` on the page declared with `persist=True`, in
+declaration order, extracted by `_extract_page_state` alongside
+`state`/`computed`/`watch`. No value of its own, same shape as `watch`.
+
+**HTML backend (`arklight/backend/html/page_render.py`):** `page.persist`
+rides along as its own `data-ark-persist` JSON attribute on the same
+state marker `data-ark-computed`/`data-ark-watch` already use (both the
+plain-`<body>` and `app_shell` marker-`<div>` shapes).
+
+**JS backend (`arklight/backend/js/runtime/state.py`):** unlike
+`computed`/`watch`, this isn't a new sibling module or a `createState`
+argument -- `initState()` reads `data-ark-persist` directly and does
+two small, independently `try`/`catch`-wrapped steps: overrides each
+persisted key's initial value from `localStorage["ark:<location.
+pathname>:<key>"]` before the store is built, and (only when at least
+one key is persisted) writes the current value of each persisted key
+back to that same key on every `store.subscribe` notification. Both
+localStorage-touching blocks have their own `try`/`catch`, separate
+from the outer one guarding the hydration blob's JSON parsing -- a
+private-browsing/quota/malformed-value failure degrades to "this key
+just doesn't persist" for that key alone, never a page-wide warning.
+Always present on a stateful page (a no-op loop when no key opts in),
+not gated behind a usage flag the way `wireWatchers`/
+`renderModelBindings`/`renderRepeat`/`renderShow` are.
+
+See `tests/test_vdom_8.py` for dedicated coverage (API, Validation, IR,
+both HTML backend shapes, and four Node end-to-end checks against
+stubbed `document`/`localStorage`/`location`).
+
 ## [Unreleased] -- `vdom-7`: per-item list rendering (`Repeat`) + conditional show/hide (`Show`)
 
 **Scope:** `docs/Backends/REFACTOR-INDEX.md` row 15. Adds the two

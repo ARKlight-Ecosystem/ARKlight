@@ -409,6 +409,17 @@ def _validate_state_declaration(node: ARKNode, *, path: str, parent_is_page: boo
     name = node.props.get("name")
     if not isinstance(name, str) or not name:
         raise ValidationError(f"State(...) at {path} needs a non-empty string name.")
+    # `vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): `persist`
+    # defaults to `False` (unset is fine, mirroring every other
+    # optional bool prop in this module) but a value that *is*
+    # provided must actually be a bool -- a truthy non-bool (e.g. a
+    # stray string) would otherwise silently opt a key into
+    # `localStorage` persistence without the caller meaning to.
+    persist = node.props.get("persist", False)
+    if not isinstance(persist, bool):
+        raise ValidationError(
+            f"State(...) at {path} has persist={persist!r}, which must be a bool."
+        )
 
 
 def _validate_derive_ref(

@@ -79,6 +79,15 @@ class IRPage:
     # other, so there's no dependency graph to topologically sort.
     # Empty for pages that declare no `Watch(...)`.
     watch: list[dict[str, Any]] = field(default_factory=list)
+    # `vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): names of the
+    # `State(...)` keys declared with `persist=True`, in declaration
+    # order. Carries no value of its own (unlike `state`) -- it's a
+    # plain list of keys the JS runtime should read an override for
+    # from `localStorage` on init and write back out to on every
+    # change (see `arklight/backend/js/runtime/state.py`'s
+    # `initState()`). Empty for pages that declare no persisted
+    # `State(...)`.
+    persist: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -356,10 +365,17 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
 
 def _extract_page_state(
     page: ARKNode,
-) -> tuple[dict[str, Any], list[tuple[str, dict[str, Any]]], dict[str, Any], list[dict[str, Any]], list]:
+) -> tuple[
+    dict[str, Any],
+    list[tuple[str, dict[str, Any]]],
+    dict[str, Any],
+    list[dict[str, Any]],
+    list[str],
+    list,
+]:
     """
     Split a validated Page node's children into (state, computed,
-    computed_initial, watch, remaining children). `State(...)`/
+    computed_initial, watch, persist, remaining children). `State(...)`/
     `Computed(...)`/`Watch(...)` nodes are declarations, not renderable
     content -- they must never reach the HTML backend as a child.
 
@@ -369,15 +385,22 @@ def _extract_page_state(
     order, computed via `_evaluate_derivation` against `state` and
     previously-evaluated entries. `watch` (`vdom-5`) is returned in
     declaration order -- see `IRPage.watch`'s docstring for why no
-    sort is needed here, unlike `computed`.
+    sort is needed here, unlike `computed`. `persist` (`vdom-8`) is
+    also declaration order, and is simply the `name` of every
+    `State(...)` on this page whose `persist` prop is `True` -- no
+    dependency graph, no value of its own, same reasoning as `watch`.
     """
     state: dict[str, Any] = {}
     computed_defs: dict[str, dict[str, Any]] = {}
     watch: list[dict[str, Any]] = []
+    persist: list[str] = []
     remaining: list = []
     for child in page.children:
         if isinstance(child, ARKNode) and child.type == "State":
-            state[child.props["name"]] = child.props.get("initial")
+            name = child.props["name"]
+            state[name] = child.props.get("initial")
+            if child.props.get("persist"):
+                persist.append(name)
         elif isinstance(child, ARKNode) and child.type == "Computed":
             spec = _derivation_ref_to_spec(child.props["derive"])
             spec["deps"] = list(child.props.get("deps", ()))
@@ -404,7 +427,7 @@ def _extract_page_state(
         computed_initial[name] = _evaluate_derivation(computed_defs[name], get=_get)
 
     computed = [(name, computed_defs[name]) for name in order]
-    return state, computed, computed_initial, watch, remaining
+    return state, computed, computed_initial, watch, persist, remaining
 
 
 def build_website_ir(
@@ -470,7 +493,7 @@ def build_website_ir(
     collector = _ResponsiveStyleCollector()
     ir_pages = []
     for route, page in pages.items():
-        state, computed, computed_initial, watch, remaining_children = _extract_page_state(page)
+        state, computed, computed_initial, watch, persist, remaining_children = _extract_page_state(page)
         root_page = ARKNode(type=page.type, props=page.props, children=remaining_children)
         ir_pages.append(
             IRPage(
@@ -480,6 +503,7 @@ def build_website_ir(
                 computed=computed,
                 computed_initial=computed_initial,
                 watch=watch,
+                persist=persist,
             )
         )
     return WebsiteIR(
