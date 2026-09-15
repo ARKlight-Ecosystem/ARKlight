@@ -8,7 +8,7 @@ Detail sections below are kept in reverse-chronological order (newest
 first) and are the narrative record -- what was tried, what was
 rejected, what broke. For the plain version history, see
 [`CHANGELOG.md`](./CHANGELOG.md); for the architecture-level roadmap
-table, see [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md).
 
 ## Snapshot
 
@@ -29,7 +29,7 @@ table, see [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ### Planned, not yet scheduled to a version
 
-Design-sketched in `docs/DESIGN-NOTES.md`, explicitly waiting on a
+Design-sketched in `docs/Foundational/DESIGN-NOTES.md`, explicitly waiting on a
 go-ahead before implementation starts on any of these:
 
 - **Custom CSS class authoring.** Today `class_name=` only ever
@@ -188,9 +188,9 @@ implementation work.
 - Explicit scope boundary honored: this milestone added **capability,
   not vocabulary** -- no new named behaviors, just the registry
   refactor plus the `State`/`Bind`/`Action` primitives, exactly as
-  scoped in `docs/DESIGN-NOTES.md` ("v0.0035: stateful JS --
+  scoped in `docs/Foundational/DESIGN-NOTES.md` ("v0.0035: stateful JS --
   capability, not vocabulary").
-- This is the reactivity/IR-state milestone `docs/DESIGN-NOTES.md`
+- This is the reactivity/IR-state milestone `docs/Foundational/DESIGN-NOTES.md`
   named as the real prerequisite for v0.100 (alternate backends) to
   mean more than static HTML wearing a different file extension --
   worth revisiting that section before scoping v0.100 for real.
@@ -216,14 +216,14 @@ request, before committing to the JS design.
   many framework backends" (the v0.100 vision). Confirmed the Backend
   interface is already shaped correctly for this, but that ARKlight's
   IR (`type/props/children`, no state or event semantics) isn't yet --
-  see `docs/DESIGN-NOTES.md` for the full reasoning. This is now an
+  see `docs/Foundational/DESIGN-NOTES.md` for the full reasoning. This is now an
   explicit, named gap in the roadmap rather than an implicit one.
 - Wrote up honest positioning against htpy/FastHTML (mature Python
   "no template language" tools; FastHTML already has an HTMX-based JS
   story) and against the Svelte comparison (structurally similar small
   beginning, but Svelte's breakout came from a genuinely new technical
   insight solving an acutely-felt problem, not just "started small").
-  Captured in `docs/DESIGN-NOTES.md`.
+  Captured in `docs/Foundational/DESIGN-NOTES.md`.
 
 ### What's implemented
 
@@ -265,7 +265,7 @@ request, before committing to the JS design.
       "Show details" button using `on_click="toggle"` -- a working
       interactive element with no hand-written JavaScript anywhere in
       the example.
-- [x] `docs/DESIGN-NOTES.md` added: styling ceiling (`style=`'s real ceiling
+- [x] `docs/Foundational/DESIGN-NOTES.md` added: styling ceiling (`style=`'s real ceiling
       is no pseudo-classes/`@media`/`@keyframes`/custom fonts, all of
       which need a `<head>` hook `Page` doesn't expose yet), audience
       positioning, the Svelte-comparison writeup, the Mitosis-reframe
@@ -535,7 +535,7 @@ python3 -m pytest -q
 
 ## v0.036 -- ARK Bundle spec v1 (DONE)
 
-Implemented. Full writeup in `docs/DESIGN-NOTES.md` ("v0.036: ARK
+Implemented. Full writeup in `docs/Foundational/DESIGN-NOTES.md` ("v0.036: ARK
 Bundle spec v1"). Short version: `arklight pack <build-dir> -o
 site.ark` packages a site's existing build output into a single
 `.ark` file, so it can be shared and opened like a native document --
@@ -559,7 +559,7 @@ the existing pipeline already produces. No changes to `normalize.py`/
 `validate.py`/`build.py`/the `Backend` interface/the IR, and a
 separate module (`arklight/packer/`) rather than logic folded into
 the compiler internals (per explicit request -- see
-`docs/DESIGN-NOTES.md`). **Only `.html`/`.css`/`.js` files are
+`docs/Foundational/DESIGN-NOTES.md`). **Only `.html`/`.css`/`.js` files are
 inlined/packed** -- an `assets/` folder (images/audio/video/anything
 else) is detected and reported as skipped rather than packed; carrying
 those over is the next planned version, not this one. An
@@ -592,7 +592,7 @@ The other two pieces of the old "v0.004" heading, renumbered to their
 own milestone since they didn't land with the scaffolding above and
 are now the next scheduled release. Design is complete and unchanged;
 implementation has not started. Full writeup in
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.048: CSS media
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
 queries + `<head>` extension").
 
 - [ ] `responsive_style={...}` prop -> real `@media` blocks in the CSS
@@ -604,7 +604,7 @@ queries + `<head>` extension").
   yet.
 - [ ] Anything else that touches the generated `<header>` element as
   part of this pass (the element, not the `<head>` extension above --
-  see `docs/DESIGN-NOTES.md` for the distinction once design work
+  see `docs/Foundational/DESIGN-NOTES.md` for the distinction once design work
   starts).
 
 **Explicitly out of scope for v0.048**, tracked separately below under
@@ -616,7 +616,7 @@ queries + `<head>` extension").
 
 ## v0.010 -- Components (user-defined, reusable) (PLANNED)
 
-Not started. Per `docs/DESIGN-NOTES.md`, this is where "write a plain
+Not started. Per `docs/Foundational/DESIGN-NOTES.md`, this is where "write a plain
 Python function" (today's `nav()` pattern) becomes a real, first-class
 reusable unit -- likely with its own default styling bundled in, which
 would be a genuine differentiator versus htpy/FastHTML (neither ships
@@ -645,7 +645,7 @@ tables, media) and two more closed JS behaviors (`copy`, `dismiss`) on
 top of the original v0.003 JavaScript-helpers work, entirely as data
 in `arklight.ir.schema.SCHEMA` / `arklight.ir.schema.KNOWN_BEHAVIORS`
 -- no changes to normalize.py, validate.py, or build.py. See
-`CHANGELOG.md` for the full list and `docs/DESIGN-NOTES.md` ("v0.003:
+`CHANGELOG.md` for the full list and `docs/Foundational/DESIGN-NOTES.md` ("v0.003:
 closing the vocabulary gap, not the structural ceiling") for what this
 does and doesn't change about the ceiling (still no
 `@media`/`@container`, still a closed JS vocabulary).
@@ -701,7 +701,7 @@ only as placeholder directories (`templates/simple/assets/`,
 wired into `arklight/cli/main.py` yet. That work is now done -- see
 "v0.004a -- CLI scaffolding (DONE)" above.
 
-Also documented, not implemented, in `docs/DESIGN-NOTES.md`: two CLI
+Also documented, not implemented, in `docs/Foundational/DESIGN-NOTES.md`: two CLI
 helpers, `arklight --help` and `arklight --search <name>`, for looking
 up a component's schema by name once the vocabulary is large enough
 that recall becomes the bottleneck. Still not implemented as of this
@@ -728,7 +728,7 @@ store.get(key)` already renders a list via JS's own
 `Array.prototype.toString()`. Per-item templating (a real `<li>` per
 item) is bigger scope and deliberately left for a future version, same
 as derived/computed state, `Action.set_from_input`, and
-debounced/throttled actions -- see `docs/DESIGN-NOTES.md`
+debounced/throttled actions -- see `docs/Foundational/DESIGN-NOTES.md`
 ("v0.0035: stateful-JS vocabulary addendum II").
 
 ## v0.041 -- stateful JS vocabulary addendum I: decrement/reset (DONE)
@@ -749,7 +749,7 @@ generation logic):
       (170 total, all passing).
 
 Deliberately left for a future version at the time (see
-`docs/DESIGN-NOTES.md`, "v0.0035: stateful-JS vocabulary addendum"):
+`docs/Foundational/DESIGN-NOTES.md`, "v0.0035: stateful-JS vocabulary addendum"):
 list actions -- addressed in addendum II directly above --
 derived/computed state, `Action.set_from_input` (binding state to
 `input`/`change` events, not just `click`), and debounced/throttled
@@ -758,6 +758,6 @@ actions.
 ## Milestone checklist
 
 See the "Snapshot" table at the top of this file for current status,
-and [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the canonical
+and [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the canonical
 milestone roadmap (kept in sync with this file as the single source of
 truth, rather than a third copy of the same list).

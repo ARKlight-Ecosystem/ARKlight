@@ -42,12 +42,12 @@ vocabulary addenda (`Action.decrement`, `Action.reset`,
 
 **Next up: v0.048 -- CSS `@media` queries + `<head>`/`<header>`
 extension.** Design complete, implementation not started. See
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.048: CSS media
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
 queries + `<head>` extension"). Custom CSS class authoring and an
 `arklight --search <name>` schema lookup are sketched but not yet
 scheduled to a version.
 
-See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full
+See [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the full
 milestone roadmap.
 
 ## Install
@@ -208,7 +208,7 @@ from the default stylesheet: `.nav`, `.card`, `.muted`, `.page`,
 ### Responsive layout, without `@media` (platform-independent by construction)
 
 `Page` never gets a `<head>` hook (see
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md)), so a generated site
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)), so a generated site
 has no `@media`/`@container` query available to it at all -- there is
 no "desktop breakpoint" or "mobile breakpoint" to hand-tune, and
 nothing keyed to a specific screen width, device, or platform. Layouts
@@ -281,7 +281,7 @@ Validation stage -- an unknown behavior name (or a missing
 `behavior_target`) fails the build with a clear message rather than
 silently doing nothing in the browser. There is deliberately no way to
 pass arbitrary JavaScript: see
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) for why that boundary
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) for why that boundary
 is a design choice, not a gap.
 
 The current page's nav link is also highlighted automatically (an
@@ -395,7 +395,7 @@ packages that output as a single `.ark` file:
   currently looking at was never in scope to hide. Sealing protects the
   *other* pages/assets bundled alongside it, not the one on screen.
 
-See [`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.036: ARK
+See [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.036: ARK
 Bundle spec v1" and "v0.037: sealed bundles") for the full byte layout,
 packing algorithm, cipher construction, and known caveats.
 
@@ -421,7 +421,7 @@ arklight-framework/
     compiler/          Pipeline orchestration
     cli/               `arklight` command-line entry point
       templates/       `simple`/`production` scaffolds for
-                        `arklight new` (v0.004a; see docs/DESIGN-NOTES.md)
+                        `arklight new` (v0.004a; see docs/Foundational/DESIGN-NOTES.md)
     packer/            `arklight pack` -- ARK Bundle (.ark) packaging,
                         reads already-built output only, never touches
                         the compiler pipeline
@@ -450,7 +450,7 @@ pytest
 ## Roadmap
 
 Full milestone table (with status) lives in
-[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) -- kept as the single
+[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) -- kept as the single
 canonical copy rather than duplicated here, in `PROGRESS.md`, and in
 `CHANGELOG.md`. Short version: v0.001 through v0.041 are done; v0.048
 (CSS `@media` + `<head>`/`<header>` extension) is next; v0.010
