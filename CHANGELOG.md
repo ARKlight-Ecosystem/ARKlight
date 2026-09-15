@@ -5,6 +5,38 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- Desktop backend, Stage 4 (CI packaging)
+
+**What:** the generated `.github/workflows/desktop-build.yml` (see
+Stage 1's own entry below) gains a third job, `package`, alongside its
+existing `build` (Stage 2) and `launch-smoke-test` (Stage 3) jobs --
+downloads `build`'s uploaded binary, checks out the repo again for
+the scaffolded `<app_id>.desktop` launcher entry, and tars the two
+together into a downloadable `<binary>-linux.tar.gz` workflow
+artifact. A distributable shape beyond the bare `bin/<binary>` Stage 2
+already uploads, mirroring the Android backend's Stage 4 (`assemble-
+release`) in staging position -- though, unlike that job, there's no
+keystore-signing equivalent to gate this one behind an opt-in flag, so
+it's unconditional and generated every time, same as Stages 2/3. See
+`docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`'s "Stage 4
+implementation notes" for the `needs: build` (not `launch-smoke-
+test`), tarball-not-`.deb`, and second-checkout-not-shared-artifact
+decisions made while landing it.
+
+**Implementation:** `arklight/backend/desktop/runtime.py` --
+`_github_ci_workflow_yml` now also takes `app_id` (to locate the
+checked-out `.desktop` file) and generates the `package` job;
+`project_files` threads `app_id` through to it. No `arklight/cli/
+desktop.py` changes -- this stage is CI-only, nothing runs on the
+user's own machine.
+
+**Tests (`tests/test_desktop.py`):** the generated workflow YAML
+parses (`yaml.safe_load`) and has exactly the three expected jobs;
+`package` depends on `build` alone, not `launch-smoke-test`; it
+downloads `build`'s uploaded artifact by name; it bundles the correct
+`<app_id>.desktop` file, with and without a `project_subdir` prefix;
+and `scaffold_project`'s own output includes the new job end-to-end.
+
 ## [Unreleased] -- Desktop backend, Stage 1 (`arklight desktop scaffold`, Linux only)
 
 **What:** `arklight desktop scaffold <build-dir> -o <project-dir>

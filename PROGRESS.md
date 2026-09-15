@@ -36,7 +36,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.054   | JS backend capability expansion (reactive core parity with Vue 3) -- renumbered from v0.044 now that v0.048 has shipped; all 8 vdom-staging stages above are now DONE | DONE |
 | v0.060   | User-defined, reusable components -- renumbered from v0.100     | PLANNED |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
-| v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stage 1 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host) done, Stages 2-7 (CI build/smoke-test/packaging, then their local-toolchain counterparts) not started | IN PROGRESS |
+| v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v1.0     | Stable compiler                                              | PLANNED |
 
 ### Planned, not yet scheduled to a version
