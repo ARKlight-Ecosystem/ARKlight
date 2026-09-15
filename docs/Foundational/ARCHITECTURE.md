@@ -217,5 +217,5 @@ change.
 
 ---
 
-See `PROGRESS.md` in the repo root for implementation status and
-`CHANGELOG.md` for version history.
+See `docs/version history/PROGRESS.md` for implementation status and
+`docs/version history/CHANGELOG.md` for version history.
