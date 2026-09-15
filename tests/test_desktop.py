@@ -486,6 +486,72 @@ def test_build_run_failure_raises(tmp_path):
 
 
 # --------------------------------------------------------------------
+# Generated CI workflow -- `package` job (Stage 4)
+# --------------------------------------------------------------------
+
+
+def test_workflow_includes_package_job():
+    yml = runtime._github_ci_workflow_yml("My Cool Site!", "com.example.mysite", "my-cool-site")
+
+    assert "  package:" in yml
+    assert "needs: build" in yml
+    assert "my-cool-site-linux.tar.gz" in yml
+
+
+def test_workflow_package_job_depends_only_on_build():
+    yml = runtime._github_ci_workflow_yml("My Cool Site!", "com.example.mysite", "my-cool-site")
+
+    package_job = yml.split("  package:", 1)[1]
+    assert "needs: build" in package_job
+    # Doesn't wait on launch-smoke-test -- same "release doesn't wait
+    # on the smoke test" shape the Android backend's own
+    # assemble-release job uses.
+    assert "needs: [build" not in package_job
+    assert "launch-smoke-test]" not in package_job
+
+
+def test_workflow_package_job_downloads_build_artifact():
+    yml = runtime._github_ci_workflow_yml("My Cool Site!", "com.example.mysite", "my-cool-site")
+
+    package_job = yml.split("  package:", 1)[1]
+    assert "name: My-Cool-Site-linux" in package_job
+
+
+def test_workflow_package_job_bundles_desktop_entry():
+    yml = runtime._github_ci_workflow_yml("My Cool Site!", "com.example.mysite", "my-cool-site")
+
+    assert 'cp "com.example.mysite.desktop"' in yml
+
+
+def test_workflow_package_job_respects_project_subdir():
+    yml = runtime._github_ci_workflow_yml(
+        "My Cool Site!", "com.example.mysite", "my-cool-site", project_subdir="desktop"
+    )
+
+    assert 'cp "desktop/com.example.mysite.desktop"' in yml
+
+
+def test_workflow_is_valid_yaml_with_three_jobs():
+    yaml = pytest.importorskip("yaml")
+    yml = runtime._github_ci_workflow_yml("My Cool Site!", "com.example.mysite", "my-cool-site")
+
+    data = yaml.safe_load(yml)
+    assert set(data["jobs"].keys()) == {"build", "launch-smoke-test", "package"}
+    assert data["jobs"]["package"]["needs"] == "build"
+
+
+def test_scaffold_generated_workflow_includes_package_job(tmp_path):
+    out_dir = build_dir(tmp_path)
+    project_dir = tmp_path / "desktop-project"
+
+    scaffold_project(out_dir, output_dir=project_dir)
+
+    workflow = (project_dir / ".github" / "workflows" / "desktop-build.yml").read_text()
+    assert "  package:" in workflow
+    assert "arklight-app-linux.tar.gz" in workflow
+
+
+# --------------------------------------------------------------------
 # `arklight desktop build` -- CLI-level
 # --------------------------------------------------------------------
 

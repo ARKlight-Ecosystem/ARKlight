@@ -14,7 +14,8 @@ Two things get generated:
 
 - **The native host itself** (`main.c`, `Makefile`, `.gitignore`, a
   freedesktop `.desktop` launcher entry, a GitHub Actions workflow at
-  `.github/workflows/desktop-build.yml` plus its
+  `.github/workflows/desktop-build.yml` (build, launch-smoke-test, and
+  package jobs -- Stages 2-4) plus its
   `.github/scripts/desktop-smoke-test.sh` helper (see
   `_github_ci_workflow_yml`/`_desktop_smoke_test_sh` -- mirrors the
   Android backend's own generated workflow, see `arklight.backend.
@@ -120,7 +121,7 @@ def project_files(
         ".gitignore": _GITIGNORE,
         f"{app_id}.desktop": _desktop_entry(app_name, app_id, name),
         ".github/workflows/desktop-build.yml": _github_ci_workflow_yml(
-            app_name, name, project_subdir=project_subdir
+            app_name, app_id, name, project_subdir=project_subdir
         ),
         ".github/scripts/desktop-smoke-test.sh": _desktop_smoke_test_sh(name),
         "README.md": _readme_md(app_name, app_id, name),
@@ -403,6 +404,7 @@ wait "$PID" 2>/dev/null || true
 
 def _github_ci_workflow_yml(
     app_name: str,
+    app_id: str,
     binary: str,
     *,
     project_subdir: str | None = None,
@@ -413,7 +415,7 @@ def _github_ci_workflow_yml(
     launch check the moment it's generated, no local C toolchain,
     GTK3/WebKit2GTK headers, or display server required on the
     *user's own* machine. Mirrors `arklight.backend.android.runtime.
-    _github_ci_workflow_yml`'s two-job shape:
+    _github_ci_workflow_yml`'s job shape:
 
     - **`build`** (Stage 2) -- installs the same apt packages this
       project's own README.md's "Building" section already tells a
@@ -431,6 +433,18 @@ def _github_ci_workflow_yml(
       Android backend's own `install-launch-smoke-test` job asks,
       just answered by launching a plain binary directly instead of
       installing an APK onto an emulator.
+    - **`package`** (Stage 4) -- downloads `build`'s uploaded binary,
+      checks out the repo again to grab the generated `.desktop`
+      launcher entry alongside it, and tars the two together into a
+      single `<binary>-linux.tar.gz` -- a distributable artifact
+      shape beyond a bare binary, per
+      `DESKTOP-BACKEND-IMPLEMENTATION.md`'s Stage 4 row. Depends only
+      on `build` (mirrors the Android backend's own `assemble-release`
+      job, which similarly doesn't wait on its smoke test) -- a real
+      distro package (`.deb`, etc.) is a stretch goal for this stage,
+      not a requirement of it, and there's no keystore-signing
+      equivalent here to gate this job behind an opt-in flag the way
+      the Android backend's release job is.
 
     `project_subdir`, if given, is the project's path relative to the
     repo root the workflow will actually run from -- e.g. `"desktop"`
@@ -446,7 +460,12 @@ def _github_ci_workflow_yml(
     `launch-smoke-test` job needs no such prefix: `actions/download-
     artifact` and `_desktop_smoke_test_sh`'s own `find bin -name
     '<binary>'` don't care where the binary was originally built from,
-    only what it's named. `None` (the default) means this project IS
+    only what it's named. The `package` job needs the same prefix as
+    `build` for one thing only -- locating the checked-out
+    `<app_id>.desktop` file it tars up alongside the downloaded
+    binary -- since that file (unlike the binary, which arrives via
+    `download-artifact` already flattened to `bin/`) is read straight
+    from the checkout. `None` (the default) means this project IS
     the repo root, matching the original no-subdirectory behavior.
     """
     # Used only in the uploaded artifact's display name -- purely
@@ -460,11 +479,12 @@ def _github_ci_workflow_yml(
 name: Desktop build
 
 # Builds the native GTK3 + WebKit2GTK host on a GitHub-hosted Linux
-# runner on every push/PR, then launches it under a headless Xvfb
-# display on that same runner to confirm it doesn't crash immediately
-# -- see DESKTOP-BACKEND-IMPLEMENTATION.md, Stages 2 and 3. Requires
-# no C toolchain, GTK3/WebKit2GTK headers, or display server on your
-# own machine for either job; all of it lives on the runner.
+# runner on every push/PR, launches it under a headless Xvfb display
+# on that same runner to confirm it doesn't crash immediately, and
+# packages the built binary into a downloadable tarball -- see
+# DESKTOP-BACKEND-IMPLEMENTATION.md, Stages 2, 3, and 4. Requires no
+# C toolchain, GTK3/WebKit2GTK headers, or display server on your own
+# machine for any of these jobs; all of it lives on the runner.
 on:
   push:
     branches: [main]
@@ -520,6 +540,46 @@ jobs:
 
       - name: Launch and check it stays up
         run: xvfb-run --auto-servernum bash .github/scripts/desktop-smoke-test.sh
+
+  package:
+    name: Package (tarball)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the project
+        # Needed for the generated `{app_id}.desktop` launcher entry
+        # this job tars up alongside the downloaded binary -- the
+        # binary itself comes from the `build` job's uploaded
+        # artifact below, not this checkout.
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: {slug}-linux
+          path: bin
+
+      - name: Assemble tarball
+        run: |
+          set -e
+          BIN=$(find bin -maxdepth 1 -type f | head -n1)
+          if [ -z "$BIN" ]; then
+            echo "::error::No downloaded binary found under bin/"
+            exit 1
+          fi
+          chmod +x "$BIN"
+          STAGE="{binary}-linux"
+          mkdir -p "$STAGE"
+          cp "$BIN" "$STAGE/{binary}"
+          cp "{path_prefix}{app_id}.desktop" "$STAGE/"
+          tar czf "$STAGE.tar.gz" "$STAGE"
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: {slug}-linux-package
+          path: {binary}-linux.tar.gz
+          if-no-files-found: error
 '''
 
 
@@ -595,7 +655,7 @@ make
 | `assets.gen.c` / `assets.gen.h` | The packaged site (every file from the `arklight build` output directory this was scaffolded from), embedded as C byte arrays. Regenerated fresh on every `arklight desktop scaffold` run -- don't hand-edit. |
 | `Makefile` | Builds `bin/{binary}` from the two files above. |
 | `{app_id}.desktop` | A [freedesktop Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/latest/) launcher. Edit `Exec=` to an absolute path (or put `bin/{binary}` on your `PATH`) and copy it to `~/.local/share/applications/` to add a launcher-menu entry. |
-| `.github/workflows/desktop-build.yml` | A GitHub Actions workflow that builds this project on a GitHub-hosted Linux runner on every push/PR, uploads `bin/{binary}` as a downloadable artifact, then launches it under a headless Xvfb display on that same runner to confirm it doesn't crash immediately -- no local toolchain or display server needed for either check. Regenerated fresh on every `arklight desktop scaffold` run; it's a normal, hand-editable workflow file, not something only this tool may touch. **Note:** this workflow only fires on GitHub if `.github/workflows/` sits at your repository's *root* -- if `arklight desktop scaffold` told you this project is nested inside an existing repo, move this file there first (see that command's own terminal output for the exact paths). |
+| `.github/workflows/desktop-build.yml` | A GitHub Actions workflow that builds this project on a GitHub-hosted Linux runner on every push/PR, uploads `bin/{binary}` as a downloadable artifact, launches it under a headless Xvfb display on that same runner to confirm it doesn't crash immediately, and packages the binary plus its `.desktop` launcher entry into a downloadable `{binary}-linux.tar.gz` -- no local toolchain or display server needed for any of that. Regenerated fresh on every `arklight desktop scaffold` run; it's a normal, hand-editable workflow file, not something only this tool may touch. **Note:** this workflow only fires on GitHub if `.github/workflows/` sits at your repository's *root* -- if `arklight desktop scaffold` told you this project is nested inside an existing repo, move this file there first (see that command's own terminal output for the exact paths). |
 | `.github/scripts/desktop-smoke-test.sh` | The launch/liveness-check logic the workflow's `launch-smoke-test` job runs, kept in its own script rather than inline in the workflow file. Hand-editable, but re-running `arklight desktop scaffold` will overwrite it. |
 
 ## Updating the packaged site
@@ -611,8 +671,10 @@ app/window icons, a sealed `.ark` bundle as the embedded payload
 (this scaffold embeds the unpacked build directory instead -- see
 `arklight.backend.desktop.runtime`'s module docstring for why),
 a local `arklight desktop build` command that runs this `Makefile` for
-you, and Windows/macOS targets. A GitHub Actions CI build is already
-included -- see `.github/workflows/desktop-build.yml` above.
+you, a local equivalent of the CI package job's tarball
+(`arklight desktop build --package`), and Windows/macOS targets. A
+GitHub Actions CI build, launch smoke test, and packaging job are
+already included -- see `.github/workflows/desktop-build.yml` above.
 """
 
 
