@@ -22,8 +22,27 @@ This is intentionally a thin, uniform structure:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
+
+
+@dataclass(frozen=True)
+class ClassBindSpec:
+    """
+    A reference to a state-driven CSS class toggle -- e.g.
+    `Bind.when("active", "is-active")`. Used as a `bind_class=` prop
+    value (alongside a component's ordinary `class_name=`) once a page
+    declares `State(...)`.
+
+    Mirrors `ActionRef`'s shape: a small structured object, not a
+    string, validated against the page's declared `State(...)` names at
+    compile time (an unknown `state` target fails the build) and never
+    a class-name string built by concatenation at runtime. See
+    docs/DESIGN-NOTES.md ("Reactive-core vdom staging", Stage 2).
+    """
+
+    state: str
+    class_name: str
 
 
 @dataclass(frozen=True)
@@ -45,6 +64,107 @@ class ActionRef:
     action: str
     state: str
     args: dict[str, Any] = field(default_factory=dict)
+    # Stage 3 ("Reactive-core vdom staging", see docs/DESIGN-NOTES.md):
+    # event modifiers -- `prevent`/`stop`/`once` stored verbatim, and
+    # `debounce`/`throttle` stored as `"debounce:<ms>"`/`"throttle:<ms>"`
+    # tokens. Deliberately a tuple of plain strings (not a nested
+    # dataclass per modifier) since every entry is either bare or a
+    # single "name:param" pair -- see arklight.ir.schema.MODIFIER_REGISTRY
+    # for what's valid here; Validation checks these tokens the same way
+    # it already checks `action`/`state` above.
+    modifiers: tuple[str, ...] = field(default_factory=tuple)
+
+    def with_modifiers(self, *names: str) -> "ActionRef":
+        """
+        Attach one or more boolean modifiers: `.with_modifiers("prevent",
+        "once")`. Returns a new `ActionRef` -- the original is untouched,
+        same immutable-builder shape `.debounce(...)`/`.throttle(...)`
+        below share.
+        """
+        return replace(self, modifiers=self.modifiers + tuple(names))
+
+    def debounce(self, ms: int) -> "ActionRef":
+        """`.debounce(300)` -- wait 300ms of silence since the last
+        click on this element before actually running the action."""
+        return replace(self, modifiers=self.modifiers + (f"debounce:{ms}",))
+
+    def throttle(self, ms: int) -> "ActionRef":
+        """`.throttle(300)` -- run the action at most once every
+        300ms while clicks keep happening."""
+        return replace(self, modifiers=self.modifiers + (f"throttle:{ms}",))
+
+
+@dataclass(frozen=True)
+class DerivationRef:
+    """
+    A reference to a closed-vocabulary derivation -- e.g.
+    `Derive.multiply("price", "qty")`. Used as a `Computed(...)`'s
+    `derive=` value (`vdom-4`, see docs/Backends/REFACTOR-INDEX.md row
+    12 / docs/Foundational/DESIGN-NOTES.md "Computed/derived state").
+
+    Mirrors `ActionRef`'s shape and reasoning: a small structured
+    object, not a string -- validated against
+    `arklight.ir.schema.DERIVATION_REGISTRY` at compile time (unknown
+    `kind`, wrong arity, an unknown `compare` op, or a `names` entry
+    that isn't part of the owning `Computed(...)`'s declared `deps` all
+    fail the build) and never a template/expression string evaluated
+    at runtime.
+
+    - `kind`  : the closed vocabulary entry, e.g. "sum"/"multiply"/
+                "join"/"count"/"format"/"compare".
+    - `names` : the state/computed names this derivation reads, in the
+                order the runtime fragment expects them (positional
+                for `sum`/`multiply`/`join`/`format`; exactly two, in
+                `(a, b)` order, for `compare`; exactly one for
+                `count`).
+    - `args`  : closed extra keyword data the `kind` needs beyond
+                `names` -- `sep` for `join`, `template`/`names_map`
+                for `format`, `op` for `compare`. Never a raw
+                expression string.
+    """
+
+    kind: str
+    names: tuple[str, ...] = field(default_factory=tuple)
+    args: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PredicateRef:
+    """
+    A reference to a closed-vocabulary predicate -- e.g.
+    `Predicate.truthy("flag")`. Used as a `Show(...)`'s first
+    (positional) argument (`vdom-7`, see docs/Backends/REFACTOR-INDEX.md
+    row 15).
+
+    Mirrors `DerivationRef`'s shape and reasoning: a small structured
+    object, not a string -- validated against
+    `arklight.ir.schema.PREDICATE_REGISTRY` at compile time (unknown
+    `kind`, wrong arity, or a `names` entry that isn't a `State(...)`/
+    `Computed(...)` declared on the owning page all fail the build) and
+    never a template/expression string evaluated at runtime.
+    """
+
+    kind: str
+    names: tuple[str, ...] = field(default_factory=tuple)
+    args: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ItemIndexRef:
+    """
+    A reference to the *current* `Repeat(...)` item's live position --
+    `Item.index()` (`arklight/api.py`). Only meaningful as an
+    `Action.*(...)` arg value inside a `Repeat(...)`'s `template=`
+    callable, e.g. `Action.remove(name, Item.index())` -- unlike a
+    plain literal index, this is resolved fresh on every render (see
+    `arklight/backend/js/runtime/repeat.py`), so it stays correct
+    across an `Action.remove(...)`-driven reorder rather than going
+    stale the way a baked-in literal index would. Carries no fields of
+    its own -- it's a pure marker, recognized by identity/type wherever
+    an `ActionRef.args` value is resolved (build-time substitution for
+    the HTML backend's per-item fallback rendering; a JSON sentinel for
+    the JS backend's client-side item construction).
+    """
 
 
 @dataclass
