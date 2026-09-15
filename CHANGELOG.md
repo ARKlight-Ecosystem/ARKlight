@@ -5,6 +5,39 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- User-defined components, Stage 0 (registration + Option A macro expansion)
+
+**What:** opens the `v0.060` milestone. `component(*, props=None,
+mode="macro")` (new, `arklight/api.py`) registers a plain Python
+render function as a named, reusable component -- `NavBar(active=
+"home")` now reads exactly like a built-in call, but produces a
+marker node that a new pipeline stage expands into its real subtree
+before Normalization runs, per Option A of
+`docs/Foundational/user-defined-components.md`. `mode="registry"` is
+also selectable today as an explicit EXPERIMENTAL opt-in toward Option
+B, though it does not yet have distinct behavior -- see
+`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` for the
+full staged ladder and the hybrid decision this pins down.
+
+**Implementation:** `arklight/ir/components.py` (new) --
+`Prop`/`ComponentSpec`/`COMPONENT_REGISTRY`/`register_component`/
+`expand_ark_ast`/`expand_node`, with a props contract (unknown/missing/
+mistyped props fail the build via `ComponentError`, not a raw Python
+`TypeError`) and cycle/depth guards (mirrors `validate.py` check #13's
+`Computed`/`Derive` self-reference check). `arklight/compiler/
+pipeline.py` gains a new `"Expanding user-defined components..."`
+stage between ARK-AST construction and Normalization. No changes to
+`arklight/ir/schema.py`, `tag_map.py`, or any backend.
+
+**Tests:** `tests/test_user_defined_components_stage0.py` (17 tests,
+new); two `tests/test_pipeline_end_to_end.py` stage-order assertions
+updated for the new stage message. Full suite: 1057 passed.
+
+**Not done this stage:** `arklight search` typo-suggestion integration
+(Stage 1), default-styling registration hook (Stage 2), Option B's
+actual per-backend rendering differentiator (Stage 3), component-owned
+state (Stage 4).
+
 ## [Unreleased] -- Desktop backend, Stage 4 (CI packaging)
 
 **What:** the generated `.github/workflows/desktop-build.yml` (see

@@ -207,6 +207,7 @@ def test_build_on_stage_reports_every_stage_in_order(tmp_path):
 
     assert messages == [
         "Discovering site and compiling AST trees...",
+        "Expanding user-defined components...",
         "Normalizing AST...",
         "Running validation...",
         "Building website IR...",
@@ -241,6 +242,7 @@ def test_compile_site_file_on_stage_reports_its_own_stages(tmp_path):
 
     assert messages == [
         "Discovering site and compiling AST trees...",
+        "Expanding user-defined components...",
         "Normalizing AST...",
         "Running validation...",
         "Building website IR...",

@@ -1,6 +1,21 @@
 # ARKlight v0.060 — User-Defined, Reusable Components
 
-**Status check first, since this matters:** v0.060 is listed in
+# ARKlight v0.060 — User-Defined, Reusable Components
+
+**Status update (Stage 0 landed):** the "no implementation on `alpha`"
+statement immediately below is now out of date -- Stage 0 of the
+staged rollout (registration, props contract, and Option A macro
+expansion) has landed; see
+[`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`](./USER-DEFINED-COMPONENTS-IMPLEMENTATION.md)
+for the staged ladder, current status, and the **hybrid** Option A/B
+decision that doc pins down (Option A stays the default and does all
+the real work; Option B is now selectable as an explicit
+`mode="registry"` opt-in, but is EXPERIMENTAL and not yet a distinct
+rendering outcome -- see that doc's "What Option B is and isn't, right
+now"). Left unchanged below verbatim as the original design record.
+
+**Status check first, since this matters (as of this document's
+original writing):** v0.060 is listed in
 `docs/Foundational/ARCHITECTURE.md`'s roadmap table as **PLANNED**,
 without the "design complete in `docs/DESIGN-NOTES.md`" qualifier that
 v0.054 and v0.080 carry. There is no implementation on the `alpha`
