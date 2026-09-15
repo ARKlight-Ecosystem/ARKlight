@@ -47,10 +47,12 @@ unworkable going forward. Full detail in
 [`CHANGELOG.md`](./CHANGELOG.md); narrative/decision log in
 [`PROGRESS.md`](./PROGRESS.md).
 
-**Next up:** custom CSS class authoring and an
-`arklight --search <name>` schema lookup are sketched but not yet
-scheduled to a version -- see "Planned, not yet scheduled" in
-[`PROGRESS.md`](./PROGRESS.md).
+**Already shipped:** custom CSS class authoring (`Site.style(...)`)
+and `arklight search <name>` schema lookup landed as v0.042 -- see
+[`docs/version history/v0.042.md`](./docs/version%20history/v0.042.md).
+**Next up:** see the milestone table in
+[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md)
+for what's still queued.
 
 See [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the full
 milestone roadmap.
@@ -464,6 +466,9 @@ Full milestone table (with status) lives in
 [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) -- kept as the single
 canonical copy rather than duplicated here, in
 [`PROGRESS.md`](./PROGRESS.md), and in
-[`CHANGELOG.md`](./CHANGELOG.md). Short version: v0.001 through v0.041 are done; v0.048
-(CSS `@media` + `<head>`/`<header>` extension) is next; v0.010
-(components) and v0.100 (alternate backends) are further out.
+[`CHANGELOG.md`](./CHANGELOG.md). Short version: v0.001 through
+0.54.0 are done, which folds in the v0.042, v0.043, and v0.048
+milestones (see `docs/version history/` for each); v0.060
+(user-defined components) and v0.080 (Android backend, in progress)
+are next, with v0.100 (Desktop backend) and v1.0 (stable) further
+out.
