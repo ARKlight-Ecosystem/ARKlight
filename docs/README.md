@@ -26,10 +26,15 @@ follow the links below into the subfolders for the topic you need.
 
 ## Folder Guide
 
-### `docs/Foundational/`
+Each subfolder now has its own `README.md` with a fuller overview and
+index — the summaries below are quick pointers, not the source of
+truth.
+
+### [`docs/Foundational/`](Foundational/README.md) — permanent
 
 The core reading for understanding how ARKlight works and why it's
-built the way it is.
+built the way it is. **Not deletable** — this is the permanent design
+record for the project, updated in place rather than removed.
 
 | File | Covers |
 | --- | --- |
@@ -38,33 +43,35 @@ built the way it is.
 | [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | The `arklight` CLI: build/deploy workflows and commands. |
 | [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
+| [`user-defined-components.md`](Foundational/user-defined-components.md) | Design for user-defined, reusable components (v0.060). |
 
-### `docs/Backends/`
+### [`docs/Backends/`](Backends/README.md) — working reference
 
-Details specific to individual output backends and their refactor history.
+Design/staging docs for individual output backends. **Working
+reference only** — removed once the work they describe is finished
+and captured in the changelog or a Foundational doc.
 
 | File | Covers |
 | --- | --- |
-| [`REFACTOR-INDEX.md`](Backends/REFACTOR-INDEX.md) | Index/overview of backend refactor efforts — start here for this folder. |
-| [`HTML-BACKEND-REFACTOR.md`](Backends/HTML-BACKEND-REFACTOR.md) | HTML backend refactor notes. |
-| [`JS-BACKEND-REFACTOR-PLAN.md`](Backends/JS-BACKEND-REFACTOR-PLAN.md) | Plan for the JS backend refactor. |
-| [`HTMX-INTEGRATION.md`](Backends/HTMX-INTEGRATION.md) | How htmx is integrated and only shipped when used. |
-| [`NEUTRALINO-INTEGRATION.md`](Backends/NEUTRALINO-INTEGRATION.md) | Neutralino desktop-app integration. |
+| [`ANDROID-BACKEND-IMPLEMENTATION.md`](Backends/ANDROID-BACKEND-IMPLEMENTATION.md) | Staged implementation plan for the Android packaging backend. |
 | [`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`](Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md) | Proposal for a purpose-built native desktop host/packager (replacing Neutralino.js as the canonical desktop backend). |
+| [`NEUTRALINO-INTEGRATION.md`](Backends/NEUTRALINO-INTEGRATION.md) | Neutralino desktop-app integration (current desktop backend). |
 
-### `docs/new js backend proposal/`
+### [`docs/new js backend proposal/`](<new js backend proposal/README.md>) — working reference
 
-Proposals under consideration for a redesigned JS backend.
+Competing proposals under consideration for a redesigned JS backend.
+**Working reference only** — removed once a direction is chosen.
 
 | File | Covers |
 | --- | --- |
 | [`ARCHITECTURE-VDOM.md`](<new js backend proposal/ARCHITECTURE-VDOM.md>) | Proposal using a virtual DOM approach. |
 | [`ARCHITECTURE no vdom.md`](<new js backend proposal/ARCHITECTURE no vdom.md>) | Alternative proposal without a virtual DOM. |
 
-### `docs/Far Future Concern/`
+### [`docs/Far Future Concern/`](<Far Future Concern/README.md>) — working reference
 
 Speculative/backlog material for backends that aren't a near-term
-priority.
+priority. **Working reference only** — cleared out if a backend is
+dropped, or graduated elsewhere if it's picked up.
 
 | File | Covers |
 | --- | --- |
