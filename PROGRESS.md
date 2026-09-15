@@ -8,7 +8,7 @@ Detail sections below are kept in reverse-chronological order (newest
 first) and are the narrative record -- what was tried, what was
 rejected, what broke. For the plain version history, see
 [`CHANGELOG.md`](./CHANGELOG.md); for the architecture-level roadmap
-table, see [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md).
 
 ## Snapshot
 
@@ -30,9 +30,10 @@ table, see [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 | vdom-5   | Watch effects (`Watch(...)`, reuses the action dispatcher) -- docs/Backends/REFACTOR-INDEX.md row 13 | DONE |
 | vdom-6   | Two-way input binding (`bind_value=Bind.model(...)` -> `data-ark-model`) -- docs/Backends/REFACTOR-INDEX.md row 14 | DONE |
 | vdom-7   | Per-item list rendering (`Repeat`) + conditional show/hide (`Show`) -- docs/Backends/REFACTOR-INDEX.md row 15 | DONE |
+| vdom-8   | `localStorage` persistence for `State(..., persist=True)` -- docs/Backends/REFACTOR-INDEX.md row 16, the last stage of the combined reactive-core refactor | DONE |
 | v0.0431  | Emergency patch: build-time warning for unrouted `srcset`/`poster`/`action`/`formaction` | DONE |
 | v0.048   | CSS `@media` queries + `<head>`/`<header>` extension (Stage A of 2: `meta`/`links` DONE; Stage B of 2: `responsive_style` + `@media` compilation DONE) | DONE |
-| v0.054   | JS backend capability expansion (reactive core parity with Vue 3) -- renumbered from v0.044 now that v0.048 has shipped | PLANNED |
+| v0.054   | JS backend capability expansion (reactive core parity with Vue 3) -- renumbered from v0.044 now that v0.048 has shipped; all 8 vdom-staging stages above are now DONE | DONE |
 | v0.060   | User-defined, reusable components -- renumbered from v0.100     | PLANNED |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080 | PLANNED |
@@ -43,26 +44,6 @@ table, see [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 Design-sketched in `docs/DESIGN-NOTES.md`, explicitly waiting on a
 go-ahead before implementation starts on any of these:
 
-- **JS backend refactor (module split + HTMX-bus adoption + app-shell
-  navigation), staged** -- see
-  `docs/Backends/JS-BACKEND-REFACTOR-PLAN.md`. Reconciles the
-  remaining vdom-staging work (Stages 4-8 below) with
-  `docs/Backends/HTMX-INTEGRATION.md`'s 4-stage plan, adds a new
-  `app_shell=True` navigation stage the packaging backends
-  (Android/KaiOS/Desktop) all implicitly need, and names -- without
-  scoping -- a later, explicitly opt-in server-backed state-streaming
-  milestone informed by an external reference prototype. 15 of 16
-  merged stages done as of this session (see
-  `docs/Backends/REFACTOR-INDEX.md`'s table for the full, current
-  per-row status) -- most recently `vdom-7` (per-item list rendering
-  `Repeat(name, template=...)` + conditional `Show(predicate, ...)`;
-  `Repeat` keys its vnode diff by each item's own value and routes
-  through the vendored snabbdom `patch()` as originally scoped, `Show`
-  deliberately doesn't and toggles the native `hidden` attribute
-  instead -- both for hydration-safety reasons the vendored core's
-  lack of a dedicated hydration pass forces; see
-  `docs/Backends/REFACTOR-INDEX.md` row 15). Only `vdom-8`
-  (`localStorage` persistence) remains.
 - **KaiOS backend.** Design complete --
   `docs/Far Future Concern/KAIOS-BACKEND-IMPLEMENTATION.md` (plus the
   constraint-gathering doc in the same directory,
@@ -747,7 +728,7 @@ Requested by the maintainer: bring "most of Vue 3's JS capabilities"
 into the JS backend -- computed/derived state, watchers, two-way
 input binding, per-item list rendering, conditional show/hide, event
 modifiers, reactive class binding. Full design writeup in
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.044: JS backend
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.044: JS backend
 capability expansion -- reactive core parity with Vue 3"). Design
 complete; implementation not started.
 
@@ -1450,7 +1431,7 @@ The other two pieces of the old "v0.004" heading, renumbered to their
 own milestone since they didn't land with the scaffolding above and
 are now the next scheduled release. Design is complete and unchanged;
 implementation has not started. Full writeup in
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.048: CSS media
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
 queries + `<head>` extension").
 
 - [x] `responsive_style={...}` prop -> real `@media` blocks in the CSS
@@ -1618,6 +1599,6 @@ actions.
 ## Milestone checklist
 
 See the "Snapshot" table at the top of this file for current status,
-and [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the canonical
+and [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the canonical
 milestone roadmap (kept in sync with this file as the single source of
 truth, rather than a third copy of the same list).

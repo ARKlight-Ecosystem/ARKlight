@@ -1875,7 +1875,7 @@ expansion -- computed/derived state, watch effects, two-way input
 binding, per-item list rendering, conditional show/hide, event
 modifiers, reactive class binding) -- see the "Planned" section of
 [`PROGRESS.md`](./PROGRESS.md) and
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.044: JS backend
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.044: JS backend
 capability expansion -- reactive core parity with Vue 3") for the
 design.
 
@@ -1959,7 +1959,7 @@ source.
 Goal was cutting boilerplate/nesting in the styling API and closing
 two long-open CLI discoverability gaps -- not new `@media`/`<head>`
 capability (that's still v0.048). Full design context in
-[`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md) ("v0.042: extra CSS
+[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.042: extra CSS
 features").
 
 ### Added
@@ -2041,7 +2041,7 @@ silently drift apart again.
 
 Next up is **v0.048** (CSS `@media` queries + structured
 `<head>`/`<header>` extension) -- see the "Planned" section of
-[`PROGRESS.md`](./PROGRESS.md) and [`docs/DESIGN-NOTES.md`](./docs/DESIGN-NOTES.md)
+[`PROGRESS.md`](./PROGRESS.md) and [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
 ("v0.048: CSS media queries + `<head>` extension") for the design.
 Custom CSS class authoring and an `arklight --search <name>` schema
 lookup are sketched but not yet scheduled to a version -- also in
