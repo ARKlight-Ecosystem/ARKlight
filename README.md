@@ -27,7 +27,7 @@ produces `ARK/index.html` -- plain, dependency-free HTML.
 
 ## Status
 
-**Current release: 0.42.0 -- alpha catch-up.** Brings `main` up to
+**Current release: 0.54.0 -- alpha catch-up.** Brings `main` up to
 parity with `alpha`'s CSS `@media`/`<head>` extension, an HTML backend
 refactor, a reactive JS core (computed state, watch effects, two-way
 binding, list rendering, show/hide, `localStorage` persistence), a

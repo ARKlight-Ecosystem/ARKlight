@@ -34,6 +34,7 @@ table itself, independent of what's landed so far), see
 | [`v0.036.md`](./v0.036.md) | ARK Bundle spec v1 -- `arklight pack`. |
 | [`v0.037.md`](./v0.037.md) | Sealed ARK Bundles -- encrypted by default, `arklight unpack`. |
 | [`v0.041.md`](./v0.041.md) | CLI/pipeline/JS runtime hardening + stateful JS vocabulary addenda I & II. |
+| [`v0.54.0.md`](./v0.54.0.md) | Alpha catch-up -- CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV. First release on the new `MAJOR.MINOR.PATCH` version format. |
 
 ## Adding a new version
 
