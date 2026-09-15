@@ -14,10 +14,12 @@ Two things get generated:
 
 - **The native host itself** (`main.c`, `Makefile`, `.gitignore`, a
   freedesktop `.desktop` launcher entry, a GitHub Actions workflow at
-  `.github/workflows/desktop-build.yml` (see `_github_ci_workflow_yml`
-  -- mirrors the Android backend's own generated workflow, see
-  `arklight.backend.android.runtime`'s module docstring), `README.md`)
-  -- a small GTK3 + WebKit2GTK program, per the proposal's "native
+  `.github/workflows/desktop-build.yml` plus its
+  `.github/scripts/desktop-smoke-test.sh` helper (see
+  `_github_ci_workflow_yml`/`_desktop_smoke_test_sh` -- mirrors the
+  Android backend's own generated workflow, see `arklight.backend.
+  android.runtime`'s module docstring), `README.md`) -- a small
+  GTK3 + WebKit2GTK program, per the proposal's "native
   host responsibilities" (section 4): create the window, initialize
   the platform WebView, register an in-process `ark:` resource scheme
   backed by an in-memory asset store, load the entry document, and
@@ -120,6 +122,7 @@ def project_files(
         ".github/workflows/desktop-build.yml": _github_ci_workflow_yml(
             app_name, name, project_subdir=project_subdir
         ),
+        ".github/scripts/desktop-smoke-test.sh": _desktop_smoke_test_sh(name),
         "README.md": _readme_md(app_name, app_id, name),
     }
 
@@ -342,6 +345,62 @@ _GITIGNORE = """\
 # ---------------------------------------------------------------------------
 
 
+def _desktop_smoke_test_sh(binary: str) -> str:
+    """
+    The `launch-smoke-test` job's launch/liveness-check logic, as a
+    real script file rather than inline in `_github_ci_workflow_yml`'s
+    `run:` block -- same "keep it in its own file, invoke it as a
+    single line" shape `arklight.backend.android.runtime.
+    _android_smoke_test_sh` already established (see that function's
+    own docstring for why, though the specific multi-line-`script:`
+    breakage it describes is a `reactivecircus/android-emulator-
+    runner` quirk this job doesn't share; this is kept as its own file
+    anyway for the same readability/reuse benefit, not because a
+    plain `run: |` block would actually break).
+
+    Finds the downloaded binary by name under `bin/` with `find`
+    rather than assuming a fixed path -- `actions/download-artifact`
+    doesn't guarantee it preserves the `path_prefix` the upload step
+    used (a single-file `path:` upload is stored flat in the
+    artifact), so this doesn't assume one either. Same "don't assume,
+    search for it" shape `_android_smoke_test_sh`'s own `find apk
+    -name '*.apk'` already uses for the same reason.
+    """
+    return f'''\
+#!/usr/bin/env bash
+# Launches the downloaded desktop binary (under Xvfb -- the workflow
+# step invoking this script wraps it in `xvfb-run`) and fails if it
+# isn't still running a few seconds later (i.e. it crashed on
+# startup). See this file's own generator, `_desktop_smoke_test_sh` in
+# arklight/backend/desktop/runtime.py, for why this logic lives in its
+# own script rather than inline in desktop-build.yml.
+set -euo pipefail
+
+BIN="$(find bin -type f -name '{binary}' | head -n 1)"
+if [ -z "$BIN" ]; then
+  echo "::error::No file named '{binary}' found under bin/ -- listing what's actually there:"
+  find bin -type f
+  exit 1
+fi
+chmod +x "$BIN"
+
+echo "Launching $BIN"
+"$BIN" &
+PID=$!
+sleep 5
+
+if ! kill -0 "$PID" 2>/dev/null; then
+  echo "::error::$BIN exited before the 5-second liveness check -- it likely crashed on startup."
+  wait "$PID" || true
+  exit 1
+fi
+
+echo "$BIN launched and is still running -- smoke test passed."
+kill "$PID" 2>/dev/null || true
+wait "$PID" 2>/dev/null || true
+'''
+
+
 def _github_ci_workflow_yml(
     app_name: str,
     binary: str,
@@ -350,23 +409,28 @@ def _github_ci_workflow_yml(
 ) -> str:
     """
     A GitHub Actions workflow, entirely on a GitHub-hosted Linux
-    runner -- so a scaffolded project gets an automated build the
-    moment it's generated, no local C toolchain or GTK3/WebKit2GTK
-    dev headers required on the *user's own* machine. Mirrors
-    `arklight.backend.android.runtime._github_ci_workflow_yml`'s single
-    `assemble-debug` job: install the same apt packages this project's
-    own README.md's "Building" section already tells a human to run,
-    `make`, then upload `bin/<binary>` as a downloadable artifact.
+    runner -- so a scaffolded project gets an automated build *and*
+    launch check the moment it's generated, no local C toolchain,
+    GTK3/WebKit2GTK headers, or display server required on the
+    *user's own* machine. Mirrors `arklight.backend.android.runtime.
+    _github_ci_workflow_yml`'s two-job shape:
 
-    No install/launch smoke-test job (the Android workflow's Stage-3
-    equivalent) here yet -- that's DESKTOP-BACKEND-IMPLEMENTATION.md's
-    own Stage 3, tracked separately rather than folded into this
-    function, since it needs a headless `Xvfb` display plus the
-    WebKit2GTK runtime libs on the runner (distinct from the `-dev`
-    headers this job already installs to *build*), not just this
-    job's existing steps. This function only verifies the build
-    compiles and links; Stage 3 will add the "does it also launch
-    without crashing" check on top of what it produces.
+    - **`build`** (Stage 2) -- installs the same apt packages this
+      project's own README.md's "Building" section already tells a
+      human to run, runs `make`, and uploads `bin/<binary>` as a
+      downloadable artifact.
+    - **`launch-smoke-test`** (Stage 3) -- downloads that binary,
+      installs the WebKit2GTK *runtime* libs and `xvfb` (distinct from
+      the `-dev` headers `build` installs to compile), launches the
+      binary under a headless `Xvfb` display (`xvfb-run`) since a
+      GTK3 + WebKit2GTK window needs some display to open even
+      though nothing on the runner ever actually shows it, and fails
+      the job if the process isn't still running a few seconds later.
+      Depends on `build`'s uploaded binary, not a local one -- same
+      "does this thing actually start and stay up" question the
+      Android backend's own `install-launch-smoke-test` job asks,
+      just answered by launching a plain binary directly instead of
+      installing an APK onto an emulator.
 
     `project_subdir`, if given, is the project's path relative to the
     repo root the workflow will actually run from -- e.g. `"desktop"`
@@ -374,13 +438,16 @@ def _github_ci_workflow_yml(
     existing repo's `desktop/` subdirectory rather than at that repo's
     own root (see `arklight.cli.desktop._find_enclosing_git_root`,
     itself mirroring `arklight.cli.android._find_enclosing_git_root`).
-    When set, the `make` step gets a matching `working-directory:`,
-    and the uploaded binary's path is prefixed with it -- otherwise
-    `make` looks for a `Makefile` in the checkout root and fails
-    immediately, since checkout always happens at the *repo* root, not
-    wherever this project was scaffolded into. `None` (the default)
-    means this project IS the repo root, matching the original
-    no-subdirectory behavior.
+    When set, the `build` job's `make` step gets a matching
+    `working-directory:`, and the uploaded binary's path is prefixed
+    with it -- otherwise `make` looks for a `Makefile` in the checkout
+    root and fails immediately, since checkout always happens at the
+    *repo* root, not wherever this project was scaffolded into. The
+    `launch-smoke-test` job needs no such prefix: `actions/download-
+    artifact` and `_desktop_smoke_test_sh`'s own `find bin -name
+    '<binary>'` don't care where the binary was originally built from,
+    only what it's named. `None` (the default) means this project IS
+    the repo root, matching the original no-subdirectory behavior.
     """
     # Used only in the uploaded artifact's display name -- purely
     # cosmetic, so it's slugified defensively rather than validated
@@ -393,10 +460,11 @@ def _github_ci_workflow_yml(
 name: Desktop build
 
 # Builds the native GTK3 + WebKit2GTK host on a GitHub-hosted Linux
-# runner on every push/PR, so a build regression is caught without any
-# of the dev headers below needing to exist on a contributor's own
-# machine. No install/launch smoke test yet -- see
-# DESKTOP-BACKEND-IMPLEMENTATION.md's Stage 3.
+# runner on every push/PR, then launches it under a headless Xvfb
+# display on that same runner to confirm it doesn't crash immediately
+# -- see DESKTOP-BACKEND-IMPLEMENTATION.md, Stages 2 and 3. Requires
+# no C toolchain, GTK3/WebKit2GTK headers, or display server on your
+# own machine for either job; all of it lives on the runner.
 on:
   push:
     branches: [main]
@@ -425,6 +493,33 @@ jobs:
           name: {slug}-linux
           path: {path_prefix}bin/{binary}
           if-no-files-found: error
+
+  launch-smoke-test:
+    name: Launch on Xvfb
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the project
+        # Needed so .github/scripts/desktop-smoke-test.sh (see the
+        # "Launch and check it stays up" step below) actually exists
+        # on the runner -- same reasoning the Android workflow's own
+        # smoke-test job checkout step gives.
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: {slug}-linux
+          path: bin
+
+      - name: Install WebKit2GTK runtime + Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libwebkit2gtk-4.1-0
+
+      - name: Launch and check it stays up
+        run: xvfb-run --auto-servernum bash .github/scripts/desktop-smoke-test.sh
 '''
 
 
@@ -500,7 +595,8 @@ make
 | `assets.gen.c` / `assets.gen.h` | The packaged site (every file from the `arklight build` output directory this was scaffolded from), embedded as C byte arrays. Regenerated fresh on every `arklight desktop scaffold` run -- don't hand-edit. |
 | `Makefile` | Builds `bin/{binary}` from the two files above. |
 | `{app_id}.desktop` | A [freedesktop Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/latest/) launcher. Edit `Exec=` to an absolute path (or put `bin/{binary}` on your `PATH`) and copy it to `~/.local/share/applications/` to add a launcher-menu entry. |
-| `.github/workflows/desktop-build.yml` | A GitHub Actions workflow that builds this project on a GitHub-hosted Linux runner on every push/PR and uploads `bin/{binary}` as a downloadable artifact -- no local toolchain needed for that. Regenerated fresh on every `arklight desktop scaffold` run; it's a normal, hand-editable workflow file, not something only this tool may touch. **Note:** this workflow only fires on GitHub if `.github/workflows/` sits at your repository's *root* -- if `arklight desktop scaffold` told you this project is nested inside an existing repo, move this file there first (see that command's own terminal output for the exact paths). |
+| `.github/workflows/desktop-build.yml` | A GitHub Actions workflow that builds this project on a GitHub-hosted Linux runner on every push/PR, uploads `bin/{binary}` as a downloadable artifact, then launches it under a headless Xvfb display on that same runner to confirm it doesn't crash immediately -- no local toolchain or display server needed for either check. Regenerated fresh on every `arklight desktop scaffold` run; it's a normal, hand-editable workflow file, not something only this tool may touch. **Note:** this workflow only fires on GitHub if `.github/workflows/` sits at your repository's *root* -- if `arklight desktop scaffold` told you this project is nested inside an existing repo, move this file there first (see that command's own terminal output for the exact paths). |
+| `.github/scripts/desktop-smoke-test.sh` | The launch/liveness-check logic the workflow's `launch-smoke-test` job runs, kept in its own script rather than inline in the workflow file. Hand-editable, but re-running `arklight desktop scaffold` will overwrite it. |
 
 ## Updating the packaged site
 

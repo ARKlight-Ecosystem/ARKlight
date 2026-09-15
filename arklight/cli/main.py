@@ -537,9 +537,10 @@ def _cmd_desktop_scaffold(args: argparse.Namespace) -> int:
     print("build instructions.")
     print()
     print("Includes a GitHub Actions workflow (.github/workflows/desktop-build.yml)")
-    print("that builds the project on a GitHub-hosted Linux runner and uploads the")
-    print("binary as a downloadable artifact on push/PR -- no local toolchain needed")
-    print("for that.")
+    print("that builds the project on a GitHub-hosted Linux runner, uploads the")
+    print("binary as a downloadable artifact, then launches it under a headless Xvfb")
+    print("display on that same runner to confirm it doesn't crash immediately -- no")
+    print("local toolchain or display server needed for either check.")
     if result.enclosing_git_root is not None:
         print()
         print(
