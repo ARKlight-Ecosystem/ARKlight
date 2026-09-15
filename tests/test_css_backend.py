@@ -57,6 +57,74 @@ def test_css_backend_includes_intrinsic_layout_utilities():
         )
 
 
+def test_css_backend_nav_wraps_on_narrow_viewports():
+    # Regression test: `.nav` is a flex row like every other intrinsic
+    # layout utility (`.cluster`, `.sidebar`, `.switcher`), and all of
+    # those wrap their children instead of overflowing the viewport on
+    # narrow screens. `.nav` used to be the one exception -- it had
+    # `display: flex` but no `flex-wrap: wrap`, so nav links stayed on
+    # a single line and got squeezed/overflowed on mobile instead of
+    # wrapping to a second line the way `header` and the other
+    # utilities do.
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir("site", normalized)
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    nav_start = css.index(".nav {")
+    nav_end = css.index("}", nav_start)
+    nav_rule = css[nav_start:nav_end]
+
+    assert "flex-wrap: wrap" in nav_rule, (
+        ".nav is display: flex but is missing flex-wrap: wrap, so its "
+        "children will overflow narrow viewports instead of wrapping"
+    )
+
+
+def test_css_backend_background_covers_full_browser_window():
+    # Regression test: `body` carries `max-width` + centering, so its
+    # background only painted the centered content column, and neither
+    # `html` nor `body` was guaranteed to be as tall as the viewport
+    # when a page's content was shorter than the screen. A page with a
+    # short amount of content and a custom background color (set via
+    # `Site(bg=...)`, which drives `--ark-bg`) would show that
+    # background only behind the text -- with the browser's default
+    # background (usually white) showing in the gutters beside the
+    # content column and in the empty space below a short page. `html`
+    # must also carry the background and be full-height so any
+    # background color (or, in future, image) set through `--ark-bg`
+    # covers the entire browser window, not just the content box.
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir("site", normalized)
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    html_start = css.index("html {")
+    html_end = css.index("}", html_start)
+    html_rule = css[html_start:html_end]
+
+    assert "background: var(--ark-bg)" in html_rule, (
+        "html {} must paint --ark-bg so the background reaches the full "
+        "browser window, not just the centered body column"
+    )
+    assert "min-height: 100%" in html_rule, (
+        "html {} must be full-height so its background has somewhere to show"
+    )
+
+    body_start = css.index("body {")
+    body_end = css.index("}", body_start)
+    body_rule = css[body_start:body_end]
+
+    assert "min-height: 100vh" in body_rule, (
+        "body {} must be at least viewport-tall so a short page's "
+        "background still reaches the bottom of the browser window"
+    )
+
+
 def test_css_backend_has_no_media_or_container_queries():
     # Structural constraint (see docs/DESIGN-NOTES.md): everything
     # responsive has to come from intrinsic sizing, since `Page` has no
@@ -73,3 +141,143 @@ def test_css_backend_has_no_media_or_container_queries():
 
     assert "@media" not in code_only
     assert "@container" not in code_only
+
+
+def test_css_backend_renders_custom_style_class():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir(
+        "site",
+        normalized,
+        custom_styles={"pull-quote": {"font-style": "italic", "padding": "1em"}},
+    )
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    assert ".pull-quote {" in css
+    assert "font-style: italic;" in css
+    assert "padding: 1em;" in css
+
+
+def test_css_backend_custom_styles_appear_after_base_css():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir("site", normalized, custom_styles={"brand": {"color": "orange"}})
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    # Custom classes come last so they can override base rules by
+    # cascade order (both target selectors of equal specificity).
+    assert css.index(".brand {") > css.index("body {")
+
+
+def test_css_backend_multiple_custom_classes_sorted_for_determinism():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir(
+        "site",
+        normalized,
+        custom_styles={"zeta": {"color": "red"}, "alpha": {"color": "blue"}},
+    )
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    assert css.index(".alpha {") < css.index(".zeta {")
+
+
+def test_css_backend_no_custom_styles_block_when_none_registered():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir("site", normalized)
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    assert "Custom classes" not in css
+
+
+def test_css_backend_custom_style_properties_sorted_within_class():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir(
+        "site",
+        normalized,
+        custom_styles={"box": {"z-index": "1", "color": "red"}},
+    )
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+    block = css[css.index(".box {") : css.index(".box {") + 60]
+
+    assert block.index("color:") < block.index("z-index:")
+
+
+def test_css_backend_renders_pseudo_class_rule_as_its_own_block():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir(
+        "site",
+        normalized,
+        custom_styles={"btn": {"background": "blue", ":hover:background": "red"}},
+    )
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    assert ".btn {" in css
+    assert "background: blue;" in css
+    assert ".btn:hover {" in css
+    assert "background: red;" in css
+
+
+def test_css_backend_pseudo_class_block_follows_base_block():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir(
+        "site",
+        normalized,
+        custom_styles={"btn": {"background": "blue", ":hover:background": "red"}},
+    )
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    assert css.index(".btn {") < css.index(".btn:hover {")
+
+
+def test_css_backend_class_with_only_pseudo_rules_has_no_base_block():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir(
+        "site",
+        normalized,
+        custom_styles={"btn": {":hover:color": "red"}},
+    )
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    assert ".btn {" not in css
+    assert ".btn:hover {" in css
+
+
+def test_css_backend_multiple_pseudo_classes_each_get_their_own_block():
+    pages = {"/": Page(Text("hi"))}
+    normalized = normalize_ark_ast(pages)
+    validate_ark_ast(normalized)
+    ir = build_website_ir(
+        "site",
+        normalized,
+        custom_styles={"btn": {":hover:color": "red", ":focus:color": "blue"}},
+    )
+
+    css = CSSBackend().render(ir)[STYLESHEET_PATH]
+
+    assert ".btn:hover {" in css
+    assert ".btn:focus {" in css
+    # Sorted alphabetically by pseudo-class name, same determinism
+    # guarantee as base properties/class names.
+    assert css.index(".btn:focus {") < css.index(".btn:hover {")
