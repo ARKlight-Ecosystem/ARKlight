@@ -7,7 +7,10 @@ every work session, not just at milestone boundaries.
 Detail sections below are kept in reverse-chronological order (newest
 first) and are the narrative record -- what was tried, what was
 rejected, what broke. For the plain version history, see
-[`CHANGELOG.md`](./CHANGELOG.md); for the architecture-level roadmap
+[`CHANGELOG.md`](./CHANGELOG.md); for a short, user-facing overview of
+each shipped milestone, see
+[`docs/version history/README.md`](./docs/version%20history/README.md);
+for the architecture-level roadmap
 table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md).
 
 ## Snapshot

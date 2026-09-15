@@ -44,6 +44,7 @@ record for the project, updated in place rather than removed.
 | [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`user-defined-components.md`](Foundational/user-defined-components.md) | Design for user-defined, reusable components (v0.060). |
+| [`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`](Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md) | Staged implementation ladder for v0.060, and the Option A (default) / Option B (experimental) hybrid decision. Stage 0 done. |
 
 ### [`docs/Backends/`](Backends/README.md) — working reference
 
@@ -83,3 +84,10 @@ dropped, or graduated elsewhere if it's picked up.
 
 If you add a new doc file, add a row for it in the relevant table
 above so this index stays accurate.
+
+### [`docs/version history/`](<version history/README.md>) — permanent
+
+The user-facing overview of each shipped `alpha` milestone, separate
+from `CHANGELOG.md`/`PROGRESS.md`'s internal/dev-facing detail. See
+that folder's own README for the full index and for how it
+deliberately differs from `main`'s `docs/version history/` directory.
