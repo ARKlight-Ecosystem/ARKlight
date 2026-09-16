@@ -1,12 +1,18 @@
 # Deployment Design
 
-_Current as of **v0.063** (latest shipped milestone) — see
-[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table if a referenced
-capability's status might have moved since this was last updated._
+**Status: design only -- not implemented.** There is no `deploy`
+subcommand in `arklight/cli/` yet; every command below is a spec for
+future work, not something `arklight deploy` will currently do. See
+[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table for whether that
+has changed since this was last updated, and
+[`CLI-REFERENCE.md`](CLI-REFERENCE.md) for the subcommands that
+*are* implemented today (`build`, `pack`, `unpack`, `search`, `new`,
+`pwa`, `live-streaming`).
 
 ## Goal
 
-`arklight deploy` provides a thin deployment interface for built static sites.
+`arklight deploy` is designed to provide a thin deployment interface
+for built static sites, once implemented.
 
 Cloudflare Workers is the default deployment target. ARKlight does not implement provider-specific deployment infrastructure. It delegates deployment to the provider's official CLI.
 

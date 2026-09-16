@@ -6,8 +6,8 @@ capability's status might have moved since this was last updated._
 
 **Not to be confused with `arklight.config.py`** -- the optional
 project-level settings file (`live-streaming` host/port today, more
-sections planned), documented in the main
-[`README.md`](../../README.md#configuration-arklightconfigpy) and
+sections planned), documented in
+[`AUTHORING-GUIDE.md`](AUTHORING-GUIDE.md#configuration-arklightconfigpy) and
 implemented in `arklight/config.py`. This doc is about a different
 kind of configurability: which fixed values inside the compiler
 *should* grow into a `Site(...)`/`Page(...)` kwarg (or CLI flag) with

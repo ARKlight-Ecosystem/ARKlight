@@ -142,10 +142,11 @@ Future:
 
 Everything is a function. Children are positional arguments,
 properties are keyword arguments, components are Python functions --
-no classes to subclass, no JSX-like syntax. The quickstart example and
-the full public component/behavior/state API reference live in the
-root [`README.md`](../../README.md), kept there as the single
-canonical copy since it's also the first thing a newcomer reads.
+no classes to subclass, no JSX-like syntax. The quickstart example
+lives in the root [`README.md`](../../README.md), kept there as the
+single canonical copy since it's the first thing a newcomer reads; the
+full public component/behavior/state API reference lives in
+[`AUTHORING-GUIDE.md`](AUTHORING-GUIDE.md).
 
 ## Repository
 
