@@ -292,7 +292,11 @@ NoScript = node("NoScript")
 # `component`/`Prop` alongside every built-in component.
 # ---------------------------------------------------------------------------
 
-from arklight.ir.components import Prop, register_component  # noqa: E402
+from arklight.ir.components import (  # noqa: E402
+    Prop,
+    register_backend_render,
+    register_component,
+)
 
 
 def component(
@@ -325,10 +329,15 @@ def component(
     the build with a clear message instead of a raw Python `TypeError`
     inside `NavBar` itself.
 
-    `mode="macro"` (the default, Option A) is the only mode with a
-    distinct rendering behavior today. `mode="registry"` (Option B) is
-    EXPERIMENTAL -- see `arklight.ir.components`'s module docstring and
-    the implementation doc for what it does and doesn't do yet.
+    `mode="macro"` (the default, Option A) never has a distinct
+    rendering behavior beyond its shared `render_fn`. `mode="registry"`
+    (Option B) is EXPERIMENTAL, and is the only mode that can register
+    a per-backend override -- via `.register_backend(backend_name)` on
+    the value this decorator returns (v0.060, Stage 3; see
+    `arklight.ir.components`'s module docstring and the implementation
+    doc for the full design). A `mode="registry"` component with no
+    backend override registered behaves exactly like `mode="macro"` --
+    it always falls back to its one shared `render_fn`.
 
     `default_style`, if given (v0.060, Stage 2), is a `{css-property:
     value}` dict -- the same shape and syntax `Site.style(...)` accepts
@@ -361,6 +370,38 @@ def component(
         marker.__name__ = name
         marker.__qualname__ = name
         marker.__doc__ = render_fn.__doc__
+
+        def register_backend(backend_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            """
+            v0.060, Stage 3. Decorator factory that registers the
+            function it decorates as `name`'s render function for
+            `backend_name` (e.g. `"html"`):
+
+                @component(mode="registry")
+                def NavBar(active=None):
+                    return Container(...)  # shared default
+
+                @NavBar.register_backend("html")
+                def _(active=None):
+                    return Container(..., class_name="html-only-navbar")
+
+            Only available on a `mode="registry"` component -- see
+            `arklight.ir.components.register_backend_render`, which
+            this delegates to (and whose `ComponentError` this raises
+            unchanged for a `mode="macro"` component, matching this
+            decorator's "fail at the registration call, not three
+            stages later" contract with every other decorator here).
+            The decorated function's own name is irrelevant (`_` above
+            is conventional, not required) -- unlike `component(...)`
+            itself, nothing here derives an identity from it.
+            """
+            def decorator(backend_render_fn: Callable[..., Any]) -> Callable[..., Any]:
+                register_backend_render(name, backend_name, backend_render_fn)
+                return backend_render_fn
+
+            return decorator
+
+        marker.register_backend = register_backend
         return marker
 
     return decorator

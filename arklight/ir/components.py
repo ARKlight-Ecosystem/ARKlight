@@ -36,6 +36,29 @@ actually used -- see `collect_default_styles`) and onto the rendered
 subtree's root `class_name` automatically (see `_apply_default_class`),
 so a caller doesn't have to pass `class_name=` by hand just to pick up
 sane default styling.
+
+Stage 3 (see
+`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
+3 row) gives `mode="registry"` its own real differentiator:
+`register_backend_render(name, backend_name, render_fn)` (surfaced on
+the decorated component as `.register_backend(backend_name)`, see
+`arklight.api.component`) lets a `mode="registry"` component ship a
+*different* render function per backend, falling back to its shared
+`render_fn` (the same one Stage 0-2 already call "the" render
+function) wherever a backend hasn't registered its own. This module's
+own job in that story is narrow: `_render_once` tags a `mode=
+"registry"` component's rendered root with a `ComponentOrigin` marker
+-- but only when the component actually has at least one backend
+override registered, so a `mode="registry"` component with no
+overrides (the whole vocabulary before Stage 3, and the common case
+after it) produces byte-identical output to before this stage existed.
+Everything downstream of that marker -- resolving it against a
+specific backend's overrides, converting an override's own rendered
+subtree back into IR -- lives in `arklight.ir.component_dispatch`,
+which this module has no dependency on (component expansion runs once,
+backend-agnostically, in `arklight.compiler.pipeline.compile_site_file`;
+per-backend resolution runs once per backend, in `arklight.compiler.
+pipeline.build`, well after this module's job is done).
 """
 
 from __future__ import annotations
@@ -64,6 +87,23 @@ _VALID_MODES = ("macro", "registry")
 # one, but depth is cheap insurance) into a clear build-time error
 # instead of a `RecursionError` traceback.
 MAX_COMPONENT_EXPANSION_DEPTH = 64
+
+# Stage 3: the internal, never-user-visible prop key `_render_once` tags
+# a `mode="registry"` component's rendered root with, when (and only
+# when) that component has at least one backend override registered.
+# Carried as an ordinary (if oddly-named) entry in the node's own
+# `props` dict from expansion time through Normalization/Validation --
+# both already tolerate an unrecognized prop key (see `validate_node`,
+# which only ever checks *required* props are present, never rejects
+# an extra one) -- until `arklight.ir.build._ark_node_to_ir_node` pops
+# it back off and lifts it onto `IRNode.component_origin`, the same
+# "pop a compile-time-only prop into its own IR field" treatment
+# `responsive_style` already gets there. Never reaches a backend's own
+# attribute-rendering code (`arklight/backend/html/attrs.py` et al.):
+# `arklight.ir.component_dispatch.resolve_backend_dispatch` always
+# clears `component_origin` (with or without a matching override) well
+# before a backend ever walks the tree looking for attributes to emit.
+COMPONENT_ORIGIN_PROP_KEY = "__arklight_component_origin__"
 
 
 class ComponentError(RuntimeError):
@@ -124,6 +164,19 @@ class ComponentSpec:
     # CSS. `None` (the default) means this component ships no default
     # styling at all, unchanged from Stage 0/1 behavior.
     default_style: dict[str, str] | None = None
+    # v0.060, Stage 3 ("Option B's real differentiator" -- see
+    # docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
+    # `backend_name -> render_fn`, populated by
+    # `register_backend_render(...)`/`.register_backend(...)` --
+    # never at `component(...)`/`register_component(...)` registration
+    # time itself, since a project registers its backend overrides
+    # (if any) as separate, later declarations, same "the component
+    # exists first, extras attach to it after" ordering `default_style`
+    # already established for Stage 2. Empty for every component before
+    # Stage 3, and for any `mode="registry"` component that never opts
+    # in -- both behave exactly as Stage 0-2 already do (see
+    # `_render_once`).
+    backend_render_fns: dict[str, RenderFn] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.mode not in _VALID_MODES:
@@ -131,6 +184,23 @@ class ComponentSpec:
                 f"component {self.name!r}: mode={self.mode!r} is not one of "
                 f"{_VALID_MODES!r}."
             )
+
+
+@dataclass(frozen=True)
+class ComponentOrigin:
+    """
+    Stage 3: what `COMPONENT_ORIGIN_PROP_KEY` carries -- which
+    component instance a rendered root node came from, and the exact
+    resolved props it was rendered with, so a backend override can be
+    called with the same arguments the shared `render_fn` already was.
+    Constructed once, by `_render_once`, immediately after resolving
+    `resolved_props`; never mutated afterward (`ARKNode`/`IRNode`
+    props dicts are copied whole on every transform this codebase
+    already does, so this rides along by value).
+    """
+
+    name: str
+    resolved_props: dict[str, Any] = field(default_factory=dict)
 
 
 # Populated by `component(...)`/`register_component(...)` as a project's
@@ -172,6 +242,61 @@ def register_component(
     )
     COMPONENT_REGISTRY[name] = spec
     return spec
+
+
+def register_backend_render(component_name: str, backend_name: str, render_fn: RenderFn) -> ComponentSpec:
+    """
+    Stage 3: register `render_fn` as `component_name`'s override for
+    `backend_name` (e.g. `"html"` -- `Backend.name` on whichever
+    `arklight.backend.base.Backend` subclass this is for). Surfaced to
+    site/component authors as `.register_backend(backend_name)` on the
+    callable `component(...)` returns -- see `arklight.api.component`
+    -- this lower-level entry point exists for the same reason
+    `register_component` does: something a test or an advanced caller
+    can reach directly, without going through the decorator.
+
+    Only a `mode="registry"` component can take a backend override --
+    per-backend dispatch is Option B's own defining feature (see this
+    module's docstring); a `mode="macro"` component has no `identity`
+    for a backend to look up an override *by*, since its marker is
+    already fully spliced away before this registry is ever consulted
+    again. Raises `ComponentError` for an unregistered `component_name`
+    or a `mode="macro"` one -- both are project mistakes caught at
+    registration time, the same "fail where the mistake was made, not
+    three stages later" discipline `_resolve_props` already applies to
+    a bad prop.
+
+    Last-registration-wins per `(component_name, backend_name)` pair,
+    same rule `register_component` already uses for re-registering a
+    component outright -- registering `"html"` twice for the same
+    component just replaces the earlier override, it doesn't error.
+    """
+    spec = COMPONENT_REGISTRY.get(component_name)
+    if spec is None:
+        raise ComponentError(
+            f"Cannot register a {backend_name!r} render function for "
+            f"{component_name!r}: no component with that name is "
+            "registered yet. Register the component with @component(...) "
+            "first."
+        )
+    if spec.mode != "registry":
+        raise ComponentError(
+            f"Cannot register a {backend_name!r} render function for "
+            f"{component_name!r}: only mode=\"registry\" components support "
+            f"per-backend rendering (this component was registered with "
+            f"mode={spec.mode!r}). Register it with "
+            "@component(mode=\"registry\") to opt in."
+        )
+    if not backend_name:
+        raise ComponentError(
+            f"Cannot register a backend render function for "
+            f"{component_name!r}: backend_name must be a non-empty string."
+        )
+    new_backend_render_fns = dict(spec.backend_render_fns)
+    new_backend_render_fns[backend_name] = render_fn
+    new_spec = replace(spec, backend_render_fns=new_backend_render_fns)
+    COMPONENT_REGISTRY[component_name] = new_spec
+    return new_spec
 
 
 def _resolve_props(spec: ComponentSpec, call_props: dict[str, Any]) -> dict[str, Any]:
@@ -242,6 +367,44 @@ def _apply_default_class(rendered: Any, class_name: str) -> Any:
     return replace(rendered, props=new_props)
 
 
+def apply_default_style_class(component_name: str, rendered: Any) -> Any:
+    """
+    Public wrapper around `_apply_default_class`, keyed by component
+    name rather than a bare class-name string -- Stage 3's own reason
+    for this existing: `arklight.ir.component_dispatch` needs the exact
+    same "fold `.{ComponentName}` onto the rendered root, merge rather
+    than clobber, no-op on a non-`ARKNode` result" treatment for a
+    backend override's own rendered subtree that `_render_once` already
+    gives the shared `render_fn`'s output below -- `default_style` is
+    mode-independent *and* backend-independent, a registration-time
+    property of the component itself, not of which render function
+    happened to produce a given subtree.
+    """
+    return _apply_default_class(rendered, component_name)
+
+
+def _tag_component_origin(rendered: Any, name: str, resolved_props: dict[str, Any]) -> Any:
+    """
+    Stage 3: stamp `rendered`'s root with a `ComponentOrigin`, under
+    `COMPONENT_ORIGIN_PROP_KEY` -- see that constant's own docstring
+    for the full trip this takes through Normalization/Validation/IR-
+    build before `arklight.ir.component_dispatch` reads it back off.
+    Same "no single root, no-op" shape as `_apply_default_class` above,
+    for the same reason: a component whose render function returns a
+    list of siblings (or a bare string) has nothing to tag identity
+    onto, so a backend override is simply unreachable for that call --
+    unchanged, Option-A-shaped behavior for it, exactly as if this
+    component had never registered any backend overrides at all.
+    """
+    if not isinstance(rendered, ARKNode):
+        return rendered
+    new_props = dict(rendered.props)
+    new_props[COMPONENT_ORIGIN_PROP_KEY] = ComponentOrigin(
+        name=name, resolved_props=dict(resolved_props)
+    )
+    return replace(rendered, props=new_props)
+
+
 def _render_once(spec: ComponentSpec, resolved_props: dict[str, Any]) -> Any:
     """
     The hybrid dispatch itself -- Option A vs. Option B, as an
@@ -257,11 +420,13 @@ def _render_once(spec: ComponentSpec, resolved_props: dict[str, Any]) -> Any:
         # away right here, nothing about it survives past this pass.
         rendered = spec.render_fn(**resolved_props)
     elif spec.mode == "registry":
-        # Option B (EXPERIMENTAL): Stage 0 does not yet give this its
-        # own render path (see module docstring) -- it still resolves
-        # through the component's one render function, same as Option
-        # A above. A later stage that gives Option B per-backend
-        # dispatch extends *this* branch, not the whole ladder.
+        # Option B: still resolves through the component's shared
+        # `render_fn` here, same as Option A above -- this call always
+        # produces the *default* rendering, the one every backend
+        # without its own override falls back to. Stage 3 (see below)
+        # is what gives a backend an actual way to supply a different
+        # subtree for the *same* call site; this branch itself is
+        # unchanged from Stage 0/1/2.
         rendered = spec.render_fn(**resolved_props)
     else:  # pragma: no cover -- unreachable, ComponentSpec.__post_init__ already validated this
         raise ComponentError(f"Component {spec.name!r}: unknown mode {spec.mode!r}.")
@@ -271,6 +436,15 @@ def _render_once(spec: ComponentSpec, resolved_props: dict[str, Any]) -> Any:
     # registration-time property of the component itself.
     if spec.default_style:
         rendered = _apply_default_class(rendered, spec.name)
+
+    # Stage 3: only a `mode="registry"` component that actually has at
+    # least one backend override registered gets tagged -- a component
+    # with none (every component before Stage 3, and most
+    # mode="registry" components after it too) produces the exact same
+    # `ARKNode` it always did, with no extra prop riding along for
+    # `arklight.ir.component_dispatch` to strip back out later.
+    if spec.mode == "registry" and spec.backend_render_fns:
+        rendered = _tag_component_origin(rendered, spec.name, resolved_props)
     return rendered
 
 
