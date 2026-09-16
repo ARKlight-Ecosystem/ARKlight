@@ -77,10 +77,15 @@ ARKlight production layout: service-oriented, separated by concern
   pages/*.py        one module per route. Builds that page's Page(...)
                      tree by composing components/ + content/ --
                      no markup lives inline in site.py.
-  components/*.py   reusable pieces (nav, footer, cards, ...) as plain
-                     functions. No special "component" mechanism --
-                     ordinary composition, so there's nothing framework-
-                     specific to learn.
+  components/*.py   reusable pieces (nav, footer, cards, ...). Plain
+                     functions still work with zero setup -- ordinary
+                     composition, nothing framework-specific required.
+                     For a piece that wants a checked prop contract
+                     (required/optional props, build-time validation)
+                     or per-backend rendering, register it instead with
+                     the optional @component(...) decorator (v0.060) --
+                     see docs/Foundational/USER-DEFINED-COMPONENTS.md.
+                     Neither is required to use the other; mix freely.
   content/*.py      copy/text/config constants, kept out of both
                      components/ and pages/ so wording can change
                      without touching markup or logic.
