@@ -5,6 +5,55 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- JS vocabulary addendum, stage 1 of 10: math siblings (`v0.061`)
+
+**What:** `Derive.subtract`, `Derive.divide`, `Derive.min`,
+`Derive.max` (`arklight/api.py`) -- the missing math siblings of
+`Derive.sum`/`Derive.multiply`, first rung of the JS vocabulary
+expansion ladder staged in
+`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`. Each follows
+the exact registry-fragment pattern that doc promises: no new IR
+node, no parser, no `eval`/`new Function`. `subtract`/`divide` take
+`names[0]` as the starting value and apply every later name against
+it in declared order (`Derive.subtract("total", "discount")` ==
+`total - discount`); both need at least two names since neither is
+associative the way `sum`/`multiply` are. `min`/`max` are associative
+like `sum`, so one name is already meaningful. `divide` mirrors
+JavaScript's own `x / 0` semantics (`Infinity`/`-Infinity`/`NaN`) in
+its Python build-time counterpart too, instead of letting Python's
+`/` raise `ZeroDivisionError` -- keeps a page's server-rendered
+`Bind(...)` text and the client recompute in agreement even at this
+edge case.
+
+**Implementation:** `arklight/backend/js/derivations/subtract.py`,
+`divide.py`, `min.py`, `max.py` (new) -- each exports `NAME` +
+`JS_FRAGMENT`, mirroring `sum.py`'s shape.
+`arklight/backend/js/derivations/__init__.py` -- registers the four
+new modules into `DERIVATION_MODULES`/`DERIVATION_FRAGMENTS`.
+`arklight/ir/schema.py` -- four new `DERIVATION_REGISTRY` entries
+(`subtract`/`divide`: `min_names=2, max_names=None`; `min`/`max`:
+`min_names=1, max_names=None`). `arklight/ir/build.py` --
+`_evaluate_derivation` gains `"subtract"`/`"divide"`/`"min"`/`"max"`
+branches, kind-for-kind mirrors of the new JS fragments (imports
+`math` for the `divide`-by-zero `Infinity`/`NaN` handling).
+`arklight/api.py` -- `Derive.subtract`/`.divide`/`.min`/`.max` static
+methods, same shape as the existing `Derive.*` methods. No changes to
+`arklight/ir/validate.py` (the existing `DerivationSpec`-driven arity
+check already covers the new `min_names`/`max_names` values),
+`arklight/ir/normalize.py`, or any backend's generation logic.
+
+**Tests:** `tests/test_js_vocabulary_v0061.py` (19 tests, new) -- API
+return values; validation (`subtract`/`divide` reject fewer than two
+names, `min` accepts one); IR-build initial-value evaluation for all
+four kinds, including chained/multi-name `subtract` and the
+divide-by-zero `Infinity` case; HTML backend `Bind(...)` pre-fill; JS
+backend ships only the derivation kind(s) actually used;
+`DERIVATION_FRAGMENTS` registry coverage; and a Node.js end-to-end
+check that the shipped `subtract` fragment's recompute agrees with
+the Python build-time initial value. Full suite: 1144 passed, no
+regressions (1127 before this stage + 19 new; `test_version.py`'s 2
+pre-existing, unrelated failures unchanged).
+
 ## [Unreleased] -- User-defined components, Stage 4 (component-owned state, final stage)
 
 **What:** `component(..., state={...})` (`arklight/api.py`) lets a

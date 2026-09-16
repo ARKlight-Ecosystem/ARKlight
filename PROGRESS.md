@@ -43,6 +43,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.060-stage2 | User-defined components, Stage 2 of 4: default styling hook (`component(..., default_style={...})`) -- folded into the site's stylesheet under `.{ComponentName}` (only for components a build actually uses) and onto the rendered subtree's own root `class_name`, so a caller doesn't have to pass `class_name=` by hand | DONE |
 | v0.060-stage3 | User-defined components, Stage 3 of 4: Option B's real differentiator, per-backend render dispatch (`.register_backend(backend_name)`/`register_backend_render`) -- a `mode="registry"` component's identity survives (via a tagged prop, lifted onto `IRNode.component_origin`) far enough that `HTMLBackend` can supply its own render function for a component, falling back to the shared default when it doesn't; `arklight/ir/component_dispatch.py` (new module) resolves this once per backend, after the shared `WebsiteIR` already exists | DONE |
 | v0.060-stage4 | User-defined components, Stage 4 of 4 (final): component-owned state (`component(..., state={...})`/`ComponentState`) -- a component's own local, instance-scoped `State(...)`-equivalent, hoisted onto its owning page under a uniquely-namespaced key per call site (`arklight/ir/components.py`'s `_hoist_component_state`/`_rewrite_component_state_refs`), so `Bind(...)`/`Action.*(...)`/`bind_class=`/`bind_value=` all work exactly like they would against a page-level `State(...)`, with zero changes to Normalization/Validation/any backend | DONE |
+| v0.061   | JS vocabulary addendum, stage 1 of 10: math siblings (`Derive.subtract`/`.divide`/`.min`/`.max`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v1.0     | Stable compiler                                              | PLANNED |
@@ -75,6 +76,43 @@ go-ahead before implementation starts on any of these:
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
+
+## v0.061 -- JS vocabulary addendum, stage 1 of 10: math siblings (DONE)
+
+Opens the JS vocabulary expansion ladder staged in
+`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` -- the first
+and cheapest rung, four missing math siblings of the existing `sum`/
+`multiply` derivations: `Derive.subtract`, `Derive.divide`,
+`Derive.min`, `Derive.max`. Each is a pure registry-fragment addition
+in the pattern the ladder doc promises: one new `arklight/backend/js/
+derivations/<name>.py` (`NAME` + `JS_FRAGMENT`) plus one
+`DERIVATION_REGISTRY` line in `arklight/ir/schema.py`, one
+`_evaluate_derivation` branch in `arklight/ir/build.py`, and one
+`Derive.*` static method in `arklight/api.py` -- never a change to
+Validation's arity-check *logic* (the existing `DerivationSpec.
+min_names`/`max_names` fields already cover the new values) or any
+backend's generation logic.
+
+`subtract`/`divide` aren't associative the way `sum`/`multiply` are,
+so both need `min_names=2`: `names[0]` is the starting value and
+every later name applies against it in declared order. `divide`
+mirrors JavaScript's own `x / 0` float semantics (`Infinity`/`NaN`,
+never a thrown error) on the Python build-time-evaluation side too,
+rather than letting Python's `/` raise `ZeroDivisionError` -- keeps
+the server-rendered `Bind(...)` text and the client recompute in
+agreement even at this edge case, the same "never disagree" contract
+`sum.py`'s own docstring already holds. `min`/`max` are associative
+like `sum`, so `min_names=1` is enough.
+
+Tests: `tests/test_js_vocabulary_v0061.py` (19 tests, new) -- API,
+validation (arity), IR-build initial-value evaluation (including the
+divide-by-zero/`Infinity` case), HTML pre-fill, JS fragment shipping
+(only the used kind ships, once), and a Node.js end-to-end check that
+the shipped runtime fragment's recompute agrees with the build-time
+initial value. Full suite: 1144 passed (2 pre-existing, unrelated
+`test_version.py` failures -- package metadata lookup fails in a bare
+source checkout, reproduces identically on `origin/alpha` before this
+change), no regressions.
 
 ## v0.060-stage0 -- User-defined components, Stage 0 of 4 (DONE)
 

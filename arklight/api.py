@@ -677,6 +677,36 @@ class Derive:
         """
         return DerivationRef(kind="compare", names=(a, b), args={"op": op})
 
+    @staticmethod
+    def subtract(*names: str) -> DerivationRef:
+        """
+        `v0.061`: `names[0]` minus every later name, in declared
+        order -- `Derive.subtract("total", "discount")` reads as
+        `total - discount`. Not associative like `sum`, so needs at
+        least two names.
+        """
+        return DerivationRef(kind="subtract", names=tuple(names))
+
+    @staticmethod
+    def divide(*names: str) -> DerivationRef:
+        """
+        `v0.061`: `names[0]` divided by every later name, in declared
+        order -- `Derive.divide("total", "count")` reads as
+        `total / count`. Not associative like `sum`, so needs at
+        least two names.
+        """
+        return DerivationRef(kind="divide", names=tuple(names))
+
+    @staticmethod
+    def min(*names: str) -> DerivationRef:
+        """`v0.061`: the smallest of one or more state/computed values."""
+        return DerivationRef(kind="min", names=tuple(names))
+
+    @staticmethod
+    def max(*names: str) -> DerivationRef:
+        """`v0.061`: the largest of one or more state/computed values."""
+        return DerivationRef(kind="max", names=tuple(names))
+
 
 # ---------------------------------------------------------------------------
 # `vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13): watch effects.
