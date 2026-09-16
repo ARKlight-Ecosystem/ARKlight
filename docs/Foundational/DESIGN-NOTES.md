@@ -166,13 +166,16 @@ the way ARKlight's CSS backend does -- "beautiful with zero CSS
 written" is a real, currently-unclaimed angle worth protecting as the
 roadmap continues, more than trying to out-feature FastHTML on JS.
 
-## Does reaching v0.010 (user components) change the comparison?
+## Does v0.060 (user-defined components) change the comparison?
 
 Only partially, and in a way that sharpens the distinction rather than
-closing it. v0.010 would replace "write a Python function and call it"
-(today's `nav()` pattern in the example site) with real composable,
-reusable components -- closing real ergonomic ground with htpy/FastHTML,
-and possibly bundling default per-component styling as a genuine
+closing it. `v0.060` (shipped in full, Stages 0-4 -- see
+[`USER-DEFINED-COMPONENTS.md`](./USER-DEFINED-COMPONENTS.md) for the
+reference) replaced "write a Python function and call it" (the old
+`nav()` pattern in the example site) with real composable, reusable
+components -- registered, props-checked, participating in `arklight
+search`'s typo suggestions -- closing real ergonomic ground with
+htpy/FastHTML, and bundling default per-component styling as a genuine
 differentiator neither of those tools has.
 
 What it does **not** touch: the actual reason Svelte broke out, which

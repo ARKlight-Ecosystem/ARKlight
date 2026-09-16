@@ -67,7 +67,8 @@ worth knowing before adding a file here:
 | [`v0.0431.md`](./v0.0431.md) | Emergency patch -- build-time warning for unrouted `srcset`/`poster`/`action`/`formaction`. |
 | [`v0.048.md`](./v0.048.md) | CSS `@media` queries + structured `<head>`/`<header>` extension. |
 | [`v0.054.md`](./v0.054.md) | JS backend capability expansion (reactive core) -- rolls up all 8 `vdom-N` staging sub-stages. |
-| [`v0.060-stage0.md`](./v0.060-stage0.md) | User-defined, reusable components -- Stage 0 (registration, Option A macro expansion, experimental Option B selector). Milestone `v0.060` itself is still IN PROGRESS; this file covers only what Stage 0 shipped. |
+| [`v0.060-stage0.md`](./v0.060-stage0.md) | User-defined, reusable components -- Stage 0 (registration, Option A macro expansion, experimental Option B selector). Milestone `v0.060` shipped in full, Stages 0-4 -- see `v0.060.md` for the rollup; this file covers only what Stage 0 shipped. |
+| [`v0.060.md`](./v0.060.md) | User-defined, reusable components -- full milestone rollup (Stages 0-4: registration/props, typo diagnostics, default styling, per-backend rendering, component-owned state). |
 
 Not yet covered here: `v0.080` (Android) and `v0.100` (Desktop) are
 both still IN PROGRESS with no fully-landed user-facing milestone to
