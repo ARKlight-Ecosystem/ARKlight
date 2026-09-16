@@ -19,31 +19,29 @@ of what Vue-3-style reactivity needs (state, computed values,
 watchers, two-way binding, list rendering, conditional rendering,
 persistence).
 
-This proposal covers two things:
+This proposal covers four things, in ascending order of effort:
 
-1. A **much larger, exhaustive catalog of scalar derivations and
+1. **Tier 1 -- trivial gaps** already designed but never shipped
+   (basic arithmetic, basic string casing, the comparison predicates)
+   -- one-hour, one-file, one-registry-line additions each.
+2. **Tier 2 -- small new runtime primitives** (`IntersectionObserver`-
+   based `reveal`/lazy-load, debounced two-way binding, clipboard
+   paste, geolocation, `matchMedia`-driven state) -- a day or two
+   each, same registry pattern, no new IR node.
+3. A **much larger, exhaustive catalog of scalar derivations and
    predicates** -- pulled from JS's own `Math`, `String`, `Number`,
    and `Array` built-ins plus common cross-language utility-belt
    operations -- as candidate `DERIVATION_REGISTRY`/`PREDICATE_REGISTRY`
-   entries. This is deliberately *not* the short "obvious next few"
-   list (`subtract`/`divide`/`min`/`max`, `uppercase`/`trim`,
-   `equals`/`gt`/`lt`); those are one-line additions already implied
-   by existing modules and don't need a proposal to justify them. The
-   point here is to establish the *full* boundary of what a
-   closed-vocabulary scalar-derivation system can cover before
-   reaching for a real evaluator, so the registry grows once, in a
-   principled way, instead of by one-off requests forever.
-2. The **larger, IR-node-sized gaps** (client-side data fetching
+   entries, going well beyond Tier 1. The point here is to establish
+   the *full* boundary of what a closed-vocabulary scalar-derivation
+   system can cover before reaching for a real evaluator, so the
+   registry grows once, in a principled way, instead of by one-off
+   requests forever.
+4. The **larger, IR-node-sized gaps** (client-side data fetching
    chief among them) and the **out-of-scope bucket** that conflicts
    with ARKlight's stated non-goals -- kept here because they're the
    part of the original audit that actually needs a maintainer
    decision, not just typing.
-
-Small per-file runtime primitives (an `IntersectionObserver`-based
-`reveal` behavior, debounced two-way binding, clipboard paste,
-geolocation, `matchMedia` state) are likewise not repeated here --
-same reasoning: each is a one-file, one-registry-line addition in the
-existing pattern, not something that needs a design proposal.
 
 ---
 
@@ -109,7 +107,44 @@ proposal's derivation catalog:
 | File upload preview | Common on any upload form | Not available |
 | Keyboard shortcuts | Common in app-like sites | Not available (click-only dispatch) |
 
-## 4. The exhaustive scalar-derivation and predicate catalog
+## 4. Tier 1 -- Trivial gaps (hours each)
+
+Already designed in the docs, just never implemented -- mirrors an
+existing module's `op` logic almost exactly, so each is a same-day,
+one-file, one-registry-line addition:
+
+- **Math**: `subtract`, `divide`, `min`, `max` -- the missing
+  siblings of `sum`/`multiply`.
+- **Strings**: `uppercase`, `trim` -- the missing siblings of
+  `join`/`format`.
+- **`Show` predicates**: `equals`, `gt`, `lt` -- already speced
+  alongside `compare`'s `eq/ne/gt/lt/gte/lte` op set, just never
+  wired into `PREDICATE_REGISTRY` (which today only has
+  `truthy`/`falsy`).
+
+## 5. Tier 2 -- Small new runtime primitives (a day or two each)
+
+Same registry pattern as Tier 1, but each needs a small new runtime
+module (extends `arklight/backend/js/runtime/*.py`) rather than just
+a fragment file -- no new IR node type required:
+
+- **`reveal`/`lazy` behavior via `IntersectionObserver`** -- same
+  shape as `scroll-to`, wraps an observer instead of
+  `scrollIntoView`.
+- **Debounced two-way binding** -- extends `Bind.model` to accept
+  the existing `MODIFIER_REGISTRY` debounce/throttle tokens (the
+  modifier plumbing already exists for actions; this wires it into
+  `wireModelBinding` too).
+- **Clipboard *paste*** behavior (`navigator.clipboard.readText()`)
+  -- mirrors `copy.py` almost exactly.
+- **Geolocation one-shot action** (`Action.geolocate(name)` writes
+  `{lat, lng}` into state) -- self-contained, no new dependency-graph
+  edges.
+- **`matchMedia`-driven boolean state**
+  (`State(..., media="(min-width: 768px)")`) -- one
+  `MediaQueryList` listener per declared media state.
+
+## 6. The exhaustive scalar-derivation and predicate catalog
 
 This is the core of the proposal. Every function below returns a
 single scalar (number/string/boolean) from a small, fixed set of
@@ -120,13 +155,11 @@ need a parser, an evaluator, or a change to `_evaluate_derivation`'s
 dispatch pattern in `arklight/ir/build.py` -- each is "one new file +
 one registry line," just a *lot* of them, cataloged here once so they
 can be triaged as a set instead of trickling in one GitHub issue at a
-time. (The handful of these already flagged in the original audit as
-one-hour additions -- `subtract`, `divide`, `min`, `max`, `round`,
-`modulo`, `uppercase`, `lowercase`, `trim`, `truncate`, and the
-`equals`/`gt`/`lt`/`gte`/`lte` predicates -- are omitted below since
-they're already accounted for; everything here is additional.)
+time. Tier 1's `subtract`/`divide`/`min`/`max`/`uppercase`/`trim`/
+`equals`/`gt`/`lt` (§4) are not repeated below; everything here is
+additional to those.
 
-### 4.1 Math derivations (beyond the basic arithmetic already noted)
+### 6.1 Math derivations (beyond the basic arithmetic in §4)
 
 Pulled from JS's own `Math` object, which is the de facto exhaustive
 list any language's numeric vocabulary converges on:
@@ -164,7 +197,7 @@ it needs an explicit design note (e.g. it's excluded from
 build-time pre-rendering and always resolves client-side only) rather
 than silently reusing the existing derivation dispatch contract.
 
-### 4.2 String derivations (beyond `uppercase`/`lowercase`/`trim`/`truncate`)
+### 6.2 String derivations (beyond `uppercase`/`trim` in §4)
 
 Pulled from JS's `String.prototype` methods:
 
@@ -197,11 +230,11 @@ ruled out categorically for template expressions -- worth stating
 explicitly in the registry entry's docstring so a future contributor
 doesn't "helpfully" add regex support later.
 
-### 4.3 Predicates (beyond `equals`/`gt`/`lt`/`gte`/`lte`)
+### 6.3 Predicates (beyond `equals`/`gt`/`lt` in §4)
 
-`Show`'s `PREDICATE_REGISTRY` currently only has `truthy`/`falsy`.
-Beyond the comparison operators already flagged as designed-but-
-unshipped, common `v-if`-equivalent guards include:
+`Show`'s `PREDICATE_REGISTRY` currently only has `truthy`/`falsy`,
+plus the Tier 1 comparison predicates in §4 once those are wired up.
+Beyond those, common `v-if`-equivalent guards include:
 
 | Predicate | Meaning | Notes |
 |---|---|---|
@@ -213,14 +246,14 @@ unshipped, common `v-if`-equivalent guards include:
 | `is_empty` / `is_not_empty` | string/array/`null` emptiness | see 4.2 |
 | `is_null` | value is `null`/`undefined` | common guard before rendering optional data |
 
-### 4.4 List-scalar derivations (input is a list-valued state name, output is still scalar)
+### 6.4 List-scalar derivations (input is a list-valued state name, output is still scalar)
 
 `Repeat` renders lists, but nothing today reduces a list-typed
 `State` value to a scalar the way `sum`/`count` reduce multiple
 *named* states. These read `Array.prototype` methods but stay
 scalar-out, so they don't need the new "list-in, list-out" registry
 (`SORT_REGISTRY`/`FILTER_REGISTRY`) that sorting/filtering would --
-that stays in Tier 3 below.
+that stays in Tier 3 (§7) below.
 
 | Derivation | JS equivalent | Notes |
 |---|---|---|
@@ -234,7 +267,7 @@ that stays in Tier 3 below.
 | `list_any` | `Array.prototype.some(...)` over a fixed comparison | predicate, bounded to the existing `compare` op set, not an arbitrary callback |
 | `list_all` | `Array.prototype.every(...)` over a fixed comparison | predicate, same bound |
 
-## 5. Tier 3 -- New IR-node-sized features (kept from the original audit)
+## 7. Tier 3 -- New IR-node-sized features (kept from the original audit)
 
 These need a new IR node + schema + validation, the size of
 `Repeat`/`Show` when those landed. Listed here because they're the
@@ -253,16 +286,16 @@ registry-filling exercise:
 - **Sort/filter over `Repeat`** -- a genuinely list-in/list-out
   concept, needing its own registry since `DERIVATION_REGISTRY`
   assumes scalar output (unlike the list-*reducing* derivations in
-  §4.4, which stay scalar).
+  §6.4, which stay scalar).
 - **File upload + preview** -- `<input type=file>` handling, a
   `FileReader`-based preview runtime module, and IR support for
   binding the preview into `Bind`.
 
-## 6. Tier 4 -- Out of scope (maintainer/design decision required)
+## 8. Tier 4 -- Out of scope (maintainer/design decision required)
 
 - **General arithmetic/string expressions** (`price * qty - discount`)
   -- exactly what the permanent non-goal in §2 rules out. However
-  exhaustive §4's catalog gets, an open expression syntax is a
+  exhaustive §6's catalog gets, an open expression syntax is a
   different mechanism entirely and stays off the table by design.
 - **WebSocket/SSE as an authored primitive** -- technically
   approachable (dev CLI already uses `EventSource` internally), but
@@ -276,21 +309,23 @@ registry-filling exercise:
   anti-pattern for the project's whole premise, not just a missing
   feature.
 
-## 7. Suggested order
+## 9. Suggested order
 
-1. Ship the already-flagged one-hour items (basic arithmetic,
-   `uppercase`/`trim`, comparison predicates) -- not detailed here,
-   already understood.
-2. Triage §4 as a batch: it's long on purpose, so a maintainer should
-   pick a subset (math-heavy sites want §4.1, text-heavy sites want
-   §4.2, list-heavy dashboards want §4.4) rather than shipping all of
+1. Ship **Tier 1** (§4) first -- same day, closes the most-noticed
+   gaps (basic math ops, the already-designed `Show` predicates).
+2. **Tier 2** (§5) next, prioritizing `reveal`/`IntersectionObserver`
+   and debounced input binding -- the two most commonly reached-for
+   browser APIs missing today.
+3. Triage §6 as a batch: it's long on purpose, so a maintainer should
+   pick a subset (math-heavy sites want §6.1, text-heavy sites want
+   §6.2, list-heavy dashboards want §6.4) rather than shipping all of
    it reflexively. Flag `random_int` and `replace_first`/`replace_all`
-   for explicit sign-off given the caveats in §4.1/§4.2.
-3. Treat §5's `DataSource`/client-side fetch as its own milestone
+   for explicit sign-off given the caveats in §6.1/§6.2.
+4. Treat §7's `DataSource`/client-side fetch as its own milestone
    (like `v0.054` was for reactivity) -- it's the actual answer to
    "the computation isn't enough," since today ARKlight genuinely
    cannot express "load this JSON and render it" without a full
    server round-trip via htmx.
-4. Leave §6 out of scope unless the "no eval, ever" and "static
+5. Leave §8 out of scope unless the "no eval, ever" and "static
    output only" invariants themselves are up for reconsideration --
    that's a philosophy call, not an engineering one.
