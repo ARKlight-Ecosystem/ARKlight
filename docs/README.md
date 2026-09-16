@@ -72,6 +72,7 @@ folder's own README for the full rationale. Removed or graduated
 | [`URL-STATE-AS-PRIMITIVE-PROPOSAL.md`](<Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md>) | Proposal for a `State(..., query=...)` primitive extending `persist=True` to cover URL query parameters, including which navigation architecture a query-param change should trigger. |
 | [`ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](<Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md>) | Proposal for an `arklight assistant` subcommand: a read-only, doc-grounded CLI companion ("Raeliana") behind `--wake-up-raeliana`, plus a separate opt-in `--activate-memory` flag for cross-session recall. **Accepted -- implementation deferred to v0.090+.** |
 | [`PROJECT-KNOWELEDGE-PROPOSAL.md`](<Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md>) | Proposal for a compiler-owned `.arklight/` project-local knowledge directory: providers/facts/observations model, Git as the first provider, persistence across builds. **Accepted -- staged in `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` as `v0.071`-`v0.078`.** |
+| [`SEARCH-RETRIEVE-DOC-PROPOSAL.md`](<Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md>) | Proposal for `arklight search --retrieve-doc`: a doc-tree retrieval mode on the existing `search` subcommand, printing the root or a folder's `README.md` index and, with `--file NAME`, one file's full contents. |
 
 ### [`docs/Implementation/`](Implementation/README.md) — accepted, staged
 
