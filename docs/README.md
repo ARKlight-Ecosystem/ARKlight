@@ -103,14 +103,53 @@ dropped, or graduated elsewhere if it's picked up.
 | [`KAIOS-BACKEND-IMPLEMENTATION.md`](<Far Future Concern/KAIOS-BACKEND-IMPLEMENTATION.md>) | Implementation notes for a KaiOS backend. |
 | [`WINDOWS-PHONE-BACKEND.md`](<Far Future Concern/WINDOWS-PHONE-BACKEND.md>) | Notes on a (very) speculative Windows Phone backend. |
 
-## Contributing to the Docs
-
-If you add a new doc file, add a row for it in the relevant table
-above so this index stays accurate.
-
 ### [`docs/version history/`](<version history/README.md>) — permanent
 
 The user-facing overview of each shipped `alpha` milestone, separate
 from `CHANGELOG.md`/`PROGRESS.md`'s internal/dev-facing detail. See
 that folder's own README for the full index and for how it
 deliberately differs from `main`'s `docs/version history/` directory.
+
+## Adding a new doc
+
+Every doc file here exists to answer one kind of question, for one
+kind of reader, and every fact should live in exactly one of them --
+the same normalization rule `docs/version history/README.md` states
+for its own directory ("exactly one file per version") applied to the
+whole tree. Two checks before writing a new file or a new section:
+
+**1. Does this fact already have a home?** Search for it first
+(`grep -r` for the term, or skim the tables above). If it does, link
+to that file rather than restating the fact -- copy-pasted facts drift
+the moment one copy gets updated and the other doesn't (see
+`docs/Foundational/ARCHITECTURE.md`'s "Why this file is short on
+prose, long on links" for a worked example of a redundancy this
+caused and how it was fixed). This applies to the root `README.md`
+too: it's the landing page, not a second copy of anything that has a
+canonical home elsewhere -- `README.md`'s own "Status" section is the
+template every other section should follow (a two-line pointer, not a
+restated table).
+
+**2. Which folder matches this content's *state*?** Each folder below
+is one state in the same lifecycle, in order:
+
+| State | Folder | Leaves the folder when... |
+| --- | --- | --- |
+| Speculative, not proposed as work | `docs/Far Future Concern/` | A backend/idea gets picked up for real -> graduates to `docs/Backends/` or `docs/Proposals/`. |
+| Proposed, not yet decided | `docs/Proposals/` | A maintainer accepts or rejects it -> graduates to `docs/Implementation/` (accepted) or is removed (rejected). |
+| Accepted, staged, in-flight | `docs/Implementation/` (general work) or `docs/Backends/` (a specific backend's own staging doc, for locality) | Every stage ships -> the outcome is captured in `docs/version history/` + `CHANGELOG.md`/`PROGRESS.md`, and the staging file itself is trimmed or removed. |
+| Shipped, user-facing summary | `docs/version history/` | Never -- permanent, one file per version (see that folder's own README). |
+| Shipped, permanent design rationale | `docs/Foundational/` | Never -- permanent, updated in place, not deletable. |
+
+If a new file doesn't obviously match one row, it's usually a sign the
+content should be a section added to an existing file instead of a
+new one -- a folder here is a *state*, not a topic, so "JS vocabulary
+notes" isn't itself a reason for a new file if the content is actually
+staged-and-in-flight (`docs/Implementation/`) or already-shipped-
+rationale (`docs/Foundational/`) material.
+
+**Once you know which file:** add or update the content there, then
+add (or update) its row in that folder's own `README.md` index *and*
+in the Folder Guide table above -- both, since a reader may land on
+either README first. A file with no index row is invisible to anyone
+browsing rather than searching.

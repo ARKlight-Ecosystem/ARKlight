@@ -3,7 +3,7 @@
 ## What counts as "experimental"
 
 ARKlight's default surface is built entirely on the intrinsic layout
-model described in `docs/DESIGN-NOTES.md`: flexbox/grid sizing
+model described in `DESIGN-NOTES.md`: flexbox/grid sizing
 keywords (`minmax()`, `auto-fit`, `clamp()`, `flex-wrap`) and the
 `.stack`/`.cluster`/`.switcher`/`.grid`/`.sidebar` utility classes
 built on top of them. Nothing in that model is keyed to a specific
@@ -18,7 +18,7 @@ experimental API.** That currently means:
   below), and, as of v0.048 Stage B, a per-node `responsive_style=
   {"(max-width: 600px)": {...}}` prop any component may carry. Both
   compile to the same kind of viewport-keyed `@media` block and share
-  this one gate -- see `docs/DESIGN-NOTES.md` ("v0.048: CSS media
+  this one gate -- see `DESIGN-NOTES.md` ("v0.048: CSS media
   queries + `<head>` extension") for `responsive_style`'s design.
 - `experimental-install-pwa` -- a native browser install-prompt button
   (`arklight pwa ... --install-button`), which depends entirely on
