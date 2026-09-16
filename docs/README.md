@@ -43,6 +43,7 @@ record for the project, updated in place rather than removed.
 | [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | The `arklight` CLI: build/deploy workflows and commands. |
 | [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
+| [`SYSTEM-DESIGN-AGREEMENTS.md`](Foundational/SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |
 | [`USER-DEFINED-COMPONENTS.md`](Foundational/USER-DEFINED-COMPONENTS.md) | User-defined, reusable components (v0.060, shipped in full) -- props, default styling, macro/registry modes, component-owned state, and scope boundaries. |
 
 ### [`docs/Backends/`](Backends/README.md) — working reference
@@ -68,6 +69,8 @@ folder's own README for the full rationale. Removed or graduated
 | File | Covers |
 | --- | --- |
 | [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](<Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md>) | Proposal for the client-side JS vocabulary: trivial gaps, small new primitives, an exhaustive scalar derivation/predicate catalog, and the larger client-side-fetch-sized gaps still open. |
+| [`URL-STATE-AS-PRIMITIVE-PROPOSAL.md`](<Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md>) | Proposal for a `State(..., query=...)` primitive extending `persist=True` to cover URL query parameters, including which navigation architecture a query-param change should trigger. |
+| [`ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](<Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md>) | Proposal for an `arklight assistant` subcommand: a read-only, doc-grounded CLI companion ("Raeliana") behind `--wake-up-raeliana`, plus a separate opt-in `--activate-memory` flag for cross-session recall. |
 
 ### [`docs/Implementation/`](Implementation/README.md) — accepted, staged
 
