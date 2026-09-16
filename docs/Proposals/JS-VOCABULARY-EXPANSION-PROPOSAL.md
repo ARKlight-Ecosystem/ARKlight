@@ -30,13 +30,15 @@ This proposal covers four things, in ascending order of effort:
    each, same registry pattern, no new IR node.
 3. A **much larger, exhaustive catalog of scalar derivations and
    predicates** -- pulled from JS's own `Math`, `String`, `Number`,
-   and `Array` built-ins plus common cross-language utility-belt
-   operations -- as candidate `DERIVATION_REGISTRY`/`PREDICATE_REGISTRY`
-   entries, going well beyond Tier 1. The point here is to establish
-   the *full* boundary of what a closed-vocabulary scalar-derivation
-   system can cover before reaching for a real evaluator, so the
-   registry grows once, in a principled way, instead of by one-off
-   requests forever.
+   and `Array` built-ins (§6.1-6.4) plus common cross-language
+   "batteries included" idioms JS itself has no built-in for at all,
+   like C++'s `lerp`, Rust's saturating arithmetic and `Option`
+   combinators, and Python/Rust "humanize"/inflection libraries
+   (§6.5) -- as candidate `DERIVATION_REGISTRY`/`PREDICATE_REGISTRY`
+   entries. The point here is to establish the *full* boundary of
+   what a closed-vocabulary scalar-derivation system can cover before
+   reaching for a real evaluator, so the registry grows once, in a
+   principled way, instead of by one-off requests forever.
 4. The **larger, IR-node-sized gaps** (client-side data fetching
    chief among them) and the **out-of-scope bucket** that conflicts
    with ARKlight's stated non-goals -- kept here because they're the
@@ -267,6 +269,48 @@ that stays in Tier 3 (§7) below.
 | `list_any` | `Array.prototype.some(...)` over a fixed comparison | predicate, bounded to the existing `compare` op set, not an arbitrary callback |
 | `list_all` | `Array.prototype.every(...)` over a fixed comparison | predicate, same bound |
 
+### 6.5 Cross-language "batteries included" primitives (beyond JS's own built-ins)
+
+§6.1-6.4 above are all things JS itself already ships as `Math`/
+`String`/`Array` methods -- ARKlight is just missing a registry
+fragment around them. This subsection instead looks at what Python,
+Rust, and C++ standard libraries offer that JS has *no* built-in for
+at all, filtered down to the ones that still reduce to a scalar
+function of fixed inputs and so still fit the closed-registry shape
+without a new IR node:
+
+| Derivation/Predicate | Inspired by | Notes |
+|---|---|---|
+| `lerp` | C++20 `std::lerp(a, b, t)` (`<cmath>`) | linear interpolation, `a + t*(b-a)` with the correctly-rounded edge cases C++20 specifically added a stdlib function for (`t=0` returns exactly `a`, `t=1` returns exactly `b`). Very common in progress-bar/slider/drag-to-scale UI, which is exactly ARKlight's territory -- JS has no built-in equivalent, everyone hand-rolls it. |
+| `midpoint` | C++20 `std::midpoint(a, b)` (`<numeric>`) | `(a + b) / 2` computed without the intermediate-overflow risk of the naive version -- niche in JS's float world, but cheap to add for parity/precision. |
+| `saturating_add` / `saturating_subtract` | Rust `i32::saturating_add`/`saturating_sub` | clamps to a fixed min/max instead of overflowing or going negative -- e.g. a quantity stepper that should stop at 0 rather than go negative. Complements `clamp` (§6.1) but reads more naturally for increment/decrement-style UI. |
+| `value_or` | Rust `Option::unwrap_or` | returns a named state value, or a fallback from `args` if it's `null`/`undefined`/empty-string -- the scalar, non-panicking cousin of Rust's `Option` combinators; useful for "show this, or a placeholder" text bindings without a full `Show`/`Watch` pair. |
+| `first_present` | Rust `Option::or` chains / SQL `COALESCE` | first non-null/non-empty value across 2+ named states, in order -- generalizes `value_or` to more than one fallback. |
+| `to_ordinal` | Python/Rust "humanize"-style libraries (`inflection`, `humanize`, `humfmt`) | `1` -> `"1st"`, `2` -> `"2nd"`, etc. -- common in date/ranking UI. |
+| `humanize_bytes` | Rust `humanize-bytes`, Python `humanize.naturalsize` | `1536` -> `"1.5 KB"` -- extremely common for upload/download/storage UI; JS has no built-in (`Intl` covers currency/number/date, not byte counts). |
+| `humanize_duration` | Rust `humantime`/`humanize-duration`, Python `humanize.naturaldelta` | seconds -> `"2h 15m"`-style string -- common for "time remaining"/"elapsed" UI. |
+| `pluralize` | Python `inflection`, Rust `inflector-plus`, Ruby on Rails inflector (the common ancestor most of these port) | `"item"` + count -> `"item"`/`"items"` -- ubiquitous in list-count UI copy ("3 items in cart"). English pluralization has enough irregular forms (`person` -> `people`, `octopus` -> `octopi`) that this is closer to Tier 2 effort than Tier 1: it needs a small irregular-word table, not just a suffix rule, and should ship with a documented "regular-plural-only" fallback rather than pretending to be exhaustive. |
+| `to_snake_case` / `to_camel_case` / `to_kebab_case` / `to_title_case` | Python `inflection`/`camelcase-to-snakecase`, Rust `inflector-plus`, Dart `Inflector` (all cross-porting the same idea) | pure string-rewrite case converters, ubiquitous across *every* language's utility-belt library -- no irregular-word problem like `pluralize`, so these stay genuinely Tier 1/one-hour-shaped despite living in this cross-language section. |
+
+None of these need a parser or a callback -- `lerp`/`midpoint`/
+`saturating_add`/`value_or`/`first_present` are pure arithmetic or
+null-coalescing over named states; the humanize/case/pluralize
+entries are pure string rewrites over one input plus a locale/rules
+table baked into the fragment (same shape `format.py` already uses
+for its format-string argument). `pluralize` is the one entry worth
+flagging as more than an hour's work; everything else here is exactly
+as cheap as §6.1-6.4.
+
+**Not included here:** Python's `itertools`/Rust's `Iterator`
+combinators (`pairwise`, `batched`/`chunk`, `accumulate`/running-sum,
+`dedupe`/`unique`) are common across every language's "batteries
+included" story too, but they're list-*in*, list-*out* -- the same
+shape as sort/filter in Tier 3 (§7), not a scalar reduction like
+§6.4's `list_min`/`list_average`. They're flagged there instead of
+here so this section stays honest about what's actually
+registry-shaped today versus what needs the new list-transform
+registry Tier 3 already calls for.
+
 ## 7. Tier 3 -- New IR-node-sized features (kept from the original audit)
 
 These need a new IR node + schema + validation, the size of
@@ -286,7 +330,13 @@ registry-filling exercise:
 - **Sort/filter over `Repeat`** -- a genuinely list-in/list-out
   concept, needing its own registry since `DERIVATION_REGISTRY`
   assumes scalar output (unlike the list-*reducing* derivations in
-  §6.4, which stay scalar).
+  §6.4, which stay scalar). The same registry is the natural home for
+  Python `itertools`/Rust `Iterator`-style list-in/list-out
+  transforms flagged in §6.5 -- `pairwise` (consecutive-pair diffs),
+  `batched`/`chunk` (fixed-size groups, e.g. for a grid layout),
+  `accumulate` (running totals for a sparkline), and `dedupe`/
+  `unique` -- once that registry exists, since none of them fit
+  today's scalar-only `DERIVATION_REGISTRY`.
 - **File upload + preview** -- `<input type=file>` handling, a
   `FileReader`-based preview runtime module, and IR support for
   binding the preview into `Bind`.
@@ -318,9 +368,10 @@ registry-filling exercise:
    browser APIs missing today.
 3. Triage §6 as a batch: it's long on purpose, so a maintainer should
    pick a subset (math-heavy sites want §6.1, text-heavy sites want
-   §6.2, list-heavy dashboards want §6.4) rather than shipping all of
-   it reflexively. Flag `random_int` and `replace_first`/`replace_all`
-   for explicit sign-off given the caveats in §6.1/§6.2.
+   §6.2, list-heavy dashboards want §6.4, animation/UI-heavy sites
+   want §6.5's `lerp`) rather than shipping all of it reflexively.
+   Flag `random_int` (§6.1), `replace_first`/`replace_all` (§6.2),
+   and `pluralize` (§6.5) for explicit sign-off given their caveats.
 4. Treat §7's `DataSource`/client-side fetch as its own milestone
    (like `v0.054` was for reactivity) -- it's the actual answer to
    "the computation isn't enough," since today ARKlight genuinely
