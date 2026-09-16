@@ -51,6 +51,23 @@ worth knowing before adding a file here:
   rule `main`'s own README states. Sub-stage detail stays in
   `PROGRESS.md`/`CHANGELOG.md`, where it already lives.
 
+## A deliberate exception: `v0.061`-`v0.070` are PLANNED, not shipped
+
+Everything above this note is the folder's normal rule: a file here
+means a milestone (or a fully-landed stage of one) actually shipped.
+`v0.061.md` through `v0.070.md` are a deliberate, marked exception --
+each is a forward-looking summary written while staging
+[`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md),
+before any of that ladder's ten stages has started. Each file says
+**PLANNED** at the top for exactly this reason, and each will be
+rewritten to describe actual shipped behavior once its stage lands --
+until then, treat them as the ladder's user-facing preview, not a
+record. `v0.080`/`v0.100` below deliberately do **not** get this
+treatment yet, because neither has a finished, rung-by-rung staged
+plan the way the JS vocabulary addendum now does; once one gets a
+comparable `docs/Implementation/` (or `docs/Backends/`) ladder, the
+same PLANNED-entry treatment can apply to it too.
+
 ## Index
 
 | Version | Covers |
@@ -69,6 +86,16 @@ worth knowing before adding a file here:
 | [`v0.054.md`](./v0.054.md) | JS backend capability expansion (reactive core) -- rolls up all 8 `vdom-N` staging sub-stages. |
 | [`v0.060-stage0.md`](./v0.060-stage0.md) | User-defined, reusable components -- Stage 0 (registration, Option A macro expansion, experimental Option B selector). Milestone `v0.060` shipped in full, Stages 0-4 -- see `v0.060.md` for the rollup; this file covers only what Stage 0 shipped. |
 | [`v0.060.md`](./v0.060.md) | User-defined, reusable components -- full milestone rollup (Stages 0-4: registration/props, typo diagnostics, default styling, per-backend rendering, component-owned state). |
+| [`v0.061.md`](./v0.061.md) | **PLANNED.** JS vocabulary addendum, stage 1/10 -- math siblings (`subtract`/`divide`/`min`/`max`). |
+| [`v0.062.md`](./v0.062.md) | **PLANNED.** JS vocabulary addendum, stage 2/10 -- string-casing sibling + comparison `Show` predicates. |
+| [`v0.063.md`](./v0.063.md) | **PLANNED.** JS vocabulary addendum, stage 3/10 -- small new runtime primitives (`reveal`, debounced binding, clipboard paste, geolocation, `matchMedia`). |
+| [`v0.064.md`](./v0.064.md) | **PLANNED.** JS vocabulary addendum, stage 4/10 -- math derivations catalog. |
+| [`v0.065.md`](./v0.065.md) | **PLANNED.** JS vocabulary addendum, stage 5/10 -- string derivations catalog. |
+| [`v0.066.md`](./v0.066.md) | **PLANNED.** JS vocabulary addendum, stage 6/10 -- predicates catalog. |
+| [`v0.067.md`](./v0.067.md) | **PLANNED.** JS vocabulary addendum, stage 7/10 -- list-scalar derivations catalog. |
+| [`v0.068.md`](./v0.068.md) | **PLANNED.** JS vocabulary addendum, stage 8/10 -- cross-language numeric batteries (`lerp`, `midpoint`, saturating arithmetic, `value_or`/`first_present`). |
+| [`v0.069.md`](./v0.069.md) | **PLANNED.** JS vocabulary addendum, stage 9/10 -- cross-language formatting/case batteries (`humanize_*`, `to_ordinal`, case converters). |
+| [`v0.070.md`](./v0.070.md) | **PLANNED.** JS vocabulary addendum, stage 10/10 (capstone) -- `pluralize` + `random_int`, the two entries needing an explicit design exception. |
 
 Not yet covered here: `v0.080` (Android) and `v0.100` (Desktop) are
 both still IN PROGRESS with no fully-landed user-facing milestone to
