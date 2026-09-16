@@ -321,6 +321,24 @@ def _attr_string(
             parts.append(f' data-ark-on-click="behavior:{escape(value, quote=True)}"')
             continue
 
+        if key == "on_reveal" and isinstance(value, str):
+            # `v0.063`: a closed reveal-behavior name (see
+            # `arklight.ir.schema.REVEAL_REGISTRY`), compiled to its
+            # own `data-ark-on-reveal` attribute rather than folding
+            # into `on_click`'s `data-ark-on-click` -- `wireReveal`
+            # (`arklight/backend/js/runtime/reveal.py`) queries for
+            # this attribute directly at mount time, never through the
+            # click interceptor. `toggle_class`, if also given, is
+            # already handled generically below via
+            # `BEHAVIOR_PROP_ATTRS` -- the same `data-ark-toggle-class`
+            # attribute `toggle`/`dismiss` already emit, read here by
+            # `wireReveal` instead of a click handler. The behavior
+            # name is escaped, not validated here -- the Validation
+            # stage (`arklight.ir.validate`) already rejects anything
+            # not in `KNOWN_REVEAL_BEHAVIORS` before this code runs.
+            parts.append(f' data-ark-on-reveal="{escape(value, quote=True)}"')
+            continue
+
         if key == "shell_persistent":
             # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): a bool
             # prop that compiles to htmx's own `hx-preserve="true"` --

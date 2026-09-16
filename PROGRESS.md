@@ -45,6 +45,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.060-stage4 | User-defined components, Stage 4 of 4 (final): component-owned state (`component(..., state={...})`/`ComponentState`) -- a component's own local, instance-scoped `State(...)`-equivalent, hoisted onto its owning page under a uniquely-namespaced key per call site (`arklight/ir/components.py`'s `_hoist_component_state`/`_rewrite_component_state_refs`), so `Bind(...)`/`Action.*(...)`/`bind_class=`/`bind_value=` all work exactly like they would against a page-level `State(...)`, with zero changes to Normalization/Validation/any backend | DONE |
 | v0.061   | JS vocabulary addendum, stage 1 of 10: math siblings (`Derive.subtract`/`.divide`/`.min`/`.max`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
 | v0.062   | JS vocabulary addendum, stage 2 of 10: string-casing siblings + comparison predicates (`Derive.uppercase`/`.trim`, `Predicate.equals`/`.gt`/`.lt`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
+| v0.063   | JS vocabulary addendum, stage 3 of 10: `Action.geolocate(name)`, clipboard `paste` behavior, `State(..., media=...)` (`matchMedia`-driven boolean state), `reveal`/`lazy` behavior (`on_reveal=`, `IntersectionObserver`), debounced/throttled `Bind.model(...)` -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v1.0     | Stable compiler                                              | PLANNED |
@@ -151,6 +152,99 @@ initial-value evaluation (including non-string coercion for
 attribute against the new predicates, JS fragment/`arkEvalPredicate`
 shipping, and Node.js end-to-end parity checks. Full suite: 1170
 passed, no regressions.
+
+## v0.063 -- JS vocabulary addendum, stage 3 of 10: small new runtime primitives (DONE)
+
+Third rung of the JS vocabulary expansion ladder staged in
+`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` -- five small
+runtime primitives, each extending `arklight/backend/js/runtime/*.py`
+without a new IR node. Landed across two passes: an earlier,
+incomplete one already shipped `Action.geolocate`'s JS fragment and
+`Bind.model(..., debounce=...)`/`.throttle(...)` before stopping
+mid-stage (a "Work on v0.063 is not done yet" commit); this pass
+finished the remaining wiring (`Action.geolocate` itself never had an
+`ACTION_REGISTRY` entry or an `arklight/api.py` static method yet)
+and the other three primitives.
+
+`Action.geolocate(name)` is a one-shot, argument-less action --
+`navigator.geolocation.getCurrentPosition` writes `{lat, lng}` into
+`State(name)` once the browser's permission prompt resolves.
+Asynchronous, unlike every other action so far: the dispatcher's
+existing "fire and forget" `action(store, key, args)` call already
+made this safe without any dispatcher changes.
+
+Clipboard **paste** (`on_click="paste"`) mirrors `copy.py` closely --
+same `behavior_target` selector, same clipboard-availability guard,
+reading instead of writing. Writing into an `Input`/`Textarea` also
+dispatches a real `input` event, so an element that also carries
+`bind_value=Bind.model(...)` picks the pasted text up into state too,
+for free.
+
+`State(..., media="(min-width: 768px)")` is the third kind of
+`State(...)` declaration with a second, non-`Action.*(...)` writer
+(after `persist=True`): `IRPage.media` carries `(name, query)` pairs
+through the IR exactly the shape `IRPage.persist` already
+established, `data-ark-media` rides along `data-ark-persist` on the
+same hydration marker, and `initState()` overrides the initial value
+with `matchMedia(query).matches` before the store is created, then
+attaches one `MediaQueryList` "change" listener per declared media
+key.
+
+`reveal`/`lazy` (`on_reveal="reveal"`, `IntersectionObserver`) needed
+an actual design decision, flagged when this stage was originally
+planned: every existing named behavior is click-triggered, wired
+through `wireClickInterceptor`'s delegated `click` listener, but a
+reveal-on-scroll-into-view effect has no click to hook. Reusing
+`on_click=`'s prop/registry for a mechanism that isn't click-triggered
+at all would silently misbehave the moment a site tried to combine
+the two on one element -- so `on_reveal=` got its own prop, its own
+small registry (`arklight.ir.schema.REVEAL_REGISTRY`/
+`KNOWN_REVEAL_BEHAVIORS`), and its own mount-time wiring pass
+(`wireReveal`, `arklight/backend/js/runtime/reveal.py`) called from
+`arkInitPage()` -- first load and, on an `app_shell` site, after every
+boosted swap -- rather than one more entry in the click-dispatched
+`behaviors` object. One kind so far: `reveal` adds `toggle_class`
+(default `"is-visible"`, reusing `toggle`/`dismiss`'s existing
+attribute/default) to the element itself the first time it enters the
+viewport, then stops observing it.
+
+While making sure `from arklight import *` actually reached this
+stage's own new names, found (and fixed) that it didn't reach several
+*older* ones either: `Repeat`, `RepeatItem`, `Show`, `Predicate`,
+`PredicateRef`, `ItemIndexRef`, `ClassBindSpec`, `ModelBindSpec` were
+all defined in `arklight/api.py`/`arklight/ast/nodes.py` but missing
+from `arklight/api.py`'s own `__all__` and from
+`arklight/__init__.py`'s import/`__all__` list entirely -- reachable
+via `arklight.api.Repeat` etc., but not via the wildcard import users
+are told to use. Same class of gap `tests/test_package_exports.py`
+already caught once before, for the v0.003 second vocabulary
+addendum; fixed the same way, plus a regression test in
+`tests/test_js_vocabulary_v0063.py` this time so it can't quietly
+regress a third time.
+
+Every new `window.*` access in this stage (`window.matchMedia`,
+`"IntersectionObserver" in window`) is guarded with `typeof window
+!== "undefined"` rather than a bare reference -- needed for
+`tests/test_vdom_8.py`'s existing Node.js harness (a hand-built
+`document`/`localStorage` stub with no `window` global) to keep
+passing once `initState()`'s JS grew a `window.matchMedia` branch;
+caught by running the full suite before considering this stage done,
+not by inspection.
+
+Tests: `tests/test_js_vocabulary_v0063.py` (new, 36 tests) --
+`Action.geolocate`/`ACTION_REGISTRY` coverage and validation against
+undeclared state; `paste`'s registry coverage, `behavior_target`
+requirement, and HTML/JS output; `media=`'s IR round-trip, validation,
+and HTML/JS output; `on_reveal=`'s validation (notably that it does
+*not* require `behavior_target`, unlike `on_click`) and that
+`wireReveal()` ships/runs independent of `has_state`; `Bind.model(...,
+debounce=...)`/`.throttle(...)`; a combined test exercising all five
+primitives on one page; `from arklight import *`/`from arklight.api
+import *` wildcard-export regression tests; and a Node.js check of the
+shipped `wireReveal` fragment. Full suite: 1204 passed (2
+pre-existing, unrelated `test_version.py` failures in a bare,
+non-`pip install`ed checkout -- present before this stage too), no
+regressions.
 
 ## v0.060-stage0 -- User-defined components, Stage 0 of 4 (DONE)
 

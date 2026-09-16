@@ -78,6 +78,12 @@ Checks performed:
     `Bind(...)`/`bind_class=` may reference a `Computed(...)`'s `name`
     exactly like a `State(...)`'s; `Action.*(...)` may not -- a
     `Computed(...)` has no independent value of its own to mutate.
+16. `on_reveal` (`v0.063`, JS vocabulary addendum stage 3/10), if
+    present, must be a known reveal-behavior name
+    (`arklight.ir.schema.KNOWN_REVEAL_BEHAVIORS`) -- unlike `on_click`,
+    it never takes an `Action.*(...)` reference or a `behavior_target`
+    (see `_validate_reveal_props`). `State(..., media="...")`'s
+    `media` prop, if present, must be a non-empty string.
 14. `Watch(...)` (`vdom-5`, see docs/Backends/REFACTOR-INDEX.md row 13)
     may only appear as a direct child of `Page(...)`, same as
     `State(...)`/`Computed(...)`; its `name` must resolve to a
@@ -114,6 +120,7 @@ from arklight.ir.schema import (
     COMPARE_OPS,
     DERIVATION_REGISTRY,
     KNOWN_BEHAVIORS,
+    KNOWN_REVEAL_BEHAVIORS,
     MODIFIER_REGISTRY,
     PREDICATE_REGISTRY,
     SCHEMA,
@@ -419,6 +426,29 @@ def _validate_behavior_props(node: ARKNode, *, path: str, mutable_state: frozens
         )
 
 
+def _validate_reveal_props(node: ARKNode, *, path: str) -> None:
+    """
+    `v0.063`: `on_reveal=`, unlike `on_click=`, is never click-triggered
+    and never takes a `behavior_target` -- the observed element *is*
+    the element that carries `on_reveal=` (see
+    `arklight.ir.schema.REVEAL_REGISTRY`'s comment for why this is a
+    separate prop/registry rather than reusing `on_click=`'s). Only a
+    known reveal-behavior name is accepted; there's no `Action.*(...)`-
+    shaped alternative the way `on_click=` has, since a reveal effect
+    has no state to mutate of its own.
+    """
+    on_reveal = node.props.get("on_reveal")
+    if on_reveal is None:
+        return
+    if on_reveal not in KNOWN_REVEAL_BEHAVIORS:
+        known = ", ".join(sorted(KNOWN_REVEAL_BEHAVIORS))
+        raise ValidationError(
+            f"{node.type!r} at {path} has on_reveal={on_reveal!r}, which "
+            f"isn't a recognized reveal behavior. Known reveal behaviors "
+            f"are: {known}."
+        )
+
+
 def _validate_state_declaration(node: ARKNode, *, path: str, parent_is_page: bool) -> None:
     if not parent_is_page:
         raise ValidationError(
@@ -439,6 +469,19 @@ def _validate_state_declaration(node: ARKNode, *, path: str, parent_is_page: boo
     if not isinstance(persist, bool):
         raise ValidationError(
             f"State(...) at {path} has persist={persist!r}, which must be a bool."
+        )
+    # `v0.063`: `media` defaults to `None` (unset, plain state --
+    # unchanged behavior) but a value that *is* provided must be a
+    # non-empty string -- the raw text ARKlight hands straight to
+    # `window.matchMedia(...)` client-side, so an empty/non-string
+    # value would silently become a useless (or throwing) media query
+    # at runtime instead of failing loudly here at build time, same
+    # discipline `persist`'s bool check above already holds.
+    media = node.props.get("media")
+    if media is not None and (not isinstance(media, str) or not media.strip()):
+        raise ValidationError(
+            f"State(...) at {path} has media={media!r}, which must be a "
+            f'non-empty media condition string, e.g. "(min-width: 768px)".'
         )
 
 
@@ -783,6 +826,7 @@ def validate_node(
             )
 
     _validate_behavior_props(node, path=path, mutable_state=mutable_state)
+    _validate_reveal_props(node, path=path)
     _validate_class_bind(node, path=path, page_state=page_state)
     _validate_model_bind(node, path=path, mutable_state=mutable_state)
     _validate_responsive_style(node, path=path)

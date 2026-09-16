@@ -87,6 +87,7 @@ from arklight.backend.js.runtime.model import (
 from arklight.backend.js.runtime.nav import NAV_HIGHLIGHT_JS
 from arklight.backend.js.runtime.notify import NOTIFY_JS
 from arklight.backend.js.runtime.repeat import RENDER_REPEAT_JS
+from arklight.backend.js.runtime.reveal import WIRE_REVEAL_JS
 from arklight.backend.js.runtime.show import RENDER_SHOW_JS
 from arklight.backend.js.runtime.state import CREATE_STATE_JS, INIT_STATE_JS
 from arklight.backend.js.runtime.watch import WIRE_WATCHERS_JS
@@ -110,4 +111,5 @@ __all__ = [
     "WIRE_MODEL_BINDING_JS",
     "RENDER_REPEAT_JS",
     "RENDER_SHOW_JS",
+    "WIRE_REVEAL_JS",
 ]

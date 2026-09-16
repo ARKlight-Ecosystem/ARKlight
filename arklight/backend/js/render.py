@@ -284,6 +284,7 @@ from arklight.backend.js.runtime import RENDER_REPEAT_JS as _RENDER_REPEAT_JS
 from arklight.backend.js.runtime import RENDER_SHOW_JS as _RENDER_SHOW_JS
 from arklight.backend.js.runtime import STATE_CORE_JS as _STATE_CORE_JS
 from arklight.backend.js.runtime import WIRE_MODEL_BINDING_JS as _WIRE_MODEL_BINDING_JS
+from arklight.backend.js.runtime import WIRE_REVEAL_JS as _WIRE_REVEAL_JS
 from arklight.backend.js.runtime import WIRE_WATCHERS_JS as _WIRE_WATCHERS_JS
 from arklight.backend.js.vdom import SNABBDOM_CORE_JS
 from arklight.ir.build import IRNode, WebsiteIR
@@ -310,7 +311,7 @@ def _walk(node: IRNode):
 
 def _collect_usage(
     ir: WebsiteIR,
-) -> tuple[set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool]:
+) -> tuple[set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool, bool]:
     """
     Inspect the site's IR for what the runtime actually needs to ship:
     which named behaviors are referenced, which actions are referenced
@@ -332,7 +333,11 @@ def _collect_usage(
     template `IRNode`, not a separate declaration pulled out like
     `Computed`/`Watch` are), so the `_walk` loop below already picks it
     up into `used_on_click_actions`/`used_actions` without any special
-    case.
+    case. Also returns `has_reveal` (`v0.063`) -- whether any node
+    anywhere carries `on_reveal=` -- gating `WIRE_REVEAL_JS`/
+    `wireReveal()` the same "only ship what's used" way `has_repeat`/
+    `has_show` gate their own runtime pieces, and independent of
+    `has_state`: a reveal effect never reads or writes `State(...)`.
     """
     used_behaviors: set[str] = set()
     used_on_click_actions: set[str] = set()
@@ -345,6 +350,7 @@ def _collect_usage(
     has_model_binding = False
     has_repeat = False
     has_show = False
+    has_reveal = False
 
     for page in ir.pages:
         for node in _walk(page.root):
@@ -361,6 +367,8 @@ def _collect_usage(
                 has_repeat = True
             elif node.type == "Show":
                 has_show = True
+            if node.props.get("on_reveal"):
+                has_reveal = True
 
     # vdom-5: a Watch(...)'s `then=` reuses the exact same
     # ACTION_REGISTRY dispatcher an on_click=Action.*(...) does (see
@@ -386,6 +394,7 @@ def _collect_usage(
         has_model_binding,
         has_repeat,
         has_show,
+        has_reveal,
     )
 
 
@@ -472,6 +481,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         has_model_binding,
         has_repeat,
         has_show,
+        has_reveal,
     ) = _collect_usage(ir)
 
     # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): the click
@@ -612,6 +622,13 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         parts.append(_WIRE_MODEL_BINDING_JS)
         parts.append("")
 
+    if has_reveal:
+        # `v0.063`: independent of `has_state` -- a reveal effect
+        # never reads or writes `State(...)`, it just needs
+        # `wireReveal()` itself declared before `arkInitPage()` calls
+        # it below.
+        parts.append(_WIRE_REVEAL_JS)
+
     parts.append(_NAV_HIGHLIGHT_JS)
     parts.append("")
 
@@ -627,6 +644,14 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         parts.append("")
 
     init_body = ["    highlightActiveNavLink();"]
+    if has_reveal:
+        # `v0.063`: called every time `arkInitPage()` runs -- first
+        # load and, on an app_shell site, every boosted swap after
+        # that -- so an element newly brought in by a boosted
+        # navigation still gets observed. See `wireReveal`'s own
+        # docstring for why re-observing an already-observed element
+        # on a later call is safe.
+        init_body.append("    wireReveal();")
     if has_state:
         init_body.append("    arkStore = initState();")
         render_calls = "renderBindings(arkStore); renderClassBindings(arkStore);"

@@ -377,14 +377,29 @@ def _render_page(
         if page.persist:
             persist_json = escape(json.dumps(page.persist), quote=True)
             persist_attr = f' data-ark-persist="{persist_json}"'
+        # `v0.063` (docs/version history/v0.063.md): `page.media` rides
+        # along as its own `data-ark-media` attribute, same reasoning
+        # as `data-ark-persist` above -- `[name, query]` pairs, no
+        # value of their own (`state_json` above already carries this
+        # key's server-rendered-guess initial value), read by
+        # `initState()` (`arklight/backend/js/runtime/state.py`) to
+        # override that guess with the real `matchMedia(query).matches`
+        # and keep it live after that. A page can only ever have
+        # `page.media` non-empty when `page.state` is too (`media=`
+        # only exists as a prop on a `State(...)` node), so it's always
+        # safe to place all five attributes on the same marker.
+        media_attr = ""
+        if page.media:
+            media_json = escape(json.dumps(page.media), quote=True)
+            media_attr = f' data-ark-media="{media_json}"'
         if app_shell:
             state_marker = (
                 f'<div id="ark-state" data-ark-state="{state_json}"'
-                f"{computed_attr}{watch_attr}{persist_attr} hidden></div>\n"
+                f"{computed_attr}{watch_attr}{persist_attr}{media_attr} hidden></div>\n"
             )
         else:
             body_attr_parts.append(
-                f' data-ark-state="{state_json}"{computed_attr}{watch_attr}{persist_attr}'
+                f' data-ark-state="{state_json}"{computed_attr}{watch_attr}{persist_attr}{media_attr}'
             )
     if app_shell:
         body_attr_parts.append(' hx-boost="true"')

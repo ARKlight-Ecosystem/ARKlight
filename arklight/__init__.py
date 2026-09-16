@@ -120,6 +120,26 @@ from arklight.api import (
     Bind,
     Action,
     ActionRef,
+    # `vdom-4`..`vdom-7` (docs/Backends/REFACTOR-INDEX.md rows 12/13/15)
+    # + v0.062: previously defined in arklight/api.py but missing from
+    # this package's own `import` list, same gap
+    # `tests/test_package_exports.py` already found and fixed once for
+    # the v0.003 second vocabulary extension addendum -- `from arklight
+    # import *` (the documented way users are told to import
+    # everything) couldn't reach these even though `from arklight.api
+    # import Computed` (etc.) worked.
+    Computed,
+    Watch,
+    Derive,
+    DerivationRef,
+    Repeat,
+    RepeatItem,
+    Show,
+    Predicate,
+    PredicateRef,
+    ItemIndexRef,
+    ClassBindSpec,
+    ModelBindSpec,
     ARKNode,
 )
 
@@ -260,6 +280,18 @@ __all__ = [
     "Bind",
     "Action",
     "ActionRef",
+    "Computed",
+    "Watch",
+    "Derive",
+    "DerivationRef",
+    "Repeat",
+    "RepeatItem",
+    "Show",
+    "Predicate",
+    "PredicateRef",
+    "ItemIndexRef",
+    "ClassBindSpec",
+    "ModelBindSpec",
     "ARKNode",
     "__version__",
     "CHANNEL",

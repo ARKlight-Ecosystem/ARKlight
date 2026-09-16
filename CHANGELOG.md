@@ -5,6 +5,86 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- JS vocabulary addendum, stage 3 of 10: small new runtime primitives (`v0.063`)
+
+**What:** Five small runtime primitives, third rung of the JS
+vocabulary expansion ladder staged in
+`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`.
+`Action.geolocate(name)` (`arklight/api.py`) -- a one-shot,
+argument-less action: `navigator.geolocation.getCurrentPosition`
+writes `{lat, lng}` into `State(name)` once the browser's permission
+prompt resolves; asynchronous, unlike every other action, but safe
+under the existing "fire and forget" dispatcher. Clipboard **paste**
+(`on_click="paste"`) -- mirrors `copy.py`, reading
+`navigator.clipboard.readText()` into the `behavior_target`
+selector's `.value`/`.textContent` instead of writing to it; also
+dispatches an `input` event so a co-located
+`bind_value=Bind.model(...)` picks the pasted text up too.
+`State(name, initial, media="(min-width: 768px)")`
+(`arklight/api.py`) -- `matchMedia`-driven boolean state: the
+runtime overrides `initial` with `matchMedia(media).matches` on init
+and keeps writing the key via a `MediaQueryList` "change" listener
+after that. `reveal`/`lazy` behavior via `IntersectionObserver`
+(`on_reveal="reveal"`) -- deliberately its own prop/registry rather
+than folded into `on_click=`, since it's never click-triggered;
+adds `toggle_class` (default `"is-visible"`) to the element the first
+time it enters the viewport, then stops observing it. Debounced/
+throttled two-way binding -- `Bind.model(name, debounce=300)`/
+`Bind.model(name, throttle=300)` extend `bind_value=` to accept the
+existing `debounce:<ms>`/`throttle:<ms>` modifier tokens.
+
+**Also fixed:** `Repeat`, `RepeatItem`, `Show`, `Predicate`,
+`PredicateRef`, `ItemIndexRef`, `ClassBindSpec`, `ModelBindSpec` were
+defined in `arklight/api.py`/`arklight/ast/nodes.py` but missing from
+`arklight/api.py`'s own `__all__` and from `arklight/__init__.py`'s
+import/`__all__` list -- unreachable via `from arklight import *`
+(the documented way to import everything) even though `from
+arklight.api import Repeat` etc. worked. Same gap
+`tests/test_package_exports.py` already caught once before, for the
+v0.003 second vocabulary addendum; fixed the same way, plus a
+regression test this time.
+
+**Implementation:** `arklight/backend/js/actions/geolocate.py`,
+`arklight/ir/schema.py` (`ACTION_REGISTRY["geolocate"]`) --
+`Action.geolocate`. `arklight/backend/js/behaviors/paste.py` (new),
+`arklight/backend/js/behaviors/__init__.py`, `arklight/ir/schema.py`
+(`BEHAVIOR_REGISTRY["paste"]`) -- clipboard paste.
+`arklight/ir/build.py` (`IRPage.media`, `_extract_page_state`),
+`arklight/ir/validate.py` (media shape check),
+`arklight/backend/html/page_render.py` (`data-ark-media`),
+`arklight/backend/js/runtime/state.py` (`initState()`'s `matchMedia`
+override/listener wiring) -- `media=`. `arklight/ir/schema.py`
+(`REVEAL_REGISTRY`/`KNOWN_REVEAL_BEHAVIORS`, separate from
+`BEHAVIOR_REGISTRY`), `arklight/ir/validate.py`
+(`_validate_reveal_props`), `arklight/backend/html/attrs.py`
+(`data-ark-on-reveal`), `arklight/backend/js/runtime/reveal.py`
+(new, `wireReveal()`), `arklight/backend/js/render.py` (`has_reveal`
+usage detection, shipped/called independent of `has_state`) --
+`on_reveal=`. `arklight/ast/nodes.py` (`ModelBindSpec`),
+`arklight/api.py` (`Bind.model(..., debounce=..., throttle=...)`),
+`arklight/backend/html/attrs.py` (`data-ark-model-modifiers`) --
+debounced/throttled binding. Every new `window.*` access is guarded
+with `typeof window !== "undefined"` so `arklight.js` stays testable
+from a Node.js harness with no real `window` global (caught by
+`tests/test_vdom_8.py`'s existing localStorage-persistence Node
+tests, which broke without the guard once `initState()`'s JS grew a
+`matchMedia` branch). No changes to `arklight/ir/normalize.py`.
+
+**Tests:** `tests/test_js_vocabulary_v0063.py` (new, 36 tests) --
+API return values and registry coverage for all five primitives;
+validation (undeclared state for `geolocate`, missing
+`behavior_target` for `paste`, non-string/empty `media`, unknown
+`on_reveal` kinds, and that `on_reveal` does *not* require
+`behavior_target`); HTML backend attribute compilation for each;
+JS backend "ships only what's used" checks, including that
+`wireReveal()` ships/runs independent of `has_state`; a combined
+test exercising all five primitives on one page; `from arklight
+import *`/`from arklight.api import *` wildcard-export regression
+tests; and a Node.js check of the shipped `wireReveal` fragment.
+Full suite: 1204 passed (2 pre-existing, unrelated
+`test_version.py` failures from a bare non-`pip install`ed checkout,
+present before this stage too), no regressions.
+
 ## [Unreleased] -- JS vocabulary addendum, stage 2 of 10: string casing + comparison predicates (`v0.062`)
 
 **What:** `Derive.uppercase`, `Derive.trim` (`arklight/api.py`) -- the

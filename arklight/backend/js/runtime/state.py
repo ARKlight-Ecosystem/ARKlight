@@ -115,6 +115,34 @@ graph, no derivation kind to look up, and no other module needs to
 read `persist` -- it's purely "override on init, write on change,"
 both of which `initState()` already touches every other piece of
 hydration state at.
+
+`v0.063` (JS vocabulary addendum, stage 3/10 -- see `docs/version
+history/v0.063.md`): `initState()` also reads a sibling
+`data-ark-media` attribute (`IRPage.media`, same marker/`<body>`-
+attribute duality again) -- a list of `[name, query]` pairs for every
+`State(..., media=...)` declared on the page. Same "override on init,
+keep writing after that" shape `persist` above already establishes,
+just sourced from `window.matchMedia` instead of `localStorage`:
+
+1. *Override*, before `createState` is called: for each `[name,
+   query]` pair, if `window.matchMedia` exists, override that key's
+   server-rendered initial value with `matchMedia(query).matches` --
+   so the very first render already reflects the *real* viewport,
+   not just whatever guess `State(..., media=...)`'s own `initial=`
+   argument server-rendered for a JS-disabled visitor.
+2. *Listen*, once the store exists: attach one `"change"` listener per
+   `MediaQueryList` (`mql.addEventListener`, falling back to the
+   older `mql.addListener` for Safari versions that predate the
+   standard event-target API) that calls `store.set(name, e.matches)`
+   whenever the query's match state flips -- the live-updating half
+   `persist` has no equivalent of (persisted state only ever changes
+   through an explicit `Action.*(...)`/user input, never on its own).
+
+Both steps are wrapped in their own `try`/`catch`, same degrade-
+quietly discipline `persist`'s `localStorage` access already holds --
+a media query the browser can't parse, or a very old browser lacking
+`matchMedia` entirely, means this key just never updates on its own,
+never a page-breaking error.
 """
 
 from __future__ import annotations
@@ -164,10 +192,14 @@ INIT_STATE_JS = """  function initState() {
     var rawPersist = marker
       ? marker.getAttribute("data-ark-persist")
       : document.body.getAttribute("data-ark-persist");
+    var rawMedia = marker
+      ? marker.getAttribute("data-ark-media")
+      : document.body.getAttribute("data-ark-media");
     try {
       var computed = rawComputed ? JSON.parse(rawComputed) : [];
       var watch = rawWatch ? JSON.parse(rawWatch) : [];
       var persist = rawPersist ? JSON.parse(rawPersist) : [];
+      var media = rawMedia ? JSON.parse(rawMedia) : [];
       var initial = JSON.parse(raw);
       persist.forEach(function (key) {
         try {
@@ -179,7 +211,32 @@ INIT_STATE_JS = """  function initState() {
           // key alone -- never a page-wide failure.
         }
       });
+      media.forEach(function (entry) {
+        try {
+          if (typeof window !== "undefined" && window.matchMedia) {
+            initial[entry[0]] = matchMedia(entry[1]).matches;
+          }
+        } catch (err) {
+          // A media query string the browser can't parse, or no
+          // matchMedia support at all: keep the server-rendered guess
+          // for this key alone -- never a page-wide failure.
+        }
+      });
       var store = createState(initial, computed);
+      if (typeof window !== "undefined" && window.matchMedia) {
+        media.forEach(function (entry) {
+          try {
+            var name = entry[0];
+            var mql = matchMedia(entry[1]);
+            var handler = function (e) { store.set(name, e.matches); };
+            if (mql.addEventListener) { mql.addEventListener("change", handler); }
+            else if (mql.addListener) { mql.addListener(handler); }
+          } catch (err) {
+            // Same degrade-quietly discipline as the override step
+            // above -- this key just never updates live.
+          }
+        });
+      }
       store.subscribe(function () {
         renderBindings(store);
         renderClassBindings(store);

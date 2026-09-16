@@ -451,7 +451,9 @@ def component(
 # ---------------------------------------------------------------------------
 
 
-def State(name: str, initial: Any = None, persist: bool = False) -> ARKNode:
+def State(
+    name: str, initial: Any = None, persist: bool = False, media: str | None = None
+) -> ARKNode:
     """
     Declare page-scoped reactive state: `State("count", 0)`.
 
@@ -470,8 +472,35 @@ def State(name: str, initial: Any = None, persist: bool = False) -> ARKNode:
     browsing, quota, a hand-edited non-JSON value) degrade to "this key
     just doesn't persist" -- never a page-breaking error. Off by
     default, unchanged behavior for existing `State(...)` calls.
+
+    `media="(min-width: 768px)"` (`v0.063`) opts this key into
+    `matchMedia`-driven boolean state: as soon as the shipped runtime
+    initializes, it overrides `initial` with
+    `window.matchMedia(media).matches` (the value given here is only
+    ever what a JS-disabled visitor sees -- pick a reasonable
+    server-rendered guess, e.g. `False` for a "wide viewport" query),
+    and attaches one `MediaQueryList` "change" listener per declared
+    media state that keeps writing `State(name)` as the viewport
+    crosses the query's breakpoint, exactly like a window resize
+    listener but native and debounced by the browser itself.
+
+        State("is_wide", False, media="(min-width: 768px)")
+        Show(Predicate.truthy("is_wide"), Text("Desktop layout"))
+
+    A `media=` key is still an ordinary `State(...)` in every other
+    respect -- `Bind(...)`/`bind_class=`/`Show(...)` all read it the
+    same way -- it just also has a second, non-`Action.*(...)` writer.
+    Mutually independent of `persist=True` (both may be set at once,
+    though a media-driven value re-derives itself every load, making
+    persistence for it a no-op in practice). `None` (the default)
+    means this key is plain, non-media-driven state, unchanged
+    behavior for existing `State(...)` calls.
     """
-    return ARKNode(type="State", props={"name": name, "initial": initial, "persist": persist}, children=[])
+    return ARKNode(
+        type="State",
+        props={"name": name, "initial": initial, "persist": persist, "media": media},
+        children=[],
+    )
 
 
 def Bind(name: str) -> ARKNode:
@@ -597,6 +626,28 @@ class Action:
     def remove(name: str, index: Any) -> ActionRef:
         """Removes the element at `index` from a list-valued `State(...)`."""
         return ActionRef(action="remove", state=name, args={"index": index})
+
+    @staticmethod
+    def geolocate(name: str) -> ActionRef:
+        """
+        `v0.063`: on click, asks the browser for the visitor's current
+        location (`navigator.geolocation.getCurrentPosition`) and, once
+        the browser's own permission prompt resolves, writes a plain
+        `{"lat": ..., "lng": ...}` object into `State(name)`.
+
+            State("here", None)
+            Button("Find me", on_click=Action.geolocate("here"))
+            Text(Bind("here"))
+
+        Unlike every other action, this one is asynchronous: the write
+        happens some time after the click, not before this dispatch
+        returns -- see `arklight/backend/js/actions/geolocate.py` for
+        why that's safe with the existing "fire and forget" dispatcher.
+        If geolocation isn't available (unsupported browser, insecure
+        context, permission denied), `name`'s value is simply never
+        updated and a small notice is shown -- never a thrown error.
+        """
+        return ActionRef(action="geolocate", state=name, args={})
 
 
 # ---------------------------------------------------------------------------
@@ -2134,5 +2185,21 @@ __all__ = [
     "Watch",
     "Derive",
     "DerivationRef",
+    # `vdom-7`/`v0.062` (docs/Backends/REFACTOR-INDEX.md row 15): these
+    # were defined in this module but missing from `__all__` --
+    # reachable via `arklight.api.Repeat` etc., but not via `from
+    # arklight.api import *`, the same gap `test_package_exports.py`
+    # already found and fixed once for the v0.003 second vocabulary
+    # addendum. `arklight/__init__.py` re-exports all of these too, so
+    # `from arklight import *` (the documented way users are told to
+    # import everything) reaches them as well.
+    "Repeat",
+    "RepeatItem",
+    "Show",
+    "Predicate",
+    "PredicateRef",
+    "ItemIndexRef",
+    "ClassBindSpec",
+    "ModelBindSpec",
     "ARKNode",
 ]
