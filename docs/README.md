@@ -69,6 +69,18 @@ folder's own README for the full rationale. Removed or graduated
 | --- | --- |
 | [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](<Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md>) | Proposal for the client-side JS vocabulary: trivial gaps, small new primitives, an exhaustive scalar derivation/predicate catalog, and the larger client-side-fetch-sized gaps still open. |
 
+### [`docs/Implementation/`](Implementation/README.md) — accepted, staged
+
+Staged, rung-by-rung implementation ladders for proposals a maintainer
+has already accepted -- turning "should we?" into "here's the landing
+order." Sits between `docs/Proposals/`'s *unsettled* and
+`docs/Foundational/`'s *settled and shipped*. See the folder's own
+README for the full rationale.
+
+| File | Covers |
+| --- | --- |
+| [`JS-VOCABULARY-ADDENDUM-v0.070.md`](Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md) | Staged, ten-rung (`v0.061`-`v0.070`) implementation ladder for the philosophy-compliant parts of `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`. |
+
 ### [`docs/new js backend proposal/`](<new js backend proposal/README.md>) — working reference
 
 Competing proposals under consideration for a redesigned JS backend.
