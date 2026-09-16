@@ -1,7 +1,7 @@
 # JS Vocabulary Addendum: Staged Order, v0.061 -> v0.070
 
-**Status:** IN PROGRESS -- stages 1-2/10 (`v0.061`, `v0.062`) have
-shipped; stages 3-10 remain PLANNED. This file turns
+**Status:** IN PROGRESS -- stages 1-3/10 (`v0.061`-`v0.063`) have
+shipped; stages 4-10 remain PLANNED. This file turns
 the accepted, philosophy-compliant part of
 [`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](../Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md)
 into a trackable, ten-rung landing order, the same role
@@ -9,6 +9,16 @@ into a trackable, ten-rung landing order, the same role
 Android backend's staging list. It does not restate that proposal's
 reasoning; it exists to turn "here's a catalog" into "here's the
 order it ships in and why."
+
+**Two other, independently accepted proposals share slots in this
+range rather than getting their own:** `v0.064` also carries
+`arklight search --retrieve-doc` (see
+[`SEARCH-RETRIEVE-DOC-ADDENDUM.md`](SEARCH-RETRIEVE-DOC-ADDENDUM.md)),
+and `v0.065`-`v0.070` also carry `Provider`'s six-rung ladder (see
+[`PROVIDER-SDK-ADDENDUM.md`](PROVIDER-SDK-ADDENDUM.md)). Neither
+changes this ladder's own scope or ordering below -- they're
+unrelated work that happens to land in the same milestone slots, the
+same precedent `v0.041` already set.
 
 ## Scope filter: what's in this ladder, and what isn't
 
@@ -175,8 +185,8 @@ needing sign-off before they ship as written:
 | Stage | Covers | Status |
 | --- | --- | --- |
 | v0.061 | Math siblings (`subtract`/`divide`/`min`/`max`) | SHIPPED |
-| v0.062 | String-casing sibling + comparison predicates | PLANNED |
-| v0.063 | Small new runtime primitives | PLANNED |
+| v0.062 | String-casing sibling + comparison predicates | SHIPPED |
+| v0.063 | Small new runtime primitives | SHIPPED |
 | v0.064 | Math derivations catalog | PLANNED |
 | v0.065 | String derivations catalog | PLANNED |
 | v0.066 | Predicates catalog | PLANNED |

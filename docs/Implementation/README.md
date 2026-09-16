@@ -59,6 +59,8 @@ out which.
 | --- | --- |
 | [`JS-VOCABULARY-ADDENDUM-v0.070.md`](JS-VOCABULARY-ADDENDUM-v0.070.md) | Staged, ten-rung (`v0.061`-`v0.070`) implementation ladder for the philosophy-compliant parts of `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` (Tier 1, Tier 2, and the exhaustive §6 scalar catalog) -- easiest additions first, the two entries needing an explicit design exception last. |
 | [`PROJECT-KNOWLEDGE-ADDENDUM.md`](PROJECT-KNOWLEDGE-ADDENDUM.md) | Staged, eight-rung (`v0.071`-`v0.078`) implementation ladder for the accepted `docs/Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md` -- `.arklight/` directory foundation first, future-provider open slot last. Follows the proposal's own §19 \"Suggested order\" exactly, one version per stage. |
+| [`SEARCH-RETRIEVE-DOC-ADDENDUM.md`](SEARCH-RETRIEVE-DOC-ADDENDUM.md) | Single-version (`v0.064`) implementation entry for the accepted `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md` -- `arklight search --retrieve-doc`, a doc-tree retrieval mode on the existing `search` subcommand, sharing `v0.064` with JS vocabulary addendum stage 4. |
+| [`PROVIDER-SDK-ADDENDUM.md`](PROVIDER-SDK-ADDENDUM.md) | Staged, six-rung (`v0.065`-`v0.070`) implementation ladder for the accepted `docs/Proposals/PROVIDER-SDK-PROPOSAL.md` -- contract + experimental gating first, capability-enum finalization last -- interleaved one stage per version alongside JS vocabulary addendum stages 5-10. |
 
 ## Contributing
 
