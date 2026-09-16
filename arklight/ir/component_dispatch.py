@@ -100,6 +100,15 @@ def _render_backend_override(
             f"must return an ARKNode, got {type(rendered).__name__!r}."
         )
 
+    # `expand_node` is called bare here -- no `hoisted`/`counter` (v0.060,
+    # Stage 4) -- because there is no page-level accumulator to hoist a
+    # component-owned `State(...)` onto at this point in the pipeline
+    # (`WebsiteIR` already exists; see `_render_backend_override`'s own
+    # caller). A backend override subtree that itself calls a `state=`-
+    # declaring component raises `ComponentError` here, same as any
+    # other bare `expand_node()` call would -- not supported yet, see
+    # `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s
+    # Stage 4 "explicitly out of scope" note.
     rendered = expand_node(rendered)
     spec = COMPONENT_REGISTRY.get(component_name)
     if spec is not None and spec.default_style:

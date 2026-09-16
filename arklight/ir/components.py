@@ -59,14 +59,38 @@ which this module has no dependency on (component expansion runs once,
 backend-agnostically, in `arklight.compiler.pipeline.compile_site_file`;
 per-backend resolution runs once per backend, in `arklight.compiler.
 pipeline.build`, well after this module's job is done).
+
+Stage 4 (see the implementation doc's Stage 4 row) gives a component
+its own, instance-scoped reactive state: `component(..., state={...})`
+declares one or more local state names (`ComponentState`) a component's
+own render function can `Bind(...)`/`Action.*(...)`/`bind_class=`/
+`bind_value=` against exactly like a page-level `State(...)`. Because
+`IRPage.state` (`arklight.ir.build`) is only ever extracted from a
+`Page(...)` node's *direct* children, and a component's rendered
+subtree can land arbitrarily deep inside the tree, this module does two
+things per component *instance* (not per component -- two calls to the
+same state-owning component are two independent instances) at
+expansion time, in `_render_once`: hoists a real, uniquely-namespaced
+`State(...)` node for each declared local name onto a page-scoped
+accumulator (`_hoist_component_state`), then rewrites that instance's
+own rendered subtree so every reference to a local state name points
+at its hoisted, namespaced key instead (`_rewrite_component_state_refs`).
+`expand_ark_ast` splices each page's accumulated hoisted `State(...)`
+nodes onto that page's own direct children once the whole page finishes
+expanding. By the time Normalization/Validation run, a component
+instance's own state is indistinguishable from a page-level
+`State(...)` -- zero changes required anywhere downstream, the same
+"Option A macro expansion" property every earlier stage already
+preserved.
 """
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
-from arklight.ast.nodes import ARKNode
+from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec
 
 # A component render function: takes resolved keyword props, returns
 # the ARKNode subtree (built entirely out of other components -- built-in
@@ -104,6 +128,19 @@ MAX_COMPONENT_EXPANSION_DEPTH = 64
 # clears `component_origin` (with or without a matching override) well
 # before a backend ever walks the tree looking for attributes to emit.
 COMPONENT_ORIGIN_PROP_KEY = "__arklight_component_origin__"
+
+# v0.060, Stage 4 ("Component-owned state" -- see
+# docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md). The
+# namespaced key format a `state=`-declaring component's local state
+# names are rewritten into -- see `_namespaced_state_name`. Prefixed
+# the same way `COMPONENT_ORIGIN_PROP_KEY` is (an internal, dunder-
+# wrapped name no hand-written `State(...)`/`Bind(...)` call would
+# plausibly collide with), and includes both the component's own name
+# and a per-page instance counter so two call sites of the same
+# component -- or two different components that both happen to declare
+# a local state name like `"count"` -- never collide once hoisted onto
+# the same page (see `expand_ark_ast`).
+_COMPONENT_STATE_NAME_PREFIX = "__arklight_component_state__"
 
 
 class ComponentError(RuntimeError):
@@ -145,6 +182,41 @@ class Prop:
 
 
 @dataclass(frozen=True)
+class ComponentState:
+    """
+    One entry in a component's `state={...}` declaration -- v0.060,
+    Stage 4 ("Component-owned state", see
+    docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
+
+        @component(state={"open": ComponentState(False)})
+        def Accordion(label=""):
+            return Container(
+                Button(label, on_click=Action.toggle_bool("open")),
+                Show(Predicate.truthy("open"), Container(...)),
+            )
+
+    Mirrors `State(...)`'s own two knobs: `initial` is the value a
+    *fresh instance* of this component's local state starts at (every
+    call site gets its own independent copy, never a value shared
+    across instances -- see `_namespaced_state_name`); `persist`
+    mirrors `State(..., persist=True)`, opting that one instance's key
+    into `localStorage` under its own instance-namespaced key,
+    independent of any other instance of the same component.
+
+    A bare initial value (`state={"open": False}`) is accepted too --
+    `arklight.api._validate_component_state` normalizes it into
+    `ComponentState(initial=False)` at registration time. This
+    dataclass only needs to be spelled out explicitly when a component
+    wants `persist=True`, the same "usually just the bare value,
+    sometimes a small structured object" ergonomics `Prop` already has
+    for `type=`.
+    """
+
+    initial: Any = None
+    persist: bool = False
+
+
+@dataclass(frozen=True)
 class ComponentSpec:
     """Everything the expansion pass needs to know about one registered
     user component. Built by `component(...)`/`register_component(...)`,
@@ -177,6 +249,16 @@ class ComponentSpec:
     # in -- both behave exactly as Stage 0-2 already do (see
     # `_render_once`).
     backend_render_fns: dict[str, RenderFn] = field(default_factory=dict)
+    # v0.060, Stage 4 ("Component-owned state" -- see
+    # docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
+    # `local_name -> ComponentState`, registered at `component(...,
+    # state={...})` time and validated by `arklight.api.component` the
+    # same way `default_style` already is. Empty for every component
+    # before Stage 4, and for any component that never declares its
+    # own state -- both behave exactly as Stage 0-3 already do (see
+    # `_render_once`, which only does any extra work here when this is
+    # non-empty).
+    state: dict[str, ComponentState] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.mode not in _VALID_MODES:
@@ -218,6 +300,7 @@ def register_component(
     props: dict[str, Prop] | None = None,
     mode: str = "macro",
     default_style: dict[str, str] | None = None,
+    state: dict[str, ComponentState] | None = None,
 ) -> ComponentSpec:
     """
     Register `render_fn` under `name`. Re-registering an existing name
@@ -231,7 +314,9 @@ def register_component(
     it doesn't re-check CSS syntax itself, same division of labor
     `props`/`mode` already have between `arklight.api.component` (the
     user-facing, validating entry point) and this lower-level registry
-    function.
+    function. `state` (v0.060, Stage 4) is the same story: expected
+    already-normalized into `{local_name: ComponentState}` by
+    `arklight.api._validate_component_state`, stored verbatim here.
     """
     spec = ComponentSpec(
         name=name,
@@ -239,6 +324,7 @@ def register_component(
         props=dict(props or {}),
         mode=mode,
         default_style=dict(default_style) if default_style else None,
+        state=dict(state) if state else {},
     )
     COMPONENT_REGISTRY[name] = spec
     return spec
@@ -405,7 +491,143 @@ def _tag_component_origin(rendered: Any, name: str, resolved_props: dict[str, An
     return replace(rendered, props=new_props)
 
 
-def _render_once(spec: ComponentSpec, resolved_props: dict[str, Any]) -> Any:
+def _namespaced_state_name(component_name: str, instance_id: int, local_name: str) -> str:
+    """
+    v0.060, Stage 4: the page-level `State(...)` name one component
+    instance's local state name (`local_name`, whatever the component's
+    own render function called it, e.g. `"open"`) is rewritten into --
+    unique per `(component_name, instance_id)` pair, so two call sites
+    of the same component (or two different components that both
+    happen to pick the same local name) never collide once hoisted
+    onto the same page. `instance_id` comes from a per-page counter
+    `expand_ark_ast` threads through expansion -- see that function's
+    own docstring.
+    """
+    return f"{_COMPONENT_STATE_NAME_PREFIX}{component_name}__{instance_id}__{local_name}"
+
+
+def _hoist_component_state(
+    spec: ComponentSpec, instance_id: int, hoisted: list[ARKNode]
+) -> dict[str, str]:
+    """
+    v0.060, Stage 4: for one instance of a `state=`-declaring
+    component, append a real `State(...)` `ARKNode` (in declaration
+    order) onto `hoisted` for every locally-declared name, under that
+    name's instance-namespaced key -- see `_namespaced_state_name`.
+    `hoisted` is a page-scoped, mutable accumulator `expand_ark_ast`
+    splices onto the owning page's own direct children once expansion
+    of that whole page finishes, the same "declared where the design
+    doc says state belongs -- directly on `Page(...)`" place a
+    hand-written `State(...)` call already occupies (`_extract_page_state`
+    only ever looks at a Page node's *direct* children).
+
+    Returns the `{local_name: namespaced_name}` map
+    `_rewrite_component_state_refs` needs to retarget this instance's
+    own `Bind(...)`/`Action.*(...)`/`bind_class=`/`bind_value=`
+    references onto the state this just hoisted, so that by the time
+    Normalization/Validation run, this instance's component-owned
+    state is indistinguishable from a page-level `State(...)` --
+    because it now *is* one.
+    """
+    name_map: dict[str, str] = {}
+    for local_name, comp_state in spec.state.items():
+        namespaced = _namespaced_state_name(spec.name, instance_id, local_name)
+        name_map[local_name] = namespaced
+        hoisted.append(
+            ARKNode(
+                type="State",
+                props={
+                    "name": namespaced,
+                    "initial": comp_state.initial,
+                    "persist": comp_state.persist,
+                },
+                children=[],
+            )
+        )
+    return name_map
+
+
+def _rewrite_component_state_refs(value: Any, name_map: dict[str, str]) -> Any:
+    """
+    v0.060, Stage 4: recursively rewrite every reference to one of
+    `name_map`'s local component-state names -- a `Bind(name)` node, an
+    `on_click=Action.*(...)` (`ActionRef.state`), a
+    `bind_class=Bind.when(...)` (`ClassBindSpec.state`), or a
+    `bind_value=Bind.model(...)` (a plain string prop) -- into that
+    name's instance-namespaced page-state key. Runs once, on a
+    `state=`-declaring component's own freshly rendered subtree, before
+    Normalization/Validation ever see it (same pipeline position every
+    other expansion-time transform in this module already runs at) --
+    so every downstream check (`validate.py`'s Bind/Action/bind_class/
+    bind_value-against-declared-`State(...)` rules, the JS runtime's
+    own hydration blob) treats a component-owned state name exactly
+    like an ordinary page-level `State(...)`, with zero special-casing
+    anywhere past this point.
+
+    A name *not* in `name_map` (a prop value the caller passed in from
+    the page's own `State(...)`, e.g. `Card(count_state=Bind("total"))`
+    -- see the module docstring's "consume `Bind(...)`/`ActionRef`
+    values passed in as props" carve-out `user-defined-components.md`
+    Section 4 already established as in-scope before this stage even
+    existed) is left completely untouched; only a component's *own*
+    locally-declared state names are ever rewritten here.
+    """
+    if isinstance(value, list):
+        return [_rewrite_component_state_refs(item, name_map) for item in value]
+    if not isinstance(value, ARKNode):
+        return value
+
+    if value.type == "Bind":
+        name = value.props.get("name")
+        if name in name_map:
+            new_props = dict(value.props)
+            new_props["name"] = name_map[name]
+            return replace(value, props=new_props)
+        return value
+
+    new_props = value.props
+    props_changed = False
+
+    on_click = new_props.get("on_click")
+    if isinstance(on_click, ActionRef) and on_click.state in name_map:
+        if not props_changed:
+            new_props = dict(new_props)
+            props_changed = True
+        new_props["on_click"] = replace(on_click, state=name_map[on_click.state])
+
+    bind_class = new_props.get("bind_class")
+    if isinstance(bind_class, ClassBindSpec) and bind_class.state in name_map:
+        if not props_changed:
+            new_props = dict(new_props)
+            props_changed = True
+        new_props["bind_class"] = replace(bind_class, state=name_map[bind_class.state])
+
+    bind_value = new_props.get("bind_value")
+    if isinstance(bind_value, str) and bind_value in name_map:
+        if not props_changed:
+            new_props = dict(new_props)
+            props_changed = True
+        new_props["bind_value"] = name_map[bind_value]
+
+    new_children = [_rewrite_component_state_refs(c, name_map) for c in value.children]
+    children_changed = new_children != value.children
+
+    if not props_changed and not children_changed:
+        return value
+    return replace(
+        value,
+        props=new_props if props_changed else value.props,
+        children=new_children if children_changed else value.children,
+    )
+
+
+def _render_once(
+    spec: ComponentSpec,
+    resolved_props: dict[str, Any],
+    *,
+    instance_id: int | None = None,
+    hoisted: list[ARKNode] | None = None,
+) -> Any:
     """
     The hybrid dispatch itself -- Option A vs. Option B, as an
     `if`/`elif` ladder over `spec.mode`, exactly as
@@ -414,6 +636,12 @@ def _render_once(spec: ComponentSpec, resolved_props: dict[str, Any]) -> Any:
     `expand_node` can keep expanding (an `ARKNode`, a string/number, a
     list of either, or `None`/`False`) -- the same shape
     `normalize_children` already accepts from any component call.
+
+    `instance_id`/`hoisted` (v0.060, Stage 4) are only ever consulted
+    when `spec.state` is non-empty -- see `expand_node`, the only real
+    caller, for how they're produced and threaded through. Every
+    component before Stage 4, and every Stage-4-aware component that
+    simply never declares `state=`, ignores both entirely.
     """
     if spec.mode == "macro":
         # Option A: plain, immediate call -- the marker is expanded
@@ -430,6 +658,22 @@ def _render_once(spec: ComponentSpec, resolved_props: dict[str, Any]) -> Any:
         rendered = spec.render_fn(**resolved_props)
     else:  # pragma: no cover -- unreachable, ComponentSpec.__post_init__ already validated this
         raise ComponentError(f"Component {spec.name!r}: unknown mode {spec.mode!r}.")
+
+    # Stage 4: only a `state=`-declaring component does any extra work
+    # here -- hoist one `State(...)` per locally-declared name (under
+    # this call's own `instance_id`), then retarget every reference to
+    # one of those local names inside `rendered` onto its hoisted,
+    # namespaced key. A component with no `state=` declared (every
+    # component before Stage 4, and most components after it too)
+    # skips this entirely -- `rendered` passes through unchanged.
+    if spec.state:
+        assert instance_id is not None and hoisted is not None, (
+            "expand_node is required to supply instance_id/hoisted for a "
+            "state=-declaring component; see expand_node's own ComponentError "
+            "for the caller-facing message when it can't."
+        )
+        name_map = _hoist_component_state(spec, instance_id, hoisted)
+        rendered = _rewrite_component_state_refs(rendered, name_map)
 
     # Stage 2: both branches above get the same default-class
     # treatment -- `default_style` isn't mode-specific, it's a
@@ -448,19 +692,34 @@ def _render_once(spec: ComponentSpec, resolved_props: dict[str, Any]) -> Any:
     return rendered
 
 
-def expand_child(value: Any, stack: tuple[str, ...], used: set[str] | None = None) -> Any:
+def expand_child(
+    value: Any,
+    stack: tuple[str, ...],
+    used: set[str] | None = None,
+    hoisted: list[ARKNode] | None = None,
+    counter: "itertools.count[int] | None" = None,
+) -> Any:
     """Expand one child position -- an `ARKNode`, a nested list, or a
     plain value passed through unchanged (mirrors
     `arklight.ir.normalize.normalize_children`'s own recursive shape,
-    since this pass runs one stage earlier over the same kind of tree)."""
+    since this pass runs one stage earlier over the same kind of tree).
+
+    `hoisted`/`counter` (v0.060, Stage 4) are threaded straight through
+    to `expand_node` unchanged -- see that function's own docstring."""
     if isinstance(value, ARKNode):
-        return expand_node(value, stack, used)
+        return expand_node(value, stack, used, hoisted, counter)
     if isinstance(value, list):
-        return [expand_child(item, stack, used) for item in value]
+        return [expand_child(item, stack, used, hoisted, counter) for item in value]
     return value
 
 
-def expand_node(node: ARKNode, stack: tuple[str, ...] = (), used: set[str] | None = None) -> Any:
+def expand_node(
+    node: ARKNode,
+    stack: tuple[str, ...] = (),
+    used: set[str] | None = None,
+    hoisted: list[ARKNode] | None = None,
+    counter: "itertools.count[int] | None" = None,
+) -> Any:
     """
     Expand `node` and everything beneath it. If `node.type` names a
     registered component, its marker is replaced by its rendered
@@ -478,10 +737,37 @@ def expand_node(node: ARKNode, stack: tuple[str, ...] = (), used: set[str] | Non
     keeps every pre-Stage-2 call site -- including direct test calls to
     this function -- unaffected; expansion behaves identically either
     way, this only controls whether usage is recorded anywhere.
+
+    `hoisted`/`counter` (v0.060, Stage 4) exist for exactly one reason:
+    a `state=`-declaring component. `counter` (an `itertools.count()`,
+    fresh per page -- see `expand_ark_ast`) hands out this call's
+    unique `instance_id`; `hoisted` is where this call's own
+    `State(...)` node(s) get appended (see `_hoist_component_state`),
+    to later be spliced onto the *page's* own direct children once
+    that whole page finishes expanding -- a component's rendered
+    subtree can land arbitrarily deep inside the tree, but `State(...)`
+    is only ever meaningful as a direct child of `Page(...)`
+    (`_extract_page_state` only ever looks there). Both default to
+    `None`: a component that never declares `state=` never touches
+    either, so every pre-Stage-4 call site here -- including direct
+    test calls to this function with no `hoisted=`/`counter=` at all --
+    is completely unaffected. Calling `expand_node`/`expand_child`
+    directly (skipping `expand_ark_ast`) on a tree that *does* contain
+    a `state=`-declaring component's call site without supplying both
+    raises `ComponentError` below, rather than silently dropping that
+    component's state -- this is what happens today, for instance, if
+    a `mode="registry"` backend override (`arklight.ir.
+    component_dispatch`, which calls `expand_node(rendered)` bare) uses
+    a state-owning component: not supported yet, see this module's own
+    docstring and `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s
+    Stage 4 "explicitly out of scope" note.
     """
     spec = COMPONENT_REGISTRY.get(node.type)
     if spec is None:
-        return replace(node, children=[expand_child(c, stack, used) for c in node.children])
+        return replace(
+            node,
+            children=[expand_child(c, stack, used, hoisted, counter) for c in node.children],
+        )
 
     if node.type in stack:
         chain = " -> ".join((*stack, node.type))
@@ -500,8 +786,24 @@ def expand_node(node: ARKNode, stack: tuple[str, ...] = (), used: set[str] | Non
         used.add(node.type)
 
     resolved_props = _resolve_props(spec, node.props)
-    rendered = _render_once(spec, resolved_props)
-    return expand_child(rendered, (*stack, node.type), used)
+
+    instance_id: int | None = None
+    if spec.state:
+        if hoisted is None or counter is None:
+            raise ComponentError(
+                f"Component {spec.name!r} declares its own state "
+                f"(state={{...}}) but is being expanded somewhere that can't "
+                "hoist that state onto a page -- either a bare expand_node()/"
+                "expand_child() call outside expand_ark_ast(...), or a "
+                "mode=\"registry\" backend override's own rendered subtree "
+                "(v0.060 Stage 3). A state-owning component used inside a "
+                "backend override is not supported yet; use expand_ark_ast(...) "
+                "for a normal page build."
+            )
+        instance_id = next(counter)
+
+    rendered = _render_once(spec, resolved_props, instance_id=instance_id, hoisted=hoisted)
+    return expand_child(rendered, (*stack, node.type), used, hoisted, counter)
 
 
 def expand_ark_ast(
@@ -520,8 +822,34 @@ def expand_ark_ast(
     `expand_node`'s own docstring. Defaults to `None`, so this
     function's return value and side effects on `pages` are unchanged
     from Stage 0/1; passing a set is purely additive.
+
+    v0.060, Stage 4: this is the one expansion entry point that can
+    actually finish a `state=`-declaring component's trip onto the
+    page. Each page gets its own fresh `hoisted` accumulator and
+    `instance_id` counter (an `itertools.count()`, so instance ids are
+    unique *within* a page -- there's no need for cross-page
+    uniqueness, since each page's own `IRPage.state` is independent).
+    After a page's tree finishes expanding, every `State(...)` node
+    `hoisted` collected along the way (declaration order, i.e. the
+    order component instances were encountered depth-first) is
+    appended onto that page's own direct children -- the exact place
+    `_extract_page_state` (`arklight.ir.build`) looks for `State(...)`,
+    so by the time Normalization/Validation run, a component instance's
+    own state is a completely ordinary page-level `State(...)`, with
+    zero special-casing anywhere downstream of this function. A page
+    that never uses a `state=`-declaring component gets an empty
+    `hoisted` list and its children are left byte-for-byte as
+    `expand_node` already produced them -- unchanged from Stage 0-3.
     """
-    return {route: expand_node(page, used=used) for route, page in pages.items()}
+    result: dict[str, ARKNode] = {}
+    for route, page in pages.items():
+        hoisted: list[ARKNode] = []
+        counter = itertools.count()
+        expanded = expand_node(page, used=used, hoisted=hoisted, counter=counter)
+        if hoisted:
+            expanded = replace(expanded, children=[*expanded.children, *hoisted])
+        result[route] = expanded
+    return result
 
 
 def collect_default_styles(used: set[str]) -> dict[str, dict[str, str]]:

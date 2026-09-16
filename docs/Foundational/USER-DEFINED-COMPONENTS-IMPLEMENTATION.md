@@ -1,6 +1,6 @@
 # User-Defined Components Implementation: Staged Order
 
-Status: **Stages 0-3 done**, Stage 4 not started. This file does not
+Status: **Stages 0-4 done**. This file does not
 restate the design already written in
 [`docs/Foundational/user-defined-components.md`](./user-defined-components.md)
 -- it exists only to turn that design's Option A / Option B discussion
@@ -98,7 +98,7 @@ component's own shared `render_fn` always was.
 | 1 | Typo diagnostics | Extend `arklight/search/feedback.py`'s `parse_undefined_component_name` path so a typo'd call to a *registered user* component gets the same "did you mean...?" treatment a typo'd `Headign(...)` already gets -- today a typo'd user-component call is just a plain Python `NameError` with no ARKlight-specific help, since it was never in the closed built-in vocabulary `arklight search` already knows. | Stage 0 | **Done** -- `tests/test_user_defined_components_stage1.py` |
 | 2 | Default styling hook | An optional default `Site.style(...)` block attached at `component(..., default_style={...})` registration time, expanded into the site's CSS output the same way built-in defaults are -- lets a user component ship with sane default styling instead of forcing every caller to pass `class_name=`. | Stage 0 | **Done** -- `tests/test_user_defined_components_stage2.py` |
 | 3 | Option B's real differentiator: per-backend render dispatch | The actual "registry-based late binding" `user-defined-components.md` describes: a `mode="registry"` component's identity survives expansion far enough that the HTML backend, and eventually Android/Desktop, can each supply their own render function for the same component name, falling back to a shared default when a backend doesn't define one. This is the stage that makes Option B a real alternative outcome instead of the earlier same-as-Option-A placeholder. | Stage 0 (the `mode=` selector already exists to build on) | **Done** -- `tests/test_user_defined_components_stage3.py` |
-| 4 | Component-owned state | Explicitly **out of scope** until `v0.054`'s reactive-core IR semantics have something for it to hook into (`user-defined-components.md` Section 4 already calls this out as its own, later milestone -- listed here only so this ladder doesn't silently drop it). A component today may *consume* `Bind(...)`/`ActionRef` values passed in as props from a page that already declares `State(...)`, exactly like `Container`/`Button` already do -- it just can't declare new state of its own yet. | `v0.054` (already DONE) + Stages 0-3 | Not started |
+| 4 | Component-owned state | `component(..., state={...})`: a `ComponentState(initial=..., persist=False)` per locally-declared name (or a bare initial value, normalized the same way). A component's render function references a declared name exactly like a page-level `State(...)` -- `Bind(...)`/`on_click=Action.*(...)`/`bind_class=Bind.when(...)`/`bind_value=Bind.model(...)` -- and each call site gets its own independent, uniquely-namespaced copy (`arklight/ir/components.py`'s `_hoist_component_state`/`_rewrite_component_state_refs`, threaded through `expand_node`/`expand_child`/`expand_ark_ast` via new `hoisted`/`counter` parameters). A component may still *consume* `Bind(...)`/`ActionRef` values passed in as props from a page that already declares `State(...)`, exactly like `Container`/`Button` already do -- both are supported, independently. | `v0.054` (already DONE) + Stages 0-3 | **Done** -- `tests/test_user_defined_components_stage4.py` |
 
 Each rung is independently useful and additive, same "later stages
 extend one branch instead of retrofitting a mode switch that was never
@@ -441,3 +441,124 @@ likely works, since `resolve_backend_dispatch` is a plain recursive
 tree walk with no special-casing of any node type, but "likely works"
 and "covered" are different claims, and only the latter is being made
 here).
+
+## Stage 4 implementation notes
+
+Decisions made while landing component-owned state that weren't
+already pinned down by `user-defined-components.md` Section 4 (which
+only ever committed to *not* building this in `v0.060` proper -- see
+that section's own "reasonable `v0.061`-or-later extension" framing):
+
+- **Instance-scoped, not component-scoped.** `component(...,
+  state={...})` declares *local* state names a component's own render
+  function can reference -- but every call site (every "instance") of
+  a state-owning component gets its own independent copy. Two
+  `Counter()` calls on the same page never share one `"count"` value.
+  This is the "props flowing into a closed-registry reactive system,
+  re-render scoping" difficulty `user-defined-components.md` Section 4
+  named as the reason this was deferred -- solved by never actually
+  giving the *registry* (`COMPONENT_REGISTRY`, still a plain
+  process-global dict, unchanged) any state of its own at all. State
+  lives exactly where it already did before this stage: on the page,
+  as an ordinary `IRPage.state` entry -- see the next point.
+- **A component's own state is real, page-level `State(...)` by the
+  time Normalization ever sees it -- not a new IR concept.** This is
+  the same "Option A macro expansion" property every earlier stage
+  preserved: rather than teaching `arklight.ir.build`/`validate.py`/
+  the JS runtime a *second* kind of reactive state that happens to be
+  scoped to a component instance, `_render_once` hoists an ordinary
+  `State(...)` `ARKNode` onto the owning page's own direct children
+  (`_hoist_component_state`) and rewrites that instance's own rendered
+  subtree to reference it by its hoisted name
+  (`_rewrite_component_state_refs`) -- see `arklight/ir/components.py`'s
+  own module docstring for the full trip. Zero changes to
+  `arklight/ir/validate.py`, `arklight/ir/build.py`, or any backend;
+  the "zero changes required downstream" property Option A promised in
+  Stage 0 held again here, for the same reason it held for Stage 0-3.
+- **Namespacing, not a schema change, is what keeps instances apart.**
+  A local name like `"count"` is rewritten to
+  `__arklight_component_state__<ComponentName>__<instance_id>__count`
+  (`_namespaced_state_name`) -- `instance_id` comes from a per-page
+  `itertools.count()` `expand_ark_ast` creates fresh for each page and
+  threads through `expand_node`/`expand_child` as a new `counter`
+  parameter (alongside a new `hoisted` parameter, the page-scoped
+  accumulator the hoisted `State(...)` nodes themselves land in until
+  the whole page finishes expanding). Both default to `None` and are
+  only ever consulted when a component's own `ComponentSpec.state` is
+  non-empty -- a component that never declares `state=` doesn't
+  allocate an instance id, doesn't touch `hoisted`, and produces
+  identical output to Stage 0-3, including for every direct
+  `expand_node(...)`/`expand_child(...)` test call across the earlier
+  stage test files that never passes `hoisted=`/`counter=` at all.
+- **Where hoisting has to land, and why it can't happen where the
+  component itself is.** `arklight.ir.build._extract_page_state` only
+  ever looks at a `Page(...)` node's *direct* children for
+  `State(...)` -- but a component's rendered subtree can (and usually
+  does) land arbitrarily deep inside the tree (e.g. `Container(Card(),
+  Card())`'s two `Card()` instances render several levels down). So
+  hoisting can't just leave the `State(...)` node next to the
+  component's own rendered root; it has to travel all the way up to
+  the page. `expand_ark_ast` is the one function positioned to do
+  that: it already holds the whole page's root node in hand after
+  `expand_node` returns, so it simply appends every `State(...)` node
+  `hoisted` accumulated during that page's expansion onto that page's
+  own children (`replace(expanded, children=[*expanded.children,
+  *hoisted])`) before moving to the next page. A page that never uses
+  a state-owning component gets an empty `hoisted` and is left
+  byte-for-byte as `expand_node` already produced it.
+- **Rewriting is narrow and explicit, not a generic tree-wide
+  find/replace.** `_rewrite_component_state_refs` only ever touches
+  four specific shapes -- a `Bind(name)` node's `name` prop, an
+  `on_click=Action.*(...)`'s `ActionRef.state`, a
+  `bind_class=Bind.when(...)`'s `ClassBindSpec.state`, and a
+  `bind_value=Bind.model(...)` (a bare string prop) -- and only when
+  the referenced name is one of *this* component's own declared local
+  names. A prop value the caller passed in from the page's own
+  `State(...)` (e.g. `Card(count_state=Bind("total"))`, the
+  `user-defined-components.md` Section 4 "consume `Bind(...)`/
+  `ActionRef` values passed in as props" carve-out that was already
+  in-scope before this stage existed) is left completely untouched --
+  it isn't one of the component's own local names, so it never matches
+  `name_map`.
+- **A state-owning component used where there's no page to hoist
+  onto raises `ComponentError`, rather than silently dropping its
+  state.** Two places call `expand_node`/`expand_child` outside
+  `expand_ark_ast`'s own per-page loop: a bare test call with no
+  `hoisted=`/`counter=`, and `arklight.ir.component_dispatch`'s
+  `_render_backend_override` (Stage 3's own `mode="registry"` backend
+  override path, which calls `expand_node(rendered)` with neither,
+  since `WebsiteIR` already exists by that point and there's no
+  page-level accumulator left to hoist onto). Both raise the same
+  clear `ComponentError` today rather than quietly producing a
+  `Bind(...)`/`Action.*(...)` reference to a `State(...)` that was
+  never actually declared anywhere (which `validate.py` would then
+  reject with a much less specific message, several stages later).
+- **`Computed(...)`/`Watch(...)` are not part of this stage.** A
+  component can declare its own `State(...)`-equivalent via `state=`,
+  but not its own `Computed(...)` or `Watch(...)` -- `_hoist_component_
+  state` only ever emits `State(...)` nodes. A component's render
+  function can still read a page-level `Computed(...)`/react to a
+  page-level `Watch(...)` passed in as an ordinary prop, exactly as it
+  could before this stage; it just can't *declare* either one as its
+  own. Listed here as a known, deliberate scope line (the same
+  "independently useful and additive" shape every earlier stage's own
+  scope line took), not a bug.
+
+## Explicitly out of scope for Stage 4
+
+Component-owned state inside a `mode="registry"` component's own
+per-backend override subtree (Stage 3) -- `_render_backend_override`
+calls `expand_node(rendered)` bare, with no page-level `hoisted`
+accumulator available at that point in the pipeline, so a backend
+override that itself calls a state-owning component raises
+`ComponentError` today rather than being supported. Also out of scope,
+for the same "no dependency graph to hoist onto or interact with yet"
+reason: a state-owning component's local `state=` interacting with
+`Computed(...)`/`Watch(...)` (see the implementation note above), and
+any interaction between a state-owning component and `Repeat(...)`'s
+per-item template (a component with `state=` used *inside* a
+`Repeat(...)` template has not been exercised by this stage's own
+tests -- the same "likely works, since expansion has no
+special-casing for it, but 'likely works' and 'covered' are different
+claims" gap Stage 3 already named for its own backend-dispatch path,
+extended here to Stage 4's hoisting path specifically).

@@ -184,11 +184,11 @@ backend doesn't (Desktop's design is still pending, not complete), so
 it moves ahead in sequence. Scope is unchanged for both; only order
 moved. v0.054 (JS backend expansion) has since shipped in full --
 all 8 vdom-staging stages feeding it are DONE; v0.060
-(user-defined components -- Stage 0 of
+(user-defined components --
 `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s staged
-ladder now done, IN PROGRESS overall), v0.080 (Android), and v0.100
-(Desktop) are designed (Desktop excepted -- design pending) but full
-implementation is still in progress or deferred. Alternate backends (Vue, Svelte) remain moved to unscheduled
+ladder now DONE in full, Stages 0-4), v0.080 (Android), and v0.100
+(Desktop) are designed (Desktop excepted -- design pending); v0.080/
+v0.100 implementation is still in progress or deferred. Alternate backends (Vue, Svelte) remain moved to unscheduled
 future work, pending further development of the IR and state/event
 semantics.
 

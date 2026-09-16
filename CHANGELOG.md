@@ -5,6 +5,80 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- User-defined components, Stage 4 (component-owned state, final stage)
+
+**What:** `component(..., state={...})` (`arklight/api.py`) lets a
+component declare its own local, instance-scoped reactive state --
+`ComponentState(initial=..., persist=False)` per name (or a bare
+initial value, normalized the same way `State(name, initial)`'s own
+two-positional-arg ergonomics already work). A component's render
+function references a declared name exactly like a page-level
+`State(...)`: `Bind(...)`, `on_click=Action.*(...)`,
+`bind_class=Bind.when(...)`, `bind_value=Bind.model(...)` all work
+unchanged. Every call site gets its own independent copy -- two
+`Counter()` calls on the same page never share one `"count"` value --
+solving the "props flowing into a closed-registry reactive system,
+re-render scoping" difficulty `docs/Foundational/
+user-defined-components.md` Section 4 named as the reason this was
+deferred out of `v0.060` proper, by never giving the registry itself
+any state: a component's own state is real, page-level `State(...)`
+by the time Normalization ever runs, hoisted onto its owning page
+under a uniquely-namespaced key per instance. This is the fourth and
+final stage of the `v0.060` "User-defined, reusable components"
+milestone -- see `docs/Foundational/
+USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage 4 row and its own
+"Stage 4 implementation notes"/"Explicitly out of scope for Stage 4"
+sections for the full design (notably: not yet supported inside a
+`mode="registry"` backend override's own subtree, and untested against
+`Repeat(...)`'s per-item template).
+
+**Implementation:** `arklight/ir/components.py` -- `ComponentState`
+(`initial`/`persist`), `ComponentSpec.state`, `_namespaced_state_name`,
+`_hoist_component_state`, `_rewrite_component_state_refs`;
+`_render_once` gains `instance_id`/`hoisted` keyword-only parameters,
+consulted only when `spec.state` is non-empty. `expand_node`/
+`expand_child`/`expand_ark_ast` gain new `hoisted: list[ARKNode] |
+None`/`counter: itertools.count | None` parameters, both defaulting to
+`None` and threaded straight through recursion; `expand_ark_ast`
+creates a fresh `hoisted` list and `itertools.count()` per page, and
+splices `hoisted`'s accumulated `State(...)` nodes onto that page's own
+direct children once the whole page finishes expanding (the one place
+`arklight.ir.build._extract_page_state` looks for them). A component
+that never declares `state=` -- every component before this stage, and
+most after it -- allocates no instance id, touches neither new
+parameter, and produces byte-identical output to Stage 0-3, including
+for every pre-existing bare `expand_node(...)` test call across the
+Stage 0-3 test files that passes neither. `arklight/api.py` --
+`component(...)` gains a `state=` keyword, `_validate_component_state`
+(mirrors `_validate_component_default_style`'s validate-at-registration-
+time contract). `arklight/__init__.py` -- re-exports `ComponentState`
+alongside `component`/`Prop`. `arklight/ir/component_dispatch.py` --
+comment only, clarifying why its own bare `expand_node(rendered)` call
+now raises `ComponentError` for a state-owning component used inside a
+backend override (no page-level `hoisted` accumulator exists at that
+point in the pipeline). No changes to `arklight/ir/validate.py`,
+`arklight/ir/build.py`, `arklight/ir/normalize.py`, or any backend --
+a component's hoisted state is indistinguishable from a hand-written
+page-level `State(...)` by the time any of them run.
+
+**Tests:** `tests/test_user_defined_components_stage4.py` (18 tests,
+new) -- registration/validation (`state=` accepts a bare value or an
+explicit `ComponentState`, rejects an empty dict or an empty name;
+`register_component` stores `state` directly), expansion (hoists one
+`State(...)` per declared name; rewrites `Bind`/`on_click`/`bind_class`/
+`bind_value` to the hoisted name; two instances of the same component
+get independent, non-colliding namespaced state; `persist` flows
+through; a prop value passed in from the page's own `State(...)` is
+left untouched; nested state-owning components both get hoisted; a
+bare `expand_node()` call with no hoisting context raises
+`ComponentError`; a non-stateful component is unaffected by a bare
+`expand_node()` call, matching Stage 0-3 behavior), and two end-to-end
+compiles through the full `compile_site_file`/`HTMLBackend` pipeline
+confirming a counter component's state actually reaches `IRPage.state`
+and renders a `data-ark-bind` attribute, and that two sibling instances
+produce two independent `IRPage.state` entries. Full suite: 1127
+passed, no regressions (1109 before this stage + 18 new).
+
 ## [Unreleased] -- User-defined components, Stage 3 (per-backend render dispatch)
 
 **What:** `mode="registry"` components (Option B) get their actual

@@ -293,6 +293,7 @@ NoScript = node("NoScript")
 # ---------------------------------------------------------------------------
 
 from arklight.ir.components import (  # noqa: E402
+    ComponentState,
     Prop,
     register_backend_render,
     register_component,
@@ -304,6 +305,7 @@ def component(
     props: dict[str, Prop] | None = None,
     mode: str = "macro",
     default_style: dict[str, str] | None = None,
+    state: dict[str, Any] | None = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., ARKNode]]:
     """
     Decorator that registers a render function as a named, reusable
@@ -352,6 +354,27 @@ def component(
     never sets `default_style` behaves exactly as it did in Stage 0/1:
     no class is added, nothing is emitted for it, `class_name=` (if the
     render function sets one itself) is left completely alone.
+
+    `state`, if given (v0.060, Stage 4 -- see
+    `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`),
+    declares this component's own local, instance-scoped reactive
+    state: `{local_name: initial_value}` (the common case, mirroring
+    `State("name", initial)`'s own ergonomics), or
+    `{local_name: ComponentState(initial=..., persist=True)}` when an
+    instance needs `persist=True`. The render function references a
+    declared name exactly like a page-level `State(...)` -- `Bind(...)`,
+    `on_click=Action.*(...)`, `bind_class=Bind.when(...)`,
+    `bind_value=Bind.model(...)` -- and every call site gets its own
+    independent copy: two `Accordion(...)` calls on the same page never
+    share one `"open"` value. A component that never sets `state=`
+    behaves exactly as it did in Stage 0-3: it may still *consume*
+    `Bind(...)`/`ActionRef` values a caller passes in as ordinary props
+    from a page that already declares its own `State(...)`, exactly
+    like `Container`/`Button` already do -- it just can't declare new
+    state of its own. Not yet supported inside a `mode="registry"`
+    component's own per-backend override subtree (v0.060 Stage 3) --
+    see `arklight.ir.components.expand_node`'s docstring for the
+    `ComponentError` that use raises today.
     """
     def decorator(render_fn: Callable[..., Any]) -> Callable[..., ARKNode]:
         name = render_fn.__name__
@@ -360,8 +383,16 @@ def component(
             if default_style is not None
             else None
         )
+        validated_state = (
+            _validate_component_state(name, state) if state is not None else None
+        )
         register_component(
-            name, render_fn, props=props, mode=mode, default_style=validated_default_style
+            name,
+            render_fn,
+            props=props,
+            mode=mode,
+            default_style=validated_default_style,
+            state=validated_state,
         )
 
         def marker(**call_props: Any) -> ARKNode:
@@ -988,6 +1019,40 @@ def _validate_component_default_style(
             )
         _check_css_syntax(f"component {component_name!r}: default_style", prop, value)
         clean[prop] = value
+    return clean
+
+
+def _validate_component_state(
+    component_name: str, state: dict[str, Any]
+) -> dict[str, ComponentState]:
+    """
+    v0.060, Stage 4: validate/normalize `component(..., state={...})`.
+    Each entry is either a bare initial value (`{"open": False}` -- the
+    common case, mirroring `State("open", False)`'s own two-positional-
+    arg ergonomics) or an explicit `ComponentState(initial=False,
+    persist=True)` for the less-common `persist=True` case. Returns a
+    clean `{local_name: ComponentState}` dict (never the caller's own
+    dict by reference) -- same "validate/normalize once, at
+    registration time, so a mistake here is a clear error at import
+    time rather than a ComponentError three build stages later"
+    contract `_validate_component_default_style` already established
+    for `default_style`.
+    """
+    if not isinstance(state, dict) or not state:
+        raise ValueError(
+            f"component {component_name!r}: state needs a non-empty dict of "
+            f"{{local_name: initial_value}} (or {{local_name: "
+            f"ComponentState(initial=..., persist=True)}} for persist=True), "
+            f"got {state!r}."
+        )
+    clean: dict[str, ComponentState] = {}
+    for local_name, value in state.items():
+        if not isinstance(local_name, str) or not local_name:
+            raise ValueError(
+                f"component {component_name!r}: state has a non-string or "
+                f"empty local state name: {local_name!r}."
+            )
+        clean[local_name] = value if isinstance(value, ComponentState) else ComponentState(initial=value)
     return clean
 
 
