@@ -1,5 +1,9 @@
 # User-Defined, Reusable Components (v0.060)
 
+_Current as of **v0.063** (latest shipped milestone) — see
+[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table if this file's own
+status line below might have moved since it was last updated._
+
 Status: **shipped in full** (Stages 0-4). This is the one practical
 reference for using `component(...)` -- what it does, its full prop
 surface, and its scope boundaries. For *why* it's shaped this way (the
