@@ -22,6 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+import math
 import re
 
 from arklight import experimental
@@ -411,6 +412,32 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
         if op == "lte":
             return a <= b
         return False  # unreachable once Validation has run
+    if kind == "subtract":
+        values = [_coerce_number(get(name)) for name in names]
+        total = values[0]
+        for value in values[1:]:
+            total -= value
+        return total
+    if kind == "divide":
+        values = [_coerce_number(get(name)) for name in names]
+        total = values[0]
+        for value in values[1:]:
+            # Mirrors JavaScript's own `x / 0` semantics (`Infinity`/
+            # `-Infinity`/`NaN`, never a thrown error) rather than
+            # Python's `ZeroDivisionError` -- see
+            # `arklight/backend/js/derivations/divide.py`'s docstring.
+            if value == 0:
+                if total == 0:
+                    total = math.nan
+                else:
+                    total = math.copysign(math.inf, total) * math.copysign(1.0, value)
+            else:
+                total /= value
+        return total
+    if kind == "min":
+        return min(_coerce_number(get(name)) for name in names)
+    if kind == "max":
+        return max(_coerce_number(get(name)) for name in names)
     return None  # unreachable once Validation has run
 
 

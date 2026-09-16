@@ -20,7 +20,18 @@ same "only ship what's used" discipline `ACTION_FRAGMENTS`/
 
 from __future__ import annotations
 
-from arklight.backend.js.derivations import compare, count, format, join, multiply, sum
+from arklight.backend.js.derivations import (
+    compare,
+    count,
+    divide,
+    format,
+    join,
+    max as max_,
+    min as min_,
+    multiply,
+    subtract,
+    sum,
+)
 
 DERIVATION_MODULES = {
     sum.NAME: sum,
@@ -29,6 +40,10 @@ DERIVATION_MODULES = {
     count.NAME: count,
     format.NAME: format,
     compare.NAME: compare,
+    subtract.NAME: subtract,
+    divide.NAME: divide,
+    min_.NAME: min_,
+    max_.NAME: max_,
 }
 
 DERIVATION_FRAGMENTS: dict[str, str] = {

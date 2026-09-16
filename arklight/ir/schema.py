@@ -386,6 +386,15 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     "count": DerivationSpec(min_names=1, max_names=1),
     "format": DerivationSpec(min_names=1, max_names=None, extra_args=("template", "names_map")),
     "compare": DerivationSpec(min_names=2, max_names=2, extra_args=("op",)),
+    # `v0.061` (docs/version history/v0.061.md): math siblings of
+    # `sum`/`multiply`. `subtract`/`divide` aren't associative, so
+    # they need at least two names (the first is the starting value,
+    # every later one applies against it in order); `min`/`max` are
+    # associative like `sum`, so one name is already meaningful.
+    "subtract": DerivationSpec(min_names=2, max_names=None),
+    "divide": DerivationSpec(min_names=2, max_names=None),
+    "min": DerivationSpec(min_names=1, max_names=None),
+    "max": DerivationSpec(min_names=1, max_names=None),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)

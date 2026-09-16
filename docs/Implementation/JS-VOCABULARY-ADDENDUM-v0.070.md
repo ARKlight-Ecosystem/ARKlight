@@ -1,6 +1,7 @@
 # JS Vocabulary Addendum: Staged Order, v0.061 -> v0.070
 
-**Status:** PLANNED -- no stage below has started. This file turns
+**Status:** IN PROGRESS -- stage 1/10 (`v0.061`) has shipped; stages
+2-10 remain PLANNED. This file turns
 the accepted, philosophy-compliant part of
 [`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](../Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md)
 into a trackable, ten-rung landing order, the same role
@@ -173,7 +174,7 @@ needing sign-off before they ship as written:
 
 | Stage | Covers | Status |
 | --- | --- | --- |
-| v0.061 | Math siblings (`subtract`/`divide`/`min`/`max`) | PLANNED |
+| v0.061 | Math siblings (`subtract`/`divide`/`min`/`max`) | SHIPPED |
 | v0.062 | String-casing sibling + comparison predicates | PLANNED |
 | v0.063 | Small new runtime primitives | PLANNED |
 | v0.064 | Math derivations catalog | PLANNED |
