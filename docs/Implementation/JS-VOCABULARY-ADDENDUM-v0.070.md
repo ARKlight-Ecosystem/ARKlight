@@ -1,7 +1,7 @@
 # JS Vocabulary Addendum: Staged Order, v0.061 -> v0.070
 
-**Status:** IN PROGRESS -- stage 1/10 (`v0.061`) has shipped; stages
-2-10 remain PLANNED. This file turns
+**Status:** IN PROGRESS -- stages 1-2/10 (`v0.061`, `v0.062`) have
+shipped; stages 3-10 remain PLANNED. This file turns
 the accepted, philosophy-compliant part of
 [`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](../Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md)
 into a trackable, ten-rung landing order, the same role

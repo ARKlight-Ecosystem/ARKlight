@@ -438,6 +438,10 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
         return min(_coerce_number(get(name)) for name in names)
     if kind == "max":
         return max(_coerce_number(get(name)) for name in names)
+    if kind == "uppercase":
+        return str(get(names[0])).upper()
+    if kind == "trim":
+        return str(get(names[0])).strip()
     return None  # unreachable once Validation has run
 
 

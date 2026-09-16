@@ -31,6 +31,8 @@ from arklight.backend.js.derivations import (
     multiply,
     subtract,
     sum,
+    trim,
+    uppercase,
 )
 
 DERIVATION_MODULES = {
@@ -44,6 +46,10 @@ DERIVATION_MODULES = {
     divide.NAME: divide,
     min_.NAME: min_,
     max_.NAME: max_,
+    # `v0.062` (docs/version history/v0.062.md): JS vocabulary
+    # addendum stage 2/10 -- string-casing siblings of `join`/`format`.
+    uppercase.NAME: uppercase,
+    trim.NAME: trim,
 }
 
 DERIVATION_FRAGMENTS: dict[str, str] = {

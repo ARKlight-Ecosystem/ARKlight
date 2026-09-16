@@ -65,11 +65,17 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
 
 
 def _evaluate_predicate(predicate: PredicateRef, *, page_state: dict) -> bool:
-    """`vdom-7`: the same truthy/falsy check `Predicate.*(...)`
-    describes, evaluated at build time against the page's initial
-    state -- see `arkEvalPredicate` in `arklight/backend/js/runtime/
-    show.py` for the client-side twin that re-runs this on every state
-    change."""
+    """`vdom-7`/`v0.062`: the same truthy/falsy/equals/gt/lt check
+    `Predicate.*(...)` describes, evaluated at build time against the
+    page's initial state -- see `arkEvalPredicate` in
+    `arklight/backend/js/runtime/show.py` for the client-side twin
+    that re-runs this on every state change."""
+    if predicate.kind == "equals":
+        return page_state.get(predicate.names[0]) == page_state.get(predicate.names[1])
+    if predicate.kind == "gt":
+        return page_state.get(predicate.names[0]) > page_state.get(predicate.names[1])
+    if predicate.kind == "lt":
+        return page_state.get(predicate.names[0]) < page_state.get(predicate.names[1])
     value = page_state.get(predicate.names[0])
     return (not value) if predicate.kind == "falsy" else bool(value)
 

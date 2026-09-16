@@ -44,6 +44,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.060-stage3 | User-defined components, Stage 3 of 4: Option B's real differentiator, per-backend render dispatch (`.register_backend(backend_name)`/`register_backend_render`) -- a `mode="registry"` component's identity survives (via a tagged prop, lifted onto `IRNode.component_origin`) far enough that `HTMLBackend` can supply its own render function for a component, falling back to the shared default when it doesn't; `arklight/ir/component_dispatch.py` (new module) resolves this once per backend, after the shared `WebsiteIR` already exists | DONE |
 | v0.060-stage4 | User-defined components, Stage 4 of 4 (final): component-owned state (`component(..., state={...})`/`ComponentState`) -- a component's own local, instance-scoped `State(...)`-equivalent, hoisted onto its owning page under a uniquely-namespaced key per call site (`arklight/ir/components.py`'s `_hoist_component_state`/`_rewrite_component_state_refs`), so `Bind(...)`/`Action.*(...)`/`bind_class=`/`bind_value=` all work exactly like they would against a page-level `State(...)`, with zero changes to Normalization/Validation/any backend | DONE |
 | v0.061   | JS vocabulary addendum, stage 1 of 10: math siblings (`Derive.subtract`/`.divide`/`.min`/`.max`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
+| v0.062   | JS vocabulary addendum, stage 2 of 10: string-casing siblings + comparison predicates (`Derive.uppercase`/`.trim`, `Predicate.equals`/`.gt`/`.lt`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v1.0     | Stable compiler                                              | PLANNED |
@@ -113,6 +114,43 @@ initial value. Full suite: 1144 passed (2 pre-existing, unrelated
 `test_version.py` failures -- package metadata lookup fails in a bare
 source checkout, reproduces identically on `origin/alpha` before this
 change), no regressions.
+
+## v0.062 -- JS vocabulary addendum, stage 2 of 10: string casing + comparison predicates (DONE)
+
+Second rung of the JS vocabulary expansion ladder staged in
+`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` -- the last of
+the genuinely one-hour additions, plus the `Show` comparison
+predicates that were already speced but never wired up.
+
+`Derive.uppercase`/`Derive.trim` are the missing string-casing
+siblings of `Derive.join`/`Derive.format`, single-value transforms
+with the same fixed arity as `Derive.count`: one new
+`arklight/backend/js/derivations/<name>.py` (`NAME` + `JS_FRAGMENT`)
+each, one `DERIVATION_REGISTRY` line (`min_names=1, max_names=1`),
+one `_evaluate_derivation` branch (`str.upper()`/`str.strip()`), and
+one `Derive.*` static method -- the exact same registry-fragment
+pattern `v0.061` used.
+
+`Predicate.equals`/`.gt`/`.lt` fill the `PREDICATE_REGISTRY` gap
+`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` flagged: the
+predicates were already speced alongside `Derive.compare`'s
+`eq/ne/gt/lt/gte/lte` op set, but only `truthy`/`falsy` had ever
+shipped. Each new kind takes exactly two names (`PredicateSpec(names=2)`)
+and gets its own `_evaluate_predicate` branch
+(`arklight/backend/html/page_render.py`, build-time) and its own
+`arkEvalPredicate` case (`arklight/backend/js/runtime/show.py`,
+client-side), so a page's server-rendered initial `hidden` state and
+every subsequent client recompute agree -- no changes needed to
+Validation's arity-check *logic*, just an updated error message
+listing the new predicate kinds.
+
+Tests: `tests/test_js_vocabulary_v0062.py` (new) -- API,
+`PREDICATE_REGISTRY` coverage, validation (arity), IR-build
+initial-value evaluation (including non-string coercion for
+`uppercase`), HTML `Bind(...)` pre-fill and `Show(...)` `hidden`
+attribute against the new predicates, JS fragment/`arkEvalPredicate`
+shipping, and Node.js end-to-end parity checks. Full suite: 1170
+passed, no regressions.
 
 ## v0.060-stage0 -- User-defined components, Stage 0 of 4 (DONE)
 

@@ -395,6 +395,12 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     "divide": DerivationSpec(min_names=2, max_names=None),
     "min": DerivationSpec(min_names=1, max_names=None),
     "max": DerivationSpec(min_names=1, max_names=None),
+    # `v0.062` (docs/version history/v0.062.md): JS vocabulary
+    # addendum stage 2/10 -- string-casing siblings of `join`/
+    # `format`. Both are single-value transforms, same fixed arity as
+    # `count`.
+    "uppercase": DerivationSpec(min_names=1, max_names=1),
+    "trim": DerivationSpec(min_names=1, max_names=1),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
@@ -419,6 +425,16 @@ class PredicateSpec:
 PREDICATE_REGISTRY: dict[str, PredicateSpec] = {
     "truthy": PredicateSpec(names=1),
     "falsy": PredicateSpec(names=1),
+    # `v0.062` (docs/version history/v0.062.md): JS vocabulary
+    # addendum stage 2/10 -- comparison predicates already speced
+    # alongside `Derive.compare`'s `eq/ne/gt/lt/gte/lte` op set, just
+    # never wired into this registry. Each is its own fixed-arity
+    # `kind` (mirrors `truthy`/`falsy`'s shape) rather than one
+    # `compare`-style kind plus an `op` extra arg, since
+    # `PredicateSpec` has no `extra_args` slot to carry one.
+    "equals": PredicateSpec(names=2),
+    "gt": PredicateSpec(names=2),
+    "lt": PredicateSpec(names=2),
 }
 
 KNOWN_PREDICATES = frozenset(PREDICATE_REGISTRY)
