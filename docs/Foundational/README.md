@@ -21,7 +21,9 @@ knowledge.
 | --- | --- |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
 | [`CONFIGURABILITY.md`](CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. |
-| [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) | The `arklight deploy` subcommand: a thin wrapper delegating to a hosting provider's own CLI (Cloudflare Workers/Wrangler by default) rather than reimplementing provider deployment logic. For every other subcommand (`build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`), see the root [`README.md`](../../README.md#cli), the single canonical CLI reference. |
+| [`CLI-REFERENCE.md`](CLI-REFERENCE.md) | The implemented, shipped `arklight` subcommands (`build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`) -- the single canonical CLI reference. |
+| [`AUTHORING-GUIDE.md`](AUTHORING-GUIDE.md) | The full public component/behavior/state API: routing, head metadata, layout, styling, behaviors, the component vocabulary, the ARK Bundle format, and `arklight.config.py`. |
+| [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) | **Design only, not implemented.** The planned `arklight deploy` subcommand: a thin wrapper intended to delegate to a hosting provider's own CLI (Cloudflare Workers/Wrangler by default) rather than reimplementing provider deployment logic. |
 | [`DESIGN-NOTES.md`](DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`SYSTEM-DESIGN-AGREEMENTS.md`](SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |

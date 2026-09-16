@@ -39,8 +39,10 @@ record for the project, updated in place rather than removed.
 | File | Covers |
 | --- | --- |
 | [`ARCHITECTURE.md`](Foundational/ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
-| [`CONFIGURABILITY.md`](Foundational/CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. (For the `arklight.config.py` project-settings file itself, see the README's "Configuration" section.) |
-| [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | The `arklight` CLI: build/deploy workflows and commands. |
+| [`CONFIGURABILITY.md`](Foundational/CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. (For the `arklight.config.py` project-settings file itself, see `AUTHORING-GUIDE.md`'s "Configuration" section.) |
+| [`CLI-REFERENCE.md`](Foundational/CLI-REFERENCE.md) | The implemented, shipped `arklight` CLI: every subcommand, its flags, and worked examples. |
+| [`AUTHORING-GUIDE.md`](Foundational/AUTHORING-GUIDE.md) | The full public component/behavior/state API reference (moved out of the root `README.md`, which keeps only the quickstart). |
+| [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | **Design only, not implemented.** The planned `arklight deploy` subcommand and its spec. |
 | [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`SYSTEM-DESIGN-AGREEMENTS.md`](Foundational/SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |
