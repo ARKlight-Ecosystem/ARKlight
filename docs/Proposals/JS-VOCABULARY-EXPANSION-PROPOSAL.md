@@ -1,8 +1,13 @@
 # Proposal: Expanding the Client-Side JS Vocabulary
 
-**Status:** Proposal -- not yet reviewed or scheduled. Nothing in this
-file is committed; it exists to be argued with, cut down, or approved
-a section at a time.
+**Status:** Partially accepted. Tier 1, Tier 2, and §6 (the
+exhaustive scalar catalog, including §6.5) have been accepted and
+staged as a ten-rung implementation ladder --
+[`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md)
+(`v0.061`-`v0.070`), all currently PLANNED. Tier 3 and Tier 4 (§7/§8
+below) remain unsettled proposals -- nothing in this file's
+acceptance covers either. The rest of this document is kept in full,
+unedited, as the source catalog that ladder was staged from.
 
 **Origin:** an audit of `alpha` branch (`arklight/backend/js/*`,
 `arklight/ir/schema.py`, `PROGRESS.md`, `docs/Foundational/DESIGN-NOTES.md`)
