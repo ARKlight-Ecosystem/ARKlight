@@ -68,26 +68,35 @@ bug in this directory, not a valid state -- if you find one, that's
 the fix: delete the superseded file, keep the one that's current, and
 update the Index table to match.
 
-## A deliberate exception: `v0.062`-`v0.070` are PLANNED, not shipped
+## A deliberate exception: `v0.062`-`v0.078` are PLANNED, not shipped
 
 Everything above this note is the folder's normal rule: a file here
 means a milestone (or a fully-landed stage of one) actually shipped.
-`v0.062.md` through `v0.070.md` are a deliberate, marked exception --
-each is a forward-looking summary written while staging
-[`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md),
-before that stage of the ladder has started. Each such file says
-**PLANNED** at the top for exactly this reason, and each will be
+`v0.062.md` through `v0.078.md` are a deliberate, marked exception --
+each is a forward-looking summary written while staging its respective
+implementation ladder, before that stage has started. Each such file
+says **PLANNED** at the top for exactly this reason, and each will be
 rewritten to describe actual shipped behavior once its stage lands --
 until then, treat them as the ladder's user-facing preview, not a
-record. `v0.061.md` was the first rung of this same ladder and has
-since shipped (see its own file, no longer marked PLANNED) -- proof
-the exception is meant to be temporary per-file, not a standing
-status for the whole range. `v0.080`/`v0.100` below deliberately do
-**not** get this treatment yet, because neither has a finished,
-rung-by-rung staged plan the way the JS vocabulary addendum now does;
-once one gets a comparable `docs/Implementation/` (or
-`docs/Backends/`) ladder, the same PLANNED-entry treatment can apply
-to it too.
+record.
+
+`v0.062.md`-`v0.070.md` were written while staging
+[`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md).
+`v0.061.md` was the first rung of that same ladder and has since
+shipped (see its own file, no longer marked PLANNED) -- proof the
+exception is meant to be temporary per-file, not a standing status
+for the whole range.
+
+`v0.071.md`-`v0.078.md` were written while staging
+[`docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md`](../Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md)
+(the eight-rung Project Knowledge ladder). They follow exactly the
+same convention.
+
+`v0.080`/`v0.100` below deliberately do **not** get this treatment
+yet, because neither has a finished, rung-by-rung staged plan the
+way the JS vocabulary addendum and Project Knowledge addendum now do;
+once one gets a comparable `docs/Implementation/` (or `docs/Backends/`)
+ladder, the same PLANNED-entry treatment can apply to it too.
 
 ## Index
 
@@ -116,6 +125,14 @@ to it too.
 | [`v0.068.md`](./v0.068.md) | **PLANNED.** JS vocabulary addendum, stage 8/10 -- cross-language numeric batteries (`lerp`, `midpoint`, saturating arithmetic, `value_or`/`first_present`). |
 | [`v0.069.md`](./v0.069.md) | **PLANNED.** JS vocabulary addendum, stage 9/10 -- cross-language formatting/case batteries (`humanize_*`, `to_ordinal`, case converters). |
 | [`v0.070.md`](./v0.070.md) | **PLANNED.** JS vocabulary addendum, stage 10/10 (capstone) -- `pluralize` + `random_int`, the two entries needing an explicit design exception. |
+| [`v0.071.md`](./v0.071.md) | **PLANNED.** Project Knowledge, stage 1/8 -- `.arklight/` foundation: detect-or-create the directory, establish the knowledge-format marker, safe read/write helpers. |
+| [`v0.072.md`](./v0.072.md) | **PLANNED.** Project Knowledge, stage 2/8 -- internal Project Knowledge context abstraction (providers/facts/observations separation) with no external provider wired in yet. |
+| [`v0.073.md`](./v0.073.md) | **PLANNED.** Project Knowledge, stage 3/8 -- Git as the first concrete provider: repository identity, working-tree state, graceful no-`.git/` handling. Read-only; nothing persisted yet. |
+| [`v0.074.md`](./v0.074.md) | **PLANNED.** Project Knowledge, stage 4/8 -- persistent project context: write derived Git facts into `.arklight/`, preserve them once `.git/` is gone. |
+| [`v0.075.md`](./v0.075.md) | **PLANNED.** Project Knowledge, stage 5/8 -- compiler build history: record build results, associate with source identity, store compiler version and timestamp. |
+| [`v0.076.md`](./v0.076.md) | **PLANNED.** Project Knowledge, stage 6/8 -- diagnostics integration: surface compact project knowledge in compiler errors, last-known-good info, verbose detail behind debug flag. |
+| [`v0.077.md`](./v0.077.md) | **PLANNED.** Project Knowledge, stage 7/8 -- historical observations: compare build states, identify last-successful and first-failing revisions, correlate repository changes with build transitions. |
+| [`v0.078.md`](./v0.078.md) | **PLANNED.** Project Knowledge, stage 8/8 (capstone, open slot) -- reserved for future knowledge providers, added only when a concrete compiler feature actually needs one. |
 
 Not yet covered here: `v0.080` (Android) and `v0.100` (Desktop) are
 both still IN PROGRESS with no fully-landed user-facing milestone to

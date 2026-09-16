@@ -58,6 +58,7 @@ out which.
 | File | Covers |
 | --- | --- |
 | [`JS-VOCABULARY-ADDENDUM-v0.070.md`](JS-VOCABULARY-ADDENDUM-v0.070.md) | Staged, ten-rung (`v0.061`-`v0.070`) implementation ladder for the philosophy-compliant parts of `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` (Tier 1, Tier 2, and the exhaustive §6 scalar catalog) -- easiest additions first, the two entries needing an explicit design exception last. |
+| [`PROJECT-KNOWLEDGE-ADDENDUM.md`](PROJECT-KNOWLEDGE-ADDENDUM.md) | Staged, eight-rung (`v0.071`-`v0.078`) implementation ladder for the accepted `docs/Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md` -- `.arklight/` directory foundation first, future-provider open slot last. Follows the proposal's own §19 \"Suggested order\" exactly, one version per stage. |
 
 ## Contributing
 

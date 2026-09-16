@@ -70,7 +70,8 @@ folder's own README for the full rationale. Removed or graduated
 | --- | --- |
 | [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](<Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md>) | Proposal for the client-side JS vocabulary: trivial gaps, small new primitives, an exhaustive scalar derivation/predicate catalog, and the larger client-side-fetch-sized gaps still open. |
 | [`URL-STATE-AS-PRIMITIVE-PROPOSAL.md`](<Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md>) | Proposal for a `State(..., query=...)` primitive extending `persist=True` to cover URL query parameters, including which navigation architecture a query-param change should trigger. |
-| [`ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](<Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md>) | Proposal for an `arklight assistant` subcommand: a read-only, doc-grounded CLI companion ("Raeliana") behind `--wake-up-raeliana`, plus a separate opt-in `--activate-memory` flag for cross-session recall. |
+| [`ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](<Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md>) | Proposal for an `arklight assistant` subcommand: a read-only, doc-grounded CLI companion ("Raeliana") behind `--wake-up-raeliana`, plus a separate opt-in `--activate-memory` flag for cross-session recall. **Accepted -- implementation deferred to v0.090+.** |
+| [`PROJECT-KNOWELEDGE-PROPOSAL.md`](<Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md>) | Proposal for a compiler-owned `.arklight/` project-local knowledge directory: providers/facts/observations model, Git as the first provider, persistence across builds. **Accepted -- staged in `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` as `v0.071`-`v0.078`.** |
 
 ### [`docs/Implementation/`](Implementation/README.md) — accepted, staged
 
@@ -83,6 +84,7 @@ README for the full rationale.
 | File | Covers |
 | --- | --- |
 | [`JS-VOCABULARY-ADDENDUM-v0.070.md`](Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md) | Staged, ten-rung (`v0.061`-`v0.070`) implementation ladder for the philosophy-compliant parts of `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`. |
+| [`PROJECT-KNOWLEDGE-ADDENDUM.md`](Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md) | Staged, eight-rung (`v0.071`-`v0.078`) implementation ladder for the accepted `docs/Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md` -- `.arklight/` foundation through future-provider open slot, one version per stage. |
 
 ### [`docs/new js backend proposal/`](<new js backend proposal/README.md>) — working reference
 
