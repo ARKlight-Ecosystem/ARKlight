@@ -51,6 +51,23 @@ worth knowing before adding a file here:
   rule `main`'s own README states. Sub-stage detail stays in
   `PROGRESS.md`/`CHANGELOG.md`, where it already lives.
 
+## This directory is a set: exactly one file per version
+
+At any given time, at most one `.md` file here may exist for a given
+version string. A version that hasn't got a coherent, user-facing
+thing to describe yet has **no** file -- not a placeholder, not a
+partial-stage file held "just in case." When a milestone's first
+user-facing-complete stage does earn an interim file (as
+`v0.060-stage0.md` did for `v0.060`), that file is a placeholder for
+the milestone's version slot, not an addition to it: the moment the
+full milestone ships and a rollup file is written, the interim file
+is deleted in the same change that adds the rollup, never left
+alongside it. Two files describing the same version (an interim stage
+file and its own later rollup, or any other duplicate) is always a
+bug in this directory, not a valid state -- if you find one, that's
+the fix: delete the superseded file, keep the one that's current, and
+update the Index table to match.
+
 ## A deliberate exception: `v0.061`-`v0.070` are PLANNED, not shipped
 
 Everything above this note is the folder's normal rule: a file here
@@ -84,8 +101,7 @@ same PLANNED-entry treatment can apply to it too.
 | [`v0.0431.md`](./v0.0431.md) | Emergency patch -- build-time warning for unrouted `srcset`/`poster`/`action`/`formaction`. |
 | [`v0.048.md`](./v0.048.md) | CSS `@media` queries + structured `<head>`/`<header>` extension. |
 | [`v0.054.md`](./v0.054.md) | JS backend capability expansion (reactive core) -- rolls up all 8 `vdom-N` staging sub-stages. |
-| [`v0.060-stage0.md`](./v0.060-stage0.md) | User-defined, reusable components -- Stage 0 (registration, Option A macro expansion, experimental Option B selector). Milestone `v0.060` shipped in full, Stages 0-4 -- see `v0.060.md` for the rollup; this file covers only what Stage 0 shipped. |
-| [`v0.060.md`](./v0.060.md) | User-defined, reusable components -- full milestone rollup (Stages 0-4: registration/props, typo diagnostics, default styling, per-backend rendering, component-owned state). |
+| [`v0.060.md`](./v0.060.md) | User-defined, reusable components -- full milestone rollup (Stages 0-4: registration/props, typo diagnostics, default styling, per-backend rendering, component-owned state). Landed first as an interim `v0.060-stage0.md` covering only Stage 0; once Stages 1-4 shipped and this rollup was written, the interim file was removed per the one-file-per-version rule below. |
 | [`v0.061.md`](./v0.061.md) | **PLANNED.** JS vocabulary addendum, stage 1/10 -- math siblings (`subtract`/`divide`/`min`/`max`). |
 | [`v0.062.md`](./v0.062.md) | **PLANNED.** JS vocabulary addendum, stage 2/10 -- string-casing sibling + comparison `Show` predicates. |
 | [`v0.063.md`](./v0.063.md) | **PLANNED.** JS vocabulary addendum, stage 3/10 -- small new runtime primitives (`reveal`, debounced binding, clipboard paste, geolocation, `matchMedia`). |
@@ -114,5 +130,9 @@ Index table above. The detailed, internal entry still goes in the root
 [`CHANGELOG.md`](../../CHANGELOG.md); this directory should never
 accumulate changelog-style detail itself. Use the milestone's plain
 `alpha` version string as the file name (`v0.060-stage0.md`, not
-`v0.60.0.md`) -- see "Why this directory looks different from `main`'s"
+`v0.60.0.md`) -- and remember "This directory is a set" above: if
+`vX.Y-stageN.md` is standing in for `vX.Y.md` before the full
+milestone lands, delete it and update the Index row in the same
+change that later adds the real `vX.Y.md` rollup, rather than leaving
+both on disk -- see "Why this directory looks different from `main`'s"
 above.
