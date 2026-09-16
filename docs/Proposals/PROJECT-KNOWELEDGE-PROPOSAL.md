@@ -2,9 +2,19 @@
 
 ## Status
 
-**Proposal — not yet accepted, not yet staged.** Follows the format and
-conventions of the existing proposal documents under
-`docs/Proposals/`.
+**Accepted — staged as an eight-rung implementation ladder,
+`v0.071`-`v0.078`.** Originally filed under `docs/Proposals/`
+following the format and conventions of the existing proposal
+documents there; moved here once accepted, per
+`docs/Proposals/README.md`'s "graduate out once decided" rule. The
+content below is left as filed -- it's the design record this
+proposal was accepted on -- and is not rewritten to reflect
+in-progress implementation detail. See
+[`PROJECT-KNOWLEDGE-ADDENDUM-v0.078.md`](PROJECT-KNOWLEDGE-ADDENDUM-v0.078.md)
+for the rung-by-rung landing order (this proposal's §19 "Suggested
+order," turned into a trackable ladder, one version per stage) and
+`docs/version history/v0.071.md` through `v0.078.md` for each stage's
+forward-looking, user-facing summary.
 
 **Origin:** ARKlight already operates on substantially more context than
 the contents of a single Python source file: the project tree,
