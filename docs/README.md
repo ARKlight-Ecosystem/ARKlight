@@ -67,7 +67,7 @@ folder's own README for the full rationale. Removed or graduated
 
 | File | Covers |
 | --- | --- |
-| [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](<Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md>) | Proposal for an exhaustive scalar math/string/list derivation-and-predicate catalog, plus the larger client-side-fetch-sized gaps still open. |
+| [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](<Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md>) | Proposal for the client-side JS vocabulary: trivial gaps, small new primitives, an exhaustive scalar derivation/predicate catalog, and the larger client-side-fetch-sized gaps still open. |
 
 ### [`docs/new js backend proposal/`](<new js backend proposal/README.md>) — working reference
 
