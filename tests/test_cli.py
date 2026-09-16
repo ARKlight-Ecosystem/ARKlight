@@ -244,6 +244,62 @@ def test_cli_search_name_and_serve_are_mutually_exclusive(capsys):
     assert "mutually exclusive" in captured.err
 
 
+def test_cli_search_retrieve_doc_prints_root_index(capsys):
+    exit_code = main(["search", "--retrieve-doc"])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("# ARKlight Documentation")
+    assert "--foundational" in captured.out
+
+
+def test_cli_search_retrieve_doc_folder_and_file(capsys):
+    exit_code = main(["search", "--retrieve-doc", "--foundational", "--file", "architecture"])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("# Foundational")
+    assert "docs/Foundational/ARCHITECTURE.md" in captured.out
+
+
+def test_cli_search_retrieve_doc_rejects_component_name(capsys):
+    exit_code = main(["search", "Picture", "--retrieve-doc"])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "doesn't look up a name" in captured.err
+
+
+def test_cli_search_retrieve_doc_and_serve_are_mutually_exclusive(capsys):
+    exit_code = main(["search", "--retrieve-doc", "--serve"])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "mutually exclusive" in captured.err
+
+
+def test_cli_search_retrieve_doc_file_without_folder_flag_errors(capsys):
+    exit_code = main(["search", "--retrieve-doc", "--file", "architecture"])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "--file requires a folder flag" in captured.err
+
+
+def test_cli_search_two_folder_flags_are_mutually_exclusive():
+    with pytest.raises(SystemExit):
+        main(["search", "--retrieve-doc", "--foundational", "--proposals"])
+
+
+def test_cli_search_folder_flag_without_retrieve_doc_is_ignored_with_notice(capsys):
+    exit_code = main(["search", "Picture", "--foundational"])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("Picture")
+    assert "--foundational only apply with --retrieve-doc" in captured.err
+
+
 def test_cli_pwa_icon_flag_adds_icons_to_manifest(tmp_path, capsys):
     import json
 

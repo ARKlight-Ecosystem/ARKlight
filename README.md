@@ -178,6 +178,42 @@ arklight search --serve
 ```
 
 ```bash
+arklight search --retrieve-doc [index | --<folder> [--file NAME]]
+```
+
+- `--retrieve-doc` -- switches `search` from component lookup into
+  **doc-tree retrieval**: prints exact, unmodified file contents from
+  `docs/`, nothing invented or summarized. Mutually exclusive with a
+  component `name` lookup (the literal `index` is accepted in its
+  place, meaning the same as the bare form) and with `--serve`. Only
+  works from an ARKlight source checkout -- `docs/` isn't shipped in
+  the installed package.
+- No folder flag -- prints the root `docs/README.md`, plus a footer
+  listing the folder flags below.
+- A folder flag (`--foundational`, `--backends`, `--proposals`,
+  `--implementation`, `--js-backend`, `--far-future`,
+  `--version-history`, one per `docs/README.md`'s own Folder Guide) --
+  prints that folder's own `README.md` index, plus a footer listing
+  the files available inside it.
+- `--file NAME`, scoped to a preceding folder flag -- appends that
+  file's full contents after the folder index. Matched
+  case-insensitively by filename stem, with spaces/hyphens/underscores
+  normalized (`--file architecture`, `--file Architecture`, and
+  `--file ARCHITECTURE` all resolve to `ARCHITECTURE.md`); an
+  unmatched name gets a typo-tolerant "did you mean" list, the same
+  posture as component lookup's own suggestions. `--file` without a
+  preceding folder flag is a hard error naming the folder the file
+  actually lives in, if one matches.
+- `--limit`/`--near`/`--accept` are component-lookup-only and are
+  ignored (with a notice) alongside `--retrieve-doc`.
+
+```bash
+arklight search --retrieve-doc
+arklight search --retrieve-doc --foundational
+arklight search --retrieve-doc --foundational --file architecture
+```
+
+```bash
 arklight new <name> [--template simple|production] [--dir PATH] [--explain-architecture]
 ```
 

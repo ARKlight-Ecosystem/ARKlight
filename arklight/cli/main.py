@@ -32,6 +32,7 @@ from arklight import __version__, experimental
 from arklight.cli import android, desktop, live_streaming
 from arklight.cli.android import AndroidError
 from arklight.cli.desktop import DesktopError
+from arklight.cli.doc_retrieval import DOC_FOLDERS, DocRetrievalError, ignored_flag_notices, run_retrieve_doc
 from arklight.cli.license_gate import ensure_license_accepted
 from arklight.cli.scaffold import ScaffoldError, new_project
 from arklight.cli.search import record_acceptance, resolve_exact, search_component
@@ -626,6 +627,36 @@ def _cmd_new(args: argparse.Namespace) -> int:
 
 
 def _cmd_search(args: argparse.Namespace) -> int:
+    if args.retrieve_doc:
+        if args.serve:
+            print(
+                "arklight search: --retrieve-doc and --serve are mutually "
+                "exclusive -- --serve starts the component-lookup stdio "
+                "server, which has nothing to do with doc retrieval.",
+                file=sys.stderr,
+            )
+            return 1
+
+        for notice in ignored_flag_notices(args):
+            print(f"arklight search: {notice}", file=sys.stderr)
+
+        try:
+            print(run_retrieve_doc(args))
+        except DocRetrievalError as exc:
+            print(f"arklight search: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    doc_flags_used = [folder.flag for folder in DOC_FOLDERS if getattr(args, folder.attr, False)]
+    if args.file is not None:
+        doc_flags_used.append("--file")
+    if doc_flags_used:
+        print(
+            f"arklight search: {', '.join(doc_flags_used)} only apply with "
+            "--retrieve-doc and are ignored here.",
+            file=sys.stderr,
+        )
+
     if args.serve:
         if args.name is not None:
             print(
@@ -1053,6 +1084,38 @@ def main(argv: list[str] | None = None) -> int:
         "for an editor/IDE extension to launch as a long-lived subprocess, "
         "the same way an LSP client launches a language server. Runs "
         "until stdin closes. 'name' must be omitted when this is given.",
+    )
+    search_parser.add_argument(
+        "--retrieve-doc",
+        dest="retrieve_doc",
+        action="store_true",
+        default=False,
+        help="Switch 'search' from component-schema lookup into doc-tree "
+        "retrieval: bare, prints the root docs/README.md; add a folder "
+        "flag (--foundational, --proposals, ...) to print that folder's "
+        "own README.md index; add --file NAME to also print one file's "
+        "full contents. Mutually exclusive with a component 'name' lookup "
+        "(the literal 'index' is accepted in its place) and with --serve.",
+    )
+    doc_folder_group = search_parser.add_mutually_exclusive_group()
+    for _doc_folder in DOC_FOLDERS:
+        doc_folder_group.add_argument(
+            _doc_folder.flag,
+            dest=_doc_folder.attr,
+            action="store_true",
+            default=False,
+            help=f"With --retrieve-doc, print docs/{_doc_folder.path}/README.md "
+            f"({_doc_folder.blurb}).",
+        )
+    search_parser.add_argument(
+        "--file",
+        dest="file",
+        metavar="NAME",
+        default=None,
+        help="With --retrieve-doc and a directory flag, append that file's "
+        "full contents after the folder index. Matched case-insensitively "
+        "against the folder's filenames by stem, with spaces/hyphens/"
+        "underscores normalized (e.g. --file architecture).",
     )
     search_parser.set_defaults(func=_cmd_search)
 
