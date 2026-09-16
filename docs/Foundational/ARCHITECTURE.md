@@ -1,5 +1,12 @@
 # ARKlight Architecture
 
+_Current as of **v0.063** (latest shipped milestone). This file is
+updated in place as new milestones land, but a fact here can still
+lag a merge — cross-check the Milestones table below and
+[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table (the fastest
+DONE/IN PROGRESS/PLANNED read) before treating anything version-
+specific as current._
+
 ## Vision
 
 The project pitch (what ARKlight is, the Python-in/HTML-out model, why
@@ -168,7 +175,10 @@ here rather than keeping their own copies. Status: DONE / PLANNED.
 | v0.054 | JS backend capability expansion -- computed/derived state, watch effects, two-way input binding, per-item list rendering, conditional show/hide, event modifiers, reactive class binding, all via closed registries (no arbitrary JS/eval) -- design complete in `DESIGN-NOTES.md`; all seven feeding capabilities landed as `vdom-1` through `vdom-7`, and `vdom-8` (the last stage, `localStorage` persistence) has now landed too | DONE |
 | vdom-staging | Reactive-core vdom staging, 8 stages feeding `v0.054`, all DONE: vendored snabbdom bare core swapped into `State`'s re-render pass (Stage 1); reactive class binding via `Bind.when(...)`/`bind_class=` (Stage 2); event modifiers -- `.with_modifiers(...)`/`.debounce(...)`/`.throttle(...)` (Stage 3); computed/derived state -- `Computed`/`Derive.*` (Stage 4); watch effects -- `Watch(...)` (Stage 5); two-way input binding -- `bind_value=Bind.model(...)` (Stage 6); per-item list rendering (`Repeat`) + conditional show/hide (`Show`) (Stage 7); `localStorage` persistence for `State(..., persist=True)` (Stage 8) -- see `DESIGN-NOTES.md` ("Reactive-core vdom staging") and `PROGRESS.md`'s Snapshot table for the per-stage implementation record | DONE |
 | v0.060 | User-defined, reusable components | DONE |
-| v0.080 | Android backend -- `arklight android` packages a `build-dir` into a native Android project via `androidx.webkit.WebViewAssetLoader`, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the backend's runtime (staged `scaffold` -> CI build (2) -> CI install/launch smoke test (3) -> CI release build (4) -> local `build` (5) -> `--install` (6) -> `--release` (7) CLI ladder); design complete in `DESIGN-NOTES.md`, staged implementation tracked in `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`, Stages 0-4 (`arklight android scaffold`, including its generated GitHub Actions CI build + emulator smoke-test + release-build workflow) done | IN PROGRESS |
+| v0.061-v0.063 | JS vocabulary addendum, stages 1-3 of 10 (math derivation siblings; string-casing siblings + comparison `Show` predicates; small new runtime primitives -- `Action.geolocate`, clipboard `paste`, `matchMedia`-driven state, `reveal`/`lazy`, debounced/throttled two-way binding) -- staged in `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`, see `docs/version history/v0.061.md`-`v0.063.md` for the per-stage user-facing summaries | DONE |
+| v0.064-v0.070 | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- staged in `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; each stage's `docs/version history/vX.md` is a marked **PLANNED** preview until its stage actually lands, see that directory's own README for the convention | PLANNED |
+| v0.071-v0.078 | Project Knowledge, stages 1-8 of 8 (compiler-owned `.arklight/` project-local knowledge directory: foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- staged in `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md`; same marked-**PLANNED**-until-shipped convention as the row above | PLANNED |
+| v0.080   | Android backend -- `arklight android` packages a `build-dir` into a native Android project via `androidx.webkit.WebViewAssetLoader`, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the backend's runtime (staged `scaffold` -> CI build (2) -> CI install/launch smoke test (3) -> CI release build (4) -> local `build` (5) -> `--install` (6) -> `--release` (7) CLI ladder); design complete in `DESIGN-NOTES.md`, staged implementation tracked in `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`, Stages 0-4 (`arklight android scaffold`, including its generated GitHub Actions CI build + emulator smoke-test + release-build workflow) done | IN PROGRESS |
 | v0.100 | Desktop backend -- `arklight desktop` packages a `build-dir` into a cross-platform desktop app (Tauri-based or similar); design pending | PLANNED |
 | v1.0 | Stable compiler | PLANNED |
 

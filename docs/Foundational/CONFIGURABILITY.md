@@ -1,5 +1,9 @@
 # Configurability: the reachability rule
 
+_Current as of **v0.063** (latest shipped milestone) — see
+[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table if a referenced
+capability's status might have moved since this was last updated._
+
 **Not to be confused with `arklight.config.py`** -- the optional
 project-level settings file (`live-streaming` host/port today, more
 sections planned), documented in the main

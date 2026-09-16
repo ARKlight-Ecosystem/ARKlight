@@ -5,6 +5,16 @@ relative to other tools. Not a spec -- a record of reasoning, kept so
 future milestone decisions don't re-litigate the same questions from
 scratch. Fold new discussions in here as they happen.
 
+_Current as of **v0.063** (latest shipped milestone). Each section
+below already carries its own status/version tag in its heading
+(`(DONE)`, `(PLANNING)`, `(as of vX.XXX)`, etc.) -- that per-section
+tag, not this file's own edit date, is the source of truth for
+whether a given section's design is still aspirational or has
+shipped. Those tags are kept current when a described milestone's
+status changes (see `PROGRESS.md`'s Snapshot table for what's landed
+right now); if you find one that's drifted, that's a bug in this file
+worth fixing on sight, the same as any other stale fact._
+
 ## What `style={...}` can and can't reach (as of v0.003)
 
 There's real headroom in the `style={...}` escape hatch that isn't
@@ -242,15 +252,15 @@ The missing piece for that vision isn't component reuse, it's
 reactivity, and that deserves its own named milestone rather than being
 assumed inside v0.100.
 
-## v0.0035 / v0.048 design: stateful JS, CLI scaffolding, responsive + head extension (v0.0035 + v0.004a DONE, v0.048 PLANNING)
+## v0.0035 / v0.048 design: stateful JS, CLI scaffolding, responsive + head extension (v0.0035 + v0.004a + v0.048 all DONE)
 
 This section is a design doc, written before any of it is built, so the
 shape gets agreed on before code exists (same discipline as the
 Alpine/htmx-vs-Reflex research that preceded v0.003). Status has moved
 on since it was written -- see PROGRESS.md for what's actually landed
 (v0.0035 and the CLI-scaffolding half of what was originally called
-"v0.004" are both DONE; the CSS `@media`/`<head>` half is renumbered
-v0.048 and still PLANNING).
+"v0.004" are both DONE; the CSS `@media`/`<head>` half, renumbered
+v0.048, has since shipped in full too -- both Stage A and Stage B).
 
 Three initiatives, originally staged as two named milestones so this
 didn't land as one undifferentiated grab-bag:
@@ -262,9 +272,10 @@ didn't land as one undifferentiated grab-bag:
   backends) to mean anything.
 - **v0.004a -- CLI scaffolding (DONE).** Shipped independently of
   state landing first.
-- **v0.048 -- responsive/head extension (PLANNING).** The other half
+- **v0.048 -- responsive/head extension (DONE).** The other half
   of the original "v0.004" grouping; renumbered once v0.004a shipped
-  ahead of it. Still not implemented.
+  ahead of it. Both stages (A: `meta`/`links`; B: `responsive_style` +
+  `@media` compilation) have since shipped -- see `PROGRESS.md`.
 
 ### v0.0035: stateful JS -- capability, not vocabulary
 
@@ -735,7 +746,7 @@ out of scope for this addendum on purpose: growing *those* means
 deciding on a new argument grammar per pseudo-class, not just adding a
 name to a flat set, so it's a different-shaped change than this one.
 
-## Reactive-core vdom staging: Stage 1 of 8 (Stages 1-3 IMPLEMENTED, Stages 4-8 PLANNING)
+## Reactive-core vdom staging: Stage 1 of 8 (all 8 stages DONE, feeding v0.054)
 
 A separate, narrower initiative from `v0.044` below, tracked with its
 own "Stage N" numbering rather than a `v0.0XX` id because it isn't new
@@ -836,26 +847,38 @@ Computed/derived state, two-way input binding, watch effects,
 conditional show/hide, and per-item list rendering remain -- same
 designs already written up in `v0.044` below; landing them as Stage 4
 through 7 here means they get built directly against Stage 1's vdom
-rather than the old textContent pass.
+rather than the old textContent pass. **All four have since shipped**
+(Stage 4: `Computed`/`Derive.*`; Stage 5: `Watch(...)`; Stage 6:
+`bind_value=Bind.model(...)`; Stage 7: `Repeat`/`Show`) -- see
+`PROGRESS.md`'s Snapshot table for the per-stage record.
 
-**Stage 8 -- `State` persistence to browser storage (PLANNING).**
+**Stage 8 -- `State` persistence to browser storage (DONE, shipped as
+`State(..., persist=True)`).**
 Opt-in `localStorage` persistence for individual state keys --
 `State("count", 0, persist=True)` -- so a value survives a page
-reload. Sketched here, not yet built: `initState()` would read a
+reload. Sketched here as a design, and the shipped implementation
+(`arklight/backend/js/runtime/state.py`'s `initState()`) matches the
+sketch closely: it reads a
 `localStorage["ark:<page-path>:<key>"]` value (if present and
 JSON-parseable) as an override on top of the server-rendered initial
-value, and `store.subscribe` would gain one more fixed subscriber that
+value, and `store.subscribe` gains one more fixed subscriber that
 writes persisted keys back out on every change, wrapped in its own
-`try/catch` (private-browsing/quota errors must degrade to "state
-just doesn't persist," never a hard failure) -- same defensive
-discipline `arkNotify` already applies elsewhere in this runtime.
+`try/catch` (private-browsing/quota errors degrade to "state just
+doesn't persist," never a hard failure) -- same defensive discipline
+`arkNotify` already applies elsewhere in this runtime.
 
-## v0.0438: Android backend -- androidx.webkit.WebViewAssetLoader packaging (PLANNING)
+## v0.0438: Android backend -- androidx.webkit.WebViewAssetLoader packaging (renumbered v0.080, IN PROGRESS -- Stages 0-4 DONE)
 
 Internal design doc only -- deliberately not summarized in `README.md`
 until (if) implementation actually lands, same "design complete,
 implementation not started" discipline every other PLANNING section
-in this file follows. Placed here, right after Stage 8 above rather
+in this file follows when it's written. Status has moved on since
+this section was written: the design below is complete and Stages 0-4
+of the staged implementation ladder
+(`docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`) have shipped --
+see `PROGRESS.md`'s Snapshot table (`v0.080`) for the current
+per-stage record; Stages 5-7 (the local-toolchain counterparts to the
+CI-only stages below) remain open. Placed here, right after Stage 8 above rather
 than near `v0.044`, because the real dependency this milestone has is
 on Stage 8's persistence work, not on anything in `v0.044` proper --
 see "Why this sits after Stage 8, not after v0.044" below. Per the
@@ -1286,14 +1309,18 @@ refactor track -- that file also gives Stage 0 a file-by-file
 breakdown of what in `ARKlight-Viewer-for-Android-Devices` (linked
 there) carries over unchanged vs. needs splitting.
 
-## v0.044: JS backend capability expansion -- reactive core parity with Vue 3 (PLANNING)
+## v0.044: JS backend capability expansion -- reactive core parity with Vue 3 (renumbered v0.054, DONE)
 
 Requested directly by the maintainer: "add all kinds [of] cool JS
 ability to the pkg... more capable of handling so much more
 reactivity... to match Vue 3's breadth." This section is the design
 doc for that, written before any of it is built, same discipline as
-every other PLANNING section in this file. Status: design complete,
-implementation not started.
+every other PLANNING section in this file when it was written. Status
+has moved on since: design complete, and every capability below has
+now shipped, renumbered to `v0.054` (see "Re-renumbered again" in
+`ARCHITECTURE.md`'s Milestones section for why) -- via the `vdom-1`
+through `vdom-8` staging ladder described above. See `PROGRESS.md`'s
+Snapshot table for the per-stage implementation record.
 
 This section assumes the reader has `v0.0035`'s section above in
 mind: `State`/`Bind`/`Action.*`, the `BEHAVIOR_REGISTRY`/
