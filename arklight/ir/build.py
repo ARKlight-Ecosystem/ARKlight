@@ -26,6 +26,7 @@ import re
 
 from arklight import experimental
 from arklight.ast.nodes import ActionRef, ARKNode, DerivationRef
+from arklight.ir.components import COMPONENT_ORIGIN_PROP_KEY, ComponentOrigin
 
 
 @dataclass
@@ -35,6 +36,19 @@ class IRNode:
     type: str
     props: dict[str, Any] = field(default_factory=dict)
     children: list["IRNode | str"] = field(default_factory=list)
+    # v0.060, Stage 3 (docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md):
+    # set (by `_ark_node_to_ir_node`, popped straight off the incoming
+    # `ARKNode`'s props under `COMPONENT_ORIGIN_PROP_KEY`) when this
+    # node is the rendered root of a `mode="registry"` component call
+    # that has at least one backend override registered -- `None` for
+    # every other node, which is every node on every site before Stage
+    # 3, and most nodes after it too (only a component that both opts
+    # into `mode="registry"` *and* registers a backend override ever
+    # produces a non-`None` value here). `arklight.ir.component_dispatch.
+    # resolve_backend_dispatch` is the only real reader; it always
+    # clears this back to `None` on its way past a node, matched or
+    # not, so it never reaches a backend's own attribute-rendering code.
+    component_origin: ComponentOrigin | None = None
 
 
 @dataclass
@@ -236,13 +250,50 @@ def _ark_node_to_ir_node(
             classes.append(generated_class)
         props["class_name"] = " ".join(classes)
 
+    # v0.060, Stage 3: same "pop a compile-time-only prop, lift it onto
+    # its own IRNode field" treatment `responsive_style` just got above
+    # -- `COMPONENT_ORIGIN_PROP_KEY` is never a real HTML attribute
+    # either, it's `arklight.ir.components._tag_component_origin`'s own
+    # internal marker, absent from every node except the rendered root
+    # of a `mode="registry"` component call that has a backend override
+    # registered (see that function's docstring for why it's this
+    # narrowly scoped).
+    component_origin = props.pop(COMPONENT_ORIGIN_PROP_KEY, None)
+
     children: list[IRNode | str] = []
     for child in node.children:
         if isinstance(child, ARKNode):
             children.append(_ark_node_to_ir_node(child, collector=collector, on_warning=on_warning))
         else:
             children.append(str(child))
-    return IRNode(type=node.type, props=props, children=children)
+    return IRNode(type=node.type, props=props, children=children, component_origin=component_origin)
+
+
+def ark_node_to_ir_node(
+    node: ARKNode, *, on_warning: Callable[[str], None] | None = None
+) -> IRNode:
+    """
+    Public, single-node wrapper around `_ark_node_to_ir_node` -- v0.060
+    Stage 3's own reason for needing one: `arklight.ir.component_dispatch`
+    converts a backend override's freshly-rendered subtree straight to
+    `IRNode` without going through a whole-site `build_website_ir` call
+    (there's no `Site`, no page, no route to build a *whole* IR from at
+    that point in the pipeline -- just one subtree).
+
+    Uses a throwaway, single-call `_ResponsiveStyleCollector`: a
+    `responsive_style={...}` prop used *inside* a backend override's
+    own subtree still gets its generated class name folded into
+    `class_name` here, exactly like anywhere else, but the underlying
+    `@media` rule this collector gathers has nowhere to go -- there's
+    no site-wide `WebsiteIR.responsive_rules` list left to hand it to
+    at this point in `resolve_backend_dispatch`'s own pass, which runs
+    once per backend, after `WebsiteIR` already exists. This is a known
+    Stage 3 limitation (a documented gap, not a silent bug): a backend
+    override that needs a responsive rule of its own should register it
+    via `site.media_query(...)` instead, which -- unlike `responsive_style`
+    -- is collected once, up front, independent of any one node.
+    """
+    return _ark_node_to_ir_node(node, collector=_ResponsiveStyleCollector(), on_warning=on_warning)
 
 
 def _derivation_ref_to_spec(derive: DerivationRef) -> dict[str, Any]:

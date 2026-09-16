@@ -5,6 +5,71 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- User-defined components, Stage 3 (per-backend render dispatch)
+
+**What:** `mode="registry"` components (Option B) get their actual
+differentiator: `.register_backend(backend_name)` on the value
+`component(...)` returns lets a component ship a *different* render
+function per backend, falling back to the shared `render_fn` wherever
+a backend hasn't registered its own -- the "registry-based late
+binding" `docs/Foundational/user-defined-components.md` describes, and
+the open design question `docs/Foundational/
+USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s "hybrid decision" section
+left unresolved ("identity preserved through to a per-backend render
+dispatch ... or ... a different mechanism -- open design question, not
+pre-decided here"). Resolved via a tagged prop that survives
+Normalization/Validation unnoticed (neither module rejects an
+unrecognized prop key) and is lifted onto a new `IRNode.component_origin`
+field during IR conversion; resolution itself happens once per backend,
+after the shared `WebsiteIR` already exists, wired into `HTMLBackend.
+render()`. A `mode="registry"` component with no backend override
+registered -- every component before this stage, and most after it --
+produces byte-identical output to Stage 0-2. See the implementation
+doc's Stage 3 notes for the full design and its "Explicitly out of
+scope" list (Android/Desktop dispatch -- neither is a `WebsiteIR`-
+consuming backend yet -- and `Repeat(...)`-nested coverage, notably).
+
+**Implementation:** `arklight/ir/components.py` --
+`ComponentSpec.backend_render_fns`, `ComponentOrigin`,
+`COMPONENT_ORIGIN_PROP_KEY`, `register_backend_render(...)`,
+`_tag_component_origin`, `apply_default_style_class` (public wrapper
+around the existing `_apply_default_class`), `_render_once` tags a
+registry-mode rendered root only when `backend_render_fns` is
+non-empty. `arklight/ir/build.py` -- `IRNode.component_origin`,
+`_ark_node_to_ir_node` pops `COMPONENT_ORIGIN_PROP_KEY` into it (same
+treatment `responsive_style` already gets there), new public
+single-node wrapper `ark_node_to_ir_node`. `arklight/ir/
+component_dispatch.py` (new module) -- `resolve_backend_dispatch(ir,
+backend_name)`, a pure function that walks every page's IR tree,
+swaps a matched override's own (expanded, default-styled, normalized)
+subtree in place of the default rendering, and always clears the
+marker either way. `arklight/backend/html/render.py` -- `HTMLBackend.
+render()` calls `resolve_backend_dispatch` as its first line;
+`CSSBackend`/`JSBackend` untouched (neither walks a node tree for
+markup). `arklight/api.py` -- `component(...)`'s decorated value gains
+`.register_backend(backend_name)`, delegating to `register_backend_render`.
+No changes to `arklight/ir/validate.py`, `arklight/ir/normalize.py`
+(reuses its existing `normalize_node`), or `arklight/ir/schema.py`.
+
+**Tests:** `tests/test_user_defined_components_stage3.py` (21 tests,
+new) -- registration (`register_backend_render`/`.register_backend`,
+rejecting an unknown component and a `mode="macro"` one, last-call-wins),
+expansion tagging (only a registry component *with* an override is
+tagged; a macro component never is), `resolve_backend_dispatch` (swaps
+in a match, falls back cleanly when no override exists for that
+backend, clears the marker either way, is a pure function, raises on
+an override returning a sibling list or a non-`ARKNode`, applies
+`default_style`'s class to an override's own root, supports an
+override nesting further components), and end-to-end compiles through
+`HTMLBackend`/`CSSBackend`/the full `build()` pipeline confirming the
+override actually renders, the internal marker never leaks into
+output, and `CSSBackend` is unaffected by backend-specific overrides.
+Full suite: 1107 passed, no regressions (1086 before this stage + 21
+new); 2 pre-existing, unrelated failures in `tests/test_version.py`
+(package metadata lookup fails in a bare source checkout that was
+never `pip install`ed -- reproduces identically on `origin/alpha`
+before this change).
+
 ## [Unreleased] -- User-defined components, Stage 2 (default styling hook)
 
 **What:** `component(..., default_style={...})` (`arklight/api.py`) lets
