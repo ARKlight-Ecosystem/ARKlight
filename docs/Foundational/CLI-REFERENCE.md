@@ -10,9 +10,22 @@ teaser and points here for the rest.
 `arklight deploy` is **not** one of them -- it's a design-only,
 not-yet-implemented subcommand; see
 [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) for its spec and status.
+`android` and `desktop` (below) are implemented, but alpha-only so
+far -- see the note in their own section.
+
+**One-time license gate.** The first time any `arklight <command>`
+runs on a machine, it prints the ARKlight Additional Terms and asks
+for a typed `agree` before continuing; acceptance is then recorded in
+`~/.arklight/license-accepted` (override with `ARKLIGHT_HOME`) so it
+only happens once. `ARKLIGHT_ACCEPT_LICENSE=1` skips the prompt for
+CI/Docker/scripted use -- set it only after actually reading the
+terms in `LICENSE`. If stdin isn't a TTY and the env var isn't set,
+the command refuses to proceed rather than hanging on a prompt that
+can never be answered.
 
 ```bash
 arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--debug]
+    [--max-width VALUE] [--bg VALUE] [--font-family VALUE] [--button-text VALUE] [--lang TAG]
 ```
 
 - `entry.py` -- your site file (must define `site = Site()` and at
@@ -23,26 +36,81 @@ arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--de
 - `--open` (default) -- opens `index.html` in your default browser
   after building. `--no-open` disables this.
 - `--verbose` -- prints a `[ARKlight] ...` line as each pipeline stage
-  starts (discovering the site, normalizing, validating, building the
-  IR, each backend's render/postprocess, writing files, copying
-  assets), e.g.:
+  starts (discovering the site, expanding user-defined `component(...)`
+  calls, normalizing, validating, building the IR, each backend's
+  render/postprocess, any `Site.raw_postprocess(...)` functions,
+  writing files, copying assets), e.g.:
 
   ```
   [ARKlight] Discovering site and compiling AST trees...
+  [ARKlight] Expanding user-defined components...
   [ARKlight] Normalizing AST...
   [ARKlight] Running validation...
   [ARKlight] Building website IR...
   [ARKlight] Rendering backend 'html'...
-  ...
-  [ARKlight] Build complete -> ARK/index.html
+  [ARKlight] Postprocessing backend 'html'...
+  [ARKlight] Writing 3 file(s) -> ARK/...
+  [ARKlight] Copying assets...
   ```
 
   Useful for seeing exactly which stage a build reached before it
-  failed or hung.
+  failed or hung. (If a project doesn't use `component(...)` at all,
+  that stage still runs -- it's a no-op expansion pass, not a
+  conditional step -- so it still prints under `--verbose`.)
 - `--debug` -- implies `--verbose`, and on failure prints the full
   chained Python traceback instead of the short one-line error
   message, so you can trace a compiler error back to the exact file
   and line that raised it.
+- `--max-width VALUE` -- overrides the page's max content width
+  (`--ark-max-width`), e.g. `90rem`, `1400px`, `100%`. Takes
+  precedence over `Site(max_width=...)` in the site file, without
+  requiring an edit to it.
+- `--bg VALUE` -- overrides the page background (`--ark-bg`), e.g.
+  `#0f0f1a`. Takes precedence over `Site(bg=...)`.
+- `--font-family VALUE` -- overrides the page font stack
+  (`--ark-font-family`), e.g. `'Georgia, serif'`. Takes precedence
+  over `Site(font_family=...)`. Default: ARKlight's stock system-font
+  stack.
+- `--button-text VALUE` -- overrides button text color
+  (`--ark-button-text`), e.g. `#111827`. Takes precedence over
+  `Site(button_text=...)`. Default `#ffffff` -- worth setting
+  explicitly alongside a light `--ark-accent`, since button background
+  follows accent.
+- `--lang TAG` -- overrides the `<html lang="...">` tag, e.g. `es`,
+  `ta`, `fr-CA`. Overrides `Site(lang=...)` without a site-file edit
+  -- a page's own `Page(lang=...)`, if set, still wins for that page.
+  Default: `en`.
+
+  These five flags exist specifically so CI (or a one-off variant
+  build) can override a design token without editing the site file's
+  `Site(...)` call; leaving all of them off changes nothing.
+
+After a successful build (`--verbose` or not), the CLI always prints
+a one-line summary and every file it wrote:
+
+```
+ARKlight v0.063 built 3 file(s) -> ARK/
+  ARK/index.html
+  ARK/styles.css
+  ARK/arklight.js
+```
+
+Two more things print unconditionally after that, never gated behind
+`--verbose`/`--debug`, if they apply:
+
+- **Experimental-feature warnings** -- if the site uses any API from
+  `arklight/experimental.py` (`Site.media_query(...)`,
+  `responsive_style=...`, `Site.import_style(...)`,
+  `Site.raw_postprocess(...)`, or `arklight pwa --install-button`),
+  both an inline banner at the point of use and an end-of-build
+  summary are printed. See
+  [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md)'s "CLI contract" for
+  the exact format and why these aren't gated like ordinary stage
+  narration.
+- **Alpha-limitation warnings** -- any `[ARKlight ALPHA]`-marked
+  warning raised during the build (a known, non-fatal alpha-branch
+  limitation, not a build failure) is collected and printed as a
+  `NOTE: this alpha build is under active maintenance...` block.
 
 Both flags are off by default -- a plain `arklight build` is
 unchanged.
@@ -191,7 +259,7 @@ arklight pwa <build-dir> --name "My Site" [--short-name NAME] [--start-url URL]
 - `--icon` is repeatable, e.g.
   `--icon assets/icon-192.png:192x192 --icon assets/icon-512.png:512x512`.
 - `--install-button` is EXPERIMENTAL (see
-  [`docs/Foundational/EXPERIMENTAL-APIS.md`](./docs/Foundational/EXPERIMENTAL-APIS.md)):
+  [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md)):
   injects a native install-prompt button on every page.
 - Idempotent -- safe to re-run after every `arklight build` to keep
   the manifest/service worker/precache list in sync.
@@ -236,6 +304,59 @@ arklight live-streaming --subscribe examples/hello_site/site.py
 arklight live-streaming --subscribe examples/hello_site/site.py --channel
 arklight live-streaming --status
 arklight live-streaming --unsubscribe
+```
+
+```bash
+arklight android scaffold <build-dir> -o OUTPUT_DIR [--debug-keystore PATH] [--release]
+arklight desktop scaffold <build-dir> -o OUTPUT_DIR [--target linux]
+arklight desktop build <project-dir> [--run]
+```
+
+**Alpha-only so far -- not yet on `main`.** `android` and `desktop`
+are real, implemented subcommands (unlike `arklight deploy`), but
+they're part of the in-progress Android/Desktop backend work (see
+`PROGRESS.md`'s Snapshot table -- `v0.080`/`v0.100`, both IN
+PROGRESS) and haven't landed on the stable `main` branch yet. Full
+design and staging detail:
+[`docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`](../Backends/ANDROID-BACKEND-IMPLEMENTATION.md)
+and
+[`docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`](../Backends/DESKTOP-BACKEND-IMPLEMENTATION.md).
+
+- `arklight android scaffold <build-dir> -o OUTPUT_DIR` -- generates
+  an Android Studio / Gradle project (Application mode) from an
+  `arklight build` output directory. Templating only -- no JDK/Android
+  SDK required to run this command. Includes a GitHub Actions workflow
+  that builds a debug APK and smoke-tests it (install + launch on an
+  emulator) in CI, no local toolchain needed.
+  - `--debug-keystore PATH` -- pin a shared debug signing key (copied
+    in as `app/debug.keystore`) so debug APKs built on different
+    machines/CI runs share a signature and can be installed as updates
+    over each other. Without it, every machine auto-generates its own.
+  - `--release` -- also generate a signed release-build job. Off by
+    default; it's a no-op until you set the
+    `RELEASE_KEYSTORE_BASE64`/`RELEASE_KEYSTORE_PASSWORD`/
+    `RELEASE_KEY_ALIAS`/`RELEASE_KEY_PASSWORD` repo secrets (see the
+    generated project's own README).
+  - `arklight android build`, `--install`, and local (on-this-machine)
+    release builds are staged as later stages of the same ladder and
+    are **not implemented yet**.
+- `arklight desktop scaffold <build-dir> -o OUTPUT_DIR [--target linux]`
+  -- generates a native GTK3 + WebKit2GTK host project. Templating +
+  asset-embedding only -- no C toolchain required to run this command
+  itself. `--target` only supports `linux` so far (the default);
+  Windows/macOS aren't implemented. Includes a GitHub Actions workflow
+  that builds the project and smoke-tests it under a headless Xvfb
+  display, no local toolchain or display server needed.
+- `arklight desktop build <project-dir> [--run]` -- builds an
+  already-scaffolded project by shelling out to its own `make`. Needs
+  a C compiler, `pkg-config`, and the GTK3/WebKit2GTK dev headers on
+  this machine. `--run` launches the built binary once `make`
+  succeeds.
+
+```bash
+arklight android scaffold ARK -o android-project --release
+arklight desktop scaffold ARK -o desktop-project
+arklight desktop build desktop-project --run
 ```
 
 ```bash
