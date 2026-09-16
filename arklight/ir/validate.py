@@ -568,7 +568,8 @@ def _validate_predicate_ref(
     if not isinstance(predicate, PredicateRef):
         raise ValidationError(
             f"Show(...) at {path} needs predicate=Predicate.truthy(...)/"
-            f"Predicate.falsy(...), got {predicate!r}."
+            f"Predicate.falsy(...)/Predicate.equals(...)/Predicate.gt(...)/"
+            f"Predicate.lt(...), got {predicate!r}."
         )
     spec = PREDICATE_REGISTRY.get(predicate.kind)
     if spec is None:

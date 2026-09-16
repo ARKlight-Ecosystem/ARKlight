@@ -5,6 +5,57 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- JS vocabulary addendum, stage 2 of 10: string casing + comparison predicates (`v0.062`)
+
+**What:** `Derive.uppercase`, `Derive.trim` (`arklight/api.py`) -- the
+missing string-casing siblings of `Derive.join`/`Derive.format`,
+second rung of the JS vocabulary expansion ladder staged in
+`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`. Both are
+single-value transforms (same fixed arity as `Derive.count`): each
+reads exactly one state/computed value, coerces it to a string
+(matching JavaScript's own `String(x)` coercion rather than throwing
+on a non-string value), and applies `.toUpperCase()`/`.trim()`.
+`Predicate.equals`, `Predicate.gt`, `Predicate.lt` (`arklight/api.py`)
+-- `Show(...)` comparison predicates, already speced alongside
+`Derive.compare`'s `eq/ne/gt/lt/gte/lte` op set but never wired into
+`PREDICATE_REGISTRY` (previously only `truthy`/`falsy`). Each is its
+own fixed-arity kind (two names) rather than one `compare`-style kind
+plus an `op` extra arg, since `PredicateSpec` has no `extra_args`
+slot.
+
+**Implementation:** `arklight/backend/js/derivations/uppercase.py`,
+`trim.py` (new) -- each exports `NAME` + `JS_FRAGMENT`, mirroring
+`count.py`'s single-name shape.
+`arklight/backend/js/derivations/__init__.py` -- registers both new
+modules into `DERIVATION_MODULES`/`DERIVATION_FRAGMENTS`.
+`arklight/ir/schema.py` -- two new `DERIVATION_REGISTRY` entries
+(`uppercase`/`trim`: `min_names=1, max_names=1`) and three new
+`PREDICATE_REGISTRY` entries (`equals`/`gt`/`lt`: `names=2`).
+`arklight/ir/build.py` -- `_evaluate_derivation` gains `"uppercase"`/
+`"trim"` branches (Python `str.upper()`/`str.strip()`), kind-for-kind
+mirrors of the new JS fragments. `arklight/backend/html/
+page_render.py` -- `_evaluate_predicate` gains `"equals"`/`"gt"`/
+`"lt"` branches. `arklight/backend/js/runtime/show.py` --
+`arkEvalPredicate` gains matching comparison cases, so a page's
+initial server-rendered `hidden` state and every client-side
+re-evaluation agree. `arklight/ir/validate.py` -- updated error
+message listing the new predicate kinds (no change to validation
+*logic*; the existing registry-driven arity checks already cover the
+new entries). No changes to `arklight/ir/normalize.py`.
+
+**Tests:** `tests/test_js_vocabulary_v0062.py` (new) -- API return
+values; `PREDICATE_REGISTRY` coverage; validation (comparison
+predicates reject anything but exactly two names); IR-build
+initial-value evaluation for `uppercase`/`trim` (including non-string
+coercion); HTML backend `Bind(...)` pre-fill and `Show(...)` `hidden`
+attribute against `gt`/`equals` predicates; JS backend ships only the
+derivation kind(s) actually used and includes all three new
+`arkEvalPredicate` cases whenever `Show(...)` is used;
+`DERIVATION_FRAGMENTS` registry coverage; and Node.js end-to-end
+checks that the shipped `uppercase` fragment and the shipped
+`arkEvalPredicate` `gt` case agree with their Python build-time
+counterparts. Full suite: 1170 passed, no regressions.
+
 ## [Unreleased] -- JS vocabulary addendum, stage 1 of 10: math siblings (`v0.061`)
 
 **What:** `Derive.subtract`, `Derive.divide`, `Derive.min`,

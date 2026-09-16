@@ -633,6 +633,8 @@ class Derive:
                   derive=Derive.format("Hello, {n}!", n="name"))
         Computed("is_over_limit", deps=("count", "limit"),
                   derive=Derive.compare("count", "limit", "gt"))
+        Computed("shout", deps=("name",), derive=Derive.uppercase("name"))
+        Computed("clean_input", deps=("raw",), derive=Derive.trim("raw"))
     """
 
     @staticmethod
@@ -706,6 +708,20 @@ class Derive:
     def max(*names: str) -> DerivationRef:
         """`v0.061`: the largest of one or more state/computed values."""
         return DerivationRef(kind="max", names=tuple(names))
+
+    @staticmethod
+    def uppercase(name: str) -> DerivationRef:
+        """`v0.062`: the named state/computed value, coerced to a
+        string and upper-cased -- a string-casing sibling of
+        `Derive.join`/`Derive.format`."""
+        return DerivationRef(kind="uppercase", names=(name,))
+
+    @staticmethod
+    def trim(name: str) -> DerivationRef:
+        """`v0.062`: the named state/computed value, coerced to a
+        string with leading/trailing whitespace stripped -- a sibling
+        of `Derive.join`/`Derive.format`."""
+        return DerivationRef(kind="trim", names=(name,))
 
 
 # ---------------------------------------------------------------------------
@@ -842,6 +858,8 @@ class Predicate:
 
         Show(Predicate.truthy("is_open"), Text("Details go here"))
         Show(Predicate.falsy("is_open"), Text("Click to expand"))
+        Show(Predicate.equals("role", "admin_role"), Text("Welcome, admin"))
+        Show(Predicate.gt("score", "threshold"), Text("You passed!"))
     """
 
     @staticmethod
@@ -851,6 +869,25 @@ class Predicate:
     @staticmethod
     def falsy(name: str) -> PredicateRef:
         return PredicateRef(kind="falsy", names=(name,))
+
+    @staticmethod
+    def equals(a: str, b: str) -> PredicateRef:
+        """`v0.062`: true when the two named state/computed values are
+        `===` equal, mirroring `Derive.compare(a, b, "eq")`'s own
+        semantics but as a standalone predicate kind (no `op=` arg)."""
+        return PredicateRef(kind="equals", names=(a, b))
+
+    @staticmethod
+    def gt(a: str, b: str) -> PredicateRef:
+        """`v0.062`: true when `a`'s value is greater than `b`'s,
+        mirroring `Derive.compare(a, b, "gt")`."""
+        return PredicateRef(kind="gt", names=(a, b))
+
+    @staticmethod
+    def lt(a: str, b: str) -> PredicateRef:
+        """`v0.062`: true when `a`'s value is less than `b`'s,
+        mirroring `Derive.compare(a, b, "lt")`."""
+        return PredicateRef(kind="lt", names=(a, b))
 
 
 def Show(predicate: PredicateRef, *children: Any) -> ARKNode:

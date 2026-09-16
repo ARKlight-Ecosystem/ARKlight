@@ -55,6 +55,9 @@ it's present to a visitor -- so nothing here touches `arkPatch`.
 from __future__ import annotations
 
 RENDER_SHOW_JS = """  function arkEvalPredicate(store, spec) {
+    if (spec.kind === "equals") return store.get(spec.names[0]) === store.get(spec.names[1]);
+    if (spec.kind === "gt") return store.get(spec.names[0]) > store.get(spec.names[1]);
+    if (spec.kind === "lt") return store.get(spec.names[0]) < store.get(spec.names[1]);
     var value = store.get(spec.names[0]);
     return spec.kind === "falsy" ? !value : !!value;
   }
