@@ -260,11 +260,49 @@ BEHAVIOR_REGISTRY: dict[str, BehaviorSpec] = {
     "scroll-to": BehaviorSpec(),
     "copy": BehaviorSpec(),
     "dismiss": BehaviorSpec(extra_props=("toggle_class",)),
+    # `v0.063` (docs/version history/v0.063.md): clipboard **paste** --
+    # mirrors `copy` almost exactly (same `behavior_target` selector,
+    # same clipboard-availability guard), just reading instead of
+    # writing: `navigator.clipboard.readText()` into `target`'s
+    # `.value` (an `Input`/`Textarea`) or `.textContent` otherwise.
+    "paste": BehaviorSpec(),
 }
 
 # Derived, not hand-maintained -- Validation's existing
 # `on_click in KNOWN_BEHAVIORS` check doesn't need to change shape.
 KNOWN_BEHAVIORS = frozenset(BEHAVIOR_REGISTRY)
+
+
+# `v0.063` (docs/version history/v0.063.md): `reveal`/`lazy` behavior
+# via `IntersectionObserver` -- deliberately its own small registry,
+# not folded into `BEHAVIOR_REGISTRY` above, because it needs its own
+# prop (`on_reveal=`, not `on_click=`): every existing named behavior
+# is click-triggered (wired through `wireClickInterceptor`'s delegated
+# `click` listener), but a reveal-on-scroll-into-view effect has no
+# click to hook -- it has to be wired from a *mount-time* pass instead
+# (`wireReveal`, `arklight/backend/js/runtime/reveal.py`), observing
+# every `data-ark-on-reveal`-carrying element once at page init (and
+# again after an app-shell boosted swap). Reusing `on_click=`'s
+# registry/prop for a mechanism that isn't click-triggered at all
+# would be a silent footgun the moment a site tried to combine the
+# two (`on_click="toggle"` + a reveal effect) on the same element --
+# same reasoning `behavior_target` vs. `target` already documents in
+# `arklight/api.py`. One kind so far: `reveal` adds `toggle_class`
+# (default `"is-visible"`, reusing the same prop/attribute name
+# `toggle`/`dismiss` already use) to the element itself, once, the
+# first time it enters the viewport, then stops observing it -- a
+# one-shot scroll-reveal, the same "lazy"/"reveal-on-scroll" pattern
+# most sites reach for hand-rolled JS for.
+@dataclass
+class RevealSpec:
+    extra_props: tuple[str, ...] = field(default_factory=tuple)
+
+
+REVEAL_REGISTRY: dict[str, RevealSpec] = {
+    "reveal": RevealSpec(extra_props=("toggle_class",)),
+}
+
+KNOWN_REVEAL_BEHAVIORS = frozenset(REVEAL_REGISTRY)
 
 
 # v0.0035: a real `State` primitive with a closed *action* vocabulary,
@@ -315,6 +353,19 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
     # ------------------------------------------------------------------
     "append": ActionSpec(args=("value",)),
     "remove": ActionSpec(args=("index",)),
+    # ------------------------------------------------------------------
+    # `v0.063` (docs/version history/v0.063.md): JS vocabulary addendum
+    # stage 3/10. `geolocate` is a one-shot, argument-less write --
+    # `navigator.geolocation.getCurrentPosition` writes a plain
+    # `{lat, lng}` object into the target State(...) once the browser's
+    # location prompt resolves (see
+    # arklight/backend/js/actions/geolocate.py). Async/"fire and
+    # forget", same shape a debounced action's deferred setTimeout
+    # callback already relies on -- `wireClickInterceptor` calls
+    # `action(store, key, args)` and moves on without waiting for a
+    # return value.
+    # ------------------------------------------------------------------
+    "geolocate": ActionSpec(),
 }
 
 KNOWN_ACTIONS = frozenset(ACTION_REGISTRY)

@@ -103,6 +103,19 @@ class IRPage:
     # `initState()`). Empty for pages that declare no persisted
     # `State(...)`.
     persist: list[str] = field(default_factory=list)
+    # `v0.063` (docs/version history/v0.063.md): `(name, query)` pairs
+    # for every `State(..., media=...)` on this page, in declaration
+    # order -- the same marker/`<body>`-attribute duality every other
+    # piece of hydration state above already uses (see
+    # `arklight/backend/js/runtime/state.py`'s `initState()`, which
+    # overrides each name's initial value with
+    # `matchMedia(query).matches` on init and attaches a "change"
+    # listener that keeps writing it after that). Carries no value of
+    # its own here -- `state[name]` above already holds this key's
+    # (server-rendered-guess) initial value, same shape `persist`
+    # already establishes for a key with a second, non-`Action.*(...)`
+    # writer. Empty for pages that declare no media-driven `State(...)`.
+    media: list[tuple[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -454,12 +467,14 @@ def _extract_page_state(
     list[dict[str, Any]],
     list[str],
     list,
+    list[tuple[str, str]],
 ]:
     """
     Split a validated Page node's children into (state, computed,
-    computed_initial, watch, persist, remaining children). `State(...)`/
-    `Computed(...)`/`Watch(...)` nodes are declarations, not renderable
-    content -- they must never reach the HTML backend as a child.
+    computed_initial, watch, persist, media, remaining children).
+    `State(...)`/`Computed(...)`/`Watch(...)` nodes are declarations,
+    not renderable content -- they must never reach the HTML backend
+    as a child.
 
     `computed` is returned in dependency order (see
     `_topological_order_computed`); `computed_initial` is each
@@ -471,11 +486,14 @@ def _extract_page_state(
     also declaration order, and is simply the `name` of every
     `State(...)` on this page whose `persist` prop is `True` -- no
     dependency graph, no value of its own, same reasoning as `watch`.
+    `media` (`v0.063`) is declaration order too: `(name, query)` for
+    every `State(...)` on this page whose `media` prop is set.
     """
     state: dict[str, Any] = {}
     computed_defs: dict[str, dict[str, Any]] = {}
     watch: list[dict[str, Any]] = []
     persist: list[str] = []
+    media: list[tuple[str, str]] = []
     remaining: list = []
     for child in page.children:
         if isinstance(child, ARKNode) and child.type == "State":
@@ -483,6 +501,9 @@ def _extract_page_state(
             state[name] = child.props.get("initial")
             if child.props.get("persist"):
                 persist.append(name)
+            query = child.props.get("media")
+            if query:
+                media.append((name, query))
         elif isinstance(child, ARKNode) and child.type == "Computed":
             spec = _derivation_ref_to_spec(child.props["derive"])
             spec["deps"] = list(child.props.get("deps", ()))
@@ -509,7 +530,7 @@ def _extract_page_state(
         computed_initial[name] = _evaluate_derivation(computed_defs[name], get=_get)
 
     computed = [(name, computed_defs[name]) for name in order]
-    return state, computed, computed_initial, watch, persist, remaining
+    return state, computed, computed_initial, watch, persist, media, remaining
 
 
 def build_website_ir(
@@ -575,7 +596,7 @@ def build_website_ir(
     collector = _ResponsiveStyleCollector()
     ir_pages = []
     for route, page in pages.items():
-        state, computed, computed_initial, watch, persist, remaining_children = _extract_page_state(page)
+        state, computed, computed_initial, watch, persist, media, remaining_children = _extract_page_state(page)
         root_page = ARKNode(type=page.type, props=page.props, children=remaining_children)
         ir_pages.append(
             IRPage(
@@ -586,6 +607,7 @@ def build_website_ir(
                 computed_initial=computed_initial,
                 watch=watch,
                 persist=persist,
+                media=media,
             )
         )
     return WebsiteIR(
