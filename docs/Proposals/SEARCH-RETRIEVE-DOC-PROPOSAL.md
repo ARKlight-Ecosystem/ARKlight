@@ -2,23 +2,23 @@
 
 ## Status
 
-**Proposal — not yet accepted, not yet staged.** Follows the format
-and conventions of
+**Accepted -- staged in [`docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md`](../Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md), targeting `v0.064`.**
+Follows the format and conventions of
 [`docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md).
-Per `docs/Proposals/README.md`'s own definition, this describes
-something that does not exist yet, may never be built as written, and
-could be rejected outright.
+The content below is left as filed -- it's the design record this
+proposal was accepted on -- and is not rewritten to reflect
+in-progress implementation detail; see the addendum above for the
+current landing order and status.
 
-**A version-number note up front, since the request that prompted this
-doc referenced "v0.064":** the currently installed version
-(`pyproject.toml`) is `0.062`, and
-[`docs/version history/v0.064.md`](<../version history/v0.064.md>) is
-already reserved for stage 4 of the unrelated
-`JS-VOCABULARY-ADDENDUM-v0.070.md` ladder ("JS vocabulary: math
-derivations catalog"). This proposal does **not** target `v0.064` --
-per every other file in this folder, a `Proposals/` entry carries no
-version number at all until a maintainer accepts it and a staging doc
-(or a direct version-history entry) assigns it one. See §6.
+**A version-number note, kept for history:** this proposal originally
+disclaimed targeting `v0.064` (the currently installed version at
+filing time was `0.062`, and `v0.064` was already reserved for JS
+vocabulary addendum stage 4). At acceptance, a maintainer chose to
+interleave this proposal into `v0.064` anyway rather than push every
+later reserved slot down by one -- the same "two pieces of work, one
+milestone" precedent `v0.041` already set. The JS vocabulary addendum
+stage 4 work `v0.064` was already reserved for is unaffected; the two
+are independent and simply share a slot. See §6.
 
 **Origin:** a request to add a way for `arklight search` to return
 project documentation -- starting from the doc tree's own index, and
@@ -329,14 +329,12 @@ refinement, not required for an initial landing -- see §7.
   developer-facing CLI convenience, no interaction with "the browser
   never executes Python" / "no eval" (`docs/README.md`'s Philosophy
   section), since nothing here ships to compiled output.
-- **A frozen version number.** As noted in Status, this proposal
-  doesn't reserve `v0.064` or any other slot -- that's assigned (if
-  accepted) the same way `PROJECT-KNOWELEDGE-PROPOSAL.md` and
-  `ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md` were: a maintainer decision at
-  acceptance time, most likely the next free slot after
-  `v0.078` (currently the last reserved milestone in
-  `docs/version history/`) unless a maintainer chooses to interleave
-  it earlier.
+- **A frozen version number at filing time.** As noted in Status
+  originally, this proposal did not reserve `v0.064` or any other slot
+  when filed -- that was a maintainer decision made at acceptance
+  time, which assigned it `v0.064`, interleaved with the JS vocabulary
+  addendum stage already reserved there, per the updated Status note
+  above.
 
 ## 7. Open questions for a maintainer
 

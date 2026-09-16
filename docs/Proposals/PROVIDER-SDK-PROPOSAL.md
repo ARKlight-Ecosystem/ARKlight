@@ -2,12 +2,15 @@
 
 ## Status
 
-**Proposal -- not yet accepted, not yet staged.** Per
-`docs/Proposals/README.md`'s own definition, this describes something
-that does not exist yet, may never be built as written, and could be
-rejected outright. If accepted, this is explicitly an **experimental
-API** under `docs/Foundational/EXPERIMENTAL-APIS.md`'s existing gate --
-it is not proposed as part of ARKlight's default surface.
+**Accepted -- staged as a six-rung ladder (`v0.065`-`v0.070`) in
+[`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`](../Implementation/PROVIDER-SDK-ADDENDUM.md).**
+The content below is left as filed -- it's the design record this
+proposal was accepted on -- and is not rewritten to reflect
+in-progress implementation detail; see the addendum for the current
+landing order, per-stage status, and how it resolves this document's
+own open questions (§7). This remains an **experimental API** under
+`docs/Foundational/EXPERIMENTAL-APIS.md`'s existing gate once it
+ships -- it is not part of ARKlight's default surface.
 
 **Origin:** a discussion of whether ARKlight should have any story at
 all for sites that need to talk to an external service (Firebase was

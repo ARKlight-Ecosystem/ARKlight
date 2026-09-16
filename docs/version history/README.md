@@ -116,13 +116,13 @@ roadmap status belongs in `ARCHITECTURE.md`'s Milestones table alone.
 | [`v0.061.md`](./v0.061.md) | JS vocabulary addendum, stage 1/10 -- math siblings (`subtract`/`divide`/`min`/`max`). |
 | [`v0.062.md`](./v0.062.md) | JS vocabulary addendum, stage 2/10 -- string-casing sibling + comparison `Show` predicates. |
 | [`v0.063.md`](./v0.063.md) | JS vocabulary addendum, stage 3/10 -- small new runtime primitives (`reveal`, debounced binding, clipboard paste, geolocation, `matchMedia`). |
-| [`v0.064.md`](./v0.064.md) | **PLANNED.** JS vocabulary addendum, stage 4/10 -- math derivations catalog. |
-| [`v0.065.md`](./v0.065.md) | **PLANNED.** JS vocabulary addendum, stage 5/10 -- string derivations catalog. |
-| [`v0.066.md`](./v0.066.md) | **PLANNED.** JS vocabulary addendum, stage 6/10 -- predicates catalog. |
-| [`v0.067.md`](./v0.067.md) | **PLANNED.** JS vocabulary addendum, stage 7/10 -- list-scalar derivations catalog. |
-| [`v0.068.md`](./v0.068.md) | **PLANNED.** JS vocabulary addendum, stage 8/10 -- cross-language numeric batteries (`lerp`, `midpoint`, saturating arithmetic, `value_or`/`first_present`). |
-| [`v0.069.md`](./v0.069.md) | **PLANNED.** JS vocabulary addendum, stage 9/10 -- cross-language formatting/case batteries (`humanize_*`, `to_ordinal`, case converters). |
-| [`v0.070.md`](./v0.070.md) | **PLANNED.** JS vocabulary addendum, stage 10/10 (capstone) -- `pluralize` + `random_int`, the two entries needing an explicit design exception. |
+| [`v0.064.md`](./v0.064.md) | **PLANNED.** JS vocabulary addendum, stage 4/10 -- math derivations catalog. Plus `arklight search --retrieve-doc`, a doc-tree retrieval mode on the existing `search` subcommand. |
+| [`v0.065.md`](./v0.065.md) | **PLANNED.** JS vocabulary addendum, stage 5/10 -- string derivations catalog. Plus `Provider`, stage 1/6 -- the contract itself (`Provider.declare(...)`, closed capability enum) and its `arklight/experimental.py` gating. |
+| [`v0.066.md`](./v0.066.md) | **PLANNED.** JS vocabulary addendum, stage 6/10 -- predicates catalog. Plus `Provider`, stage 2/6 -- IR/`validate.py` integration: a declared Provider threaded through `WebsiteIR`, closed-vocabulary capability validation at build time. |
+| [`v0.067.md`](./v0.067.md) | **PLANNED.** JS vocabulary addendum, stage 7/10 -- list-scalar derivations catalog. Plus `Provider`, stage 3/6 -- JS backend emission: a fixed config blob describing declared capabilities, no networking/vendor code generated. |
+| [`v0.068.md`](./v0.068.md) | **PLANNED.** JS vocabulary addendum, stage 8/10 -- cross-language numeric batteries (`lerp`, `midpoint`, saturating arithmetic, `value_or`/`first_present`). Plus `Provider`, stage 4/6 -- an authored external-`<script src>` primitive, resolving the proposal's own §7 open question about how a concrete vendor SDK actually loads. |
+| [`v0.069.md`](./v0.069.md) | **PLANNED.** JS vocabulary addendum, stage 9/10 -- cross-language formatting/case batteries (`humanize_*`, `to_ordinal`, case converters). Plus `Provider`, stage 5/6 -- `arklight search` schema-lookup support for a registered Provider's capability contract. |
+| [`v0.070.md`](./v0.070.md) | **PLANNED.** JS vocabulary addendum, stage 10/10 (capstone) -- `pluralize` + `random_int`, the two entries needing an explicit design exception. Plus `Provider`, stage 6/6 (capstone) -- finalizing the closed capability enum and documenting the full landed contract. |
 | [`v0.071.md`](./v0.071.md) | **PLANNED.** Project Knowledge, stage 1/8 -- `.arklight/` foundation: detect-or-create the directory, establish the knowledge-format marker, safe read/write helpers. |
 | [`v0.072.md`](./v0.072.md) | **PLANNED.** Project Knowledge, stage 2/8 -- internal Project Knowledge context abstraction (providers/facts/observations separation) with no external provider wired in yet. |
 | [`v0.073.md`](./v0.073.md) | **PLANNED.** Project Knowledge, stage 3/8 -- Git as the first concrete provider: repository identity, working-tree state, graceful no-`.git/` handling. Read-only; nothing persisted yet. |
