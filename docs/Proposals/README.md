@@ -73,6 +73,8 @@ them, or for rejection.**
 | File | Covers |
 | --- | --- |
 | [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](JS-VOCABULARY-EXPANSION-PROPOSAL.md) | Proposal to expand the client-side JS vocabulary: the already-designed-but-unshipped trivial gaps, small new runtime primitives, an exhaustive catalog of scalar math/string/list derivations and predicates (both JS's own built-ins and cross-language "batteries included" idioms from Python/Rust/C++ standard libraries), and the larger IR-node-sized gaps (client-side data fetch, reorderable lists, sort/filter, file-upload preview) plus the out-of-scope bucket that conflicts with ARKlight's no-`eval` non-goal. |
+| [`URL-STATE-AS-PRIMITIVE-PROPOSAL.md`](URL-STATE-AS-PRIMITIVE-PROPOSAL.md) | Proposal for a `State(..., query=...)` primitive extending the existing `persist=True` mechanism to cover URL query parameters -- reading, coercing, fail-open defaults, write-back via `history.replaceState`, a `popstate` listener, and an opt-in push-history modifier -- and settles which of three navigation architectures a query-param change should trigger. |
+| [`ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md) | Proposal for an `arklight assistant` subcommand: a read-only, doc-grounded CLI companion ("Raeliana") woken with `--wake-up-raeliana`, plus a separate, opt-in, off-by-default `--activate-memory` flag for cross-session recall, staged as two independent capabilities. |
 
 ## Contributing
 

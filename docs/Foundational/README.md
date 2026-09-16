@@ -24,4 +24,5 @@ knowledge.
 | [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) | The `arklight deploy` subcommand: a thin wrapper delegating to a hosting provider's own CLI (Cloudflare Workers/Wrangler by default) rather than reimplementing provider deployment logic. For every other subcommand (`build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`), see the root [`README.md`](../../README.md#cli), the single canonical CLI reference. |
 | [`DESIGN-NOTES.md`](DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
+| [`SYSTEM-DESIGN-AGREEMENTS.md`](SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |
 | [`USER-DEFINED-COMPONENTS.md`](USER-DEFINED-COMPONENTS.md) | Design for user-defined, reusable components (v0.060). |

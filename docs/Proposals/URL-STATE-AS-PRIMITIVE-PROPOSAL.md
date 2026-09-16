@@ -2,12 +2,17 @@
 
 ## Status
 
-**Proposal — not yet accepted, not yet staged.** Written externally,
-following the format and conventions of
-[`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](https://github.com/Rae-ARK/ARKlight/blob/alpha/docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md).
+**Proposal — not yet accepted, not yet staged.** Follows the format
+and conventions of
+[`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](JS-VOCABULARY-EXPANSION-PROPOSAL.md).
 Per `docs/Proposals/README.md`'s own definition, this describes
 something that does not exist yet, may never be built as written, and
-could be rejected outright once a maintainer looks at it.
+could be rejected outright.
+
+**Origin:** an exhaustive grep of `arklight/` for `location.search`,
+`URLSearchParams`, and any query-string handling, done while auditing
+the client-side vocabulary for gaps the static-compilation model
+doesn't already dissolve (see §1 below).
 
 ## TL;DR
 
@@ -70,7 +75,7 @@ reuses this shape directly:
 State("page", initial=1, query="page")
 ```
 
-## 3. Design, worked through GPT's eight sub-questions
+## 3. Design, broken into eight sub-questions
 
 Each of these was raised as a separate concern worth resolving on its
 own rather than bundling into one vague "query param support" ask.
