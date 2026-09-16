@@ -57,6 +57,18 @@ and captured in the changelog or a Foundational doc.
 | [`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`](Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md) | Proposal for a purpose-built native desktop host/packager (replacing Neutralino.js as the canonical desktop backend). |
 | [`NEUTRALINO-INTEGRATION.md`](Backends/NEUTRALINO-INTEGRATION.md) | Neutralino desktop-app integration (current desktop backend). |
 
+### [`docs/Proposals/`](Proposals/README.md) — unsettled
+
+Speculative design proposals not yet reviewed or accepted by a
+maintainer — distinct from `Foundational/`'s settled, permanent
+record and from `Backends/`'s already-underway staging docs. See the
+folder's own README for the full rationale. Removed or graduated
+(into `Foundational/` or a staging doc) once a decision is made.
+
+| File | Covers |
+| --- | --- |
+| [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](<Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md>) | Proposal for an exhaustive scalar math/string/list derivation-and-predicate catalog, plus the larger client-side-fetch-sized gaps still open. |
+
 ### [`docs/new js backend proposal/`](<new js backend proposal/README.md>) — working reference
 
 Competing proposals under consideration for a redesigned JS backend.
