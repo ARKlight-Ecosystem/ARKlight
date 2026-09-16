@@ -108,7 +108,7 @@ Checks performed:
 
 from __future__ import annotations
 
-from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, DerivationRef, PredicateRef
+from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, DerivationRef, ModelBindSpec, PredicateRef
 from arklight.ir.schema import (
     ACTION_REGISTRY,
     COMPARE_OPS,
@@ -136,39 +136,50 @@ def _validate_bind(node: ARKNode, *, path: str, page_state: frozenset[str]) -> N
         )
 
 
-def _validate_modifiers(action: ActionRef, *, path: str) -> None:
-    """Stage 3 ("Reactive-core vdom staging"): check each token in
-    `action.modifiers` against `MODIFIER_REGISTRY` -- a bare name
+def _validate_modifier_tokens(modifiers: tuple[str, ...], *, path: str, label: str) -> None:
+    """Stage 3 ("Reactive-core vdom staging"), generalized at `v0.063`
+    for `bind_value=Bind.model(...).debounce(...)`/`.throttle(...)`:
+    check each token against `MODIFIER_REGISTRY` -- a bare name
     (`prevent`/`stop`/`once`) must take no parameter, and a
     `"<name>:<value>"` token (`debounce:300`/`throttle:300`) must both
-    name a param-taking modifier and carry a positive integer value."""
-    for token in action.modifiers:
+    name a param-taking modifier and carry a positive integer value.
+    `label` (`"on_click"`/`"bind_value"`) only changes the error
+    message's prefix -- the check itself is identical either way."""
+    for token in modifiers:
         name, sep, param = token.partition(":")
         spec = MODIFIER_REGISTRY.get(name)
         if spec is None:
             known = ", ".join(sorted(MODIFIER_REGISTRY))
             raise ValidationError(
-                f"on_click at {path} uses unknown modifier {name!r} (from "
+                f"{label} at {path} uses unknown modifier {name!r} (from "
                 f"{token!r}). Known modifiers are: {known}."
             )
         if spec.has_param:
             if not sep:
                 raise ValidationError(
-                    f"on_click at {path} uses modifier {name!r} without a "
+                    f"{label} at {path} uses modifier {name!r} without a "
                     f"millisecond value -- use .{name}(<ms>), e.g. .{name}(300)."
                 )
             if not param.isdigit() or int(param) <= 0:
                 raise ValidationError(
-                    f"on_click at {path} uses modifier {token!r} with an "
+                    f"{label} at {path} uses modifier {token!r} with an "
                     f"invalid value -- {name!r} needs a positive integer "
                     f"millisecond count."
                 )
         elif sep:
             raise ValidationError(
-                f"on_click at {path} uses modifier {token!r}, but {name!r} "
+                f"{label} at {path} uses modifier {token!r}, but {name!r} "
                 f"doesn't take a value -- use .with_modifiers({name!r}) "
                 f"instead."
             )
+
+
+def _validate_modifiers(action: ActionRef, *, path: str) -> None:
+    """Stage 3 ("Reactive-core vdom staging"): check each token in
+    `action.modifiers` against `MODIFIER_REGISTRY` -- see
+    `_validate_modifier_tokens` for the shared per-token check this
+    now delegates to (also used by `_validate_model_bind` below)."""
+    _validate_modifier_tokens(action.modifiers, path=path, label="on_click")
 
 
 def _validate_action(action: ActionRef, *, path: str, mutable_state: frozenset[str]) -> None:
@@ -212,26 +223,35 @@ def _validate_class_bind(node: ARKNode, *, path: str, page_state: frozenset[str]
 
 def _validate_model_bind(node: ARKNode, *, path: str, mutable_state: frozenset[str]) -> None:
     """
-    `vdom-6`: `bind_value=` (typically `Bind.model("name")`, a plain
-    string) is a two-way binding -- the target must be a real
-    `State(...)` name declared on the page, same restriction
-    `_validate_action` already enforces for `Action.*(...)` targets,
-    since a `Computed(...)` has no independent value for user input to
-    write back into.
+    `vdom-6`: `bind_value=` (a plain string, typically `Bind.model(
+    "name")`, or -- `v0.063` -- a `ModelBindSpec` from `Bind.model(
+    "name", debounce=...)`/`.throttle(...)`) is a two-way binding --
+    the target must be a real `State(...)` name declared on the page,
+    same restriction `_validate_action` already enforces for
+    `Action.*(...)` targets, since a `Computed(...)` has no
+    independent value for user input to write back into. A
+    `ModelBindSpec`'s `modifiers` are checked against the same
+    `MODIFIER_REGISTRY` `on_click=`'s modifiers already use (see
+    `_validate_modifier_tokens`).
     """
     bind_value = node.props.get("bind_value")
     if bind_value is None:
         return
-    if not isinstance(bind_value, str) or not bind_value:
+    if isinstance(bind_value, ModelBindSpec):
+        state_name = bind_value.state
+        _validate_modifier_tokens(bind_value.modifiers, path=path, label="bind_value")
+    elif isinstance(bind_value, str) and bind_value:
+        state_name = bind_value
+    else:
         raise ValidationError(
             f"{node.type!r} at {path} has bind_value={bind_value!r}, which must "
             f"be a non-empty state name string (e.g. Bind.model(\"query\"))."
         )
-    if bind_value not in mutable_state:
+    if state_name not in mutable_state:
         known = ", ".join(sorted(mutable_state)) or "(none declared)"
         raise ValidationError(
-            f"bind_value at {path} (Bind.model({bind_value!r})) targets state "
-            f"{bind_value!r}, which isn't declared on this page as State(...) "
+            f"bind_value at {path} (Bind.model({state_name!r})) targets state "
+            f"{state_name!r}, which isn't declared on this page as State(...) "
             f"(a Computed(...) name can't be a bind_value target -- it has no "
             f"independent value of its own to write back into). State declared "
             f"on this page: {known}."

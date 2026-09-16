@@ -78,7 +78,7 @@ from __future__ import annotations
 import json
 from html import escape
 
-from arklight.ast.nodes import ActionRef, ClassBindSpec
+from arklight.ast.nodes import ActionRef, ClassBindSpec, ModelBindSpec
 from arklight.backend.html.routing import (
     ASSET_OR_ROUTE_AWARE_ATTRS,
     ROUTE_AWARE_ATTRS,
@@ -249,15 +249,24 @@ def _attr_string(
             props["class_name"] = " ".join(classes)
 
     bind_value = props.get("bind_value")
-    if isinstance(bind_value, str) and bind_value and page_state is not None:
+    bind_value_state = (
+        bind_value.state
+        if isinstance(bind_value, ModelBindSpec)
+        else bind_value if isinstance(bind_value, str) else None
+    )
+    if bind_value_state and page_state is not None:
         # vdom-6: pre-fill `value` from state the same way bind_class
         # pre-fills `class_name` above, so the page reflects its
         # initial state correctly with JS disabled -- the shipped
         # runtime keeps it in sync (both directions) after that. An
         # explicit `value=` prop, if also given, wins -- bind_value
-        # only fills the gap, it doesn't override.
-        if "value" not in props and bind_value in page_state:
-            props["value"] = page_state.get(bind_value)
+        # only fills the gap, it doesn't override. `v0.063`: a
+        # `ModelBindSpec` (a debounced/throttled `Bind.model(...)`)
+        # pre-fills from its own `.state` exactly like a plain string
+        # bind_value does -- the modifier only changes when the
+        # client-side write-back happens, never the initial render.
+        if "value" not in props and bind_value_state in page_state:
+            props["value"] = page_state.get(bind_value_state)
 
     parts = []
     for key, value in props.items():
@@ -338,12 +347,24 @@ def _attr_string(
             parts.append(f' data-ark-bind-class-state="{escape(value.state, quote=True)}"')
             continue
 
-        if key == "bind_value" and isinstance(value, str) and value:
+        if key == "bind_value" and isinstance(value, (str, ModelBindSpec)) and value:
             # vdom-6: the runtime reads this to know which state key
             # to keep this element's `value` synced with, in both
             # directions -- the initial value (if any) was already
-            # folded into `value` above.
-            parts.append(f' data-ark-model="{escape(value, quote=True)}"')
+            # folded into `value` above. `v0.063`: a `ModelBindSpec`
+            # carries the same state key plus an optional
+            # debounce/throttle modifier, compiled into a second,
+            # plain `data-ark-model-modifiers` attribute --
+            # `wireModelBinding` (`arklight/backend/js/runtime/
+            # model.py`) reads it directly rather than routing through
+            # HTMX's `hx-trigger` syntax `on_click=Action.*(...)`
+            # modifiers use, since this is an `input` event, not a
+            # click HTMX's own attribute processing ever touches.
+            state_name = value.state if isinstance(value, ModelBindSpec) else value
+            parts.append(f' data-ark-model="{escape(state_name, quote=True)}"')
+            if isinstance(value, ModelBindSpec) and value.modifiers:
+                modifiers_str = ",".join(value.modifiers)
+                parts.append(f' data-ark-model-modifiers="{escape(modifiers_str, quote=True)}"')
             continue
 
         if key in BEHAVIOR_PROP_ATTRS:

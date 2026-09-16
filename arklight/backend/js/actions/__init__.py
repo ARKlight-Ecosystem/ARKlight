@@ -11,7 +11,7 @@ least one page declares `State(...)`.
 
 from __future__ import annotations
 
-from arklight.backend.js.actions import append, decrement, increment, remove, reset, set, toggle_bool
+from arklight.backend.js.actions import append, decrement, geolocate, increment, remove, reset, set, toggle_bool
 
 ACTION_MODULES = {
     set.NAME: set,
@@ -21,6 +21,9 @@ ACTION_MODULES = {
     reset.NAME: reset,
     append.NAME: append,
     remove.NAME: remove,
+    # `v0.063` (docs/version history/v0.063.md): JS vocabulary
+    # addendum stage 3/10 -- one-shot geolocation write-back.
+    geolocate.NAME: geolocate,
 }
 
 ACTION_FRAGMENTS: dict[str, str] = {

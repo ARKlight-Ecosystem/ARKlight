@@ -270,7 +270,7 @@ without also shipping the click interceptor it would never use (see
 
 from __future__ import annotations
 
-from arklight.ast.nodes import ActionRef
+from arklight.ast.nodes import ActionRef, ModelBindSpec
 from arklight.backend.base import Backend
 from arklight.backend.js.actions import ACTION_FRAGMENTS
 from arklight.backend.js.behaviors import BEHAVIOR_FRAGMENTS
@@ -354,6 +354,8 @@ def _collect_usage(
             elif isinstance(on_click, ActionRef):
                 used_on_click_actions.add(on_click.action)
             if isinstance(node.props.get("bind_value"), str) and node.props.get("bind_value"):
+                has_model_binding = True
+            elif isinstance(node.props.get("bind_value"), ModelBindSpec):
                 has_model_binding = True
             if node.type == "Repeat":
                 has_repeat = True

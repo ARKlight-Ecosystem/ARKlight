@@ -24,6 +24,7 @@ from arklight.ast.nodes import (
     ClassBindSpec,
     DerivationRef,
     ItemIndexRef,
+    ModelBindSpec,
     PredicateRef,
     node,
 )
@@ -502,7 +503,7 @@ def _bind_when(state: str, class_name: str) -> ClassBindSpec:
 Bind.when = _bind_when
 
 
-def _bind_model(name: str) -> str:
+def _bind_model(name: str, *, debounce: int | None = None, throttle: int | None = None) -> Any:
     """
     Two-way input binding (`vdom-6`): `bind_value=Bind.model("query")`
     keeps an `Input`'s `value` in sync with `State("query", ...)` in
@@ -520,8 +521,26 @@ def _bind_model(name: str) -> str:
     Only a `State(...)` name is a valid target (mirrors `Action.*(...)`
     's own restriction) -- a `Computed(...)` has no independent value
     of its own for user input to write back into.
+
+    `v0.063`: pass `debounce=<ms>` or `throttle=<ms>` to wait for a
+    pause in typing (or cap the write rate) before a keystroke is
+    written back into state -- reuses the same `debounce`/`throttle`
+    tokens `Action.*(...).debounce(...)`/`.throttle(...)` already
+    validate against `arklight.ir.schema.MODIFIER_REGISTRY`, wired
+    into the shipped `wireModelBinding` instead of the click
+    dispatcher. With neither given, returns the same plain string as
+    before -- only requesting a modifier changes the return type.
+
+        Input(bind_value=Bind.model("query", debounce=300))
     """
-    return name
+    if debounce is None and throttle is None:
+        return name
+    modifiers: list[str] = []
+    if debounce is not None:
+        modifiers.append(f"debounce:{debounce}")
+    if throttle is not None:
+        modifiers.append(f"throttle:{throttle}")
+    return ModelBindSpec(state=name, modifiers=tuple(modifiers))
 
 
 Bind.model = _bind_model

@@ -90,7 +90,7 @@ import itertools
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
-from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec
+from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, ModelBindSpec
 
 # A component render function: takes resolved keyword props, returns
 # the ARKNode subtree (built entirely out of other components -- built-in
@@ -608,6 +608,11 @@ def _rewrite_component_state_refs(value: Any, name_map: dict[str, str]) -> Any:
             new_props = dict(new_props)
             props_changed = True
         new_props["bind_value"] = name_map[bind_value]
+    elif isinstance(bind_value, ModelBindSpec) and bind_value.state in name_map:
+        if not props_changed:
+            new_props = dict(new_props)
+            props_changed = True
+        new_props["bind_value"] = replace(bind_value, state=name_map[bind_value.state])
 
     new_children = [_rewrite_component_state_refs(c, name_map) for c in value.children]
     children_changed = new_children != value.children
