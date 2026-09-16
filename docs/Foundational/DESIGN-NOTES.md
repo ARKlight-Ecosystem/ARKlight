@@ -533,7 +533,7 @@ their own rather than as one large patch:
   (...) { .arkgen-N { ... } }` rule, auto-generating a scoped class
   per node the same way today's inline `style=` handling already
   needs a per-node identity. This finally allows a real breakpoint
-  ("hide entirely on mobile"), which `docs/DESIGN-NOTES.md` has
+  ("hide entirely on mobile"), which `DESIGN-NOTES.md` has
   flagged since v0.003 as something the intrinsic-layout utilities
   cannot substitute for.
 - Explicitly deferred, not silently dropped: `@keyframes` animations
@@ -1595,7 +1595,7 @@ this file already uses for `v0.048`:
   addendum rather than spec'd speculatively now.
 - Alternate framework backends (`v0.100`) -- this milestone is
   a step toward the state/event-semantics prerequisite
-  `docs/DESIGN-NOTES.md`'s "authoring layer" section above already
+  `DESIGN-NOTES.md`'s "authoring layer" section above already
   names for that milestone, but does not itself complete it (no
   Vue/Svelte codegen ships as part of v0.044).
 

@@ -2,16 +2,12 @@
 
 ## Vision
 
-**ARKlight is a Python-first compiler for building static websites where
-developers work with a structured component API, while the output remains
-ordinary, dependency-free HTML.**
-
-Write your site in Python. ARKlight compiles it to standard HTML with CSS and
-vanilla JavaScript. The browser never executes Python — you get predictable,
-inspectable, portable output that works anywhere static files are hosted.
-
-Python ergonomics at authorship time. Clean web artifacts at deployment time.
-No Python runtime in production. No framework bloat.
+The project pitch (what ARKlight is, the Python-in/HTML-out model, why
+the browser never executes Python) lives in exactly one place: the
+opening of the root [`README.md`](../../README.md). Kept there, not
+copied here, because it's landing-page copy first and an architecture
+fact second -- see `docs/README.md`'s "Adding a new doc" section for
+the rule this follows.
 
 ## Core Principles
 
@@ -25,37 +21,74 @@ No Python runtime in production. No framework bloat.
   user-facing override (`Site(...)`/`Page(...)` kwarg, `arklight build`
   flag) only when a real site could want it different *and* nothing
   already reaches it; otherwise it stays a plain internal constant. See
-  `docs/CONFIGURABILITY.md` for the full rule and worked examples.
+  [`CONFIGURABILITY.md`](CONFIGURABILITY.md) for the full rule and worked
+  examples.
 
 ## Compiler Pipeline
+
+This is the canonical copy of the pipeline diagram -- `README.md`
+links here rather than keeping its own copy (see "Why this file is
+short" at the bottom for the rule).
 
 ```
 Python Source
     |
     v
-Python AST
-    |
+Python AST            arklight/parser/discover.py
+    |                  (static analysis via the stdlib `ast` module:
+    |                   finds Site()/@site.page(...) without executing
+    |                   user code)
     v
-ARK AST
-    |
+ARK AST               arklight/parser/loader.py + arklight/api.py
+    |                  (the module is executed; calling Heading(...),
+    |                   Text(...), etc. builds a tree of ARKNode objects
+    |                   -- that tree IS the ARK AST)
     v
-Normalization
-    |
+Normalization         arklight/ir/normalize.py
+    |                  (flattens nested lists, drops None/False,
+    |                   wraps bare strings as Text nodes where needed)
     v
-Validation
-    |
+Validation            arklight/ir/validate.py
+    |                  (schema check: known component types, required
+    |                   props, valid text-only nesting)
     v
-Website IR
-    |
+Website IR            arklight/ir/build.py
+    |                  (backend-independent IRNode tree: type/props/children
+    |                   -- models website *intent*, not HTML)
     v
-Backend Interface
-    |
+Backend Interface     arklight/backend/base.py
+    |                  (abstract `Backend.render(ir) -> {path: contents}`)
     v
-HTML Backend
-    |
+HTML Backend          arklight/backend/html/render.py
+    |                  (maps IR node types to HTML tags, rewrites internal
+    |                   Link/Image hrefs to relative file paths, links the
+    |                   generated stylesheet and behavior runtime)
     v
-index.html
+CSS Backend           arklight/backend/css/render.py
+    |                  (v0.002: generates a global default stylesheet)
+    v
+JS Backend            arklight/backend/js/render.py
+    |                  (v0.003: generates a tiny fixed behavior runtime;
+    |                   all three backends run over the same IR and their
+    |                   outputs are merged)
+    v
+index.html, about.html, styles.css, arklight.js, ...
 ```
+
+`arklight/compiler/pipeline.py` orchestrates all of the above into a
+single `build(entry_path, output_dir)` call, which is what the CLI
+uses. By default it runs `[HTMLBackend(), CSSBackend(), JSBackend()]`
+-- pass your own `backends=[...]` list to customize which backends run.
+
+Each backend can also implement `postprocess(output_files) ->
+output_files`, called once per backend (same order as `backends=[...]`)
+*after* every backend's `render()` has run, over the combined
+`{path: contents}` dict from all of them. The default `Backend`
+implementation is a no-op identity, so existing backends need no
+changes. This is the extension point for adding a new backend that
+depends on what other backends already produced (analytics snippets,
+build stamps, sitemap generation, ...) without editing that backend's
+source -- see `tests/test_pipeline_end_to_end.py` for a worked example.
 
 ## Website IR
 
@@ -69,13 +102,18 @@ The IR models website intent rather than HTML.
 ## Backend Interface
 
 Current:
-- HTML (`arklight/backend/html/`) -- a service-oriented module split
-  (mirroring the CSS backend below) is designed and Stages 1-2 of 6 are
-  now implemented (`tag_map.py`, `routing.py`), see
-  `docs/Backends/HTML-BACKEND-REFACTOR.md`.
-- CSS (`arklight/backend/css/`) -- already split into
+- HTML (`arklight/backend/html/`) -- fully split into a
+  service-oriented set of modules (`tag_map.py`, `routing.py`,
+  `attrs.py`, `head_meta.py`, `page_render.py`, `render.py`), the
+  same shape the CSS backend below already used. All 6 staged rungs
+  of this refactor shipped; the staging doc that tracked them,
+  `docs/Backends/HTML-BACKEND-REFACTOR.md`, was removed once it
+  finished -- see `CHANGELOG.md` for the per-stage record.
+- CSS (`arklight/backend/css/`) -- split into
   `base_stylesheet.py`/`design_tokens.py`/`custom_styles.py`/
-  `render.py`, see `docs/CSS-BACKEND-REFACTOR.md`.
+  `at_rules.py`/`selectors.py`/`render.py`. Same removed-once-done
+  staging doc pattern as the HTML backend above -- see `CHANGELOG.md`
+  for the record.
 - JavaScript (`arklight/backend/js/`)
 
 Future:
@@ -88,51 +126,26 @@ Future:
   parser/ir/backend internals" shape as `arklight.packer`. Evolves the
   existing `ARKlight-Viewer-for-Android-Devices` app into this
   backend's runtime rather than generating an Android project from
-  scratch. See `docs/DESIGN-NOTES.md` ("v0.0438: Android backend") for
+  scratch. See `DESIGN-NOTES.md` ("v0.0438: Android backend") for
   the design and `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md` for
-  the staged implementation order -- Stage 0 in progress.)
+  the staged implementation order -- Stages 0-4 done, see the Milestones
+  table below for current status.)
 
 ## Public API
 
-Everything is a function.
-
-Children are positional arguments.
-
-Properties are keyword arguments.
-
-Components are Python functions.
-
-```python
-from arklight import *
-
-site = Site()
-
-@site.page("/")
-def home():
-    return Page(
-        Heading("ARKlight"),
-        Text("Build websites with Python."),
-        Button("Get Started")
-    )
-```
+Everything is a function. Children are positional arguments,
+properties are keyword arguments, components are Python functions --
+no classes to subclass, no JSX-like syntax. The quickstart example and
+the full public component/behavior/state API reference live in the
+root [`README.md`](../../README.md), kept there as the single
+canonical copy since it's also the first thing a newcomer reads.
 
 ## Repository
 
-```
-arklight-framework/
-  arklight/
-    compiler/
-    parser/
-    ast/
-    ir/
-    backend/
-      html/
-    cli/
-    config.py         `arklight.config.py` project-config loader
-  examples/
-  tests/
-  docs/
-```
+The annotated repository layout is the root
+[`README.md`](../../README.md#repository-layout)'s "Repository layout"
+section, kept there as the single canonical copy rather than
+duplicated (and drifting out of sync) here.
 
 ## Milestones
 
@@ -151,18 +164,18 @@ here rather than keeping their own copies. Status: DONE / PLANNED.
 | v0.041 | CLI/pipeline/JS runtime error-handling hardening + stateful JS vocabulary addenda I & II (`Action.decrement/reset/append/remove`) | DONE |
 | v0.042 | Extra CSS features -- `Site.style(name, rules)` custom CSS class authoring, `arklight search <name>` component-schema lookup, `arklight --help`/bare `arklight` help text | DONE |
 | v0.043 | Optional `<head>` metadata props (`description`/`favicon`/`og_*` on `Page(...)`) + `Backend.postprocess(...)` extension hook | DONE |
-| v0.048 | CSS `@media` queries + structured `<head>`/`<header>` extension -- Stage A (`meta`/`links` on `Page(...)`, DONE) + Stage B (`responsive_style` + `@media` compilation, DONE); see `docs/DESIGN-NOTES.md` | DONE |
-| v0.054 | JS backend capability expansion -- computed/derived state, watch effects, two-way input binding, per-item list rendering, conditional show/hide, event modifiers, reactive class binding, all via closed registries (no arbitrary JS/eval) -- design complete in `docs/DESIGN-NOTES.md`; all seven feeding capabilities landed as `vdom-1` through `vdom-7`, and `vdom-8` (the last stage, `localStorage` persistence) has now landed too | DONE |
-| vdom-staging | Reactive-core vdom staging, 8 stages feeding `v0.054`, all DONE: vendored snabbdom bare core swapped into `State`'s re-render pass (Stage 1); reactive class binding via `Bind.when(...)`/`bind_class=` (Stage 2); event modifiers -- `.with_modifiers(...)`/`.debounce(...)`/`.throttle(...)` (Stage 3); computed/derived state -- `Computed`/`Derive.*` (Stage 4); watch effects -- `Watch(...)` (Stage 5); two-way input binding -- `bind_value=Bind.model(...)` (Stage 6); per-item list rendering (`Repeat`) + conditional show/hide (`Show`) (Stage 7); `localStorage` persistence for `State(..., persist=True)` (Stage 8) -- see `docs/DESIGN-NOTES.md` ("Reactive-core vdom staging") and `PROGRESS.md`'s Snapshot table for the per-stage implementation record | DONE |
+| v0.048 | CSS `@media` queries + structured `<head>`/`<header>` extension -- Stage A (`meta`/`links` on `Page(...)`, DONE) + Stage B (`responsive_style` + `@media` compilation, DONE); see `DESIGN-NOTES.md` | DONE |
+| v0.054 | JS backend capability expansion -- computed/derived state, watch effects, two-way input binding, per-item list rendering, conditional show/hide, event modifiers, reactive class binding, all via closed registries (no arbitrary JS/eval) -- design complete in `DESIGN-NOTES.md`; all seven feeding capabilities landed as `vdom-1` through `vdom-7`, and `vdom-8` (the last stage, `localStorage` persistence) has now landed too | DONE |
+| vdom-staging | Reactive-core vdom staging, 8 stages feeding `v0.054`, all DONE: vendored snabbdom bare core swapped into `State`'s re-render pass (Stage 1); reactive class binding via `Bind.when(...)`/`bind_class=` (Stage 2); event modifiers -- `.with_modifiers(...)`/`.debounce(...)`/`.throttle(...)` (Stage 3); computed/derived state -- `Computed`/`Derive.*` (Stage 4); watch effects -- `Watch(...)` (Stage 5); two-way input binding -- `bind_value=Bind.model(...)` (Stage 6); per-item list rendering (`Repeat`) + conditional show/hide (`Show`) (Stage 7); `localStorage` persistence for `State(..., persist=True)` (Stage 8) -- see `DESIGN-NOTES.md` ("Reactive-core vdom staging") and `PROGRESS.md`'s Snapshot table for the per-stage implementation record | DONE |
 | v0.060 | User-defined, reusable components | DONE |
-| v0.080 | Android backend -- `arklight android` packages a `build-dir` into a native Android project via `androidx.webkit.WebViewAssetLoader`, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the backend's runtime (staged `scaffold` -> CI build (2) -> CI install/launch smoke test (3) -> CI release build (4) -> local `build` (5) -> `--install` (6) -> `--release` (7) CLI ladder); design complete in `docs/DESIGN-NOTES.md`, staged implementation tracked in `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`, Stages 0-4 (`arklight android scaffold`, including its generated GitHub Actions CI build + emulator smoke-test + release-build workflow) done | IN PROGRESS |
+| v0.080 | Android backend -- `arklight android` packages a `build-dir` into a native Android project via `androidx.webkit.WebViewAssetLoader`, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the backend's runtime (staged `scaffold` -> CI build (2) -> CI install/launch smoke test (3) -> CI release build (4) -> local `build` (5) -> `--install` (6) -> `--release` (7) CLI ladder); design complete in `DESIGN-NOTES.md`, staged implementation tracked in `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`, Stages 0-4 (`arklight android scaffold`, including its generated GitHub Actions CI build + emulator smoke-test + release-build workflow) done | IN PROGRESS |
 | v0.100 | Desktop backend -- `arklight desktop` packages a `build-dir` into a cross-platform desktop app (Tauri-based or similar); design pending | PLANNED |
 | v1.0 | Stable compiler | PLANNED |
 
 **Renumbered.** v0.048 (CSS `@media` + `<head>` extension) is now
 DONE -- both Stage A (`meta`/`links` on `Page(...)`) and Stage B
 (`responsive_style` + `@media` compilation) have landed; see
-`docs/DESIGN-NOTES.md` for both designs and `PROGRESS.md` for the
+`DESIGN-NOTES.md` for both designs and `PROGRESS.md` for the
 implementation record of each stage. With v0.048 out of the way, the
 milestones behind it were renumbered to close the gap and, at the
 time, make room for a dedicated KaiOS slot: JS backend capability
@@ -178,7 +191,7 @@ now `v0.100`. Reason: an existing external project,
 `ARKlight-Viewer-for-Android-Devices`, is already most of the Android
 backend's runtime (AndroidX `WebView`, offline `.ark`-bundle handling,
 bundle/seal logic already split into its own files) -- see
-`docs/DESIGN-NOTES.md` ("v0.0438: Android backend")'s "Updated
+`DESIGN-NOTES.md` ("v0.0438: Android backend")'s "Updated
 direction" note. The Android backend has a head start the Desktop
 backend doesn't (Desktop's design is still pending, not complete), so
 it moves ahead in sequence. Scope is unchanged for both; only order
@@ -211,14 +224,32 @@ design docs already sat. See `PROGRESS.md`'s "Planned, not yet
 scheduled to a version" section for the equivalent snapshot-table
 change.
 
-## Non-goals
+## Non-goals (v0.001 and for the foreseeable future)
+
+The canonical list -- `README.md` links here rather than keeping its
+own copy:
 
 - Browser-side Python
 - Virtual DOM
-- Runtime Python
-- Feature creep
+- Runtime Python execution in the browser
+- Feature creep beyond the milestone roadmap above
 
 ---
 
 See `PROGRESS.md` in the repo root for implementation status and
 `CHANGELOG.md` for version history.
+
+## Why this file is short on prose, long on links
+
+This file is the permanent architecture record (see
+`docs/Foundational/README.md`'s "not deletable" note), so it's tempting
+to make it self-contained by re-explaining everything here. Deliberately
+not done: a fact that's also landing-page copy (the project pitch,
+the quickstart example) lives in `README.md`, and this file links to
+it rather than keeping a second, independently-editable copy that can
+drift -- exactly the "single source of truth per kind of record" rule
+`README.md`'s own "Status" section already follows for `CHANGELOG.md`/
+`PROGRESS.md`. What stays here instead: the parts that are genuinely
+*architecture*, not onboarding -- the pipeline's canonical diagram, the
+Backend Interface's current/future split, the Milestones table, and
+the Non-goals list above.

@@ -21,7 +21,7 @@ knowledge.
 | --- | --- |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
 | [`CONFIGURABILITY.md`](CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. |
-| [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) | The `arklight` CLI: build/deploy workflows and commands. |
+| [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) | The `arklight deploy` subcommand: a thin wrapper delegating to a hosting provider's own CLI (Cloudflare Workers/Wrangler by default) rather than reimplementing provider deployment logic. For every other subcommand (`build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`), see the root [`README.md`](../../README.md#cli), the single canonical CLI reference. |
 | [`DESIGN-NOTES.md`](DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
-| [`user-defined-components.md`](user-defined-components.md) | Design for user-defined, reusable components (v0.060). |
+| [`USER-DEFINED-COMPONENTS.md`](USER-DEFINED-COMPONENTS.md) | Design for user-defined, reusable components (v0.060). |

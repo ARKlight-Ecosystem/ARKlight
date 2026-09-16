@@ -279,67 +279,15 @@ full list of subcommands with a short description of each.
 ## Compiler pipeline
 
 ARKlight compiles a site in clearly separated stages, each in its own
-part of the package:
-
-```
-Python Source
-    |
-    v
-Python AST            arklight/parser/discover.py
-    |                  (static analysis via the stdlib `ast` module:
-    |                   finds Site()/@site.page(...) without executing
-    |                   user code)
-    v
-ARK AST               arklight/parser/loader.py + arklight/api.py
-    |                  (the module is executed; calling Heading(...),
-    |                   Text(...), etc. builds a tree of ARKNode objects
-    |                   -- that tree IS the ARK AST)
-    v
-Normalization         arklight/ir/normalize.py
-    |                  (flattens nested lists, drops None/False,
-    |                   wraps bare strings as Text nodes where needed)
-    v
-Validation            arklight/ir/validate.py
-    |                  (schema check: known component types, required
-    |                   props, valid text-only nesting)
-    v
-Website IR            arklight/ir/build.py
-    |                  (backend-independent IRNode tree: type/props/children
-    |                   -- models website *intent*, not HTML)
-    v
-Backend Interface     arklight/backend/base.py
-    |                  (abstract `Backend.render(ir) -> {path: contents}`)
-    v
-HTML Backend          arklight/backend/html/render.py
-    |                  (maps IR node types to HTML tags, rewrites internal
-    |                   Link/Image hrefs to relative file paths, links the
-    |                   generated stylesheet and behavior runtime)
-    v
-CSS Backend           arklight/backend/css/render.py
-    |                  (v0.002: generates a global default stylesheet)
-    v
-JS Backend            arklight/backend/js/render.py
-    |                  (v0.003: generates a tiny fixed behavior runtime;
-    |                   all three backends run over the same IR and their
-    |                   outputs are merged)
-    v
-index.html, about.html, styles.css, arklight.js, ...
-```
-
-`arklight/compiler/pipeline.py` orchestrates all of the above into a
-single `build(entry_path, output_dir)` call, which is what the CLI
-uses. By default it runs `[HTMLBackend(), CSSBackend(), JSBackend()]`
--- pass your own `backends=[...]` list to customize which backends run.
-
-Each backend can also implement `postprocess(output_files) ->
-output_files`, called once per backend (same order as `backends=[...]`)
-*after* every backend's `render()` has run, over the combined
-`{path: contents}` dict from all of them. The default `Backend`
-implementation is a no-op identity, so existing backends need no
-changes. This is the extension point for adding a new backend that
-depends on what other backends already produced (analytics snippets,
-build stamps, sitemap generation, ...) without editing that backend's
-source -- see `tests/test_pipeline_end_to_end.py` for a worked example.
+part of the package -- Python Source → Python AST → ARK AST →
+Normalization → Validation → Website IR → Backend Interface → HTML/CSS/JS
+Backends → `index.html`/`styles.css`/`arklight.js`. The full diagram,
+annotated with the exact file each stage lives in, is the single
+canonical copy in
+[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md#compiler-pipeline)
+-- kept there rather than duplicated here, alongside the `Backend`
+extension-point details (`postprocess(...)`, custom `backends=[...]`
+lists).
 
 ### Internal links are relative, not root-absolute
 
@@ -745,12 +693,13 @@ pip install pytest
 pytest
 ```
 
-## Non-goals (v0.001 and for the foreseeable future)
+## Non-goals
 
-- Browser-side Python
-- Virtual DOM
-- Runtime Python execution in the browser
-- Feature creep beyond the milestone roadmap below
+Browser-side Python, a virtual DOM, runtime Python execution in the
+browser, feature creep beyond the milestone roadmap below -- the full
+list lives in
+[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md#non-goals-v0001-and-for-the-foreseeable-future),
+the single canonical copy.
 
 ## Roadmap
 
