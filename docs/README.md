@@ -43,8 +43,7 @@ record for the project, updated in place rather than removed.
 | [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | The `arklight` CLI: build/deploy workflows and commands. |
 | [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
-| [`user-defined-components.md`](Foundational/user-defined-components.md) | Design for user-defined, reusable components (v0.060). |
-| [`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`](Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md) | Staged implementation ladder for v0.060, and the Option A (default) / Option B (experimental) hybrid decision. Stages 0-4 done. |
+| [`USER-DEFINED-COMPONENTS.md`](Foundational/USER-DEFINED-COMPONENTS.md) | User-defined, reusable components (v0.060, shipped in full) -- props, default styling, macro/registry modes, component-owned state, and scope boundaries. |
 
 ### [`docs/Backends/`](Backends/README.md) — working reference
 
