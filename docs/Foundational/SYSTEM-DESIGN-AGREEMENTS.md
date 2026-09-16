@@ -1,5 +1,9 @@
 # SYSTEM-DESIGN-AGREEMENTS
 
+_Current as of **v0.063** (latest shipped milestone) — see
+[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table if a referenced
+capability's status might have moved since this was last updated._
+
 ## Compiler First, Runtime Last
 
 ARKlight is a compiler first.

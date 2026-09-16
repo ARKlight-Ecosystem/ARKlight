@@ -68,11 +68,11 @@ bug in this directory, not a valid state -- if you find one, that's
 the fix: delete the superseded file, keep the one that's current, and
 update the Index table to match.
 
-## A deliberate exception: `v0.062`-`v0.078` are PLANNED, not shipped
+## A deliberate exception: `v0.064`-`v0.078` are PLANNED, not shipped
 
 Everything above this note is the folder's normal rule: a file here
 means a milestone (or a fully-landed stage of one) actually shipped.
-`v0.062.md` through `v0.078.md` are a deliberate, marked exception --
+`v0.064.md` through `v0.078.md` are a deliberate, marked exception --
 each is a forward-looking summary written while staging its respective
 implementation ladder, before that stage has started. Each such file
 says **PLANNED** at the top for exactly this reason, and each will be
@@ -80,12 +80,12 @@ rewritten to describe actual shipped behavior once its stage lands --
 until then, treat them as the ladder's user-facing preview, not a
 record.
 
-`v0.062.md`-`v0.070.md` were written while staging
+`v0.064.md`-`v0.070.md` were written while staging
 [`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md).
-`v0.061.md` was the first rung of that same ladder and has since
-shipped (see its own file, no longer marked PLANNED) -- proof the
-exception is meant to be temporary per-file, not a standing status
-for the whole range.
+`v0.061.md`-`v0.063.md` were the first three rungs of that same
+ladder and have since shipped (see their own files, no longer marked
+PLANNED) -- proof the exception is meant to be temporary per-file, not
+a standing status for the whole range.
 
 `v0.071.md`-`v0.078.md` were written while staging
 [`docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md`](../Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md)
@@ -116,8 +116,8 @@ ladder, the same PLANNED-entry treatment can apply to it too.
 | [`v0.054.md`](./v0.054.md) | JS backend capability expansion (reactive core) -- rolls up all 8 `vdom-N` staging sub-stages. |
 | [`v0.060.md`](./v0.060.md) | User-defined, reusable components -- full milestone rollup (Stages 0-4: registration/props, typo diagnostics, default styling, per-backend rendering, component-owned state). Landed first as an interim `v0.060-stage0.md` covering only Stage 0; once Stages 1-4 shipped and this rollup was written, the interim file was removed per the one-file-per-version rule below. |
 | [`v0.061.md`](./v0.061.md) | JS vocabulary addendum, stage 1/10 -- math siblings (`subtract`/`divide`/`min`/`max`). |
-| [`v0.062.md`](./v0.062.md) | **PLANNED.** JS vocabulary addendum, stage 2/10 -- string-casing sibling + comparison `Show` predicates. |
-| [`v0.063.md`](./v0.063.md) | **PLANNED.** JS vocabulary addendum, stage 3/10 -- small new runtime primitives (`reveal`, debounced binding, clipboard paste, geolocation, `matchMedia`). |
+| [`v0.062.md`](./v0.062.md) | JS vocabulary addendum, stage 2/10 -- string-casing sibling + comparison `Show` predicates. |
+| [`v0.063.md`](./v0.063.md) | JS vocabulary addendum, stage 3/10 -- small new runtime primitives (`reveal`, debounced binding, clipboard paste, geolocation, `matchMedia`). |
 | [`v0.064.md`](./v0.064.md) | **PLANNED.** JS vocabulary addendum, stage 4/10 -- math derivations catalog. |
 | [`v0.065.md`](./v0.065.md) | **PLANNED.** JS vocabulary addendum, stage 5/10 -- string derivations catalog. |
 | [`v0.066.md`](./v0.066.md) | **PLANNED.** JS vocabulary addendum, stage 6/10 -- predicates catalog. |

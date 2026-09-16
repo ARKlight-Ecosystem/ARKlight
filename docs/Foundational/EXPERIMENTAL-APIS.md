@@ -1,5 +1,9 @@
 # Experimental APIs
 
+_Current as of **v0.063** (latest shipped milestone) — see
+[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table if a referenced
+capability's status might have moved since this was last updated._
+
 ## What counts as "experimental"
 
 ARKlight's default surface is built entirely on the intrinsic layout
