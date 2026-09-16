@@ -55,8 +55,9 @@ and captured in the changelog or a Foundational doc.
 | File | Covers |
 | --- | --- |
 | [`ANDROID-BACKEND-IMPLEMENTATION.md`](Backends/ANDROID-BACKEND-IMPLEMENTATION.md) | Staged implementation plan for the Android packaging backend. |
-| [`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`](Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md) | Proposal for a purpose-built native desktop host/packager (replacing Neutralino.js as the canonical desktop backend). |
-| [`NEUTRALINO-INTEGRATION.md`](Backends/NEUTRALINO-INTEGRATION.md) | Neutralino desktop-app integration (current desktop backend). |
+| [`DESKTOP-BACKEND-IMPLEMENTATION.md`](Backends/DESKTOP-BACKEND-IMPLEMENTATION.md) | Staged implementation plan for the desktop packaging backend (Linux only so far). |
+| [`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`](Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md) | Proposal for a purpose-built native desktop host/packager (replacing Neutralino.js as the canonical desktop backend) -- now Stage 1 of `DESKTOP-BACKEND-IMPLEMENTATION.md`. |
+| [`NEUTRALINO-INTEGRATION.md`](Backends/NEUTRALINO-INTEGRATION.md) | Neutralino.js desktop-app integration -- superseded plan, kept for reference only. |
 
 ### [`docs/Proposals/`](Proposals/README.md) — unsettled
 
@@ -73,6 +74,8 @@ folder's own README for the full rationale. Removed or graduated
 | [`ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](<Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md>) | Proposal for an `arklight assistant` subcommand: a read-only, doc-grounded CLI companion ("Raeliana") behind `--wake-up-raeliana`, plus a separate opt-in `--activate-memory` flag for cross-session recall. **Accepted -- implementation deferred to v0.090+.** |
 | [`PROJECT-KNOWELEDGE-PROPOSAL.md`](<Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md>) | Proposal for a compiler-owned `.arklight/` project-local knowledge directory: providers/facts/observations model, Git as the first provider, persistence across builds. **Accepted -- staged in `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` as `v0.071`-`v0.078`.** |
 | [`SEARCH-RETRIEVE-DOC-PROPOSAL.md`](<Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md>) | Proposal for `arklight search --retrieve-doc`: a doc-tree retrieval mode on the existing `search` subcommand, printing the root or a folder's `README.md` index and, with `--file NAME`, one file's full contents. |
+| [`PROVIDER-SDK-PROPOSAL.md`](<Proposals/PROVIDER-SDK-PROPOSAL.md>) | Proposal for `Provider`, an experimental interface for a site to declare it talks to an external service (Firebase, a hand-rolled API, ...) at runtime -- ARKlight ships only the closed contract and validates/gates it; no vendor SDK, networking, or auth logic lives in core. |
+| [`RUNTIME-ERROR-HANDLING-PROPOSAL.md`](<Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md>) | Proposal to close the gap left by `CHANGELOG.md`'s `[0.041]` JS runtime error-handling pass -- per-element guards for five stateful primitives shipped since (`Computed`, `Repeat`, `Show`, `bind_value`, watchers), a default page-level `error`/`unhandledrejection` boundary, and a closed `ARKLIGHT_ON_ERROR` override hook. |
 
 ### [`docs/Implementation/`](Implementation/README.md) — accepted, staged
 

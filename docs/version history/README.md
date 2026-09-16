@@ -68,35 +68,33 @@ bug in this directory, not a valid state -- if you find one, that's
 the fix: delete the superseded file, keep the one that's current, and
 update the Index table to match.
 
-## A deliberate exception: `v0.064`-`v0.078` are PLANNED, not shipped
+## This directory does not carry PLANNED entries -- `ARCHITECTURE.md`'s roadmap does
 
-Everything above this note is the folder's normal rule: a file here
-means a milestone (or a fully-landed stage of one) actually shipped.
-`v0.064.md` through `v0.078.md` are a deliberate, marked exception --
-each is a forward-looking summary written while staging its respective
-implementation ladder, before that stage has started. Each such file
-says **PLANNED** at the top for exactly this reason, and each will be
-rewritten to describe actual shipped behavior once its stage lands --
-until then, treat them as the ladder's user-facing preview, not a
-record.
+This directory is retrospective only: a file here means a milestone
+(or a fully-landed stage of one) actually shipped, full stop. A
+not-yet-shipped version being staged or merely proposed already has
+its home -- the Milestones table in
+[`docs/Foundational/ARCHITECTURE.md`](../Foundational/ARCHITECTURE.md)
+carries every version, DONE or PLANNED, and `docs/Implementation/`
+(or `docs/Backends/`) carries the rung-by-rung staging ladder once one
+exists. Neither of those needs a matching preview file here, and this
+directory shouldn't grow one: the same version's status would then
+have two places to update instead of one, and a rollup file here --
+whose only job is to tell a reader "this shipped, here's what it
+does" -- would stop reliably meaning that the moment it's allowed to
+also mean "this is planned to eventually do this."
 
-`v0.064.md`-`v0.070.md` were written while staging
-[`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md).
-`v0.061.md`-`v0.063.md` were the first three rungs of that same
-ladder and have since shipped (see their own files, no longer marked
-PLANNED) -- proof the exception is meant to be temporary per-file, not
-a standing status for the whole range.
-
-`v0.071.md`-`v0.078.md` were written while staging
-[`docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md`](../Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md)
-(the eight-rung Project Knowledge ladder). They follow exactly the
-same convention.
-
-`v0.080`/`v0.100` below deliberately do **not** get this treatment
-yet, because neither has a finished, rung-by-rung staged plan the
-way the JS vocabulary addendum and Project Knowledge addendum now do;
-once one gets a comparable `docs/Implementation/` (or `docs/Backends/`)
-ladder, the same PLANNED-entry treatment can apply to it too.
+`v0.064.md` through `v0.078.md` currently violate this: each is a
+forward-looking, **PLANNED**-marked summary written while staging its
+respective implementation ladder, before that stage had started. They
+predate this rule rather than following it, and per "This directory
+is a set" above they're still a bug worth fixing -- each should be
+rewritten to describe actual shipped behavior once its stage lands
+(as `v0.061.md`-`v0.063.md` already were once their stages shipped),
+not carried forward as a pattern. Nothing needs to move to fix this
+note itself: the point is that no *new* forward-looking file should
+be added here for `v0.080`, `v0.100`, or anything after -- their
+roadmap status belongs in `ARCHITECTURE.md`'s Milestones table alone.
 
 ## Index
 
@@ -143,8 +141,12 @@ Snapshot table for their current per-stage status instead.
 
 ## Adding a new version
 
-When a milestone (or a milestone's first user-facing-complete stage)
-ships, add a new `vX.Y[-stageN].md` file here with a short,
+A version being planned, staged, or merely renumbered is not a reason
+to add a file here -- record that in `ARCHITECTURE.md`'s Milestones
+table (and a `docs/Implementation/`/`docs/Backends/` ladder, if one
+exists) instead, per the rule above. Only when a milestone (or a
+milestone's first user-facing-complete stage) actually **ships**, add
+a new `vX.Y[-stageN].md` file here with a short,
 user-facing summary of what shipped -- what a reader would actually
 want to know, not a line-by-line diff -- and add a row for it to the
 Index table above. The detailed, internal entry still goes in the root
