@@ -72,7 +72,7 @@ them, or for rejection.**
 
 | File | Covers |
 | --- | --- |
-| [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](JS-VOCABULARY-EXPANSION-PROPOSAL.md) | Proposal to expand the client-side JS vocabulary: the already-designed-but-unshipped trivial gaps, small new runtime primitives, an exhaustive catalog of scalar math/string/list derivations and predicates, and the larger IR-node-sized gaps (client-side data fetch, reorderable lists, sort/filter, file-upload preview) plus the out-of-scope bucket that conflicts with ARKlight's no-`eval` non-goal. |
+| [`JS-VOCABULARY-EXPANSION-PROPOSAL.md`](JS-VOCABULARY-EXPANSION-PROPOSAL.md) | Proposal to expand the client-side JS vocabulary: the already-designed-but-unshipped trivial gaps, small new runtime primitives, an exhaustive catalog of scalar math/string/list derivations and predicates (both JS's own built-ins and cross-language "batteries included" idioms from Python/Rust/C++ standard libraries), and the larger IR-node-sized gaps (client-side data fetch, reorderable lists, sort/filter, file-upload preview) plus the out-of-scope bucket that conflicts with ARKlight's no-`eval` non-goal. |
 
 ## Contributing
 
