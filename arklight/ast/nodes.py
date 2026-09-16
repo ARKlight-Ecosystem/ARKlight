@@ -46,6 +46,30 @@ class ClassBindSpec:
 
 
 @dataclass(frozen=True)
+class ModelBindSpec:
+    """
+    `v0.063` (JS vocabulary addendum, stage 3/10 -- see
+    `docs/version history/v0.063.md`): a reference to a two-way input
+    binding with a debounce/throttle modifier attached -- e.g.
+    `Bind.model("query", debounce=300)`. Used as a `bind_value=` prop
+    value, same slot a plain state-name string already fills.
+
+    `Bind.model(...)` only returns this structured form when a
+    modifier is actually requested; with neither `debounce=` nor
+    `throttle=` given it keeps returning a plain string, so every
+    existing `bind_value=Bind.model("query")` call site is unaffected.
+    `modifiers` reuses `arklight.ir.schema.MODIFIER_REGISTRY`'s
+    existing `debounce:<ms>`/`throttle:<ms>` tokens -- the same ones
+    `Action.*(...).debounce(...)`/`.throttle(...)` already validate --
+    rather than inventing a second modifier vocabulary for input
+    binding.
+    """
+
+    state: str
+    modifiers: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
 class ActionRef:
     """
     A reference to a closed-vocabulary, state-mutating action -- e.g.
