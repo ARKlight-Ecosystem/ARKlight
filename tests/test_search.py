@@ -116,3 +116,79 @@ def test_resolve_exact_covers_user_components_too():
     assert resolve_exact("NavBar") == "NavBar"
     assert resolve_exact("navbar") == "NavBar"
     assert resolve_exact("NotRegisteredAnywhere") is None
+
+
+def test_search_finds_action_by_bare_name():
+    result = search_component("increment")
+    assert result.startswith("Action.increment")
+    assert "delta" in result
+    assert "No component named" not in result
+
+
+def test_search_finds_action_by_dotted_name_case_insensitively():
+    result = search_component("ACTION.Increment")
+    assert result.startswith("Action.increment")
+
+
+def test_search_finds_action_with_no_args():
+    result = search_component("toggle_bool")
+    assert result.startswith("Action.toggle_bool")
+    assert "(none)" in result
+
+
+def test_search_finds_on_click_behavior():
+    result = search_component("toggle")
+    assert result.startswith("toggle")
+    assert "on_click behavior" in result
+    assert "toggle_class" in result
+
+
+def test_search_finds_on_reveal_behavior_separately_from_on_click():
+    result = search_component("reveal")
+    assert result.startswith("reveal")
+    assert "on_reveal behavior" in result
+
+
+def test_search_finds_event_modifier_with_param():
+    result = search_component("debounce")
+    assert "event modifier" in result
+    assert "takes a value  : yes" in result
+
+
+def test_search_finds_event_modifier_without_param():
+    result = search_component("prevent")
+    assert "event modifier" in result
+    assert "takes a value  : no" in result
+
+
+def test_search_finds_derivation_by_dotted_name():
+    result = search_component("Derive.sum")
+    assert result.startswith("Derive.sum")
+    assert "1+ names" in result
+
+
+def test_search_finds_derivation_with_fixed_arity():
+    result = search_component("compare")
+    assert result.startswith("Derive.compare")
+    assert "exactly 2 names" in result
+    assert "op" in result
+
+
+def test_search_finds_predicate_by_dotted_name():
+    result = search_component("Predicate.truthy")
+    assert result.startswith("Predicate.truthy")
+    assert "exactly 1 name" in result
+
+
+def test_search_component_vocabulary_still_wins_over_js_vocab_on_exact_match():
+    # No real name collision exists between PascalCase components and
+    # snake_case JS vocab, but the priority order (components first)
+    # should still hold if that ever changes.
+    result = search_component("Container")
+    assert "event modifier" not in result
+    assert "Action." not in result
+
+
+def test_search_unknown_query_does_not_match_js_vocab_by_accident():
+    result = search_component("incrementt")
+    assert "No component named 'incrementt' found" in result
