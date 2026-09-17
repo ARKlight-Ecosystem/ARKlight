@@ -44,7 +44,13 @@ same pipeline progress as short natural-language sentences, in the
 voice of **Rei**, ARKlight's compiler narrator. A new `rei` section in
 `arklight.config.py` lets a project pin its own default log mode
 (`plain` / `verbose` / `narrate`) so a team doesn't have to type the
-flag on every invocation. That's the entire feature.
+flag on every invocation. On a schema violation specifically (an
+unknown component type or a prop-shape mismatch), Rei's narration of
+the failure appends one fixed line pointing at the real tool that
+already resolves it -- `arklight search <name>` -- the same
+"terse diagnostic plus a pointer to a real tool" pattern `rustc`
+already uses (`try `rustc --explain E0308``), not a hint she invents
+on the spot (§5). That's the entire feature.
 
 ```bash
 arklight build site.py --narrate
@@ -150,7 +156,66 @@ her, which is sufficient for a closed, small vocabulary of build
 stages and keeps her free of any runtime dependency beyond the
 standard library.
 
-## 5. Relationship to Raeliana and Miko
+## 5. On a schema violation, point to `arklight search <name>`
+
+When a build narrated with `--narrate` fails on a `ValidationError`
+that names a specific component type against
+`arklight.ir.schema.SCHEMA` -- either an unrecognized type
+(`"Unknown component type 'Pciture' at ..."`,
+`arklight/ir/validate.py`'s two `SCHEMA.get(node.type) is None`
+sites) or a known type with a prop-shape violation (e.g. a missing
+required prop) -- Rei's narration of that failure appends one fixed
+line naming the exact, already-existing tool that resolves it:
+
+```
+[Rei] Compilation halted.
+
+[Rei] Unknown component type 'Pciture' at pages/home.py:12.
+
+Try: arklight search Pciture
+```
+
+`arklight search <name>` (`arklight/cli/search.py`) already does
+the real work here -- exact lookup against `SCHEMA` on a hit, and
+the existing typo-tolerant ranking pipeline
+(`arklight.search.engine`) on a miss, which is precisely the "does
+`Picture` take `sources=` or `srcs=`" job that module's own
+docstring describes. Rei does not re-implement, call into, or wrap
+that pipeline herself -- she has no typo-correction logic of her own
+and never guesses a corrected name. The line she prints is a fixed
+template with the *literal* offending name substituted in, taken
+directly from the same `node.type` (or component name) the
+`ValidationError` already carries -- the same "explain compiler
+facts, never invent them" boundary the rest of this proposal holds
+her to (§4's determinism requirement, and the original concept
+sketch's "Rei may not invent" rule this proposal inherits). Compare
+`rustc`'s own pattern: a terse diagnostic plus a fixed
+`For more information about this error, try `rustc --explain E0308`.`
+line -- a pointer to a real tool, not an explanation generated on
+the spot.
+
+**This is not Rei becoming a conversational assistant.** She prints
+exactly one line, once, using the error's own data; she does not run
+`arklight search` for the user, does not show its output inline, does
+not answer "why is this wrong," and takes no follow-up input. That
+boundary is deliberate and matches this document's own §6 scope
+limits below.
+
+**Scope of this pointer, deliberately narrow:** only the SCHEMA-backed
+errors above. Validation failures against a *different* registry --
+unknown `on_click`/`Action.*` name, an undeclared `Bind`/`State`
+target, an unknown modifier -- are not schema-lookup problems, and
+`arklight search` doesn't cover them (it reflects `SCHEMA` only, not
+`ACTION_REGISTRY`/`BEHAVIOR_REGISTRY`/`PREDICATE_REGISTRY`/
+`DERIVATION_REGISTRY`). Rei narrates those failures the same way §3-
+§4 already describe, with no tool pointer appended, rather than
+printing a command that wouldn't actually help. Extending
+`arklight search` itself (or adding an equivalent lookup) to cover
+those other registries, so a future version of this pointer could
+cover them too, is explicitly out of scope for this proposal -- see
+§7.
+
+## 6. Relationship to Raeliana and Miko
 
 Unchanged from the original concept sketch's separation, restated
 briefly since both those assistants are discussed in
@@ -167,20 +232,26 @@ briefly since both those assistants are discussed in
   the project as a whole). No shared code, no shared trust model, no
   dependency between any of the three.
 
-## 6. Explicitly out of scope
+## 7. Explicitly out of scope
 
-Everything the earlier, unfiled draft described beyond §1-§4 above:
+Everything the earlier, unfiled draft described beyond §1-§5 above:
 a structured compiler event bus or event-ID scheme, a diagnostic
 object redesign, `--trace` / machine-readable event output, a
 `--plain` sub-mode of `--narrate` (there is exactly one narrate
 style; a plainer alternative is just `--verbose` or no flag), an
 `arklight explain <event-id>` subcommand, IDE integration, and any
-notion of multiple narrator personalities. None of this is committed.
-If any of it is wanted later, it needs its own proposal, filed and
-accepted on its own terms -- not treated as an implicit stage 2 of
-this one.
+notion of multiple narrator personalities. Also out of scope: any
+tool pointer beyond §5's single, fixed
+`Try: arklight search <name>` line -- no pointers for
+action/behavior/predicate/derivation-registry errors (§5's own scope
+note), no other suggested commands for any other failure category,
+and no extension of `arklight search` itself to cover those other
+registries (that would be its own proposal, on its own merits). None
+of this is committed. If any of it is wanted later, it needs its own
+proposal, filed and accepted on its own terms -- not treated as an
+implicit stage 2 of this one.
 
-## 7. Open questions for a maintainer
+## 8. Open questions for a maintainer
 
 - Exact wording/tone for each stage's narrated sentence(s) -- left to
   implementation (`docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`),

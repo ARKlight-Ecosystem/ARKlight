@@ -28,6 +28,21 @@ section for the version-number history).
   exist, or exists and is empty" at the top of the build command,
   gating a one-time banner (Rei's introduction + the resolved `rei`
   config) before the first narrated stage line.
+- `arklight search <name>` pointer on a schema violation (proposal
+  §5): when the `ValidationError` narrated on build failure originates
+  from either of `arklight/ir/validate.py`'s two
+  `SCHEMA.get(node.type) is None` sites (unknown component type) or a
+  required-prop-shape check against a known `node.type`, Rei's
+  renderer extracts the literal offending name already present in the
+  error (no re-parsing of free text -- these sites should carry the
+  name as structured data reaching the renderer, not force it to be
+  regex-scraped back out of a formatted string) and appends exactly
+  one fixed line: `Try: arklight search <name>`. No other validation
+  failure category (state/action/behavior/predicate/derivation
+  registries) gets a tool pointer -- see the proposal's own scope
+  note for why. Rei does not import or call
+  `arklight.search.engine`/`arklight.cli.search` herself; the pointer
+  is a static template with substitution, not an invocation.
 - `docs/Foundational/CLI-REFERENCE.md` updated to document `--narrate`
   alongside `--verbose`/`--debug`, once actually shipped -- **not**
   before, per that file's own "implemented and shipped only" scope
@@ -52,6 +67,14 @@ section for the version-number history).
   deleted and rebuilt.
 - No import from any shipping `arklight/` module reaches into the
   vendored ELIZA reference material.
+- `arklight search` pointer: appears verbatim, with the correct
+  literal name substituted, on both unknown-component-type and
+  missing/malformed-required-prop failures; does **not** appear on a
+  `Bind`/`on_click`/modifier/behavior validation failure, even though
+  those are also `ValidationError`s narrated by the same renderer.
+  A regression test should assert the *absence* of the pointer line
+  on at least one of those other-registry failures, not just its
+  presence on the schema-violation cases.
 
 ## Explicitly not part of this addendum
 
