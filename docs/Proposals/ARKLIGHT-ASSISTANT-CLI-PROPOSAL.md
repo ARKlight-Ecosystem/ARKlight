@@ -253,3 +253,423 @@ Two independent reasons, not just one:
   doesn't end up committed to the repo by accident? This proposal
   assumes yes but flags it for an explicit decision rather than
   assuming silently.
+
+# Addendum: Miko as a Second Assistant
+
+## Status
+
+**Proposal addition — not yet accepted, not yet staged.**
+
+This addendum extends the existing `arklight assistant` proposal with
+a second, deliberately different assistant named **Miko**. It does
+not replace Raeliana.
+
+Raeliana and Miko serve different purposes:
+
+- **Raeliana** is the reliable secretary: document-grounded, explicit
+  about sources, conservative about unsupported claims, and concerned
+  primarily with helping a person navigate canonical ARKlight
+  documentation.
+- **Miko** is the exploratory companion: an LLM-backed assistant that
+  can invoke controlled ARKlight knowledge tools to retrieve compiler
+  knowledge and then explain the returned result conversationally.
+
+The distinction is intentional. The project should not pretend that
+one conversational interface can simultaneously behave like a
+deterministic documentation index and a free-form reasoning companion
+without making the boundary between those behaviors muddy.
+
+## 8. `--wake-up-miko` — the exploratory assistant
+
+A second wake-up flag is proposed alongside `--wake-up-raeliana`:
+
+```bash
+arklight assistant --wake-up-miko
+```
+
+The command remains inert unless explicitly requested. It does not
+change `arklight build`, generated output, the Website IR, or any
+browser/runtime behavior.
+
+On startup, Miko prints her own introduction before accepting
+questions:
+
+```text
+$ arklight assistant --wake-up-miko
+
+Hi! I'm Miko.
+I'm ARKlight's little shrine maiden, and I can use my telekinesis
+to reach into ARKlight's compiler knowledge when you ask me
+something about the project.
+
+I can look things up, connect the results, and help you think
+through what they mean. I can also be wrong, so don't mistake
+confidence for a compiler diagnostic.
+
+Ask me something, or type `exit` to leave.
+
+> what does ARKlight currently know about this component?
+```
+
+The introduction is intentionally different from Raeliana's. Miko
+is not presented as the authoritative project secretary. She is an
+interactive reasoning surface that can reach authoritative project
+data through controlled tools.
+
+## 9. Miko's telekinesis
+
+Miko's defining mechanism is **tool-mediated access to ARKlight
+compiler knowledge**.
+
+"Telekinesis" is the persona name for the capability, not a second
+runtime or a magical abstraction inside the compiler. Underneath the
+persona, the implementation is an explicit tool-call interface.
+
+Conceptually:
+
+```text
+User question
+     |
+     v
+   Miko
+     |
+     | tool call: retrieve compiler knowledge
+     v
+ARKlight knowledge providers
+     |
+     +--> project configuration
+     +--> filesystem facts
+     +--> Git facts
+     +--> build state
+     +--> .arklight/ Project Knowledge
+     |
+     v
+structured result
+     |
+     v
+   Miko
+     |
+     v
+human-readable answer
+```
+
+Miko should not receive unrestricted access to the project as a
+generic filesystem agent. The tool surface should expose specific
+read operations whose contracts are defined by ARKlight itself.
+
+Examples of possible sanctioned tools include:
+
+- retrieve the current compiler/project context;
+- retrieve a known Project Knowledge fact;
+- retrieve an observation from `.arklight/`;
+- resolve a component name against compiler knowledge;
+- inspect the current build state;
+- retrieve relevant project documentation;
+- retrieve the compiler's known relationship between a source
+  construct and a generated/backend representation.
+
+The exact tool set belongs in implementation staging. The proposal
+freezes the architectural property instead:
+
+> **Miko reaches ARKlight knowledge through explicit tool calls, not
+> arbitrary shell access or unrestricted code execution.**
+
+## 10. Miko's knowledge boundary
+
+Miko is allowed to reason over information returned by her tools, but
+the tool boundary remains authoritative about what project knowledge
+she can actually access.
+
+This gives the assistant two distinct layers:
+
+1. **Knowledge layer:** ARKlight-owned providers and Project Knowledge
+   return structured, inspectable facts or observations.
+2. **Reasoning layer:** Miko's language model interprets those results,
+   connects them, explains them, and may form hypotheses.
+
+Miko must distinguish between those layers in her answers.
+
+For example:
+
+> **Known:** the compiler's Project Knowledge says component `Card`
+> was previously resolved at a particular revision.
+>
+> **Interpretation:** that may explain why the current diagnostic
+> appears after a source change.
+>
+> **Uncertain:** Miko cannot claim that the source change caused the
+> failure unless the available evidence actually establishes that
+> relationship.
+
+The important property is not that Miko never makes mistakes. An
+LLM assistant is an LLM assistant; pretending otherwise would be a
+particularly elaborate form of documentation debt. The important
+property is that project facts have a recoverable source and that Miko
+cannot silently turn an unsupported inference into compiler knowledge.
+
+## 11. Persona
+
+Miko is a **female-presenting shrine-maiden persona** with a playful,
+clever, energetic, and sometimes overconfident voice.
+
+Her personality is deliberately less formal than Raeliana's. She can
+be curious, mischievous, imaginative, and occasionally wrong. That
+personality is part of the companion experience, but it must never
+change the underlying tool contracts or the distinction between
+retrieved facts and generated interpretation.
+
+A first working system-prompt sketch:
+
+> You are Miko, ARKlight's exploratory CLI companion. You are a
+> cheerful shrine maiden who can use telekinesis to reach ARKlight's
+> compiler knowledge through the tools provided to you. Help the
+> person understand the project, investigate compiler knowledge, and
+> think through questions using the information those tools return.
+>
+> Treat tool results as project evidence. Do not invent compiler
+> facts, Project Knowledge entries, build state, source locations, or
+> implementation details that the tools did not provide. Clearly
+> distinguish retrieved facts from your own interpretation or
+> hypothesis.
+>
+> You are not the authoritative documentation secretary. Raeliana
+> handles conservative documentation lookup. You are allowed to
+> synthesize information from multiple tool results and explain
+> possibilities, but you must not present speculation as established
+> project knowledge.
+>
+> You do not edit project files, modify compiler state, execute
+> arbitrary shell commands, or invent capabilities that are not
+> exposed through your tools. If the available tools cannot answer a
+> question, say so.
+>
+> Be playful and personable, but keep technical answers useful. Your
+> personality must never override a tool result or conceal uncertainty.
+
+This is implementation guidance, not a frozen personality script.
+
+## 12. What Miko is allowed to do
+
+Miko's tool access should be deliberately additive to the existing
+Project Knowledge architecture rather than creating a parallel
+knowledge system.
+
+### In scope
+
+- Read compiler-owned Project Knowledge.
+- Read compiler/build observations exposed through sanctioned tools.
+- Read relevant project documentation when the tool permits it.
+- Combine results from multiple tool calls.
+- Explain compiler state and project context.
+- Identify uncertainty and distinguish facts from hypotheses.
+- Help investigate questions that span documentation and compiler
+  knowledge.
+- Return concise answers with enough source/context information for
+  the user to verify important claims.
+
+### Explicitly out of scope
+
+- Arbitrary shell execution.
+- Arbitrary Python execution.
+- Arbitrary filesystem traversal outside sanctioned tool contracts.
+- Editing source files.
+- Editing `.arklight/` knowledge directly.
+- Running `arklight build` as an implicit side effect.
+- Modifying compiler state.
+- Treating an LLM-generated answer as a compiler fact.
+- Sending project knowledge to an external service unless a future
+  implementation explicitly introduces such a backend and the user
+  explicitly enables it.
+
+## 13. Miko and Project Knowledge
+
+Miko is the first proposed consumer that makes the `.arklight/`
+Project Knowledge layer conversationally useful.
+
+The intended flow is:
+
+```text
+compile
+   |
+   v
+observe
+   |
+   v
+retain
+   |
+   v
+retrieve
+   |
+   v
+Miko
+   |
+   v
+explain
+```
+
+This does not make Miko part of the compiler pipeline. Project
+Knowledge remains compiler-owned derived knowledge, while Miko is a
+consumer of that knowledge.
+
+This separation matters because the compiler must remain able to
+build without Miko, and Miko must remain unable to rewrite the
+knowledge she is reading.
+
+The `.arklight/` directory therefore remains the source of compiler
+knowledge. Miko is an interface to that knowledge, not its owner.
+
+## 14. Miko versus Raeliana
+
+The two assistants should be treated as complementary interfaces,
+not competing implementations of the same feature.
+
+| Concern | Raeliana | Miko |
+|---|---|---|
+| Primary role | Project secretary | Exploratory companion |
+| Knowledge source | Docs, README, CHANGELOG, PROGRESS | Controlled compiler-knowledge tools plus docs |
+| Reasoning style | Conservative, source-first | Generative, multi-result synthesis |
+| Unsupported claims | Refuses / says undocumented | May hypothesize, but must label hypotheses |
+| Project Knowledge | Future/limited consumer | Primary proposed conversational consumer |
+| Persona | Composed, reliable | Playful, curious, energetic |
+| Writes files | No | No |
+| Runs builds | No | No |
+| Changes compiler state | No | No |
+| Arbitrary code execution | No | No |
+| Memory | Separate opt-in proposal | Separate future capability |
+| Intended question | "What does ARKlight document?" | "What does ARKlight know, and what might it mean?" |
+
+The distinction can be summarized as:
+
+> **Raeliana tells you what the project says. Miko looks at what
+> the project knows and helps you think about it.**
+
+Neither assistant should silently inherit the other's authority model.
+
+## 15. Command surface with both assistants
+
+With Miko added, the proposed command surface becomes:
+
+```bash
+arklight assistant --wake-up-raeliana
+arklight assistant --wake-up-miko
+arklight assistant --wake-up-raeliana --activate-memory
+arklight assistant --wake-up-miko --activate-memory
+```
+
+The exact interaction between `--activate-memory` and Miko should remain
+a staging decision. In particular, accepting the memory design for
+Raeliana must not automatically imply that Miko receives persistent
+memory.
+
+The safer conceptual model is that **wake-up flags select an
+assistant, while capability flags explicitly grant additional
+capabilities**.
+
+If both wake-up flags are supplied simultaneously, the CLI should
+not invent an ambiguous mode. The implementation should reject the
+combination with a clear diagnostic unless a future proposal defines
+a deliberate multi-assistant mode.
+
+For example:
+
+```text
+error: choose one assistant to wake:
+  --wake-up-raeliana
+  --wake-up-miko
+```
+
+## 16. Miko's trust model
+
+Miko's playful personality must not be confused with permission to
+fabricate project state.
+
+The project should therefore maintain three explicit categories in
+Miko's responses:
+
+- **Retrieved fact** — directly returned by a sanctioned ARKlight
+  knowledge tool or canonical project document.
+- **Derived explanation** — a conclusion supported by one or more
+  retrieved facts.
+- **Hypothesis** — a plausible interpretation that is not established
+  by the available evidence.
+
+This is especially important for Project Knowledge observations.
+For example, an observation such as `changed_since_last_successful`
+does not by itself establish why a build failed. Miko may explain the
+relationship as a possibility, but she must not silently upgrade an
+observation into causality.
+
+The compiler's knowledge model therefore remains stricter than the
+language model's conversational model.
+
+## 17. Suggested implementation order
+
+Miko should not block the first Raeliana implementation.
+
+A reasonable staged order is:
+
+1. Ship the smallest read-only Raeliana surface.
+2. Establish the compiler-owned Project Knowledge providers and
+   retrieval contracts.
+3. Expose a minimal read-only tool interface over those providers.
+4. Add `arklight assistant --wake-up-miko`.
+5. Give Miko only the smallest useful set of sanctioned tools.
+6. Verify that tool results remain inspectable and sourceable.
+7. Expand the tool vocabulary only when a real project question
+   requires it.
+8. Treat persistent Miko memory, if ever added, as a separate
+   capability with its own design review.
+
+This keeps the assistant from becoming an excuse to prematurely build
+a general-purpose agent framework. The compiler owns knowledge; the
+assistant consumes it.
+
+## 18. Open questions for Miko
+
+- What exact Project Knowledge providers should be exposed to the
+  first Miko tool surface?
+- Should documentation retrieval use the same retrieval
+  implementation as Raeliana, or should Miko receive a single unified
+  `project_knowledge` tool?
+- Should tool results carry explicit provenance metadata so Miko can
+  cite the provider, fact name, revision, and source path directly?
+- Should Miko be permitted to request multiple tool calls
+  automatically, or should the first implementation impose a strict
+  tool-call budget?
+- Should Miko's LLM backend be local-only initially, or should the CLI
+  permit an explicitly configured remote provider?
+- If a remote model is supported, what project-data disclosure warning
+  must be shown before the first tool result is sent?
+- Should Miko be able to consume `.arklight/` observations that are
+  not intended for human-facing diagnostics, or should the provider
+  expose a curated public subset?
+- Should Miko have a dedicated `--no-telekinesis` or offline mode, or
+  should unavailable tools simply produce an explicit capability
+  error?
+- Should `arklight assistant` eventually support a shared assistant
+  protocol so additional project companions can be added without
+  changing the core command structure?
+
+## 19. Proposal boundary
+
+This Miko addition intentionally does **not** define:
+
+- a particular LLM vendor;
+- a particular model;
+- a network protocol;
+- a persistent memory format;
+- a general agent framework;
+- arbitrary tool execution;
+- compiler modifications required solely to satisfy Miko;
+- any change to ARKlight's browser runtime;
+- any change to the Website IR;
+- any native backend behavior.
+
+The architectural proposal is narrower:
+
+> **Miko is an optional, explicitly invoked, LLM-backed CLI companion
+> whose "telekinesis" is a controlled tool interface into ARKlight's
+> compiler-owned Project Knowledge.**
+
+That keeps the joke at the persona layer and the safety boundary at the
+architecture layer.
