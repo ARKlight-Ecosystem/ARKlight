@@ -5,6 +5,25 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.0643] -- Docs-only incremental patch: package docstring refresh
+
+Out-of-band, numbered inside the same `v0.064` -> `v0.065` gap as
+`[0.0431]`/`[0.0641]`/`[0.0642]` below, but docs-only: no compiler code
+changed.
+
+**Changed:** `arklight/__init__.py`'s module docstring no longer
+describes ARKlight as "a Python-first compiler for building static
+websites" -- that framing predates `[0.0642]`'s rewrite of
+`docs/Foundational/WHAT-ARKLIGHT-IS.md` and had drifted out of sync
+with it. The docstring now opens with the same **compiler framework**
+wording (static site plus optional wrapped native/PWA targets, its own
+batteries-included workflow) and its quickstart example now shows
+`State`/`Action.increment` instead of a stateless `Button`, so the
+first thing `from arklight import *` shows a reader is that
+interactivity exists and goes through the closed-vocabulary primitives
+(`State`, `Action.*`, `Derive.*`, `Predicate.*`, `Watch`), not just
+static markup.
+
 ## [0.0642] -- Docs-only incremental patch: definition rewrite + Platform API IR proposal
 
 Out-of-band, numbered inside the same `v0.064` -> `v0.065` gap as
