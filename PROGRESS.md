@@ -49,6 +49,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.064   | `arklight search --retrieve-doc` -- doc-tree retrieval mode (`--foundational`/`--backends`/`--proposals`/`--implementation`/`--js-backend`/`--far-future`/`--version-history`, plus `--file NAME`) on the existing `search` subcommand, fully wired into `arklight/cli/main.py`/`arklight/cli/doc_retrieval.py`; `tests/test_doc_retrieval.py` (48 tests incl. `test_cli.py`) passing. Landed ahead of its own `docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md` staging writeup, which was never actually filed -- see `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md` for the accepted proposal this shipped from | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
+| v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v1.0     | Stable compiler                                              | PLANNED |
@@ -81,6 +82,47 @@ go-ahead before implementation starts on any of these:
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
+
+## v0.079 -- `arklight assistant` Miko MVP, Stage A (PLANNED)
+
+Opens the `arklight assistant` subcommand described in
+`docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`, built to the
+order its appended "Sequencing Amendment: Miko First, Raeliana On
+Trigger" argues for and its "Maintainer Decision" section accepts:
+Miko before Raeliana, doc-only before Project Knowledge, and nothing
+built that a dogfooding period hasn't earned yet.
+
+`--wake-up-miko` gets exactly one sanctioned tool: an in-process
+wrapper around `arklight/cli/doc_retrieval.py`'s retrieval function --
+the same primitive `v0.064` already shipped for `arklight search
+--retrieve-doc` -- called directly rather than shelled out to via
+`subprocess`, so a multi-tool-call REPL turn doesn't pay a fork/exec
+tax per lookup. No `.arklight/` access of any kind: Project Knowledge
+(`v0.071`-`v0.078`) isn't finished, and wiring Miko to a
+still-in-flight knowledge system would tangle "is the assistant
+useful" together with "is Project Knowledge returning the right
+things" into one unreadable experiment.
+
+Shipped as an **experimental CLI feature** -- gated and labeled
+provisional the same way `docs/Foundational/EXPERIMENTAL-APIS.md`
+already treats build-time escape hatches that step outside ARKlight's
+settled default surface, even though the mechanism here is a CLI
+notice rather than that file's `arklight/experimental.py` registry
+(this is a dev-time CLI convenience, not compiled output, so it isn't
+added to that registry). Whether `arklight assistant` earns a
+permanent, unflagged spot in the CLI is explicitly not decided by this
+milestone; that's revisited once `v0.080` (Android backend) ships,
+alongside whatever Stage B's dogfooding log says about Raeliana.
+
+`--wake-up-raeliana` ships too, but only as a status stub: since her
+Stage C trigger (a fabrication or inconsistency failure Miko produces
+on a query plain doc retrieval could have answered) hasn't had a
+chance to fire yet, the flag prints her current stage per the
+proposal instead of launching a matching engine that would pre-empt
+the experiment. See the base proposal's Maintainer Decision section
+for the exact wording.
+
+Design complete; implementation not started.
 
 ## v0.061 -- JS vocabulary addendum, stage 1 of 10: math siblings (DONE)
 

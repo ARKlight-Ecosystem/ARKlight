@@ -2,12 +2,36 @@
 
 ## Status
 
-**Proposal — not yet accepted, not yet staged.** Follows the format
-and conventions of
+**Proposal — partially accepted.** Follows the format and conventions
+of
 [`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](JS-VOCABULARY-EXPANSION-PROPOSAL.md).
-Per `docs/Proposals/README.md`'s own definition, this describes
-something that does not exist yet, may never be built as written, and
-could be rejected outright.
+Per `docs/Proposals/README.md`'s own definition, everything in §1-19
+below (and the persona/architecture sections of the sequencing
+amendment appended after them) still describes something that does
+not exist yet and could be revised — but the **build order itself is
+now decided**. See "Sequencing Amendment: Miko First, Raeliana On
+Trigger" and its "Maintainer Decision" section, both appended below,
+for the accepted change to §6/§17's order and for what actually ships
+first:
+
+- **Miko's Stage A (`--wake-up-miko`, doc-only, no Project
+  Knowledge)** is accepted and slotted as **`v0.079`**, an
+  experimental CLI feature in the same "opt-in, not yet a permanent
+  part of the surface" sense `docs/Foundational/EXPERIMENTAL-APIS.md`
+  uses for build-time escape hatches — see the Maintainer Decision
+  section for why that framing applies here too. Whether `arklight
+  assistant` earns a permanent, unflagged place in the CLI is
+  explicitly *not* decided by this acceptance; that discussion is
+  deferred until `v0.080` (Android backend) ships, per `PROGRESS.md`'s
+  Snapshot table.
+- **Raeliana (§3-7) is not authorized for implementation.**
+  `--wake-up-raeliana` exists as a command-line flag in `v0.079`, but
+  it does not launch an assistant — it prints a short status log of
+  Raeliana's actual stage per this proposal (see the Maintainer
+  Decision section). She becomes buildable only if Stage B's
+  dogfooding log trips the trigger condition the amendment defines.
+- `--activate-memory` (§4) remains fully undecided and unstaged for
+  both assistants.
 
 **Origin:** the doc tree (`docs/`) has grown large enough — five
 lifecycle folders, each with its own `README.md` index, per
@@ -673,3 +697,177 @@ The architectural proposal is narrower:
 
 That keeps the joke at the persona layer and the safety boundary at the
 architecture layer.
+
+# Sequencing Amendment: Miko First, Raeliana On Trigger
+
+## Status
+
+**Proposal — not yet accepted.** This is an amendment to [`docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](https://claude.ai/chat/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md), which is itself **Accepted — implementation deferred to v0.090+** (per `docs/README.md`'s Proposals table). This document does not reopen that proposal's architecture — §3 (Raeliana), §4 (`--activate-memory`), §8-16 (Miko, telekinesis, trust model) are untouched. It amends exactly two sections: §6 ("Suggested order") and §17 ("Suggested implementation order"), which currently commit to building Raeliana first and Miko second, gated on Project Knowledge existing.
+
+This proposal reverses that order, and argues the reversal is not a style preference — it changes which build is actually the cheaper MVP, and turns "should Raeliana exist at all" from a design-time assumption into an empirical, falsifiable question answered by using Miko first.
+
+## TL;DR
+
+- Build **Miko** first, scoped down to doc-only retrieval — no Project Knowledge, no `.arklight/` access, because none of that exists yet (`v0.071`-`v0.078` are all **PLANNED**, per `PROGRESS.md`'s Snapshot table). Her one tool is a thin wrapper around the **already-shipped** `arklight search --retrieve-doc` (`v0.064`, DONE).
+
+- Dogfood her during real ARKlight development for a bounded window. Log every failure, sorted into three classes: **recall** (doesn't surface something that is documented), **fabrication** (states something false or unsupported as fact), **inconsistency** (same question, different session, different answer).
+
+- **Raeliana's implementation is authorized specifically when Stage B surfaces a fabrication or inconsistency failure on a query whose correct answer was retrievable via `arklight search --retrieve-doc` the whole time** — i.e., a case where Miko's LLM synthesis layer introduced an error that a strictly retrieval-grounded engine structurally cannot introduce, because it has no synthesis step to fail in.
+
+- If that never happens across the dogfooding window, that's a real result too: it says the deterministic engine's marginal value over an LLM-plus-retrieval-tool is close to zero for this use case, and Raeliana's ELIZA-fork work (§3 of the base proposal, plus the vendoring/rule-authoring discussion this amendment assumes as context) may not be worth doing at all.
+
+## 1. Why "Raeliana ships first" looks cheap on paper but isn't the actual MVP
+
+The base proposal's §4.1 argues Raeliana needs "no new persistence layer at all," and uses that to justify her going first. That's true, but it's an argument about *storage*, not about *total engineering cost*. It quietly assumes Raeliana's matching engine itself is free. It isn't:
+
+- Standing up a deterministic engine (the ELIZA-style, JSON-ruled, vendored-and-forked pattern-matcher this project has settled on) means a real fork-and-vendor step — MIT attribution carried into `vendor/`, a `THIRD-PARTY-LICENSES.md` entry, a clean boundary so future upstream diffs stay legible.
+
+- More importantly: it means **hand-authoring a rule table** — decomposition patterns and reassembly templates — across a doc tree that already spans five lifecycle folders and dozens of files (`docs/README.md`'s Folder Guide). That's not a one-time cost; every new doc, every renamed section, is a rule-authoring chore someone has to remember to do, forever, or Raeliana silently stops covering it.
+
+- Compare that to Miko's actual marginal cost right now: `arklight search --retrieve-doc` **already shipped**, fully wired into `arklight/cli/main.py`/`arklight/cli/doc_retrieval.py` (`v0.064`, per `PROGRESS.md`). Wiring an LLM tool-call loop to a function that already exists is an afternoon of glue code, not a new engine.
+
+So the base proposal's own logic — "ship the piece that needs no new infrastructure first" — actually points at Miko once you account for the fact that Project Knowledge doesn't have to exist for a *doc-only* Miko, and the retrieval primitive she needs is already built. The engine Raeliana needs is not.
+
+## 2. Proposed sequencing
+
+### Stage A — Miko, doc-only, no telekinesis into Project Knowledge
+
+`arklight assistant --wake-up-miko`, same inert-by-default posture, same persona sketch as the base proposal's §11, trimmed to reflect a narrower tool surface than §9 eventually describes:
+
+- **One sanctioned tool only:** a Python-level wrapper calling `arklight/cli/doc_retrieval.py`'s retrieval function **in-process**, not by shelling out to the `arklight search --retrieve-doc` CLI via `subprocess`. A tool-call loop that spawns a subprocess per lookup pays fork/exec and interpreter-startup cost on every single call an LLM makes mid-conversation — for a REPL where one user turn can trigger several tool calls, that's a real, avoidable latency tax. Calling the already-imported function directly costs a Python call frame, nothing more.
+
+- **No `.arklight/` access, full stop** — not "restricted access," no access, because there is nothing there yet. This is stricter than the base proposal's §9 vision, on purpose (see §5 below for why).
+
+- System prompt: base proposal's §11 sketch, with every sentence referring to "compiler knowledge," "build state," or "Project Knowledge" removed until Stage C (§4 below) actually exists to back it.
+
+### Stage B — Dogfood it, log the failure classes
+
+Use it for real, during actual ARKlight development, for a bounded window (see Open Questions for what "bounded" should mean). For every session, log:
+
+- **Recall failures** — Miko says something isn't documented when it is. Annoying, but structurally the same failure mode Raeliana would have (a rule/retrieval miss), not a reason to prefer the deterministic engine.
+
+- **Fabrication failures** — Miko states something as fact that no doc supports. This is the failure class a retrieval-only engine cannot produce, because it has no generative step between "found text" and "displayed text."
+
+- **Inconsistency failures** — same question, re-run, different answer, with no change to the doc tree in between. Same reasoning: structurally impossible for a rule-table engine with stable file-order tie-breaking, possible for anything sampling from a model.
+
+### Stage C — Raeliana, authorized on trigger, not by default
+
+Raeliana's implementation (the ELIZA fork/vendor/extend work) is **authorized** — not merely "next in queue" — the first time Stage B logs a fabrication or inconsistency failure on a query whose correct answer was sitting in a doc the whole time, retrievable by the exact tool Miko already had. That is the concrete, checkable bar: Miko had the information available and still got it wrong in a way retrieval alone could not.
+
+If that bar is never hit, Raeliana is not built. That's not a failure of this proposal — it's the proposal working. Section 3 spells out why treating that as an acceptable outcome, rather than something to avoid, is itself the point.
+
+## 3. Why doc-only for *both* assistants until `v0.071`-`v0.078` land is a feature
+
+This is worth stating as its own principle, not just a scoping detail: keeping both assistants off Project Knowledge until the `PROJECT-KNOWELEDGE-PROPOSAL.md` ladder actually ships is a controlled-variable choice, not a temporary inconvenience.
+
+If Miko were wired to a real `.arklight/` provider before that system existed in finished form, two separate hypotheses would be tangled into one experiment: "is a conversational assistant interface useful at all" and "does the Project Knowledge model return the right things." A failure in either one would contaminate your read of the other, and you'd have no clean way to tell which one actually broke.
+
+Restricting Stage A to doc retrieval isolates the first question cleanly: is an LLM-plus-retrieval-tool layer worth having over `arklight search --retrieve-doc` used directly? That's answerable on its own, with the doc-retrieval primitive that already exists, before `v0.071`-`v0.078` are anywhere near done. Once that verdict is in (§2's Stage B/C), *then* layering compiler-owned Project Knowledge access on top of whichever assistant(s) survive is a second, separable experiment — exactly the incremental, one-variable-at-a-time discipline `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` already uses for staging that ladder itself (§17 of the base proposal already gestures at this; this amendment just extends the same discipline one layer up, to the assistants that will eventually consume it).
+
+## 4. Relationship to the base proposal's Accepted status
+
+This amendment changes a *suggested order* (§6, §17), not an *architecture* (§3, §4, §8-16). The base proposal itself already draws that line for smaller things — §3.1 notes the system-prompt wording is "implementation detail a maintainer should be free to iterate on without that requiring a new proposal." Sequencing which of two accepted features gets built first is a bigger decision than prompt wording, which is why this is written up as its own document for a maintainer to accept or reject, rather than changed silently — but the intent is the same: the accepted design doesn't move, only the landing order does.
+
+## 5. Scope
+
+### In scope (this amendment)
+
+- Reversing §6/§17's build order: Miko (Stage A, doc-only) before Raeliana.
+
+- The specific reduced Stage-A tool surface (one in-process doc- retrieval tool, nothing else).
+
+- The dogfooding protocol and three-way failure taxonomy (§2, Stage B).
+
+- The explicit, falsifiable trigger condition authorizing Raeliana's build (§2, Stage C).
+
+### Explicitly out of scope
+
+- Re-litigating Miko's or Raeliana's persona, tone, or trust-model architecture — unchanged from the base proposal's §3, §8-16.
+
+- The local-LLM backend choice for Miko (llama.cpp vs. Ollama vs. something else) — still an open question per the base proposal's §18, untouched here.
+
+- The Raeliana ELIZA-fork engineering details (vendoring path, license-attribution file, rule-authoring format) — deliberately not designed further here, since under this amendment that work doesn't start until Stage C's trigger fires.
+
+- The Project Knowledge ladder itself (`v0.071`-`v0.078`) — proceeds on its own accepted schedule, entirely independent of this amendment's outcome.
+
+## 6. Open questions for a maintainer
+
+- What's the actual time window or session count for Stage B's dogfooding period before a null result (no fabrication/inconsistency failures observed) is treated as final, versus "not enough data yet"?
+
+- Does a single fabrication instance authorize Raeliana immediately, or should there be a minimum rate (e.g., N failures per M sessions) to rule out a one-off model quirk versus a structural pattern?
+
+- If the trigger never fires, does that retire the Raeliana half of the base proposal outright, or leave it accepted-but-indefinitely- deferred, re-evaluated if Miko's usage pattern changes later (e.g., once she does get Project Knowledge access in a later stage and the stakes of a wrong answer go up)?
+
+- Should Stage B's failure log itself live somewhere inspectable (plain text/JSON, matching the project's "fail loudly, stay inspectable" posture per `docs/README.md`'s Philosophy section), so the Stage C decision is auditable after the fact rather than resting on someone's memory of "yeah, she got that wrong once"?
+
+## Maintainer Decision
+
+Accepted, with the version slot, feature-status framing, and Raeliana
+stub behavior this amendment's open questions (§6) left for a
+maintainer to settle:
+
+- **Miko's Stage A ships as `v0.079`.** It lands as a genuinely new
+  addition layered on top of the already-shipped `v0.064`
+  (`arklight search --retrieve-doc`, per `PROGRESS.md`'s Snapshot
+  table) rather than reopening that milestone: `v0.064` still means
+  exactly what it always meant (the retrieval primitive itself), and
+  `v0.079` is the new `arklight assistant` subcommand that wraps it
+  in-process, per §2's Stage A. This slots cleanly into the existing
+  numbering — the Snapshot table's `v0.078`→`v0.080` gap was open —
+  without renumbering anything downstream.
+- **`arklight assistant` ships as an experimental CLI feature, not a
+  committed permanent subcommand.** This is the same posture
+  `docs/Foundational/EXPERIMENTAL-APIS.md` already uses for
+  build-time escape hatches that step outside ARKlight's settled
+  default surface: gated, loudly labeled as provisional, and kept
+  that way until a maintainer decides otherwise — not blocked
+  outright, but not quietly promoted to "just part of the CLI"
+  either. Concretely: every `arklight assistant` invocation (both
+  flags) prints a one-line notice that this is an experimental,
+  Stage-A-only feature and that whether it stays is undecided.
+- **Whether `arklight assistant` earns a permanent, unflagged place
+  in the CLI is not decided now.** Stage A ships and stays under
+  dogfooding (§2's Stage B) for the same span of work that finishes
+  `v0.080` (Android backend, currently the Snapshot table's next
+  `IN PROGRESS` row, Stages 5-7 not started). Once `v0.080` ships,
+  that's the checkpoint for a maintainer to look at Stage B's failure
+  log (§2, §6) and decide two separable things at once: whether
+  Raeliana's Stage C trigger has fired, and whether `arklight
+  assistant` itself graduates out of experimental status. Neither
+  answer is assumed in advance by shipping Stage A.
+- **`--wake-up-raeliana` exists as a flag in `v0.079`, but it does
+  not wake anything up.** Since Raeliana's Stage C trigger (§2) has
+  not fired — Stage B hasn't run yet — implementing her matching
+  engine now would be exactly the premature build this amendment
+  argues against. Instead, `arklight assistant --wake-up-raeliana`
+  prints a short status log naming her actual stage per this
+  proposal, e.g.:
+
+  ```
+  $ arklight assistant --wake-up-raeliana
+
+  Raeliana isn't awake yet.
+  Per docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md's sequencing
+  amendment, her implementation is authorized only once Miko's
+  doc-only dogfooding period (Stage B) logs a fabrication or
+  inconsistency failure that plain doc retrieval could have avoided.
+  Current status: Stage B not yet run. No trigger has fired.
+
+  Try `arklight assistant --wake-up-miko` instead.
+  ```
+
+  This keeps the flag's existence honest with the amendment's own
+  logic instead of quietly building the thing the amendment says not
+  to build yet, while still giving a person who reaches for
+  `--wake-up-raeliana` out of habit (from having read the base
+  proposal) an accurate, sourced answer instead of a bare "unknown
+  flag" error.
+- **`--activate-memory` remains untouched and unstaged for both
+  assistants** — this decision only resolves Stage A's build and the
+  Raeliana stub; §4's memory design is not reopened here.
+
+This decision resolves this amendment's own §6 open questions on
+timing and stub behavior only to the extent stated above; the
+rate-vs-single-instance trigger question (§6, second bullet) is
+deliberately left open until Stage B produces real data to decide it
+against.
