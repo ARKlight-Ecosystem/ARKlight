@@ -493,7 +493,12 @@ def component(
 
 
 def State(
-    name: str, initial: Any = None, persist: bool = False, media: str | None = None
+    name: str,
+    initial: Any = None,
+    persist: bool = False,
+    media: str | None = None,
+    query: str | None = None,
+    history: str | None = None,
 ) -> ARKNode:
     """
     Declare page-scoped reactive state: `State("count", 0)`.
@@ -536,10 +541,80 @@ def State(
     persistence for it a no-op in practice). `None` (the default)
     means this key is plain, non-media-driven state, unchanged
     behavior for existing `State(...)` calls.
+
+    `query="page"` (`v0.064`, `docs/Proposals/URL-STATE-AS-PRIMITIVE-
+    PROPOSAL.md`) opts this key into two-way URL query-parameter
+    syncing, the primitive this project previously had no authored
+    answer for at all:
+
+        State("page", initial=1, query="page")
+        Text(Bind("page"))
+        Button("Next", on_click=Action.increment("page", 1))
+
+    An extension of the exact same shape `persist=True` already
+    established (a value the compiler can't know at build time,
+    corrected from an external source at runtime, with the same
+    fail-open safety property), just sourced from
+    `new URLSearchParams(location.search)` instead of `localStorage`:
+
+    - *Read*, at page-init (and again on every browser back/forward
+      navigation -- `popstate`, the one genuinely new runtime surface
+      this feature adds, since ARKlight ships no SPA router and
+      nothing before this listened for that event): if the query
+      string carries this key's `query=` parameter, its value
+      overrides `initial`, coerced by `initial`'s own Python type
+      (`int` -> `parseInt`, `bool` -> a `"true"`/`"false"` mapping,
+      `str` -> passthrough -- the same type-carrying mechanism that
+      already lets `Computed(...)` be evaluated at build time). A
+      missing or malformed value silently falls back to the baked
+      `initial`, never a thrown error -- the same "every external-
+      input read in this runtime fails open" invariant `persist`
+      already holds, now a confirmed convention rather than a one-off.
+    - *Write*, on every change (through `Action.*(...)`, exactly as
+      `persist`'s `localStorage` write already does): the shipped
+      runtime calls `history.replaceState(...)` with the updated
+      search string, by default -- never a network request or page
+      navigation. `State`, `Computed`, `Derive`, and every `Action` in
+      this vocabulary are synchronous, in-memory primitives with no
+      navigation step anywhere in them; a query-tagged `State` update
+      stays that way rather than triggering a full reload or an
+      `hx-boost` swap of a document that would, by construction, be
+      byte-for-byte identical to the one already on screen (the
+      compiler never sees the query string -- static file resolution
+      strips it before ARKlight's output is even in the picture).
+
+    `query=` names exactly one flat parameter key -- no nested
+    objects, no array encodings. `None` (the default) means this key
+    is plain, non-query-tracked state, unchanged behavior for existing
+    `State(...)` calls. Mutually independent of `persist=`/`media=`
+    (any combination may be set at once).
+
+    `history="push"` (opt-in; the unmarked default is `"replace"`)
+    gives this key's changes a real, back-button-worthy history entry
+    instead of the default `history.replaceState(...)` -- for e.g. a
+    paginated list, where landing back on an earlier page via the
+    back button is expected, unlike a live-updating search box where
+    every keystroke firing `replaceState` is correct. Only meaningful
+    alongside `query=`; raises at build time if given without it. This
+    is deliberately *not* threaded through `arklight.ir.schema.
+    MODIFIER_REGISTRY` (the `prevent`/`stop`/`once`/`debounce`/
+    `throttle` tokens `.with_modifiers(...)`/`.debounce(...)` attach
+    to an `on_click=`/`bind_value=`) -- that registry describes
+    per-*event* timing/dispatch modifiers on an `ActionRef`, not a
+    per-*State-declaration* property with no event of its own to
+    attach to, so reusing it here would be forcing an unrelated shape
+    onto a different kind of knob rather than genuinely sharing one.
     """
     return ARKNode(
         type="State",
-        props={"name": name, "initial": initial, "persist": persist, "media": media},
+        props={
+            "name": name,
+            "initial": initial,
+            "persist": persist,
+            "media": media,
+            "query": query,
+            "history": history,
+        },
         children=[],
     )
 

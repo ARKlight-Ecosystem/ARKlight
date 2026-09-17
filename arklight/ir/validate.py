@@ -110,9 +110,17 @@ Checks performed:
     and whose `names` resolve to `State(...)`/`Computed(...)` declared
     on the same page; its children are ordinary content, validated the
     same way any other component's children are.
+17. `State(..., query="...")` (`v0.064`, `docs/Proposals/
+    URL-STATE-AS-PRIMITIVE-PROPOSAL.md`), if present, must be a legal
+    query-parameter key (`_LEGAL_QUERY_KEY_RE`). `State(...,
+    history="...")`, if present, must be a known mode
+    (`arklight.ir.schema.KNOWN_QUERY_HISTORY_MODES`) and requires
+    `query=` to be set alongside it.
 """
 
 from __future__ import annotations
+
+import re
 
 from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, DerivationRef, ModelBindSpec, PredicateRef
 from arklight.ir.schema import (
@@ -120,11 +128,24 @@ from arklight.ir.schema import (
     COMPARE_OPS,
     DERIVATION_REGISTRY,
     KNOWN_BEHAVIORS,
+    KNOWN_QUERY_HISTORY_MODES,
     KNOWN_REVEAL_BEHAVIORS,
     MODIFIER_REGISTRY,
     PREDICATE_REGISTRY,
     SCHEMA,
 )
+
+# `v0.064`: `query=` names a real URL query-parameter key, handed
+# straight to `URLSearchParams`/`history.*State(...)` client-side --
+# same "fail loudly at build time, not silently in the browser"
+# discipline every other check in this module holds. Deliberately
+# conservative (leading letter/underscore, then letters/digits/
+# underscore/hyphen/dot) rather than accepting anything
+# `encodeURIComponent` could theoretically survive: a key needing
+# percent-encoding to round-trip through a URL is exactly the kind of
+# footgun this project's own "beginner friendly" checks exist to catch
+# before it ships, not after.
+_LEGAL_QUERY_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
 
 
 class ValidationError(Exception):
@@ -483,6 +504,44 @@ def _validate_state_declaration(node: ARKNode, *, path: str, parent_is_page: boo
             f"State(...) at {path} has media={media!r}, which must be a "
             f'non-empty media condition string, e.g. "(min-width: 768px)".'
         )
+    # `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md):
+    # `query` defaults to `None` (unset, plain state -- unchanged
+    # behavior) but a value that *is* provided must be a legal query-
+    # parameter key -- same "fail loudly at build time" discipline
+    # `media`'s check just above already holds, now against
+    # `_LEGAL_QUERY_KEY_RE` instead of a bare non-empty-string check,
+    # since an illegal key would silently mis-round-trip through
+    # `URLSearchParams` client-side rather than failing anywhere
+    # visible.
+    query = node.props.get("query")
+    if query is not None and (not isinstance(query, str) or not _LEGAL_QUERY_KEY_RE.match(query)):
+        raise ValidationError(
+            f"State(...) at {path} has query={query!r}, which must be a "
+            f"legal query-parameter key (letters, digits, underscore, "
+            f'hyphen, or dot, starting with a letter or underscore), e.g. "page".'
+        )
+    # `history` defaults to `None` (the unmarked "replace" default --
+    # see `arklight.ir.schema.KNOWN_QUERY_HISTORY_MODES`'s docstring
+    # for why this is its own small registry rather than a reuse of
+    # `MODIFIER_REGISTRY`). A value that *is* provided must be a known
+    # mode, and only ever makes sense alongside `query=` -- a
+    # `history=` with no `query=` would silently do nothing at
+    # runtime, so this is caught here instead.
+    history = node.props.get("history")
+    if history is not None:
+        if not isinstance(history, str) or history not in KNOWN_QUERY_HISTORY_MODES:
+            known = ", ".join(sorted(KNOWN_QUERY_HISTORY_MODES))
+            raise ValidationError(
+                f"State(...) at {path} has history={history!r}, which isn't "
+                f"a recognized history mode. Known history modes are: {known}."
+            )
+        if query is None:
+            raise ValidationError(
+                f"State(...) at {path} has history={history!r} but no "
+                f"query=... -- history= only affects how a query-tracked "
+                f"key's writes hit the browser history stack, so it needs "
+                f"a query= alongside it."
+            )
 
 
 def _validate_derive_ref(

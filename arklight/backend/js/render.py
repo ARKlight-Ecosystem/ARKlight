@@ -284,6 +284,7 @@ from arklight.backend.js.runtime import RENDER_REPEAT_JS as _RENDER_REPEAT_JS
 from arklight.backend.js.runtime import RENDER_SHOW_JS as _RENDER_SHOW_JS
 from arklight.backend.js.runtime import STATE_CORE_JS as _STATE_CORE_JS
 from arklight.backend.js.runtime import WIRE_MODEL_BINDING_JS as _WIRE_MODEL_BINDING_JS
+from arklight.backend.js.runtime import WIRE_QUERY_SYNC_JS as _WIRE_QUERY_SYNC_JS
 from arklight.backend.js.runtime import WIRE_REVEAL_JS as _WIRE_REVEAL_JS
 from arklight.backend.js.runtime import WIRE_WATCHERS_JS as _WIRE_WATCHERS_JS
 from arklight.backend.js.vdom import SNABBDOM_CORE_JS
@@ -311,7 +312,9 @@ def _walk(node: IRNode):
 
 def _collect_usage(
     ir: WebsiteIR,
-) -> tuple[set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool, bool]:
+) -> tuple[
+    set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool, bool, bool
+]:
     """
     Inspect the site's IR for what the runtime actually needs to ship:
     which named behaviors are referenced, which actions are referenced
@@ -338,6 +341,17 @@ def _collect_usage(
     `wireReveal()` the same "only ship what's used" way `has_repeat`/
     `has_show` gate their own runtime pieces, and independent of
     `has_state`: a reveal effect never reads or writes `State(...)`.
+    Also returns `has_query` (`v0.064`) -- whether any page declares a
+    query-tracked `State(..., query=...)` -- gating `WIRE_QUERY_SYNC_JS`/
+    `wireQuerySync()` the same "only ship what's used" way. Unlike
+    `has_reveal`, this one implies `has_state` (`query=` is only ever
+    a prop on a `State(...)` node), but is still tracked separately:
+    the read/write halves of this same feature are folded
+    unconditionally into `STATE_CORE_JS` whenever `has_state` alone
+    (see `arklight/backend/js/runtime/state.py`'s module docstring),
+    while `wireQuerySync` -- the `popstate` listener -- is genuinely
+    new runtime surface only worth shipping when at least one page
+    actually uses it.
     """
     used_behaviors: set[str] = set()
     used_on_click_actions: set[str] = set()
@@ -347,6 +361,7 @@ def _collect_usage(
     }
     has_computed = any(page.computed for page in ir.pages)
     has_watch = any(page.watch for page in ir.pages)
+    has_query = any(page.query for page in ir.pages)
     has_model_binding = False
     has_repeat = False
     has_show = False
@@ -395,6 +410,7 @@ def _collect_usage(
         has_repeat,
         has_show,
         has_reveal,
+        has_query,
     )
 
 
@@ -482,6 +498,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         has_repeat,
         has_show,
         has_reveal,
+        has_query,
     ) = _collect_usage(ir)
 
     # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): the click
@@ -629,6 +646,13 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # it below.
         parts.append(_WIRE_REVEAL_JS)
 
+    if has_query:
+        # `v0.064`: `wireQuerySync` needs declaring before
+        # `DOMContentLoaded` registers it below (see `ready_calls`) --
+        # same "declare, then register once" shape `has_model_binding`
+        # above already follows.
+        parts.append(_WIRE_QUERY_SYNC_JS)
+
     parts.append(_NAV_HIGHLIGHT_JS)
     parts.append("")
 
@@ -702,6 +726,18 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # variant in practice, but shares the same expression either
         # way for consistency.
         ready_calls.append(f"    wireModelBinding({getter});")
+    if has_query:
+        # Same "register exactly once, getter closure" contract as
+        # wireClickInterceptor/wireModelBinding above -- has_query
+        # implies has_state (query= is only ever a prop on a
+        # State(...) node), so this getter is never the always-null
+        # variant in practice either. `wireQuerySync` (`arklight/
+        # backend/js/runtime/query.py`) re-reads the current page's
+        # own data-ark-query/data-ark-state attributes fresh on every
+        # popstate event rather than closing over them at registration
+        # -- the getter closure alone is enough for it to stay correct
+        # across an app_shell boosted swap to a different page.
+        ready_calls.append(f"    wireQuerySync({getter});")
 
     parts.append('  document.addEventListener("DOMContentLoaded", function () {')
     parts.extend(ready_calls)

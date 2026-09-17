@@ -143,6 +143,60 @@ quietly discipline `persist`'s `localStorage` access already holds --
 a media query the browser can't parse, or a very old browser lacking
 `matchMedia` entirely, means this key just never updates on its own,
 never a page-breaking error.
+
+`v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md, `docs/
+version history/v0.064.md`): `initState()` also reads a sibling
+`data-ark-query` attribute (`IRPage.query`, same marker/`<body>`-
+attribute duality again) -- `[name, param, type_tag, history_mode]`
+tuples for every `State(..., query=...)` declared on the page. Same
+"override on init, keep writing after that" shape `persist`/`media`
+above already establish, sourced from `URLSearchParams(location.
+search)` instead:
+
+1. *Override*, before `createState` is called: for each tuple, if the
+   URL's query string carries `param`, override that key's server-
+   rendered initial value with `coerceQueryValue(raw, type_tag)` --
+   `parseInt` for `"int"`, a `"true"`/`"false"` mapping for `"bool"`,
+   plain passthrough for `"str"`. A missing param, or one that fails
+   to coerce (a non-numeric `?page=abc` against an `"int"` tag),
+   leaves the server-rendered `initial` untouched -- same fail-open
+   discipline `persist`'s `JSON.parse` failure and `media`'s
+   `matchMedia` failure already hold, now a third confirmed instance
+   of "every external-input read in this runtime fails open to its
+   safe default" rather than a one-off.
+2. *Write*, as one more `store.subscribe` listener (registered only
+   when `query.length`, same "don't pay for an empty forEach"
+   discipline `persist`'s own write listener already holds): on every
+   change, rebuild the URL's query string with each tracked key's
+   current value (`serializeQueryValue`, the inverse of step 1's
+   coercion), preserving any *other* query parameters already present
+   (a `?utm_source=...` the page never declared as `State(...)`, say).
+   If that rebuilt string actually differs from the URL already on
+   screen, call `history.pushState(...)` if any key whose value
+   changed this round declared `history="push"`, `history.
+   replaceState(...)` otherwise (the unmarked default). The equality
+   check also means a `popstate`-driven update (`arklight/backend/js/
+   runtime/query.py`'s `wireQuerySync`, which calls `store.set(...)`
+   for each URL-carried key) never re-pushes/re-replaces the same URL
+   it just navigated *to* -- no separate "am I currently handling a
+   popstate" flag needed, the string comparison already makes the
+   round trip a no-op.
+
+Per §3.6 of the proposal this extends: deliberately never a real
+`history.pushState`-driven *navigation* (no document re-fetch, no
+`hx-boost` swap) -- `State`, `Computed`, `Derive`, and every `Action`
+in this vocabulary are synchronous, in-memory primitives with no
+network/navigation step anywhere in them, and the compiler-rendered
+document is invariant to the query string in the first place (static
+file resolution strips it before ARKlight's own output is even in the
+picture), so re-fetching it on every `?page=` change would only ever
+re-fetch a byte-identical page. `coerceQueryValue`/`serializeQueryValue`
+are declared inside `initState()` itself (not exported siblings like
+`wireWatchers`/`wireQuerySync`) since nothing outside this function
+needs either -- the same "no separate module, no separate lookup
+path" reasoning `persist`'s inline read/write steps already follow,
+just with a coercion step `persist`'s plain `JSON.parse`/`JSON.
+stringify` round trip never needed.
 """
 
 from __future__ import annotations
@@ -195,11 +249,37 @@ INIT_STATE_JS = """  function initState() {
     var rawMedia = marker
       ? marker.getAttribute("data-ark-media")
       : document.body.getAttribute("data-ark-media");
+    var rawQuery = marker
+      ? marker.getAttribute("data-ark-query")
+      : document.body.getAttribute("data-ark-query");
+    // v0.064: coercion is the inverse pair `initState()`'s override
+    // step and its write-back subscriber below share -- a raw URL
+    // string in, a typed value out (coerce), or a typed value in, a
+    // URL-safe string out (serialize). Declared once, here, rather
+    // than duplicated at each call site.
+    function coerceQueryValue(rawValue, typeTag) {
+      if (typeTag === "int") {
+        var n = parseInt(rawValue, 10);
+        if (isNaN(n)) { throw new Error("not an int: " + rawValue); }
+        return n;
+      }
+      if (typeTag === "bool") {
+        if (rawValue === "true") return true;
+        if (rawValue === "false") return false;
+        throw new Error("not a bool: " + rawValue);
+      }
+      return rawValue;
+    }
+    function serializeQueryValue(value, typeTag) {
+      if (typeTag === "bool") { return value ? "true" : "false"; }
+      return String(value);
+    }
     try {
       var computed = rawComputed ? JSON.parse(rawComputed) : [];
       var watch = rawWatch ? JSON.parse(rawWatch) : [];
       var persist = rawPersist ? JSON.parse(rawPersist) : [];
       var media = rawMedia ? JSON.parse(rawMedia) : [];
+      var query = rawQuery ? JSON.parse(rawQuery) : [];
       var initial = JSON.parse(raw);
       persist.forEach(function (key) {
         try {
@@ -222,6 +302,22 @@ INIT_STATE_JS = """  function initState() {
           // for this key alone -- never a page-wide failure.
         }
       });
+      // v0.064: [name, param, type_tag, history_mode] -- see this
+      // file's module docstring, "v0.064" section, step 1.
+      if (typeof URLSearchParams !== "undefined") {
+        var searchParams = new URLSearchParams(location.search);
+        query.forEach(function (entry) {
+          try {
+            var rawValue = searchParams.get(entry[1]);
+            if (rawValue !== null) { initial[entry[0]] = coerceQueryValue(rawValue, entry[2]); }
+          } catch (err) {
+            // Missing or malformed query value: fall back to the
+            // server-rendered initial value for this key alone --
+            // never a page-wide failure, same discipline persist/
+            // media's own override steps already hold.
+          }
+        });
+      }
       var store = createState(initial, computed);
       if (typeof window !== "undefined" && window.matchMedia) {
         media.forEach(function (entry) {
@@ -255,6 +351,46 @@ INIT_STATE_JS = """  function initState() {
               // the read side above.
             }
           });
+        });
+      }
+      if (query.length) {
+        // v0.064: see this file's module docstring, "v0.064" section,
+        // step 2. `lastQueryValues` snapshots each tracked key's value
+        // so a notification with no actual change to any query-tracked
+        // key (e.g. an unrelated key's Action.*(...) firing) doesn't
+        // touch the URL at all, and so the eventual write knows which
+        // key(s) changed -- and therefore which history_mode applies --
+        // without re-deriving that from the URL string itself.
+        var lastQueryValues = query.map(function (entry) { return store.get(entry[0]); });
+        store.subscribe(function () {
+          var changedModes = [];
+          query.forEach(function (entry, i) {
+            var current = store.get(entry[0]);
+            if (current !== lastQueryValues[i]) {
+              changedModes.push(entry[3]);
+              lastQueryValues[i] = current;
+            }
+          });
+          if (!changedModes.length) return;
+          try {
+            var params = new URLSearchParams(location.search);
+            query.forEach(function (entry) {
+              params.set(entry[1], serializeQueryValue(store.get(entry[0]), entry[2]));
+            });
+            var newSearch = params.toString();
+            var newUrl = location.pathname + (newSearch ? "?" + newSearch : "") + location.hash;
+            var currentUrl = location.pathname + location.search + location.hash;
+            if (newUrl === currentUrl) return;
+            if (changedModes.indexOf("push") !== -1) {
+              history.pushState(null, "", newUrl);
+            } else {
+              history.replaceState(null, "", newUrl);
+            }
+          } catch (err) {
+            // URLSearchParams/history unavailable or blocked: this
+            // key just doesn't sync to the URL, same degrade-quietly
+            // discipline persist's localStorage write already holds.
+          }
         });
       }
       if (typeof wireWatchers === "function") { wireWatchers(store, watch); }

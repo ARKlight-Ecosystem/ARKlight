@@ -71,6 +71,18 @@ siblings the same way: `repeat.py` (`RENDER_REPEAT_JS` /
 is folded into `STATE_CORE_JS` either -- each ships only on a page that
 actually uses the corresponding construct (`has_repeat`/`has_show` in
 `arklight/backend/js/render.py`'s `_collect_usage`).
+
+`v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md) adds one
+more sibling the same way: `query.py` (`WIRE_QUERY_SYNC_JS` /
+`wireQuerySync`), the `popstate` half of `State(..., query=...)`. Like
+`watch.py`, not folded into `STATE_CORE_JS` -- only shipped on a site
+where at least one page declares a query-tracked `State(...)`
+(`has_query` in `_collect_usage`). The read/coerce/write-back half of
+this same feature *is* folded directly into `STATE_CORE_JS`'s
+`INIT_STATE_JS`, unconditionally, same as `persist=`/`media=` already
+are -- see `state.py`'s module docstring, "v0.064" section, for why
+the two halves of one feature are split across "always present, no-op
+when unused" vs. "only shipped when used" this way.
 """
 
 from __future__ import annotations
@@ -86,6 +98,7 @@ from arklight.backend.js.runtime.model import (
 )
 from arklight.backend.js.runtime.nav import NAV_HIGHLIGHT_JS
 from arklight.backend.js.runtime.notify import NOTIFY_JS
+from arklight.backend.js.runtime.query import WIRE_QUERY_SYNC_JS
 from arklight.backend.js.runtime.repeat import RENDER_REPEAT_JS
 from arklight.backend.js.runtime.reveal import WIRE_REVEAL_JS
 from arklight.backend.js.runtime.show import RENDER_SHOW_JS
@@ -112,4 +125,5 @@ __all__ = [
     "RENDER_REPEAT_JS",
     "RENDER_SHOW_JS",
     "WIRE_REVEAL_JS",
+    "WIRE_QUERY_SYNC_JS",
 ]
