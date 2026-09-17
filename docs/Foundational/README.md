@@ -19,6 +19,7 @@ knowledge.
 
 | File | Covers |
 | --- | --- |
+| [`WHAT-ARKLIGHT-IS.md`](WHAT-ARKLIGHT-IS.md) | The project's own definition of itself -- a compiler framework, not a static-site generator, frontend framework, or UI framework -- verified against the `alpha` source, with an explicit account of which familiar label each part of ARKlight resembles and why none of them describe the whole thing. |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
 | [`CONFIGURABILITY.md`](CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. |
 | [`CLI-REFERENCE.md`](CLI-REFERENCE.md) | The implemented, shipped `arklight` subcommands (`build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`) -- the single canonical CLI reference. |

@@ -47,7 +47,8 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.062   | JS vocabulary addendum, stage 2 of 10: string-casing siblings + comparison predicates (`Derive.uppercase`/`.trim`, `Predicate.equals`/`.gt`/`.lt`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
 | v0.063   | JS vocabulary addendum, stage 3 of 10: `Action.geolocate(name)`, clipboard `paste` behavior, `State(..., media=...)` (`matchMedia`-driven boolean state), `reveal`/`lazy` behavior (`on_reveal=`, `IntersectionObserver`), debounced/throttled `Bind.model(...)` -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
 | v0.064   | `arklight search --retrieve-doc` -- doc-tree retrieval mode (`--foundational`/`--backends`/`--proposals`/`--implementation`/`--js-backend`/`--far-future`/`--version-history`, plus `--file NAME`) on the existing `search` subcommand, fully wired into `arklight/cli/main.py`/`arklight/cli/doc_retrieval.py`; `tests/test_doc_retrieval.py` (48 tests incl. `test_cli.py`) passing. Landed ahead of its own `docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md` staging writeup, which was never actually filed -- see `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md` for the accepted proposal this shipped from | DONE |
-| v0.0641  | Emergency patch: URL query-parameter state -- `State(..., query="page", history="push")`, extending the existing `persist=`/`media=` precedent: two-way sync with a URL query parameter, typed coercion (`_query_type_tag`, bool checked before int), `history="replace"`/`"push"` write-back via `history.replaceState`/`pushState`, and a new `wireQuerySync` `popstate` listener (`arklight/backend/js/runtime/query.py`) gated by `has_query` -- `docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same "capability fixes take priority" treatment as `v0.0431`'s bug-fix patch; `tests/test_url_query_state.py` (44 tests) passing | DONE |\n| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
+| v0.0641  | Emergency patch: URL query-parameter state -- `State(..., query="page", history="push")`, extending the existing `persist=`/`media=` precedent: two-way sync with a URL query parameter, typed coercion (`_query_type_tag`, bool checked before int), `history="replace"`/`"push"` write-back via `history.replaceState`/`pushState`, and a new `wireQuerySync` `popstate` listener (`arklight/backend/js/runtime/query.py`) gated by `has_query` -- `docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same "capability fixes take priority" treatment as `v0.0431`'s bug-fix patch; `tests/test_url_query_state.py` (44 tests) passing | DONE |
+| v0.0642  | Docs-only incremental patch: rewrote `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s one-sentence definition (new `docs/Foundational/README.md` index row) so ARKlight is stated as a **compiler framework** rather than leaning on "static-site compiler" as the load-bearing noun -- Section 4 now names, explicitly, that ARKlight is not a static-site generator, not a frontend framework, and not a UI framework, instead of leaving that distinction implied. Filed alongside it: `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` (new `docs/Proposals/README.md` index row) -- the next capability fix identified against `SYSTEM-DESIGN-AGREEMENTS.md`'s "Compiler First, Runtime Last" rule: a platform API interface layer in the compiler IR (notifications, clipboard, filesystem, device info, ...), Web as the default implementation, Android/Desktop earning individual interfaces only once mature. Proposal filed as **Proposed**, not yet accepted; no code changed this patch. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641` | DONE |\n| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
@@ -238,6 +239,68 @@ into this patch despite `v0.064` being marked DONE in the Snapshot
 table above); this bump covers both, same as any other pre-existing
 inconsistency this project's docs flag in place rather than silently
 paper over.
+
+## v0.0642 -- Docs-only incremental patch: definition rewrite + Platform API IR proposal (DONE)
+
+Out-of-band, numbered inside the same v0.064 -> v0.065 gap as
+`v0.0431`/`v0.0641`, but a different kind of patch than either of
+those two: not a bug fix, not a capability fix, a **docs-only**
+correction to how the project describes itself, filed together with
+the design proposal that correction points at.
+
+**What changed, part one -- the definition.**
+`docs/Foundational/WHAT-ARKLIGHT-IS.md` previously opened with "a
+Python-authored, closed-vocabulary static-site compiler" as its
+one-sentence definition, current as of `v0.063`. That wording made
+"static-site compiler" the load-bearing noun, which reads as a
+synonym for "static-site generator" even though Section 4 of the same
+document already argued ARKlight isn't one. This patch rewrites
+Section 1 so the load-bearing noun is **compiler framework**, and
+extends Section 4 ("What ARKlight deliberately is not") with three
+explicit bullets -- not a static-site generator, not a frontend
+framework, not a UI framework -- instead of leaving readers to infer
+the distinction from the rest of the document. Section 5's comparison
+table preamble is reworded to match: ARKlight is compared against the
+*nearest* tool on each axis precisely because, by this document's own
+definition, there isn't a peer in its own category yet. Added to
+`docs/Foundational/README.md`'s index (it wasn't listed there before
+this patch, despite already existing in the doc tree under a version
+that predates this repository's own `v0.001`-onward history -- filed
+here rather than backdated).
+
+**What changed, part two -- the proposal.** New
+`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`: a platform API interface
+layer for the compiler IR. Platform-facing capabilities (notifications,
+clipboard, filesystem, device info, ...) are represented as
+backend-independent, versioned interfaces the *compiler* owns; Web is
+the default implementation; Android and Linux Desktop earn individual
+interfaces only once their own backend is mature enough to support
+them (deliberately not granted the whole catalogue just because a
+WebView shell already works). Framed explicitly as an interface layer
+in the IR rather than "a backend" -- the same terminology discipline
+`docs/Foundational/SYSTEM-DESIGN-AGREEMENTS.md` already applies
+elsewhere ("Compiler First, Runtime Last": the compiler owns the
+semantic interface, the target owns the implementation). Borrows
+Capacitor's Web-first/native-extension shape as an architectural
+reference (Section 17 of the proposal) without adopting its
+plugin-runtime model, and explicitly rules out any
+`execute_native(...)`/`call_android(...)`-shaped generic native escape
+hatch (Section 15) -- the same non-goal
+`docs/Foundational/WHAT-ARKLIGHT-IS.md` Section 4 already states about
+ARKlight as a whole. Section 25 of the proposal draws the line against
+`Provider` (accepted, staged `v0.065`-`v0.070`): `Provider` is
+external-service abstraction, Platform API is execution-platform
+abstraction, neither absorbs the other. Added to
+`docs/Proposals/README.md`'s index.
+
+**Status:** the proposal is filed as **Proposed**, not accepted. This
+patch names it as the project's next capability-fix candidate (per the
+prompting that produced this patch) but does not itself commit to
+building it, does not reserve a version-history slot for it, and
+changes no compiler code. Acceptance, staging, and a milestone slot
+are a separate, later decision -- same posture `docs/Proposals/
+README.md` already describes for every other filed-but-undecided
+proposal in that folder.
 
 ## v0.061 -- JS vocabulary addendum, stage 1 of 10: math siblings (DONE)
 
