@@ -5,6 +5,76 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.0641] -- Emergency patch: URL query-parameter state
+
+Out-of-band alpha maintenance release (numbered inside the v0.064 ->
+v0.065 gap, ahead of v0.065). Accepted from
+`docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`: ARKlight shipped
+no authored primitive for reading, writing, or reacting to URL query
+parameters at all, confirmed by that proposal's own exhaustive grep of
+`arklight/` for `location.search`/`URLSearchParams`. Treated as a
+**capability fix** and given the same "stop and fix it now" priority
+`[0.0431]` gave its own bug fix, below -- this project's second
+recognized category of emergency patch, alongside contract-violation
+bug fixes: a missing capability, not a broken promise, but one whose
+absence has no ceiling on how much it costs everything built against
+this compiler until it's closed.
+
+**What:** `State(name, initial, query=..., history=...)`
+(`arklight/api.py`) extends the existing `persist=True`/`media=`
+two-way-sync precedent rather than inventing a fourth mechanism.
+`query="page"` names the query-string key to sync this state key
+with: overridden from `URLSearchParams(location.search)` (with type
+coercion -- `int`/`bool`/`str`, inferred from `initial`'s own Python
+type, bool checked before int) on init, kept live across
+browser back/forward navigation, and written back via
+`history.replaceState`/`pushState` on every change.
+`history="push"` (opt-in; `"replace"` is the unmarked default)
+gives that key's writes a real, back-button-worthy history entry
+instead of silently replacing the current one -- its own small
+registry (`arklight.ir.schema.KNOWN_QUERY_HISTORY_MODES`), not folded
+into `MODIFIER_REGISTRY`, since it's a per-`State`-declaration
+property with no event of its own to attach to. Deliberately never a
+real navigation or document re-fetch: every reactive primitive in this
+vocabulary is synchronous and in-memory, and the compiler-rendered
+document is invariant to the query string in the first place (static
+file resolution strips it before ARKlight's output is even in the
+picture).
+
+**Implementation:** `arklight/api.py` (`State(..., query=,
+history=)`). `arklight/ir/schema.py` (`KNOWN_QUERY_HISTORY_MODES`).
+`arklight/ir/validate.py` (`_LEGAL_QUERY_KEY_RE`; `history=` requires
+`query=`). `arklight/ir/build.py` (`IRPage.query`,
+`_query_type_tag`, `_extract_page_state`).
+`arklight/backend/html/page_render.py` (`data-ark-query`, riding
+alongside the existing five hydration attributes on the same marker/
+`<body>` placement `persist`/`media` already use).
+`arklight/backend/js/runtime/state.py` (`initState()`'s URL-override/
+write-back halves, folded unconditionally into `STATE_CORE_JS` the
+same way `persist`/`media` already are). `arklight/backend/js/runtime/
+query.py` (new file) -- `wireQuerySync`, the `popstate` listener: the
+one genuinely new runtime surface this adds, since nothing shipped by
+ARKlight listened for `popstate` before (no SPA router); gated by
+`has_query` in `arklight/backend/js/render.py`'s `_collect_usage`, the
+same "only ship what's used" discipline `has_reveal` already applies
+to `wireReveal`.
+
+**Tests:** `tests/test_url_query_state.py` (new, 44 tests) -- API/
+Validation/IR/HTML/JS-gating coverage mirroring `[v0.063]`'s `media=`
+suite, plus a Node.js integration suite exercising the actual shipped
+`createState`/`initState`/`wireQuerySync` fragments against mocked
+`document`/`location`/`history`/`window`: URL-override-on-init,
+fallback to `initial` on a missing or malformed query value, `push`-
+vs-`replace` write-back, and a `popstate` round-trip both with the
+param present and falling back to the server-rendered default when
+it's absent. Full suite: 1297 passed, no regressions.
+
+`0.063` -> `0.0641` version bump (`pyproject.toml`) -- also covering
+`v0.064`'s own `--retrieve-doc` piece, which landed without a version
+bump of its own; see [`PROGRESS.md`](./PROGRESS.md) ("v0.0641 --
+Emergency patch") for the full narrative, including that
+pre-existing inconsistency.
+
 ## [Unreleased] -- Registration collisions now fail loudly instead of overwriting silently
 
 **What:** Three registries that previously followed an unconditional

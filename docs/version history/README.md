@@ -120,6 +120,7 @@ roadmap status belongs in `ARCHITECTURE.md`'s Milestones table alone.
 | [`v0.062.md`](./v0.062.md) | JS vocabulary addendum, stage 2/10 -- string-casing sibling + comparison `Show` predicates. |
 | [`v0.063.md`](./v0.063.md) | JS vocabulary addendum, stage 3/10 -- small new runtime primitives (`reveal`, debounced binding, clipboard paste, geolocation, `matchMedia`). |
 | [`v0.064.md`](./v0.064.md) | `arklight search --retrieve-doc` -- doc-tree retrieval mode on the existing `search` subcommand. **Shipped.** (JS vocabulary addendum stage 4/10, this slot's other planned piece, hasn't landed yet -- see `ARCHITECTURE.md`'s Milestones table.) |
+| [`v0.0641.md`](./v0.0641.md) | Emergency patch -- `State(..., query=..., history=...)`, URL query-parameter state as a primitive. |
 | [`v0.065.md`](./v0.065.md) | **PLANNED.** JS vocabulary addendum, stage 5/10 -- string derivations catalog. Plus `Provider`, stage 1/6 -- the contract itself (`Provider.declare(...)`, closed capability enum) and its `arklight/experimental.py` gating. |
 | [`v0.066.md`](./v0.066.md) | **PLANNED.** JS vocabulary addendum, stage 6/10 -- predicates catalog. Plus `Provider`, stage 2/6 -- IR/`validate.py` integration: a declared Provider threaded through `WebsiteIR`, closed-vocabulary capability validation at build time. |
 | [`v0.067.md`](./v0.067.md) | **PLANNED.** JS vocabulary addendum, stage 7/10 -- list-scalar derivations catalog. Plus `Provider`, stage 3/6 -- JS backend emission: a fixed config blob describing declared capabilities, no networking/vendor code generated. |
