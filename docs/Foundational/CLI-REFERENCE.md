@@ -159,24 +159,55 @@ arklight unpack hello_site.ark -o restored
 arklight search <name>
 ```
 
-- `name` -- a built-in component name, e.g. `Picture`.
-- Prints that component's schema: required props, whether it allows
-  children, and whether it's a `Bind(...)`-able target (i.e.
-  `text_only_children`). Case-insensitive exact match wins; if nothing
-  matches, prints up to 5 typo-tolerant "did you mean" suggestions
-  (or says plainly that nothing was close enough).
+- `name` -- a built-in component name (e.g. `Picture`), a project's
+  own registered `@component(...)` name, or a name from any other
+  closed JS vocabulary: an `on_click=`/`on_reveal=` behavior (`toggle`,
+  `reveal`), an `Action.*` name (`Action.increment` or bare
+  `increment`), an event-modifier token (`debounce`), a `Derive.*`
+  name (`Derive.sum` or bare `sum`), or a `Predicate.*` name
+  (`Predicate.truthy` or bare `truthy`). The `Action.`/`Derive.`/
+  `Predicate.` prefix, if given, is matched case-insensitively and
+  stripped -- both the dotted authoring form and the bare registry key
+  resolve to the same entry.
+- Checked in this order: built-in components (`SCHEMA`) -> a
+  project's own registered components (`COMPONENT_REGISTRY`) ->
+  `on_click`/`on_reveal` behaviors -> `Action.*` -> event modifiers ->
+  `Derive.*` -> `Predicate.*`. Built-ins win a component-name
+  collision with a registered component; the JS-vocabulary registries
+  don't in practice collide with component names at all (PascalCase
+  vs. snake_case).
+- For a component match, prints its schema: required/optional props,
+  whether it allows children, and whether it's a `Bind(...)`-able
+  target (i.e. `text_only_children`). For a JS-vocabulary match,
+  prints its closed shape instead -- extra props for a behavior, args
+  for an action, name-count/extra-args for a derivation or predicate,
+  whether an event modifier takes a value.
+- Case-insensitive exact match wins outright, in any of the above. If
+  nothing matches anywhere, prints up to 5 typo-tolerant "did you
+  mean" suggestions (or says plainly that nothing was close enough) --
+  drawn from the component vocabulary only; the ranking pipeline
+  behind "did you mean" doesn't yet cover the JS-vocabulary registries
+  (only their *exact*-match lookup is wired up so far), so a typo of a
+  JS-vocabulary name doesn't yet get its own suggestion.
 
 ```bash
 arklight search Picture
 arklight search pictur   # -> "Did you mean: Picture, PictureSource?"
+arklight search increment
+arklight search Action.increment   # same result, dotted authoring form
+arklight search Derive.sum
+arklight search toggle             # on_click behavior, not Action.toggle_bool
 ```
 
 - `--limit N` -- max number of "did you mean" suggestions on a miss
   (default: 5).
 - `--near NAME` -- bias suggestion ranking toward components used
   structurally close to `NAME` in this project's own usage.
-- `--accept` -- on an exact match, record it in the usage store so
-  future searches rank it higher.
+- `--accept` -- on an exact *component* match, record it in the usage
+  store so future searches rank it higher. Has no effect on a
+  JS-vocabulary match (behavior/action/modifier/derivation/predicate)
+  -- the usage store the ranking pipeline reads back from only ever
+  scores component names, so there's nothing for it to record there.
 - `--serve` -- start a long-lived line-delimited JSON stdio server
   instead of a single lookup (for an editor/IDE extension to launch as
   a subprocess, the same way an LSP client launches a language
