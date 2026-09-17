@@ -177,11 +177,11 @@ here rather than keeping their own copies. Status: DONE / PLANNED.
 | vdom-staging | Reactive-core vdom staging, 8 stages feeding `v0.054`, all DONE: vendored snabbdom bare core swapped into `State`'s re-render pass (Stage 1); reactive class binding via `Bind.when(...)`/`bind_class=` (Stage 2); event modifiers -- `.with_modifiers(...)`/`.debounce(...)`/`.throttle(...)` (Stage 3); computed/derived state -- `Computed`/`Derive.*` (Stage 4); watch effects -- `Watch(...)` (Stage 5); two-way input binding -- `bind_value=Bind.model(...)` (Stage 6); per-item list rendering (`Repeat`) + conditional show/hide (`Show`) (Stage 7); `localStorage` persistence for `State(..., persist=True)` (Stage 8) -- see `DESIGN-NOTES.md` ("Reactive-core vdom staging") and `PROGRESS.md`'s Snapshot table for the per-stage implementation record | DONE |
 | v0.060 | User-defined, reusable components | DONE |
 | v0.061-v0.063 | JS vocabulary addendum, stages 1-3 of 10 (math derivation siblings; string-casing siblings + comparison `Show` predicates; small new runtime primitives -- `Action.geolocate`, clipboard `paste`, `matchMedia`-driven state, `reveal`/`lazy`, debounced/throttled two-way binding) -- staged in `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`, see `docs/version history/v0.061.md`-`v0.063.md` for the per-stage user-facing summaries | DONE |
-| v0.064 | JS vocabulary addendum, stage 4 of 10 (math derivations catalog) -- staged in `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; **plus** `arklight search --retrieve-doc`, a doc-tree retrieval mode added to the existing `search` subcommand (root/folder index printing, `--file NAME` full-file retrieval) -- accepted, staged in `docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md`. Two independent pieces of work sharing one milestone slot, same precedent as `v0.041` (CLI/pipeline hardening + JS vocabulary addenda I & II) | PLANNED |
+| v0.064 | `arklight search --retrieve-doc`, a doc-tree retrieval mode added to the existing `search` subcommand (root/folder index printing, `--file NAME` full-file retrieval) -- accepted, shipped ahead of its own planned `docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md` staging writeup (never actually filed); see `docs/version history/v0.064.md`. **Plus** JS vocabulary addendum, stage 4 of 10 (math derivations catalog) -- staged in `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`, **still PLANNED**, tracked under `PROGRESS.md`'s Snapshot table's `v0.064-v0.070 (remainder)` row. Two independent pieces of work sharing one milestone slot, same precedent as `v0.041` (CLI/pipeline hardening + JS vocabulary addenda I & II) -- unlike `v0.041`, this slot's two pieces have since diverged in status, one DONE and one still PLANNED | DONE (retrieve-doc) / PLANNED (JS vocab stage 4) |
 | v0.065-v0.070 | JS vocabulary addendum, stages 5-10 of 10 (string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- staged in `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` -- **interleaved with** `Provider`, an experimental, barebones interface for a site to declare it talks to an external service at runtime (contract + experimental gating, IR/validation, JS config emission, external-script loading, capability-enum finalization), accepted and staged as a six-rung ladder (stages 1-6, one per version in this range) in `docs/Implementation/PROVIDER-SDK-ADDENDUM.md`; each stage's `docs/version history/vX.md` is a marked **PLANNED** preview until its stage actually lands, see that directory's own README for the convention | PLANNED |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8 (compiler-owned `.arklight/` project-local knowledge directory: foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- staged in `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md`; same marked-**PLANNED**-until-shipped convention as the row above | PLANNED |
 | v0.080   | Android backend -- `arklight android` packages a `build-dir` into a native Android project via `androidx.webkit.WebViewAssetLoader`, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the backend's runtime (staged `scaffold` -> CI build (2) -> CI install/launch smoke test (3) -> CI release build (4) -> local `build` (5) -> `--install` (6) -> `--release` (7) CLI ladder); design complete in `DESIGN-NOTES.md`, staged implementation tracked in `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`, Stages 0-4 (`arklight android scaffold`, including its generated GitHub Actions CI build + emulator smoke-test + release-build workflow) done | IN PROGRESS |
-| v0.100 | Desktop backend -- `arklight desktop` packages a `build-dir` into a cross-platform desktop app (Tauri-based or similar); design pending | PLANNED |
+| v0.100 | Desktop backend -- `arklight desktop` packages a `build-dir` into a native Linux desktop app via a purpose-built GTK3 + WebKit2GTK host (superseding an earlier Neutralino.js plan; see `docs/Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md` and `docs/Backends/NEUTRALINO-INTEGRATION.md`, kept for reference only); design complete, staged implementation tracked in `docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`, Stages 1-4 (`arklight desktop scaffold`, including its generated GitHub Actions CI build + headless-Xvfb smoke-test workflow, and `arklight desktop build`) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v1.0 | Stable compiler | PLANNED |
 
 **Renumbered.** v0.048 (CSS `@media` + `<head>` extension) is now
@@ -199,21 +199,29 @@ None of this reordering changed scope or design, only sequencing.
 
 **Re-renumbered again.** The Desktop and Android backend slots have
 since swapped a second time: Android is now `v0.080` and Desktop is
-now `v0.100`. Reason: an existing external project,
-`ARKlight-Viewer-for-Android-Devices`, is already most of the Android
-backend's runtime (AndroidX `WebView`, offline `.ark`-bundle handling,
-bundle/seal logic already split into its own files) -- see
+now `v0.100`. Reason (at the time of the swap): an existing external
+project, `ARKlight-Viewer-for-Android-Devices`, is already most of the
+Android backend's runtime (AndroidX `WebView`, offline `.ark`-bundle
+handling, bundle/seal logic already split into its own files) -- see
 `DESIGN-NOTES.md` ("v0.0438: Android backend")'s "Updated
-direction" note. The Android backend has a head start the Desktop
-backend doesn't (Desktop's design is still pending, not complete), so
-it moves ahead in sequence. Scope is unchanged for both; only order
-moved. v0.054 (JS backend expansion) has since shipped in full --
+direction" note. The Android backend had a head start the Desktop
+backend didn't at that point (Desktop's design was still pending), so
+it moved ahead in sequence. Scope is unchanged for both; only order
+moved. **Since then, Desktop's design has also landed in full** --
+`docs/Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md` settled on a
+purpose-built GTK3 + WebKit2GTK native host, superseding the earlier
+Neutralino.js plan (`docs/Backends/NEUTRALINO-INTEGRATION.md`, kept
+for reference only) -- and both backends now have real implementation
+progress: v0.080 (Android) has Stages 0-4 of its staged CLI ladder
+done, and v0.100 (Desktop) has Stages 1-4 of its own done (see
+`PROGRESS.md`'s Snapshot table for both). v0.054 (JS backend
+expansion) has since shipped in full --
 all 8 vdom-staging stages feeding it are DONE; v0.060
 (user-defined components -- staged ladder now DONE in full, Stages
 0-4; see `docs/Foundational/USER-DEFINED-COMPONENTS.md` for the
 reference), v0.080 (Android), and v0.100
-(Desktop) are designed (Desktop excepted -- design pending); v0.080/
-v0.100 implementation is still in progress or deferred. Alternate backends (Vue, Svelte) remain moved to unscheduled
+(Desktop) are all fully designed now; v0.080/
+v0.100 implementation is in progress for both. Alternate backends (Vue, Svelte) remain moved to unscheduled
 future work, pending further development of the IR and state/event
 semantics.
 

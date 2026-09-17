@@ -84,13 +84,16 @@ whose only job is to tell a reader "this shipped, here's what it
 does" -- would stop reliably meaning that the moment it's allowed to
 also mean "this is planned to eventually do this."
 
-`v0.064.md` through `v0.078.md` currently violate this: each is a
+`v0.065.md` through `v0.078.md` currently violate this: each is a
 forward-looking, **PLANNED**-marked summary written while staging its
 respective implementation ladder, before that stage had started. They
 predate this rule rather than following it, and per "This directory
 is a set" above they're still a bug worth fixing -- each should be
 rewritten to describe actual shipped behavior once its stage lands
-(as `v0.061.md`-`v0.063.md` already were once their stages shipped),
+(as `v0.061.md`-`v0.063.md` already were once their stages shipped,
+and `v0.064.md` now has been for its shipped `--retrieve-doc` half --
+see that file's own status note for how a milestone slot with two
+independently-staged pieces is handled when only one has shipped),
 not carried forward as a pattern. Nothing needs to move to fix this
 note itself: the point is that no *new* forward-looking file should
 be added here for `v0.080`, `v0.100`, or anything after -- their
@@ -116,7 +119,7 @@ roadmap status belongs in `ARCHITECTURE.md`'s Milestones table alone.
 | [`v0.061.md`](./v0.061.md) | JS vocabulary addendum, stage 1/10 -- math siblings (`subtract`/`divide`/`min`/`max`). |
 | [`v0.062.md`](./v0.062.md) | JS vocabulary addendum, stage 2/10 -- string-casing sibling + comparison `Show` predicates. |
 | [`v0.063.md`](./v0.063.md) | JS vocabulary addendum, stage 3/10 -- small new runtime primitives (`reveal`, debounced binding, clipboard paste, geolocation, `matchMedia`). |
-| [`v0.064.md`](./v0.064.md) | **PLANNED.** JS vocabulary addendum, stage 4/10 -- math derivations catalog. Plus `arklight search --retrieve-doc`, a doc-tree retrieval mode on the existing `search` subcommand. |
+| [`v0.064.md`](./v0.064.md) | `arklight search --retrieve-doc` -- doc-tree retrieval mode on the existing `search` subcommand. **Shipped.** (JS vocabulary addendum stage 4/10, this slot's other planned piece, hasn't landed yet -- see `ARCHITECTURE.md`'s Milestones table.) |
 | [`v0.065.md`](./v0.065.md) | **PLANNED.** JS vocabulary addendum, stage 5/10 -- string derivations catalog. Plus `Provider`, stage 1/6 -- the contract itself (`Provider.declare(...)`, closed capability enum) and its `arklight/experimental.py` gating. |
 | [`v0.066.md`](./v0.066.md) | **PLANNED.** JS vocabulary addendum, stage 6/10 -- predicates catalog. Plus `Provider`, stage 2/6 -- IR/`validate.py` integration: a declared Provider threaded through `WebsiteIR`, closed-vocabulary capability validation at build time. |
 | [`v0.067.md`](./v0.067.md) | **PLANNED.** JS vocabulary addendum, stage 7/10 -- list-scalar derivations catalog. Plus `Provider`, stage 3/6 -- JS backend emission: a fixed config blob describing declared capabilities, no networking/vendor code generated. |
