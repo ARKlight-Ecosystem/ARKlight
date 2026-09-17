@@ -5,6 +5,28 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.0642] -- Docs-only incremental patch: definition rewrite + Platform API IR proposal
+
+Out-of-band, numbered inside the same `v0.064` -> `v0.065` gap as
+`[0.0431]`/`[0.0641]` below, but docs-only: no compiler code changed.
+
+**Changed:** `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s one-sentence
+definition no longer leans on "static-site compiler" as ARKlight's
+load-bearing noun. ARKlight is now stated as a **compiler framework**,
+with an explicit, three-bullet statement that it is not a static-site
+generator, not a frontend framework, and not a UI framework -- each of
+those describes one slice of the project (output shape, authoring
+ergonomics, component vocabulary respectively) and none describes the
+compiler itself. Added to `docs/Foundational/README.md`'s index.
+
+**Added:** `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` -- a platform
+API interface layer for the compiler IR (notifications, clipboard,
+filesystem, device info, ...) represented as backend-independent,
+versioned interfaces; Web is the default implementation; native
+backends (Android, Linux Desktop) earn individual interfaces only once
+mature. Filed as **Proposed**, not accepted, no version-history slot
+reserved. Added to `docs/Proposals/README.md`'s index.
+
 ## [0.0641] -- Emergency patch: URL query-parameter state
 
 Out-of-band alpha maintenance release (numbered inside the v0.064 ->
