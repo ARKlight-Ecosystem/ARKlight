@@ -116,6 +116,30 @@ class IRPage:
     # already establishes for a key with a second, non-`Action.*(...)`
     # writer. Empty for pages that declare no media-driven `State(...)`.
     media: list[tuple[str, str]] = field(default_factory=list)
+    # `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md):
+    # `(name, param, type_tag, history_mode)` tuples for every
+    # `State(..., query=...)` on this page, in declaration order --
+    # same marker/`<body>`-attribute duality every piece of hydration
+    # state above already uses (see `arklight/backend/js/runtime/
+    # state.py`'s `initState()`, which overrides each name's initial
+    # value with the matching `URLSearchParams(location.search)` entry
+    # on init, keeps it live across `popstate`, and writes it back out
+    # via `history.replaceState`/`pushState` on every change).
+    # `param` is the query-string key itself (`State("page", ...,
+    # query="page")`'s `"page"` -- usually, but not necessarily, the
+    # same string as `name`). `type_tag` is one of `"int"`/`"bool"`/
+    # `"str"`, derived from `initial`'s own Python type at build time
+    # -- the coercion the client needs to turn a raw string query
+    # value back into the right JS type, the same type-carrying
+    # mechanism that already lets `Computed(...)` be evaluated at
+    # build time. `history_mode` is `"replace"` (the unmarked default)
+    # or `"push"` (`arklight.ir.schema.KNOWN_QUERY_HISTORY_MODES`),
+    # always resolved to one of the two here so the runtime never has
+    # to guess a default itself. Carries no value of its own -- like
+    # `persist`/`media` above, `state[name]` already holds this key's
+    # server-rendered initial value. Empty for pages that declare no
+    # query-tracked `State(...)`.
+    query: list[tuple[str, str, str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -458,6 +482,27 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
     return None  # unreachable once Validation has run
 
 
+def _query_type_tag(initial: Any) -> str:
+    """
+    `v0.064`: the coercion tag a query-tracked `State(...)`'s `initial`
+    value bakes in for the client runtime -- `bool` is checked before
+    `int` since `bool` is a Python subclass of `int` (`isinstance(True,
+    int)` is `True`), the same ordering pitfall
+    `arklight/backend/js/derivations/` already has to account for
+    wherever a value's exact type (not just its `int`-compatibility)
+    matters. Anything that isn't `bool`/`int` falls back to `"str"` --
+    `str(initial)` is always a safe passthrough client-side, mirroring
+    the "fail open to the safe default" discipline the rest of this
+    feature holds, just applied to type selection instead of a bad
+    runtime read.
+    """
+    if isinstance(initial, bool):
+        return "bool"
+    if isinstance(initial, int):
+        return "int"
+    return "str"
+
+
 def _extract_page_state(
     page: ARKNode,
 ) -> tuple[
@@ -467,14 +512,14 @@ def _extract_page_state(
     list[dict[str, Any]],
     list[str],
     list,
-    list[tuple[str, str]],
+    list[tuple[str, str, str, str]],
 ]:
     """
     Split a validated Page node's children into (state, computed,
-    computed_initial, watch, persist, media, remaining children).
-    `State(...)`/`Computed(...)`/`Watch(...)` nodes are declarations,
-    not renderable content -- they must never reach the HTML backend
-    as a child.
+    computed_initial, watch, persist, media, query, remaining
+    children). `State(...)`/`Computed(...)`/`Watch(...)` nodes are
+    declarations, not renderable content -- they must never reach the
+    HTML backend as a child.
 
     `computed` is returned in dependency order (see
     `_topological_order_computed`); `computed_initial` is each
@@ -487,23 +532,33 @@ def _extract_page_state(
     `State(...)` on this page whose `persist` prop is `True` -- no
     dependency graph, no value of its own, same reasoning as `watch`.
     `media` (`v0.063`) is declaration order too: `(name, query)` for
-    every `State(...)` on this page whose `media` prop is set.
+    every `State(...)` on this page whose `media` prop is set. `query`
+    (`v0.064`) is declaration order too: `(name, param, type_tag,
+    history_mode)` for every `State(...)` on this page whose `query`
+    prop is set -- see `IRPage.query`'s docstring for what each field
+    means.
     """
     state: dict[str, Any] = {}
     computed_defs: dict[str, dict[str, Any]] = {}
     watch: list[dict[str, Any]] = []
     persist: list[str] = []
     media: list[tuple[str, str]] = []
+    query: list[tuple[str, str, str, str]] = []
     remaining: list = []
     for child in page.children:
         if isinstance(child, ARKNode) and child.type == "State":
             name = child.props["name"]
-            state[name] = child.props.get("initial")
+            initial = child.props.get("initial")
+            state[name] = initial
             if child.props.get("persist"):
                 persist.append(name)
-            query = child.props.get("media")
-            if query:
-                media.append((name, query))
+            media_condition = child.props.get("media")
+            if media_condition:
+                media.append((name, media_condition))
+            query_param = child.props.get("query")
+            if query_param:
+                history_mode = child.props.get("history") or "replace"
+                query.append((name, query_param, _query_type_tag(initial), history_mode))
         elif isinstance(child, ARKNode) and child.type == "Computed":
             spec = _derivation_ref_to_spec(child.props["derive"])
             spec["deps"] = list(child.props.get("deps", ()))
@@ -530,7 +585,7 @@ def _extract_page_state(
         computed_initial[name] = _evaluate_derivation(computed_defs[name], get=_get)
 
     computed = [(name, computed_defs[name]) for name in order]
-    return state, computed, computed_initial, watch, persist, media, remaining
+    return state, computed, computed_initial, watch, persist, media, query, remaining
 
 
 def build_website_ir(
@@ -596,7 +651,9 @@ def build_website_ir(
     collector = _ResponsiveStyleCollector()
     ir_pages = []
     for route, page in pages.items():
-        state, computed, computed_initial, watch, persist, media, remaining_children = _extract_page_state(page)
+        state, computed, computed_initial, watch, persist, media, query, remaining_children = (
+            _extract_page_state(page)
+        )
         root_page = ARKNode(type=page.type, props=page.props, children=remaining_children)
         ir_pages.append(
             IRPage(
@@ -608,6 +665,7 @@ def build_website_ir(
                 watch=watch,
                 persist=persist,
                 media=media,
+                query=query,
             )
         )
     return WebsiteIR(

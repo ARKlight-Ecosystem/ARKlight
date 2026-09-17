@@ -392,14 +392,33 @@ def _render_page(
         if page.media:
             media_json = escape(json.dumps(page.media), quote=True)
             media_attr = f' data-ark-media="{media_json}"'
+        # `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md):
+        # `page.query` rides along as its own `data-ark-query`
+        # attribute, same reasoning as `data-ark-media` above --
+        # `[name, param, type_tag, history_mode]` tuples, no value of
+        # their own (`state_json` above already carries this key's
+        # server-rendered initial value), read by `initState()`
+        # (`arklight/backend/js/runtime/state.py`) to override that
+        # value from `URLSearchParams(location.search)`, keep it live
+        # across `popstate` (`arklight/backend/js/runtime/query.py`),
+        # and write it back out via `history.replaceState`/
+        # `pushState` on every change. A page can only ever have
+        # `page.query` non-empty when `page.state` is too (`query=`
+        # only exists as a prop on a `State(...)` node), so it's
+        # always safe to place all six attributes on the same marker.
+        query_attr = ""
+        if page.query:
+            query_json = escape(json.dumps(page.query), quote=True)
+            query_attr = f' data-ark-query="{query_json}"'
         if app_shell:
             state_marker = (
                 f'<div id="ark-state" data-ark-state="{state_json}"'
-                f"{computed_attr}{watch_attr}{persist_attr}{media_attr} hidden></div>\n"
+                f"{computed_attr}{watch_attr}{persist_attr}{media_attr}{query_attr} hidden></div>\n"
             )
         else:
             body_attr_parts.append(
-                f' data-ark-state="{state_json}"{computed_attr}{watch_attr}{persist_attr}{media_attr}'
+                f' data-ark-state="{state_json}"{computed_attr}{watch_attr}'
+                f"{persist_attr}{media_attr}{query_attr}"
             )
     if app_shell:
         body_attr_parts.append(' hx-boost="true"')

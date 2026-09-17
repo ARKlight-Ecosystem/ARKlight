@@ -402,6 +402,24 @@ MODIFIER_REGISTRY: dict[str, ModifierSpec] = {
 KNOWN_MODIFIERS = frozenset(MODIFIER_REGISTRY)
 
 
+# `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md, `docs/
+# version history/v0.064.md`): `State(..., query=..., history=...)`'s
+# `history` prop names how a query-tracked key's writes affect the
+# browser history stack -- `"replace"` (the unmarked default, `State
+# (..., query=...)` with `history` left `None`) calls
+# `history.replaceState(...)`, `"push"` calls `history.pushState(...)`
+# instead, giving that key's changes a real back-button-worthy entry.
+# A small, closed set, same discipline `KNOWN_MODIFIERS` above holds
+# for event-modifier tokens -- but deliberately its own registry, not
+# a reuse of `MODIFIER_REGISTRY`: that one describes per-*event*
+# timing/dispatch tokens attached to an `ActionRef`
+# (`.with_modifiers(...)`/`.debounce(...)`/`.throttle(...)`), which
+# `history=` isn't -- it's a per-*State-declaration* property with no
+# event of its own, so it gets a small dedicated set instead of
+# stretching an unrelated one to fit.
+KNOWN_QUERY_HISTORY_MODES = frozenset({"replace", "push"})
+
+
 # `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12; docs/Foundational/
 # DESIGN-NOTES.md "Computed/derived state"): closed-vocabulary derived
 # state, the same shape discipline as `ACTION_REGISTRY`/
