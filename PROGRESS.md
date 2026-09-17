@@ -47,7 +47,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.062   | JS vocabulary addendum, stage 2 of 10: string-casing siblings + comparison predicates (`Derive.uppercase`/`.trim`, `Predicate.equals`/`.gt`/`.lt`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
 | v0.063   | JS vocabulary addendum, stage 3 of 10: `Action.geolocate(name)`, clipboard `paste` behavior, `State(..., media=...)` (`matchMedia`-driven boolean state), `reveal`/`lazy` behavior (`on_reveal=`, `IntersectionObserver`), debounced/throttled `Bind.model(...)` -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` | DONE |
 | v0.064   | `arklight search --retrieve-doc` -- doc-tree retrieval mode (`--foundational`/`--backends`/`--proposals`/`--implementation`/`--js-backend`/`--far-future`/`--version-history`, plus `--file NAME`) on the existing `search` subcommand, fully wired into `arklight/cli/main.py`/`arklight/cli/doc_retrieval.py`; `tests/test_doc_retrieval.py` (48 tests incl. `test_cli.py`) passing. Landed ahead of its own `docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md` staging writeup, which was never actually filed -- see `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md` for the accepted proposal this shipped from | DONE |
-| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
+| v0.0641  | Emergency patch: URL query-parameter state -- `State(..., query="page", history="push")`, extending the existing `persist=`/`media=` precedent: two-way sync with a URL query parameter, typed coercion (`_query_type_tag`, bool checked before int), `history="replace"`/`"push"` write-back via `history.replaceState`/`pushState`, and a new `wireQuerySync` `popstate` listener (`arklight/backend/js/runtime/query.py`) gated by `has_query` -- `docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same "capability fixes take priority" treatment as `v0.0431`'s bug-fix patch; `tests/test_url_query_state.py` (44 tests) passing | DONE |\n| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
@@ -124,6 +124,120 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.0641 -- Emergency patch: URL query-parameter state (DONE)
+
+Out-of-band alpha maintenance release, numbered inside the v0.064 ->
+v0.065 gap rather than waiting for whichever of those two versions'
+own numbered work (JS vocabulary stage 4/10; JS vocabulary stage 5/10
+plus `Provider` stage 1/6) finishes first -- same treatment as
+`v0.0431`'s bug-fix patch, extended to a second category this project
+now recognizes explicitly: a **capability fix**, not a bug fix, but
+handled with at least the same priority. `v0.0431` existed because
+`ROUTE_AWARE_ATTRS` silently broke a contract the HTML backend had
+already made (route-shaped `srcset`/`poster`/`action`/`formaction`
+values 404ing outside the domain root) -- a violation of something the
+compiler already claimed to do. This patch is the other half of that
+same "stop and fix it now, not later" posture: not a broken promise,
+but a missing one -- ARKlight shipping no authored answer at all for
+something every other reactive primitive in this vocabulary implies it
+should have. A gap that blocks real, better use of the compiler is, if
+anything, the higher-priority case to interrupt numbered work for: a
+contract violation caps how *wrong* the tool can be, but a capability
+gap caps how *useful* it can be, and the latter has no ceiling on how
+much it's costing every site built against this compiler until it's
+closed. Numbered milestone work resumes at whichever of `v0.065`'s
+pieces was in flight, unaffected by this patch landing in between.
+
+Accepted from `docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`.
+Confirmed by the proposal's own exhaustive grep of `arklight/` for
+`location.search`/`URLSearchParams`: ARKlight had no authored
+primitive for reading, writing, or reacting to URL query parameters at
+all, and -- unlike dynamic routes, nested layouts, or metadata -- this
+is a gap the static-compilation model genuinely can't dissolve.
+`/products?page=2` and `/products?page=3` resolve to the same file at
+the static-file-server level; the compiler never sees the query
+string, and the space of possible query values is unbounded, so
+"generate one file per value" was never on the table.
+
+`State(name, initial, query=..., history=...)` extends the existing
+`persist=True`/`media=` precedent rather than inventing a fourth
+parallel mechanism: same "override on init from an external source,
+keep writing after that" shape, just sourced from
+`URLSearchParams(location.search)`/`history.replaceState`/`pushState`
+instead of `localStorage`/`matchMedia`. `query=` names the query-string
+key (validated against `_LEGAL_QUERY_KEY_RE` at build time -- an
+unencodable key would otherwise mis-round-trip through
+`URLSearchParams` silently, in the browser, with nothing pointing back
+at the `State(...)` declaration that caused it). `history=` (`"push"`,
+the opt-in; `"replace"`, the unmarked default) controls whether a
+change gets a real back-button-worthy history entry or silently
+replaces the current one -- deliberately its own small registry
+(`arklight.ir.schema.KNOWN_QUERY_HISTORY_MODES`), not folded into
+`MODIFIER_REGISTRY`, since it's a per-`State`-declaration property with
+no event of its own, not a per-event dispatch/timing token.
+
+The one genuinely new runtime surface this adds: nothing shipped by
+ARKlight listened for `popstate` before this, since there's no SPA
+router. `wireQuerySync` (`arklight/backend/js/runtime/query.py`, new
+file, kept separate from `state.py` for exactly that reason) is
+registered once, from the existing `DOMContentLoaded` handler, gated
+behind `has_query` the same "only ship what's used" way `has_reveal`
+already gates `wireReveal`; it re-reads whichever page's
+`data-ark-query`/`data-ark-state` attributes are on screen *right now*
+rather than closing over a fixed manifest, so it stays correct across
+an `app_shell`-boosted navigation to a different page. The read/
+coerce/write-back half, by contrast, is folded directly into
+`STATE_CORE_JS`'s `initState()` unconditionally (present on every
+stateful page, a no-op when a page declares no `query=` state) -- same
+split `persist=`/`media=` already established between "always present"
+core behavior and "only shipped when used" wiring.
+
+Deliberately never a real navigation: `State`/`Computed`/`Derive`/every
+`Action` in this vocabulary are synchronous, in-memory primitives with
+no network/navigation step anywhere in them, and the compiler-rendered
+document is invariant to the query string in the first place (static
+file resolution strips it before ARKlight's output is even in the
+picture). So a query-tracked `State` update always stays a
+`history.replaceState`/`pushState` call, never a full reload or an
+`hx-boost` swap of a document that would, by construction, be
+byte-for-byte identical to the one already on screen. A
+before/after-URL equality check in the write-back subscriber also
+makes a `popstate`-driven `store.set(...)` round-trip a no-op --
+`wireQuerySync` never re-pushes/re-replaces the URL it just navigated
+*to*, with no separate "am I currently handling a popstate" flag
+needed.
+
+Tests: `tests/test_url_query_state.py` (new, 44 tests) -- API prop
+defaults/round-trip and independence from `persist=`/`media=`;
+`KNOWN_QUERY_HISTORY_MODES`; Validation (legal/illegal query keys,
+non-string `query`, known/unknown `history` modes, `history=` without
+`query=`, plain `State(...)` left untouched); IR build (`IRPage.query`
+tuples, `_query_type_tag`'s bool-before-int ordering, declaration
+order across multiple query-tracked keys, independence from
+`persist`/`media` lists); HTML render (`data-ark-query` presence/
+absence, marker-vs-`<body>` placement under `app_shell`); JS render
+(`data-ark-query`/`coerceQueryValue`/`serializeQueryValue` always
+present whenever any page has state, `wireQuerySync` gated strictly by
+`has_query` and shipped only once across multiple pages); and a
+Node.js integration suite (mirroring `test_vdom_7.py`'s/
+`test_js_vocabulary_v0063.py`'s precedent of checking the shipped
+runtime fragments against a real JS engine, not just compiled-output
+string assertions) exercising the actual `createState`/`initState`/
+`wireQuerySync` fragments together: URL-override-on-init, fallback to
+`initial` on a missing or malformed query value, `push`-vs-`replace`
+write-back, and a `popstate` round-trip both with the param present
+and falling back to the server-rendered default when it's absent from
+the URL. Full suite: 1297 passed, no regressions.
+
+Version bumped `0.063` -> `0.0641` (`pyproject.toml`) so `arklight
+--version` and build-output banners reflect the patch -- noting, for
+the record, that `v0.064`'s own `--retrieve-doc` piece landed without
+a version bump of its own (`pyproject.toml` was still `0.063` going
+into this patch despite `v0.064` being marked DONE in the Snapshot
+table above); this bump covers both, same as any other pre-existing
+inconsistency this project's docs flag in place rather than silently
+paper over.
 
 ## v0.061 -- JS vocabulary addendum, stage 1 of 10: math siblings (DONE)
 
