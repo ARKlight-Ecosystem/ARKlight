@@ -42,7 +42,13 @@ section for the version-number history).
   registries) gets a tool pointer -- see the proposal's own scope
   note for why. Rei does not import or call
   `arklight.search.engine`/`arklight.cli.search` herself; the pointer
-  is a static template with substitution, not an invocation.
+  is a static template with substitution, not an invocation. Also not
+  in scope: `DuplicateComponentError`/`DuplicateStyleNameError`
+  (`arklight.ir.components`/`arklight.api`) from a same-name
+  `register_component`/`register_backend_render`/`Site.style(...)`
+  re-registration -- these are import-time errors, not
+  `ValidationError`s narrated by this renderer at all (see the
+  proposal's §5 scope note).
 - `docs/Foundational/CLI-REFERENCE.md` updated to document `--narrate`
   alongside `--verbose`/`--debug`, once actually shipped -- **not**
   before, per that file's own "implemented and shipped only" scope
@@ -75,6 +81,17 @@ section for the version-number history).
   A regression test should assert the *absence* of the pointer line
   on at least one of those other-registry failures, not just its
   presence on the schema-violation cases.
+- Import-time registration errors are untouched by this addendum:
+  a site file whose own `component(...)`/`site.style(...)` calls
+  raise `DuplicateComponentError`/`DuplicateStyleNameError` (a
+  same-name re-registration without `allow_redefine=True` -- see
+  `arklight.ir.components`/`arklight.api`) still surfaces as a plain
+  Python traceback, identically under `--narrate`, `--verbose`, and no
+  flag at all, since the failure happens before `arklight build`
+  reaches any of the narrated pipeline stages. A regression test
+  should confirm `--narrate` produces no Rei output (banner or
+  otherwise) for this case, not just that no `arklight search` pointer
+  is appended.
 
 ## Explicitly not part of this addendum
 

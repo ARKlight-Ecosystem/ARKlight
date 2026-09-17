@@ -215,6 +215,21 @@ those other registries, so a future version of this pointer could
 cover them too, is explicitly out of scope for this proposal -- see
 §7.
 
+Also out of scope, for a different reason: `DuplicateComponentError`/
+`DuplicateStyleNameError` (`arklight.ir.components`/`arklight.api`,
+raised by `register_component`/`register_backend_render`/
+`Site.style(...)` on a same-name re-registration without
+`allow_redefine=True`). These aren't `ValidationError`s at all, and
+they aren't raised from `arklight/ir/validate.py` -- they fire at
+site-file *import* time, when a project's own `component(...)`/
+`site.style(...)` calls run, well before `arklight build` ever reaches
+the narrated pipeline stages §1 describes. A build that fails this way
+never gets far enough for `--narrate` to say anything about it at all;
+this is a plain Python traceback today (the same as every other
+import-time error a site file can raise), and stays one under this
+proposal. If import-time errors ever get their own narrated treatment,
+that's its own proposal, not an implicit extension of §5's pointer.
+
 ## 6. Relationship to Raeliana and Miko
 
 Unchanged from the original concept sketch's separation, restated

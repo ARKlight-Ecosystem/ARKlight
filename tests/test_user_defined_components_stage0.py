@@ -16,6 +16,7 @@ from arklight.ir.components import (
     COMPONENT_REGISTRY,
     ComponentError,
     ComponentSpec,
+    DuplicateComponentError,
     Prop,
     expand_ark_ast,
     expand_node,
@@ -77,9 +78,42 @@ def test_invalid_mode_rejected_at_registration_time():
         ComponentSpec(name="Bad", render_fn=lambda: None, mode="not-a-real-mode")
 
 
-def test_re_registering_a_name_overwrites_the_previous_entry():
+def test_re_registering_a_name_raises_without_allow_redefine():
     register_component("Thing", lambda: Text("v1"))
-    register_component("Thing", lambda: Text("v2"))
+
+    with pytest.raises(DuplicateComponentError, match="already registered"):
+        register_component("Thing", lambda: Text("v2"))
+
+    # The failed second call didn't touch the first registration.
+    assert COMPONENT_REGISTRY["Thing"].render_fn() == Text("v1")
+
+
+def test_re_registering_a_name_with_allow_redefine_overwrites():
+    register_component("Thing", lambda: Text("v1"))
+    register_component("Thing", lambda: Text("v2"), allow_redefine=True)
+    assert COMPONENT_REGISTRY["Thing"].render_fn() == Text("v2")
+
+
+def test_component_decorator_raises_on_redefinition_without_allow_redefine():
+    @component()
+    def Thing():  # noqa: N802 -- component name convention
+        return Text("v1")
+
+    with pytest.raises(DuplicateComponentError, match="already registered"):
+        @component()
+        def Thing():  # noqa: N802,F811
+            return Text("v2")
+
+
+def test_component_decorator_allow_redefine_overwrites():
+    @component()
+    def Thing():  # noqa: N802 -- component name convention
+        return Text("v1")
+
+    @component(allow_redefine=True)
+    def Thing():  # noqa: N802,F811
+        return Text("v2")
+
     assert COMPONENT_REGISTRY["Thing"].render_fn() == Text("v2")
 
 

@@ -30,6 +30,7 @@ from arklight.ir.component_dispatch import resolve_backend_dispatch
 from arklight.ir.components import (
     COMPONENT_REGISTRY,
     ComponentError,
+    DuplicateComponentError,
     Prop,
     expand_ark_ast,
     register_backend_render,
@@ -71,11 +72,54 @@ def test_register_backend_render_rejects_macro_mode():
         register_backend_render("Foo", "html", lambda: None)
 
 
-def test_register_backend_render_last_registration_wins():
+def test_register_backend_render_raises_without_allow_redefine():
     register_component("NavBar", lambda: None, mode="registry")
     register_backend_render("NavBar", "html", lambda: "first")
-    register_backend_render("NavBar", "html", lambda: "second")
+
+    with pytest.raises(ComponentError, match="already has a 'html' backend"):
+        register_backend_render("NavBar", "html", lambda: "second")
+
+    # The failed second call didn't touch the first registration.
+    assert COMPONENT_REGISTRY["NavBar"].backend_render_fns["html"]() == "first"
+
+
+def test_register_backend_render_with_allow_redefine_overwrites():
+    register_component("NavBar", lambda: None, mode="registry")
+    register_backend_render("NavBar", "html", lambda: "first")
+    register_backend_render("NavBar", "html", lambda: "second", allow_redefine=True)
     assert COMPONENT_REGISTRY["NavBar"].backend_render_fns["html"]() == "second"
+
+
+def test_decorator_register_backend_raises_on_redefinition_without_allow_redefine():
+    @component(mode="registry")
+    def NavBar():  # noqa: N802
+        return Container(Text("default"))
+
+    @NavBar.register_backend("html")
+    def _():
+        return Container(Text("first"))
+
+    with pytest.raises(DuplicateComponentError, match="already has a 'html' backend"):
+        @NavBar.register_backend("html")
+        def _():
+            return Container(Text("second"))
+
+
+def test_decorator_register_backend_allow_redefine_overwrites():
+    @component(mode="registry")
+    def NavBar():  # noqa: N802
+        return Container(Text("default"))
+
+    @NavBar.register_backend("html")
+    def _():
+        return Container(Text("first"))
+
+    @NavBar.register_backend("html", allow_redefine=True)
+    def _():
+        return Container(Text("second"))
+
+    spec = COMPONENT_REGISTRY["NavBar"]
+    assert spec.backend_render_fns["html"]().children[0].children == ["second"]
 
 
 def test_decorator_register_backend_wires_through():
