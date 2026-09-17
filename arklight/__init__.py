@@ -1,5 +1,7 @@
 """
-ARKlight -- a Python-first compiler for building static websites.
+ARKlight -- a compiler framework: author in ordinary Python, compile to
+a static site (plus optional wrapped native/PWA targets), with its own
+batteries-included developer workflow.
 
     from arklight import *
 
@@ -8,12 +10,16 @@ ARKlight -- a Python-first compiler for building static websites.
     @site.page("/")
     def home():
         return Page(
+            State("count", 0),
             Heading("ARKlight"),
             Text("Build websites with Python."),
-            Button("Get Started"),
+            Button("Get Started", on_click=Action.increment("count")),
         )
 
-Users write Python. ARKlight compiles it to standard HTML.
+Users write Python. ARKlight compiles it to standard HTML, CSS, and
+vanilla JS. Interactivity goes through a fixed, closed vocabulary of
+primitives (`State`, `Action.*`, `Derive.*`, `Predicate.*`, `Watch`) --
+no `eval`, no `new Function`, no string ever executed as code.
 The browser never executes Python.
 """
 
