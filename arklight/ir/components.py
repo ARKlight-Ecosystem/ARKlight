@@ -153,6 +153,32 @@ class ComponentError(RuntimeError):
     """
 
 
+class DuplicateComponentError(ComponentError):
+    """
+    Raised by `register_component(...)`/`register_backend_render(...)`
+    when the call would silently replace an existing registration --
+    a component name, or a `(component_name, backend_name)` per-backend
+    override, that's already present in `COMPONENT_REGISTRY`. Both
+    functions used to store the new entry over the old one
+    unconditionally ("last call wins"), which quietly hid the common
+    project mistake of two components accidentally sharing a name (or
+    the same backend override registered twice) behind an outcome that
+    looked fine at import time and only surfaced -- if at all -- as
+    wrong rendered output much later, with no error pointing at either
+    registration site.
+
+    Pass `allow_redefine=True` to either function (surfaced as
+    `allow_redefine=True` on `@component(...)` and
+    `.register_backend(backend_name, allow_redefine=True)`) for the one
+    legitimate case last-call-wins used to serve unconditionally:
+    re-importing/reloading a components module during iterative
+    development, where the replacement really is deliberate. That
+    escape hatch is opt-in and per call site, not a global switch --
+    a project turns it on exactly where it re-registers on purpose,
+    everywhere else keeps the safety net.
+    """
+
+
 @dataclass(frozen=True)
 class Prop:
     """
@@ -301,13 +327,20 @@ def register_component(
     mode: str = "macro",
     default_style: dict[str, str] | None = None,
     state: dict[str, ComponentState] | None = None,
+    allow_redefine: bool = False,
 ) -> ComponentSpec:
     """
-    Register `render_fn` under `name`. Re-registering an existing name
-    overwrites the previous entry (last registration wins) -- same
-    "last call wins" rule `Site.style(...)` already uses for custom CSS
-    classes, so re-importing/reloading a components module during
-    iterative development doesn't accumulate stale duplicates.
+    Register `render_fn` under `name`.
+
+    Re-registering an existing name raises `DuplicateComponentError`
+    unless `allow_redefine=True` is passed -- this used to be silent,
+    unconditional "last call wins" (the same rule `Site.style(...)`
+    used to apply to custom CSS classes), which hid an accidental name
+    collision between two unrelated components behind output that
+    looked correct at import time. Pass `allow_redefine=True` for the
+    one case that rule was actually protecting: re-importing/reloading
+    a components module during iterative development, where the
+    replacement is deliberate and the previous entry is known-stale.
 
     `default_style`, if given, is expected to already be validated
     (see `arklight.api.component`) -- this function stores it verbatim,
@@ -318,6 +351,17 @@ def register_component(
     already-normalized into `{local_name: ComponentState}` by
     `arklight.api._validate_component_state`, stored verbatim here.
     """
+    if name in COMPONENT_REGISTRY and not allow_redefine:
+        raise DuplicateComponentError(
+            f"A component named {name!r} is already registered. "
+            "Registering it again would silently replace the earlier "
+            "definition -- if that's deliberate (e.g. re-importing a "
+            "components module during iterative development), pass "
+            f"allow_redefine=True: register_component({name!r}, ..., "
+            "allow_redefine=True) or @component(..., "
+            "allow_redefine=True). Otherwise, two different components "
+            f"are colliding on the name {name!r}; rename one of them."
+        )
     spec = ComponentSpec(
         name=name,
         render_fn=render_fn,
@@ -330,7 +374,13 @@ def register_component(
     return spec
 
 
-def register_backend_render(component_name: str, backend_name: str, render_fn: RenderFn) -> ComponentSpec:
+def register_backend_render(
+    component_name: str,
+    backend_name: str,
+    render_fn: RenderFn,
+    *,
+    allow_redefine: bool = False,
+) -> ComponentSpec:
     """
     Stage 3: register `render_fn` as `component_name`'s override for
     `backend_name` (e.g. `"html"` -- `Backend.name` on whichever
@@ -352,10 +402,14 @@ def register_backend_render(component_name: str, backend_name: str, render_fn: R
     three stages later" discipline `_resolve_props` already applies to
     a bad prop.
 
-    Last-registration-wins per `(component_name, backend_name)` pair,
-    same rule `register_component` already uses for re-registering a
-    component outright -- registering `"html"` twice for the same
-    component just replaces the earlier override, it doesn't error.
+    Re-registering an override for a `(component_name, backend_name)`
+    pair that already has one raises `DuplicateComponentError` unless
+    `allow_redefine=True` is passed -- same reasoning and same escape
+    hatch `register_component` uses for re-registering a component
+    outright: this used to be silent last-registration-wins, which hid
+    an accidental double registration of the same backend override
+    behind output that looked fine until the wrong render function
+    turned out to be the one that stuck.
     """
     spec = COMPONENT_REGISTRY.get(component_name)
     if spec is None:
@@ -377,6 +431,19 @@ def register_backend_render(component_name: str, backend_name: str, render_fn: R
         raise ComponentError(
             f"Cannot register a backend render function for "
             f"{component_name!r}: backend_name must be a non-empty string."
+        )
+    if backend_name in spec.backend_render_fns and not allow_redefine:
+        raise DuplicateComponentError(
+            f"{component_name!r} already has a {backend_name!r} backend "
+            "render function registered. Registering it again would "
+            "silently replace the earlier override -- if that's "
+            "deliberate, pass allow_redefine=True: "
+            f"register_backend_render({component_name!r}, "
+            f"{backend_name!r}, ..., allow_redefine=True) or "
+            f"@{component_name}.register_backend({backend_name!r}, "
+            "allow_redefine=True). Otherwise this is likely two "
+            f"unrelated registrations for {backend_name!r} colliding by "
+            "mistake."
         )
     new_backend_render_fns = dict(spec.backend_render_fns)
     new_backend_render_fns[backend_name] = render_fn

@@ -1,6 +1,6 @@
 import pytest
 
-from arklight.api import CSSSyntaxError, Site
+from arklight.api import CSSSyntaxError, DuplicateStyleNameError, Site
 
 
 def test_style_registers_rules_under_the_given_name():
@@ -10,10 +10,21 @@ def test_style_registers_rules_under_the_given_name():
     assert site.custom_styles == {"pull-quote": {"font-style": "italic", "padding": "1em"}}
 
 
-def test_style_called_twice_with_same_name_overwrites():
+def test_style_called_twice_with_same_name_raises_without_allow_redefine():
     site = Site()
     site.style("brand", {"color": "red"})
-    site.style("brand", {"color": "blue"})
+
+    with pytest.raises(DuplicateStyleNameError, match="already registered"):
+        site.style("brand", {"color": "blue"})
+
+    # The failed second call didn't touch the first registration.
+    assert site.custom_styles == {"brand": {"color": "red"}}
+
+
+def test_style_called_twice_with_allow_redefine_overwrites():
+    site = Site()
+    site.style("brand", {"color": "red"})
+    site.style("brand", {"color": "blue"}, allow_redefine=True)
 
     assert site.custom_styles == {"brand": {"color": "blue"}}
 

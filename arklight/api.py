@@ -133,6 +133,24 @@ class CSSSyntaxError(ValueError):
     name, wrong dict shape) can catch it specifically.
     """
 
+
+class DuplicateStyleNameError(ValueError):
+    """
+    Raised by `Site.style(...)` when `name` is already registered in
+    `self.custom_styles`. This used to be silent, unconditional "last
+    call wins" -- the same rule `register_component(...)` used to
+    apply -- which hid two unrelated `site.style(...)` calls
+    accidentally reusing the same class name behind whichever one
+    happened to run last, no error at either call site. Subclasses
+    `ValueError` for the same reason `CSSSyntaxError` does (existing
+    `except ValueError` handling for `Site.style(...)` keeps working),
+    while staying its own type so a caller can distinguish "this name
+    is already taken" from "the CSS in this call is malformed"
+    (`CSSSyntaxError`). Pass `allow_redefine=True` to `Site.style(...)`
+    for the one legitimate case last-call-wins used to serve:
+    deliberately redefining a class as a site file is built up.
+    """
+
 # ---------------------------------------------------------------------------
 # Built-in components
 #
@@ -307,6 +325,7 @@ def component(
     mode: str = "macro",
     default_style: dict[str, str] | None = None,
     state: dict[str, Any] | None = None,
+    allow_redefine: bool = False,
 ) -> Callable[[Callable[..., Any]], Callable[..., ARKNode]]:
     """
     Decorator that registers a render function as a named, reusable
@@ -376,6 +395,17 @@ def component(
     component's own per-backend override subtree (v0.060 Stage 3) --
     see `arklight.ir.components.expand_node`'s docstring for the
     `ComponentError` that use raises today.
+
+    `allow_redefine` (default `False`) -- decorating a name that's
+    already registered raises
+    `arklight.ir.components.DuplicateComponentError` unless this is
+    `True`. This used to be silent, unconditional "last call wins":
+    two components accidentally sharing a name would just have the
+    second one win, with nothing pointing at either `@component(...)`
+    site. Pass `allow_redefine=True` for the one legitimate case that
+    served: re-importing/reloading a components module during
+    iterative development, where redefining `NavBar` really is the
+    point. See `arklight.ir.components.register_component`.
     """
     def decorator(render_fn: Callable[..., Any]) -> Callable[..., ARKNode]:
         name = render_fn.__name__
@@ -394,6 +424,7 @@ def component(
             mode=mode,
             default_style=validated_default_style,
             state=validated_state,
+            allow_redefine=allow_redefine,
         )
 
         def marker(**call_props: Any) -> ARKNode:
@@ -403,7 +434,9 @@ def component(
         marker.__qualname__ = name
         marker.__doc__ = render_fn.__doc__
 
-        def register_backend(backend_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        def register_backend(
+            backend_name: str, *, allow_redefine: bool = False
+        ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
             """
             v0.060, Stage 3. Decorator factory that registers the
             function it decorates as `name`'s render function for
@@ -426,9 +459,17 @@ def component(
             The decorated function's own name is irrelevant (`_` above
             is conventional, not required) -- unlike `component(...)`
             itself, nothing here derives an identity from it.
+
+            `allow_redefine` (default `False`) -- registering a second
+            override for the same `backend_name` on this component
+            raises `arklight.ir.components.DuplicateComponentError`
+            unless this is `True`; see that function's docstring for
+            why this is no longer silent last-registration-wins.
             """
             def decorator(backend_render_fn: Callable[..., Any]) -> Callable[..., Any]:
-                register_backend_render(name, backend_name, backend_render_fn)
+                register_backend_render(
+                    name, backend_name, backend_render_fn, allow_redefine=allow_redefine
+                )
                 return backend_render_fn
 
             return decorator
@@ -1366,7 +1407,7 @@ class Site:
             )
         self.css_var_overrides[var_name] = value
 
-    def style(self, name: str, rules: dict[str, str]) -> None:
+    def style(self, name: str, rules: dict[str, str], *, allow_redefine: bool = False) -> None:
         """
         Register a real, named, reusable CSS class -- `class_name="name"`
         anywhere in the site then picks up `rules` from the generated
@@ -1377,9 +1418,14 @@ class Site:
         already used for the per-node `style={...}` prop -- deliberately
         not a raw CSS string, so this doesn't reopen the "no arbitrary
         CSS/HTML strings" boundary the rest of ARKlight holds. Calling
-        this again with a name that's already registered overwrites the
-        previous rules for that name (last call wins), which lets a site
-        redefine a class as it's built up without needing a separate
+        this again with a name that's already registered raises
+        `DuplicateStyleNameError` unless `allow_redefine=True` is
+        passed -- this used to be silent, unconditional "last call
+        wins", which hid two unrelated `site.style(...)` calls
+        accidentally colliding on the same class name behind whichever
+        one happened to run last. Pass `allow_redefine=True` for the
+        one legitimate case that served: deliberately redefining a
+        class as a site is built up, without needing a separate
         "update" method.
 
         A key may also be a pseudo-class-scoped property, written
@@ -1394,6 +1440,16 @@ class Site:
                 f"site.style({name!r}, ...) needs a valid CSS class name -- "
                 f"letters, digits, hyphens, and underscores only, and it "
                 f"can't start with a digit."
+            )
+        if name in self.custom_styles and not allow_redefine:
+            raise DuplicateStyleNameError(
+                f"site.style({name!r}, ...) is already registered. "
+                "Registering it again would silently replace the "
+                "earlier rules -- if that's deliberate, pass "
+                f"allow_redefine=True: site.style({name!r}, rules, "
+                "allow_redefine=True). Otherwise two different calls "
+                f"are colliding on the class name {name!r}; pick a "
+                "different name for one of them."
             )
         if not isinstance(rules, dict) or not rules:
             raise ValueError(

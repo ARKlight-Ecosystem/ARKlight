@@ -5,6 +5,52 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- Registration collisions now fail loudly instead of overwriting silently
+
+**What:** Three registries that previously followed an unconditional
+"last call wins" rule now raise on a name collision by default:
+`register_component(name, ...)` (`arklight/ir/components.py`) and the
+`@component(...)` decorator that wraps it, `register_backend_render
+(component_name, backend_name, ...)` and the `.register_backend
+(backend_name)` decorator it powers, and `Site.style(name, rules)`
+(`arklight/api.py`). Each gains an `allow_redefine: bool = False`
+keyword; passing `True` restores the exact old overwrite behavior for
+the one case it legitimately served (redefining a name on purpose,
+e.g. re-importing a components module during iterative development).
+Left as `False` (the default), re-registering an already-used name now
+raises instead of quietly replacing the earlier entry.
+
+**Why:** All three previously stored the newer registration over the
+older one with no signal at all -- an accidentally duplicated
+component name, a backend override registered twice by mistake, or
+two unrelated `site.style(...)` calls colliding on the same class
+name all looked completely fine at the call site and only surfaced,
+if ever, as wrong output much later with nothing pointing back at
+either registration. Silent overwriting is now the opt-in case
+(`allow_redefine=True`), not the default.
+
+**Implementation:** `arklight/ir/components.py` -- new
+`DuplicateComponentError(ComponentError)`, raised by
+`register_component`/`register_backend_render` on a same-name/
+same-`(component, backend)` re-registration without
+`allow_redefine=True`. `arklight/api.py` -- new
+`DuplicateStyleNameError(ValueError)`, raised by `Site.style(...)` on
+the same condition; `component(...)`'s `allow_redefine` kwarg threads
+through to `register_component`, and the decorated component's
+`.register_backend(backend_name, allow_redefine=...)` threads through
+to `register_backend_render`.
+
+**Tests:** `tests/test_user_defined_components_stage0.py`,
+`tests/test_user_defined_components_stage3.py`, and
+`tests/test_api_style.py` -- each of the three previous
+"re-registering overwrites" tests now asserts the new
+`DuplicateComponentError`/`DuplicateStyleNameError` instead, confirms
+the *first* registration survives a rejected second call unchanged,
+and a companion test confirms `allow_redefine=True` still reproduces
+the old overwrite behavior exactly. New decorator-level coverage for
+`@component(..., allow_redefine=...)` and
+`.register_backend(..., allow_redefine=...)`.
+
 ## [Unreleased] -- JS vocabulary addendum, stage 3 of 10: small new runtime primitives (`v0.063`)
 
 **What:** Five small runtime primitives, third rung of the JS
