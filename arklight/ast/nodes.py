@@ -119,6 +119,37 @@ class ActionRef:
 
 
 @dataclass(frozen=True)
+class PlatformAPIRef:
+    """
+    A reference to a Platform API interface call (`v0.065`, accepted
+    from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) -- e.g.
+    `PlatformAPI.notify("Saved", body="Your changes were saved.")`.
+    Used as an `on_click=` value, alongside a named behavior string and
+    `ActionRef`.
+
+    Deliberately its own type, not another `ActionRef` variant: an
+    `ActionRef` always targets a declared `State(...)` name (it's
+    fundamentally a state mutation -- see `ActionRef`'s own docstring).
+    A Platform API call isn't one -- `notify`/`clipboard_write` neither
+    read nor write any `State(...)`, they ask the *execution platform*
+    to do something. `capability` is validated against
+    `arklight.ir.platform_api.PLATFORM_API_REGISTRY` (unknown
+    capability, or an unexpected keyword argument, both fail the
+    build at Validation) and, separately, per selected backend against
+    `arklight.ir.platform_api.BACKEND_PLATFORM_API_SUPPORT` (a
+    capability the selected backend doesn't yet implement fails the
+    build with a named diagnostic -- see
+    `arklight.ir.platform_api.check_backend_support`). Never a
+    JS/Kotlin/C string built and executed at runtime, same closed-
+    vocabulary discipline `ActionRef`/`DerivationRef`/`PredicateRef`
+    already hold.
+    """
+
+    capability: str
+    args: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class DerivationRef:
     """
     A reference to a closed-vocabulary derivation -- e.g.

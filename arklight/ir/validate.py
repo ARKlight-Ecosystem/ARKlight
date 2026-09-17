@@ -16,9 +16,13 @@ Checks performed:
    `Button`) don't contain nested component nodes -- except `Bind(...)`,
    which is a value reference, not a component (see below).
 4. `on_click`, if present, is either a known behavior name (paired with
-   a `behavior_target` selector -- arklight.ir.schema.KNOWN_BEHAVIORS)
-   or an `Action.*(...)` reference (arklight.ir.schema.ACTION_REGISTRY)
-   whose `state` targets a `State(...)` declared on the same page.
+   a `behavior_target` selector -- arklight.ir.schema.KNOWN_BEHAVIORS),
+   an `Action.*(...)` reference (arklight.ir.schema.ACTION_REGISTRY)
+   whose `state` targets a `State(...)` declared on the same page, or
+   (`v0.065`) a `PlatformAPI.*(...)` reference
+   (arklight.ir.platform_api.PLATFORM_API_REGISTRY) -- capability name
+   and keyword arguments only; backend support is checked separately,
+   per selected backend, during rendering.
 5. `State(...)` may only appear as a direct child of `Page(...)` --
    state belongs to the page, not to an arbitrary nested component --
    and every `Bind(...)` anywhere on the page must name a `State(...)`
@@ -122,7 +126,8 @@ from __future__ import annotations
 
 import re
 
-from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, DerivationRef, ModelBindSpec, PredicateRef
+from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, DerivationRef, ModelBindSpec, PlatformAPIRef, PredicateRef
+from arklight.ir.platform_api import PLATFORM_API_REGISTRY
 from arklight.ir.schema import (
     ACTION_REGISTRY,
     COMPARE_OPS,
@@ -208,6 +213,37 @@ def _validate_modifiers(action: ActionRef, *, path: str) -> None:
     `_validate_modifier_tokens` for the shared per-token check this
     now delegates to (also used by `_validate_model_bind` below)."""
     _validate_modifier_tokens(action.modifiers, path=path, label="on_click")
+
+
+def _validate_platform_api(ref: PlatformAPIRef, *, path: str) -> None:
+    """
+    `v0.065`: the backend-agnostic half of Platform API validation
+    (Section 7/11 of `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) --
+    capability existence and argument names, checked here at
+    Validation because those are compiler-owned semantic facts, true
+    regardless of which backend eventually builds this site. Whether
+    the *selected* backend actually implements a known-valid
+    capability is a separate, later check
+    (`arklight.ir.platform_api.check_backend_support`, run once per
+    backend during rendering) -- Validation has no backend selected
+    yet to check that against.
+    """
+    if ref.capability not in PLATFORM_API_REGISTRY:
+        known = ", ".join(sorted(PLATFORM_API_REGISTRY))
+        raise ValidationError(
+            f"on_click at {path} uses unknown platform API capability "
+            f"{ref.capability!r}. Known platform API capabilities are: "
+            f"{known}."
+        )
+    spec = PLATFORM_API_REGISTRY[ref.capability]
+    unknown_args = sorted(set(ref.args) - set(spec.args))
+    if unknown_args:
+        allowed = ", ".join(spec.args) or "(none)"
+        raise ValidationError(
+            f"on_click at {path} (PlatformAPI.{ref.capability}(...)) passed "
+            f"unexpected keyword argument(s) {unknown_args}. Accepted "
+            f"arguments for {ref.capability!r} are: {allowed}."
+        )
 
 
 def _validate_action(action: ActionRef, *, path: str, mutable_state: frozenset[str]) -> None:
@@ -430,6 +466,10 @@ def _validate_behavior_props(node: ARKNode, *, path: str, mutable_state: frozens
 
     if isinstance(on_click, ActionRef):
         _validate_action(on_click, path=path, mutable_state=mutable_state)
+        return
+
+    if isinstance(on_click, PlatformAPIRef):
+        _validate_platform_api(on_click, path=path)
         return
 
     if on_click not in KNOWN_BEHAVIORS:
@@ -771,6 +811,8 @@ def _validate_repeat_template(node: ARKNode, *, path: str, mutable_state: frozen
     on_click = node.props.get("on_click")
     if isinstance(on_click, ActionRef):
         _validate_action(on_click, path=path, mutable_state=mutable_state)
+    elif isinstance(on_click, PlatformAPIRef):
+        _validate_platform_api(on_click, path=path)
     elif isinstance(on_click, str) and on_click not in KNOWN_BEHAVIORS:
         known = ", ".join(sorted(KNOWN_BEHAVIORS))
         raise ValidationError(
