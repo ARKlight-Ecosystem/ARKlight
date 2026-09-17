@@ -78,7 +78,7 @@ from __future__ import annotations
 import json
 from html import escape
 
-from arklight.ast.nodes import ActionRef, ClassBindSpec, ModelBindSpec
+from arklight.ast.nodes import ActionRef, ClassBindSpec, ModelBindSpec, PlatformAPIRef
 from arklight.backend.html.routing import (
     ASSET_OR_ROUTE_AWARE_ATTRS,
     ROUTE_AWARE_ATTRS,
@@ -292,6 +292,21 @@ def _attr_string(
                 hx_trigger = _modifiers_to_hx_trigger(value.modifiers)
                 if hx_trigger:
                     parts.append(f' hx-trigger="{escape(hx_trigger, quote=True)}"')
+            continue
+
+        if key == "on_click" and isinstance(value, PlatformAPIRef):
+            # `v0.065`: PlatformAPI.*(...) values carry their own
+            # attribute shape (capability name + JSON args), reusing
+            # the same `data-ark-on-click="<prefix>:<name>"` slot
+            # ActionRef's `"action:"` prefix already established --
+            # `wireClickInterceptor` (arklight/backend/js/runtime/
+            # dispatch.py) branches on the prefix. No modifiers/hx-
+            # trigger support yet (Section 23's "Initial scope" -- kept
+            # deliberately small at acceptance); every PlatformAPI.*(...)
+            # click runs immediately, same as an unmodified Action.*(...).
+            parts.append(f' data-ark-on-click="platform:{escape(value.capability, quote=True)}"')
+            if value.args:
+                parts.append(f' data-ark-platform-api-args="{escape(json.dumps(value.args), quote=True)}"')
             continue
 
         if key == "on_click" and isinstance(value, str):

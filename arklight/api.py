@@ -25,6 +25,7 @@ from arklight.ast.nodes import (
     DerivationRef,
     ItemIndexRef,
     ModelBindSpec,
+    PlatformAPIRef,
     PredicateRef,
     node,
 )
@@ -764,6 +765,67 @@ class Action:
         updated and a small notice is shown -- never a thrown error.
         """
         return ActionRef(action="geolocate", state=name, args={})
+
+
+class PlatformAPI:
+    """
+    A closed vocabulary of platform-supplied capabilities (`v0.065`,
+    accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`), for
+    `on_click=`, alongside named behaviors and `Action.*(...)`. Each
+    returns a small structured `PlatformAPIRef` -- validated against
+    `arklight.ir.platform_api.PLATFORM_API_REGISTRY` at compile time,
+    and against the selected backend's own declared support at build
+    time -- never a string of JavaScript/Kotlin/C.
+
+        Button("Notify me", on_click=PlatformAPI.notify("Saved!", body="Your changes were saved."))
+        Button("Copy link", on_click=PlatformAPI.clipboard_write("https://example.com"))
+
+    Unlike `Action.*(...)`, a `PlatformAPI.*(...)` call never targets a
+    declared `State(...)` name -- it asks the *execution platform* to
+    do something (show a notification, touch the clipboard), not the
+    page's own reactive store. See `docs/Foundational/
+    PLATFORM-APIS.md` Section 6 for where this boundary is drawn and
+    why `Action.geolocate` stayed an `Action` rather than becoming the
+    first `PlatformAPI.*(...)` entry.
+
+    Deliberately a small, closed catalogue at acceptance (Section 23
+    of the proposal, "Initial scope"): two capabilities, both
+    implemented today by the Web backend (the reference/default
+    implementation, Section 5) and by neither the Android nor the
+    Linux Desktop backend yet (Section 6/22 -- earned progressively,
+    not granted because the backend exists). Requesting either of
+    these against `android`/`desktop` fails the build with a named
+    diagnostic rather than silently doing nothing -- see
+    `arklight.ir.platform_api.check_backend_support`.
+    """
+
+    @staticmethod
+    def notify(title: str, body: str | None = None) -> PlatformAPIRef:
+        """
+        On click, asks the browser to show a user-visible notification
+        with the given `title` and optional `body` -- the Web
+        implementation of the `notify` platform API interface
+        (`arklight/backend/js/platform_apis/notify.py`), falling back
+        to ARKlight's own in-page notice (`arkNotify`) if the
+        `Notification` API isn't available, and requesting permission
+        the first time it's needed rather than assuming it's already
+        granted.
+        """
+        args: dict[str, Any] = {"title": title}
+        if body is not None:
+            args["body"] = body
+        return PlatformAPIRef(capability="notify", args=args)
+
+    @staticmethod
+    def clipboard_write(text: str) -> PlatformAPIRef:
+        """
+        On click, writes `text` to the system clipboard -- the Web
+        implementation (`arklight/backend/js/platform_apis/
+        clipboard_write.py`) uses `navigator.clipboard.writeText`,
+        showing ARKlight's own in-page notice if clipboard access
+        isn't available rather than failing silently.
+        """
+        return PlatformAPIRef(capability="clipboard_write", args={"text": text})
 
 
 # ---------------------------------------------------------------------------

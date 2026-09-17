@@ -120,6 +120,8 @@ from arklight.api import (
     Bind,
     Action,
     ActionRef,
+    PlatformAPI,
+    PlatformAPIRef,
     # `vdom-4`..`vdom-7` (docs/Backends/REFACTOR-INDEX.md rows 12/13/15)
     # + v0.062: previously defined in arklight/api.py but missing from
     # this package's own `import` list, same gap
@@ -280,6 +282,8 @@ __all__ = [
     "Bind",
     "Action",
     "ActionRef",
+    "PlatformAPI",
+    "PlatformAPIRef",
     "Computed",
     "Watch",
     "Derive",
