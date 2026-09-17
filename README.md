@@ -115,26 +115,42 @@ arklight-framework/
     config.py          `arklight.config.py` project-config loader
                         (optional, per-project settings file -- see
                         docs/Foundational/AUTHORING-GUIDE.md#configuration-arklightconfigpy)
+    experimental.py    Registry + CLI-warning contract for opt-in,
+                        outside-the-intrinsic-model features -- see
+                        docs/Foundational/EXPERIMENTAL-APIS.md
+    pwa.py             `arklight pwa` -- manifest/service-worker
+                        generation for an existing build directory
     ast/               ARK AST node type (ARKNode)
     parser/            Python Source -> Python AST -> (loaded) ARK AST
     ir/                Normalization, Validation, Website IR
+                        (`schema.py` holds the closed action/derivation/
+                        component registries every backend reads from)
     backend/
       base.py          Backend interface
-      html/            HTML backend (the only backend in v0.001)
-      js/
-        behaviors/     v0.0035 behavior fragments (toggle, scroll-to,
-                        copy, dismiss) -- one file per
-                        BEHAVIOR_REGISTRY entry
-        actions/       v0.0035 action fragments (set, increment,
-                        toggle_bool) -- one file per ACTION_REGISTRY
-                        entry
+      html/            HTML backend
+      css/              Default stylesheet + `Site.style(...)`/
+                        `responsive_style=`/`@media` compilation
+      js/               Stateful JS runtime -- `behaviors/`/`actions/`/
+                        `derivations/` (one file per registry entry) and
+                        `runtime/` (the shared vdom/dispatch/state core)
+      android/          `arklight android` packaging backend -- see
+                        docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md
+                        (alpha-only so far, not yet on `main`)
+      desktop/          `arklight desktop` packaging backend, Linux
+                        only so far -- see
+                        docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md
+                        (alpha-only so far, not yet on `main`)
     compiler/          Pipeline orchestration
     cli/               `arklight` command-line entry point
       templates/       `simple`/`production` scaffolds for
                         `arklight new` (v0.004a; see docs/Foundational/DESIGN-NOTES.md)
-    packer/            `arklight pack` -- ARK Bundle (.ark) packaging,
-                        reads already-built output only, never touches
-                        the compiler pipeline
+    packer/            `arklight pack`/`unpack` -- ARK Bundle (.ark)
+                        packaging and sealing, reads/writes
+                        already-built output only, never touches the
+                        compiler pipeline
+    search/            `arklight search` -- built-in/user-component
+                        schema lookup, typo-tolerant suggestions, and
+                        doc-tree retrieval (`--retrieve-doc`)
   examples/
     hello_site/        Example site matching this README
   tests/               Unit + end-to-end tests for every pipeline stage
