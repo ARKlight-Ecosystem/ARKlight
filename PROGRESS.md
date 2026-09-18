@@ -56,6 +56,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.0647  | Docs-only incremental patch: rewrote the root `README.md` as a short, Chromium-style landing page -- large logo + `# ARKlight` heading, and every section below the quickstart trimmed to a two-line pointer (the pattern the "Status" section already used, per `docs/README.md`'s "Adding a new doc" rule). The three pieces of content that had no canonical home anywhere else -- the `pip`/Debian-package install instructions, the annotated repository layout, and the `pytest` workflow -- moved verbatim into new `docs/Foundational/GETTING-STARTED.md` rather than staying in the README where they'd drift the way `docs/README.md`'s own "Why this section exists" already documents happened before. `docs/Foundational/ARCHITECTURE.md`'s "Repository" section repointed from `README.md#repository-layout` to `GETTING-STARTED.md#repository-layout`. New index rows in `docs/Foundational/README.md` and `docs/README.md`'s Foundational Folder Guide table. `ARKlight-logo.png` (added at `e0fddb7`, previously unreferenced anywhere) wired into the README for the first time. No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`-`v0.0646` | DONE |
 | v0.0648  | Docs-only incremental patch, part 2 of `v0.0647`: actually rewrote the root `README.md` (the previous pass had landed the supporting docs but left the README itself untouched, still carrying the full duplicated Install/Repository-layout/Running-tests content `GETTING-STARTED.md` now owns). Root `README.md` is now the landing page `v0.0647` described: centered logo + `# ARKlight Framework` heading (amends `v0.0647`'s row, which said `# ARKlight`), the pitch and quickstart kept, an Install section reduced to the one `pip` command plus a pointer, and every other topic -- CLI, compiler pipeline, authoring API, repository layout, tests, non-goals, backends, proposals, version history -- collapsed into a single `## Documentation` section pointing at `docs/README.md` as the one index, Chromium-`README.md`-style, rather than a separate two-line pointer per topic that would itself need upkeep. Fixed the one link this broke: `docs/Foundational/CLI-REFERENCE.md`'s `README.md#cli` anchor (that heading no longer exists) now points at the Documentation section instead; `docs/Foundational/AUTHORING-GUIDE.md`'s README description updated to match. No code changed. Alpha-branch only. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`-`v0.0647` | DONE |
 | v0.0649  | Docs-only incremental patch, part 3 of `v0.0647`: moved the root `README.md`'s inline site-example code block (`Page(Heading(...), Text(...), Button(...))` + `arklight build`/output lines) into a new "Example" section in `docs/Foundational/GETTING-STARTED.md`, between Install and Repository layout. The root README was the one place still restating actual component-API surface -- exactly the kind of content that drifts as the API grows, unlike a fixed `pip install -e .` command or a pointer link. Root `README.md`'s Install section now reads pitch, one install command, one pointer -- nothing left in it that the component API, CLI, or repository layout could make stale. Updated `GETTING-STARTED.md`'s own intro line (\"pitch and quickstart\" -> \"pitch\", since the quickstart moved here) and its repository-layout comment on `examples/hello_site/` (previously \"Example site matching the root README\", now stale since the README no longer holds an example to match; repointed at this doc's new Example section instead). No code changed. Alpha-branch only. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`-`v0.0648` | DONE |
+| v0.0650  | Capability fix: preamble directives -- `# include <stdlib.ARKlight>` / `# include <acc.<dotted.module.path>>` / `# define <alias> -> <target>`, reserved-shape comments ARKlight's own loader parses and resolves itself (`arklight/parser/preamble.py`, new module), replacing reliance on raw `from X import *` for the step that gets vocabulary names into a site file's namespace. Fixes the one namespace-binding step the compiler's existing "fail loudly, no silent winner" doctrine (`DuplicateComponentError`, `CapabilityError`) didn't yet cover: two includes disagreeing on a name now raise `PreambleCollisionError` naming both sources, instead of Python's own star-import silently keeping whichever ran last. `arklight/parser/loader.py` wires the resolved bindings in before `exec`; new "Preamble directives" section in `docs/Foundational/AUTHORING-GUIDE.md`. `from arklight import *` keeps working unchanged -- purely additive. `tests/test_preamble.py` (18 tests); full suite 1425 passed. `0.0641` -> `0.0650` version bump. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same "capability fixes take priority" treatment as `v0.0431`/`v0.0641` | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -134,6 +135,92 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.0650 -- Capability fix: preamble directives (DONE)
+
+Out-of-band alpha maintenance release, same slot-sharing precedent as
+`v0.0431`/`v0.0641`-`v0.0649`. Treated as a **capability fix**, the
+category `v0.0641` first recognized: not a broken promise, but a
+missing piece whose absence has no ceiling on what it costs everything
+built against this compiler until it's closed.
+
+The gap: a site file's `from arklight import *` -- and the identical
+pattern against any other vocabulary source, ACC included -- relies
+entirely on Python's own star-import semantics to get names into the
+module namespace. Python's rule for two statements binding the same
+name is unconditional "last one wins": no diagnostic, no record of
+which source lost, nothing pointing back at either import. That is the
+exact "silently resolved by picking a winner" antipattern this
+compiler's own registries already refuse everywhere else --
+`register_component`/`register_backend_render`
+(`DuplicateComponentError`) and ACC capability identities
+(`CapabilityError`), both hardened by the `[Unreleased] --
+Registration collisions now fail loudly instead of overwriting
+silently` `CHANGELOG.md` entry well before this patch. But neither of
+those guards the *first* step, getting names bound into the namespace
+to begin with -- that step still ran on raw Python import semantics,
+with zero ARKlight involvement, until now.
+
+**What shipped:** `# include <label>` and `# define <alias> ->
+<target>`, written as reserved-shape comments before a site file's
+first executable statement. ARKlight's own loader (not Python's
+import machinery) parses and resolves these, and binds the result
+into the module namespace before the rest of the file runs.
+`# include <stdlib.ARKlight>` binds `arklight.__all__` -- identical to
+what `from arklight import *` already provides, just resolved by
+ARKlight itself instead of by Python's star-import statement.
+`# include <acc.<dotted.module.path>>` imports a real module and
+binds its own `__all__`; a module with no `__all__` raises rather than
+guessing which of its names are vocabulary (the same "no implicit
+trust beyond one documented contract" stance
+`arklight/capabilities.py` already takes for ACC capability
+registration). If two includes bind the same name to two different
+objects, `PreambleCollisionError` names every source involved and
+raises at load time. `# define <alias> -> <target>` resolves a
+collision explicitly (or just adds a local alias): a bare target must
+be unambiguous across everything included so far, a dotted target
+(`<include-label>.<name>`) picks one specific include's copy.
+
+Deliberately additive, not a breaking change: `from arklight import
+*` keeps working exactly as before, since this module only ever acts
+on comments matching the two directive shapes above -- a site that
+never adopts `# include`/`# define` is completely unaffected. That is
+also the intended migration path, documented in
+`docs/Foundational/AUTHORING-GUIDE.md`'s new "Preamble directives"
+section rather than as a breaking-change announcement.
+
+**Implementation:** `arklight/parser/preamble.py` (new module) --
+`resolve_preamble` (the entry point `load_site` calls),
+`PreambleError`/`PreambleCollisionError`, `_leading_comment_lines` (a
+`tokenize`-based preamble scanner: walks `COMMENT` tokens up to the
+first token belonging to an actual statement, the same "preamble ends
+where code starts" boundary a C preprocessor's directives respect),
+`_resolve_include_source` (the `stdlib.ARKlight`/`acc.*` label
+dispatch), `_resolve_define_target` (bare vs. dotted `# define`
+resolution, with its own unknown-label/unknown-name diagnostics).
+`arklight/parser/loader.py` -- `load_site` calls `resolve_preamble`
+right after `discover()` succeeds, binds the result into
+`module.__dict__` before `exec`, and wraps `PreambleError` as
+`SiteLoadError` like every other load-time failure this function
+already surfaces.
+
+**Tests:** `tests/test_preamble.py` (new, 18 tests) -- stdlib include
+resolution against the real `arklight.__all__`; `acc.` include
+resolution against fake modules registered into `sys.modules` for the
+test (missing-module and missing-`__all__` failure modes covered
+separately); two includes agreeing on a name (no collision, since it's
+the same object) vs. disagreeing (raises `PreambleCollisionError`);
+`# define` disambiguation, both bare and dotted, plus its own
+unknown-include-label and unknown-name-on-a-known-include failure
+modes; and integration through `load_site` -- binding without any raw
+star-import present at all, wrapping a collision as `SiteLoadError`,
+and confirming a site written the old way (`from arklight import *`,
+no directives) still loads unchanged. Full suite: 1425 passed, no
+regressions.
+
+`0.0641` -> `0.0650` version bump (`pyproject.toml`) -- the docs-only
+patches numbered in between (`v0.0642`-`v0.0649`) didn't bump it, per
+each of their own "no code changed" entries above.
 
 ## v0.0641 -- Emergency patch: URL query-parameter state (DONE)
 

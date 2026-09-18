@@ -24,6 +24,7 @@ from pathlib import Path
 
 from arklight.api import Site
 from arklight.parser.discover import DiscoveredSite, discover
+from arklight.parser.preamble import PreambleError, resolve_preamble
 
 
 class SiteLoadError(RuntimeError):
@@ -50,8 +51,20 @@ def load_site(path: str | Path) -> tuple[Site, DiscoveredSite]:
     except ValueError as exc:
         raise SiteLoadError(str(exc)) from exc
 
+    try:
+        preamble_bindings = resolve_preamble(source, filename=str(file_path))
+    except PreambleError as exc:
+        raise SiteLoadError(str(exc)) from exc
+
     module = types.ModuleType(file_path.stem)
     module.__file__ = str(file_path)
+    # Bind whatever `# include`/`# define` resolved *before* the file's
+    # own code runs, so `Page`, `Button`, etc. are already present by
+    # the time any top-level statement (or a raw `from arklight import
+    # *`, still fully supported alongside this) executes. See
+    # arklight.parser.preamble for why this exists instead of relying
+    # solely on Python's own star-import semantics.
+    module.__dict__.update(preamble_bindings)
 
     # Package-shaped sites (e.g. the `arklight new --template production`
     # scaffold: site.py + components/ + pages/ + content/) import sibling

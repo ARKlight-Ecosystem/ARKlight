@@ -5,6 +5,70 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.0650] -- Capability fix: preamble directives (`# include`/`# define`)
+
+Out-of-band alpha maintenance release (numbered inside the v0.064 ->
+v0.065 gap, same slot-sharing precedent as `[0.0641]`-`[0.0649]`).
+Treated as a **capability fix**: a site file's `from arklight import
+*` (and the identical pattern against any other vocabulary source)
+relies entirely on Python's own star-import semantics to get names
+into the module namespace, and Python's rule for two colliding names
+is unconditional "last one wins" -- silent, with no diagnostic and no
+record of which source lost. This is the exact "silently resolved by
+picking a winner" antipattern the compiler's own registries already
+refuse elsewhere -- `register_component`/`register_backend_render`
+(`DuplicateComponentError`) and ACC capability identities
+(`CapabilityError`), both hardened by the `[Unreleased] --
+Registration collisions now fail loudly instead of overwriting
+silently` entry above -- but neither of those guards touches the
+first step, getting names bound at all, which still ran on raw Python
+import semantics with zero ARKlight involvement until now.
+
+**What:** `# include <label>` and `# define <alias> -> <target>`,
+written as reserved-shape comments before a site file's first
+executable statement. ARKlight's own loader parses and resolves these
+itself -- not Python's import machinery -- and binds the result into
+the module namespace before the rest of the file executes.
+`# include <stdlib.ARKlight>` binds ARKlight's own public vocabulary
+(`arklight.__all__`), identical to what `from arklight import *`
+already provides. `# include <acc.<dotted.module.path>>` imports a
+real module and binds its own `__all__` -- the same contract
+`arklight.__all__` itself follows; a module with no `__all__` raises
+rather than guessing which of its names are vocabulary. If two
+includes bind the same name to two different objects, that's a
+collision: `PreambleCollisionError`, naming every source involved,
+raised at load time. `# define <alias> -> <target>` resolves a
+collision explicitly (or just adds a local alias) -- a bare target
+must be unambiguous across everything included so far, and a dotted
+target (`<include-label>.<name>`) picks one specific include's copy.
+`from arklight import *` keeps working exactly as before; this is
+purely additive, and only ever acts on comments matching the two
+directive shapes.
+
+**Implementation:** `arklight/parser/preamble.py` (new module) --
+`resolve_preamble`, `PreambleError`, `PreambleCollisionError`,
+`_leading_comment_lines` (a `tokenize`-based preamble scanner),
+include-label resolution for `stdlib.ARKlight`/`acc.*`, and
+`# define` target resolution (bare and dotted). `arklight/parser/
+loader.py` -- `load_site` now calls `resolve_preamble(source, ...)`
+and binds the result into the module's namespace before `exec`,
+wrapping `PreambleError` as `SiteLoadError` like every other load-time
+failure. `docs/Foundational/AUTHORING-GUIDE.md` -- new "Preamble
+directives" section, placed first, ahead of "Internal links".
+
+**Tests:** `tests/test_preamble.py` (new, 18 tests) -- stdlib/`acc.`
+include resolution, missing-module and missing-`__all__` diagnostics,
+agreeing vs. disagreeing collisions, `# define` disambiguation (bare
+and dotted, including its own unknown-label/unknown-name failure
+modes), and integration through `load_site` (binding without a raw
+star-import, wrapping a collision as `SiteLoadError`, and confirming
+`from arklight import *` still works unchanged). Full suite: 1425
+passed, no regressions.
+
+`0.0641` -> `0.0650` version bump (`pyproject.toml`) -- the docs-only
+patches numbered in between (`[0.0642]`-`[0.0649]`) didn't bump it, per
+their own "no code changed" entries.
+
 ## [0.0646] -- Docs-only: fixed a self-contradiction in `V1-DEFINITION.md`
 
 Docs-only, no compiler code changed.
