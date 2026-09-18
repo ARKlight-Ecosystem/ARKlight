@@ -292,6 +292,7 @@ registry currently knows about.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 from arklight.ast.nodes import ActionRef, ModelBindSpec, PlatformAPIRef
 from arklight.backend.base import Backend
@@ -453,6 +454,53 @@ def _collect_usage(
         has_reveal,
         has_query,
         used_platform_apis,
+    )
+
+
+@dataclass(frozen=True)
+class RuntimeUsage:
+    """Manifest-friendly summary of which named JS runtime pieces a
+    site's IR actually references -- just the sets a build-manifest/
+    SBOM consumer (arklight/compiler/sbom.py) needs, none of the
+    JS-codegen-only booleans (`has_state`, `has_computed`, ...)
+    `_collect_usage` also returns, which no consumer outside this
+    module has a reason to see."""
+
+    used_behaviors: frozenset[str]
+    used_actions: frozenset[str]
+    used_derivations: frozenset[str]
+    used_platform_apis: frozenset[str]
+
+
+def collect_used_runtime_features(ir: WebsiteIR) -> RuntimeUsage:
+    """
+    Public, backend-agnostic-facing wrapper around `_collect_usage` --
+    "what named runtime pieces does this specific site actually use",
+    without the private tuple shape or the JS-codegen-only flags mixed
+    in. Safe to call independent of whether the JS backend actually
+    ran in a given `build()` call: this only inspects the IR, it
+    doesn't touch anything the JS backend itself renders.
+    """
+    (
+        used_behaviors,
+        _used_on_click_actions,
+        used_actions,
+        _has_state,
+        used_derivations,
+        _has_computed,
+        _has_watch,
+        _has_model_binding,
+        _has_repeat,
+        _has_show,
+        _has_reveal,
+        _has_query,
+        used_platform_apis,
+    ) = _collect_usage(ir)
+    return RuntimeUsage(
+        used_behaviors=frozenset(used_behaviors),
+        used_actions=frozenset(used_actions),
+        used_derivations=frozenset(used_derivations),
+        used_platform_apis=frozenset(used_platform_apis),
     )
 
 

@@ -37,11 +37,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from arklight import experimental
+from arklight import __version__, experimental
 from arklight.backend.base import Backend
 from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
+from arklight.compiler.sbom import build_sbom_text
 from arklight.ir import binary as binary_ir
 from arklight.ir.build import WebsiteIR, build_website_ir
 from arklight.ir.components import ComponentError, collect_default_styles, expand_ark_ast
@@ -424,6 +425,10 @@ def build(
     every other argument here means the same thing either way (see
     `compile_arklight_file`'s docstring for how the overrides apply
     without a `Site(...)` to defer to).
+
+    Also always writes `sbom.txt` -- a per-build manifest of what this
+    specific compile actually contains (see `arklight.compiler.sbom`
+    for the format and what it deliberately does/doesn't claim).
     """
     log = on_stage or _noop_stage_logger
     backends = backends if backends is not None else default_backends()
@@ -490,6 +495,9 @@ def build(
                 f"{type(result).__name__!r}."
             )
         output_files = result
+
+    log("Generating build manifest (sbom.txt)...")
+    output_files["sbom.txt"] = build_sbom_text(ir, version=__version__)
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
