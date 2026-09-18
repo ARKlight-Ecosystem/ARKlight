@@ -51,7 +51,9 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.0642  | Docs-only incremental patch: rewrote `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s one-sentence definition (new `docs/Foundational/README.md` index row) so ARKlight is stated as a **compiler framework** rather than leaning on "static-site compiler" as the load-bearing noun -- Section 4 now names, explicitly, that ARKlight is not a static-site generator, not a frontend framework, and not a UI framework, instead of leaving that distinction implied. Filed alongside it: `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` (new `docs/Proposals/README.md` index row) -- the next capability fix identified against `SYSTEM-DESIGN-AGREEMENTS.md`'s "Compiler First, Runtime Last" rule: a platform API interface layer in the compiler IR (notifications, clipboard, filesystem, device info, ...), Web as the default implementation, Android/Desktop earning individual interfaces only once mature. Proposal filed as **Proposed**, not yet accepted; no code changed this patch. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641` | DONE |
 | v0.0643  | Docs-only incremental patch: rewrote `arklight/__init__.py`'s module docstring so it opens with the same **compiler framework** wording `v0.0642` gave `docs/Foundational/WHAT-ARKLIGHT-IS.md`, instead of the older "Python-first compiler for building static websites" framing; quickstart example swapped a stateless `Button` for `State`/`Action.increment` so the closed-vocabulary interactivity primitives are visible on first import. No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`/`v0.0642` | DONE |
 | v0.0644  | Docs-only incremental patch: added a new "The Goal" section to `docs/Foundational/WHAT-ARKLIGHT-IS.md` -- comparable-to-frontend-framework DX while enforcing ARKlight's own philosophy (`SYSTEM-DESIGN-AGREEMENTS.md`), for two named audiences, the Python Community and the Education Community. Filed alongside it: new `docs/Foundational/V1-DEFINITION.md` -- what `v1.0`/"Stable compiler" (`ARCHITECTURE.md`'s Milestones table) concretely means (deterministic, fails-loudly, no-breaking-vocabulary-change reliability), scoped explicitly to the Web Developing parts of the compiler only, with named exclusions (native backends, CLI conveniences beyond `build`, everything gated by `arklight/experimental.py`, `Provider`/Rei/Project Knowledge/`arklight assistant`, and -- called out specifically -- **ARKlight Component Collections**, a newly-named, not-yet-proposed concept for curated bundles of `@component`-registered content built on `USER-DEFINED-COMPONENTS.md`'s macro-expansion path, whose own release cadence is deliberately independent of the compiler's stability claim). Also documents "capability fix" (first recognized at `v0.0641`) as the mechanism and evidence trail behind `v1.0`'s reliability claim -- each capability fix landed is a checkable step toward the point where that supply runs dry. New index rows in `docs/Foundational/README.md` and `docs/README.md`; `ARCHITECTURE.md`'s `v1.0` milestone row now links to `V1-DEFINITION.md` instead of standing unexplained. Also fixed two pre-existing doc-index drifts noticed while editing `docs/README.md`'s Foundational Folder Guide table: `WHAT-ARKLIGHT-IS.md` and `PLATFORM-APIS.md` were both present in `docs/Foundational/README.md`'s own index but missing from this table, and this row's own predecessor (`v0.0643`) had a literal `\n` instead of a real line break, merging it with the `v0.064-v0.070 (remainder)` row below -- both fixed in this pass. No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`/`v0.0642`/`v0.0643` | DONE |
-| v0.0645  | Docs-only incremental patch: documented `arklight/capabilities.py` (the ACC capability-discovery hook, landed undocumented at `a4aa6b8`) for the first time anywhere in this doc tree -- new `docs/Foundational/ACC-CAPABILITIES.md` (settled design record: entry-point contract, diagnostics, API, its one current caller `compiler/sbom.py`, status against ACC's own five-stage implementation ladder). Corrects `V1-DEFINITION.md` Section 5's now-stale "no design doc yet, not-yet-proposed concept" framing, since ACC has since become a real repository (`Rae-ARK/ARKlight-Component-Collections`) with its own foundational design doc and a landed Stage 1. New index rows in `docs/Foundational/README.md` and `docs/README.md`; `README.md`'s repository-layout listing gains a `capabilities.py` line (previously missing despite the file existing since `a4aa6b8`). No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`/`v0.0642`/`v0.0643`/`v0.0644` | DONE |\n| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
+| v0.0645  | Docs-only incremental patch: documented `arklight/capabilities.py` (the ACC capability-discovery hook, landed undocumented at `a4aa6b8`) for the first time anywhere in this doc tree -- new `docs/Foundational/ACC-CAPABILITIES.md` (settled design record: entry-point contract, diagnostics, API, its one current caller `compiler/sbom.py`, status against ACC's own five-stage implementation ladder). Corrects `V1-DEFINITION.md` Section 5's now-stale "no design doc yet, not-yet-proposed concept" framing, since ACC has since become a real repository (`Rae-ARK/ARKlight-Component-Collections`) with its own foundational design doc and a landed Stage 1. New index rows in `docs/Foundational/README.md` and `docs/README.md`; `README.md`'s repository-layout listing gains a `capabilities.py` line (previously missing despite the file existing since `a4aa6b8`). No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`/`v0.0642`/`v0.0643`/`v0.0644` | DONE |
+| v0.0646  | Docs-only incremental patch: fixed a real self-contradiction in `docs/Foundational/V1-DEFINITION.md` Section 5 -- the "zero special-cased compiler support" bullet, unchanged since `v0.0644`, was left asserting exactly that in the same section `v0.0645` had just amended to say the capability-discovery hook (`arklight/capabilities.py`, compiler-side code by its own docstring's admission) had landed; narrowed the bullet's claim to Collection *content* specifically, with the hook named as the one, already-acknowledged exception. Also adds an explicit reverse rule to `docs/README.md`'s "Adding a new doc" section: deleting a file that leaves the `docs/Proposals/`/`docs/Implementation/`/`docs/Backends/`/`docs/Far Future Concern/` lifecycle and removing its index row (in that folder's own `README.md` *and* this file's Folder Guide table) are one change, not two -- closing the gap the existing rule left (add/update covered, removal wasn't). Also fixed this table's own `v0.0645` row, which had picked up a literal `\n` merging it with the `v0.064-v0.070 (remainder)` row below -- the identical defect `v0.0644`'s own row fixed for `v0.0643` two rows above, recurring. No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`-`v0.0645` | DONE |
+| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
@@ -485,6 +487,57 @@ line under `arklight/` -- previously absent despite the file existing
 since `a4aa6b8`, the same class of gap `v0.0644` found and fixed for
 `WHAT-ARKLIGHT-IS.md`/`PLATFORM-APIS.md` in `docs/README.md`'s own
 table.
+
+## v0.0646 -- Docs-only incremental patch: `V1-DEFINITION.md` self-contradiction fix + doc-removal rule (DONE)
+
+Out-of-band, numbered inside the same v0.064 -> v0.065 gap as
+`v0.0431`/`v0.0641`-`v0.0645`. Docs-only: no compiler code changed.
+
+**What was wrong.** `v0.0645` amended `V1-DEFINITION.md` Section 5's
+opening paragraph to say the ACC capability-discovery hook had landed
+in `alpha` as `arklight/capabilities.py`, compiler-side code by its
+own docstring's account -- but left that section's first bullet
+("It is content built on the compiler, not code inside it ... with
+zero special-cased compiler support") completely unchanged. The two
+statements sit two paragraphs apart in the same section and directly
+contradict each other: one says special-cased compiler-side code for
+ACC exists and names the file; the other says there is zero
+special-cased compiler support. A reader hitting the bullet right
+after the opening paragraph would reasonably read it as ARKlight
+either forgetting what it had just said, or silently reversing it.
+
+**The fix.** Narrowed the bullet's claim to what it actually meant --
+a Collection's own *content* compiles through the existing
+`USER-DEFINED-COMPONENTS.md` macro-expansion path with zero
+special-cased support -- and named the capability-discovery hook
+in-line as the one, already-acknowledged exception, rather than
+leaving it to silently contradict a claim two paragraphs above it.
+The section's underlying argument (a Collection's *content* still
+touches none of `arklight/parser/`, `arklight/ir/`, or any backend
+listed in Section 3) is unchanged; only the absolute "zero
+special-cased compiler support" phrasing needed scoping.
+
+**Also fixed, same pass** (per `docs/README.md`'s own "do it in one
+pass, not several" rule):
+
+- `docs/README.md`'s "Adding a new doc" section only ever described
+  what to do when a file is *added* or *updated* -- add/update its row
+  in that folder's own index and in this file's Folder Guide table.
+  It never said what to do when a file already covered by that
+  lifecycle table is *removed* (a rejected Proposal, a finished
+  Implementation ladder, a completed Backend staging doc, a
+  dropped Far Future idea). Added an explicit reverse rule: deleting
+  such a file and removing its index row(s) -- in that folder's own
+  `README.md` index and in `docs/README.md`'s own Folder Guide table
+  -- are one change, not two, exactly mirroring the existing
+  add/update rule. `docs/Foundational/` and `docs/version history/`
+  are named as the two exemptions, since neither folder ever loses a
+  file.
+- This file's own `v0.0645` Snapshot-table row had picked up a literal
+  `\n` merging it with the `v0.064-v0.070 (remainder)` row below it --
+  the identical defect `v0.0644`'s own row previously found and fixed
+  for `v0.0643`, recurring one row later. Fixed; the two rows are
+  separate lines again.
 
 ## v0.065 (interleaved fourth piece) -- Platform API IR, stage 1 of 2: Web reference implementation (DONE)
 

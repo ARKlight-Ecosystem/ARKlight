@@ -171,6 +171,22 @@ in the Folder Guide table above -- both, since a reader may land on
 either README first. A file with no index row is invisible to anyone
 browsing rather than searching.
 
+**The same rule runs in reverse.** When a file's row in the lifecycle
+table above says it leaves a folder -- a Proposal accepted or
+rejected, an Implementation ladder's every stage shipped, a Backend's
+staging doc finished, a Far Future idea dropped or graduated -- and
+the file is deleted (or replaced) as a result, that deletion and
+removing its index row are one change, not two: the row in that
+folder's own `README.md` index *and* the row in this file's own
+Folder Guide table above both come out in the same pass that deletes
+the file, never left dangling for a later "docs update" commit to find
+and remove. A stale row pointing at a file that no longer exists is
+exactly as much a drift bug as a missing row for a file that does --
+see "Why this section exists" below for what happens when this is
+skipped. `docs/Foundational/` and `docs/version history/` are the only
+two folders exempt from this, since (per the table above) a file
+never leaves either one.
+
 ## Why this section exists: do it in one pass, not several
 
 `git log` on this branch currently shows 56 of 204 commits (~27%) are
