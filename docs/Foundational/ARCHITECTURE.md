@@ -203,10 +203,10 @@ full public component/behavior/state API reference lives in
 
 ## Repository
 
-The annotated repository layout is the root
-[`README.md`](../../README.md#repository-layout)'s "Repository layout"
-section, kept there as the single canonical copy rather than
-duplicated (and drifting out of sync) here.
+The annotated repository layout is
+[`GETTING-STARTED.md`](GETTING-STARTED.md#repository-layout)'s
+"Repository layout" section, kept there as the single canonical copy
+rather than duplicated (and drifting out of sync) here.
 
 ## Milestones
 

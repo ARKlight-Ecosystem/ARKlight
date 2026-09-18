@@ -43,6 +43,7 @@ record for the project, updated in place rather than removed.
 | [`ARCHITECTURE.md`](Foundational/ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
 | [`CONFIGURABILITY.md`](Foundational/CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. (For the `arklight.config.py` project-settings file itself, see `AUTHORING-GUIDE.md`'s "Configuration" section.) |
 | [`CLI-REFERENCE.md`](Foundational/CLI-REFERENCE.md) | The implemented, shipped `arklight` CLI: every subcommand, its flags, and worked examples. |
+| [`GETTING-STARTED.md`](Foundational/GETTING-STARTED.md) | Install (pip and the Debian/Ubuntu package), the annotated repository layout, and the `pytest` workflow (moved out of the root `README.md`, which keeps only a two-line pointer). |
 | [`AUTHORING-GUIDE.md`](Foundational/AUTHORING-GUIDE.md) | The full public component/behavior/state API reference (moved out of the root `README.md`, which keeps only the quickstart). |
 | [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | **Design only, not implemented.** The planned `arklight deploy` subcommand and its spec. |
 | [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
