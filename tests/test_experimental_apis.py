@@ -140,6 +140,66 @@ def test_experimental_print_summary_deduplicates(capsys):
     assert out.count("Legacy API detected: css-media-queries") == 1
 
 
+# --- heavy-reliance nudge -------------------------------------------------
+
+
+def test_heavy_reliance_nudge_none_below_threshold():
+    usages = [experimental.emit("css-import"), experimental.emit("css-import")]
+    assert experimental.heavy_reliance_nudge(usages) is None
+
+
+def test_heavy_reliance_nudge_fires_at_threshold():
+    usages = [experimental.emit("css-import") for _ in range(experimental.HEAVY_RELIANCE_THRESHOLD)]
+    nudge = experimental.heavy_reliance_nudge(usages)
+    assert nudge is not None
+    assert "[Rae ARK]" in nudge
+    assert "pull request" in nudge
+    assert "ARKlight" in nudge and "ARKlight-Component-Collections" in nudge
+
+
+def test_heavy_reliance_nudge_ignores_non_upstream_candidates():
+    # css-media-queries is a deliberate, permanent tradeoff
+    # (upstream_candidate=False) -- heavy use of it alone should never
+    # trip the nudge, no matter how many times it's used.
+    usages = [experimental.emit("css-media-queries") for _ in range(10)]
+    assert experimental.heavy_reliance_nudge(usages) is None
+
+
+def test_heavy_reliance_nudge_counts_across_distinct_features():
+    usages = [
+        experimental.emit("css-import"),
+        experimental.emit("raw-postprocess"),
+        experimental.emit("experimental-install-pwa"),
+    ]
+    nudge = experimental.heavy_reliance_nudge(usages)
+    assert nudge is not None
+    assert "css-import" in nudge
+    assert "raw-postprocess" in nudge
+    assert "experimental-install-pwa" in nudge
+
+
+def test_heavy_reliance_nudge_mixed_only_counts_upstream_candidates():
+    # 2 upstream-candidate uses + many non-candidate uses should not
+    # trip a threshold of 3.
+    usages = [experimental.emit("css-import"), experimental.emit("raw-postprocess")]
+    usages += [experimental.emit("css-media-queries") for _ in range(10)]
+    assert experimental.heavy_reliance_nudge(usages) is None
+
+
+def test_print_summary_includes_nudge_when_threshold_met(capsys):
+    usages = [experimental.emit("css-import") for _ in range(experimental.HEAVY_RELIANCE_THRESHOLD)]
+    experimental.print_summary(usages)
+    out = capsys.readouterr().out
+    assert "[Rae ARK]" in out
+
+
+def test_print_summary_omits_nudge_below_threshold(capsys):
+    usages = [experimental.emit("css-import")]
+    experimental.print_summary(usages)
+    out = capsys.readouterr().out
+    assert "[Rae ARK]" not in out
+
+
 # --- css-import (Site.import_style) -------------------------------------
 
 

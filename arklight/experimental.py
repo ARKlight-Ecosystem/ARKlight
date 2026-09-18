@@ -29,6 +29,16 @@ class ExperimentalFeature:
     # Trailing "Legacy API detected" note -- why it's still here /
     # what to prefer instead.
     legacy_note: str
+    # Whether heavy reliance on this feature is a sign of a genuine
+    # missing-feature gap (worth a PR against ARKlight or ACC) rather
+    # than a deliberate, permanent design tradeoff. `css-media-queries`
+    # is the model case of `False`: ARKlight *chose* intrinsic layout
+    # over viewport queries on purpose, so "lots of media-query usage"
+    # isn't a signal anything is missing, just that this project needs
+    # the escape hatch a lot. Defaults to `True` since most features
+    # registered here are, in fact, "we haven't built the real thing
+    # yet" gaps -- see `heavy_reliance_nudge` below.
+    upstream_candidate: bool = True
 
 
 FEATURES: dict[str, ExperimentalFeature] = {
@@ -52,6 +62,9 @@ FEATURES: dict[str, ExperimentalFeature] = {
             ".switcher, .grid, .cluster, .sidebar, or other intrinsic "
             "layout primitives wherever the design can be expressed that way."
         ),
+        # Deliberate, permanent design tradeoff (intrinsic layout over
+        # viewport queries) -- not a gap. Heavy use isn't a PR signal.
+        upstream_candidate=False,
     ),
     "experimental-install-pwa": ExperimentalFeature(
         id="experimental-install-pwa",
@@ -196,7 +209,9 @@ def emit(
 
 def print_summary(usages: list[ExperimentalUsage], *, file=None) -> None:
     """Print one deduplicated end-of-run block per distinct feature
-    id in `usages`, in first-seen order. No-op for an empty list."""
+    id in `usages`, in first-seen order, followed by a heavy-reliance
+    nudge (see `heavy_reliance_nudge`) if warranted. No-op for an empty
+    list."""
     import sys
 
     out = file or sys.stdout
@@ -206,3 +221,54 @@ def print_summary(usages: list[ExperimentalUsage], *, file=None) -> None:
             continue
         seen.add(usage.feature_id)
         print(format_summary_block(usage.feature_id), file=out)
+
+    nudge = heavy_reliance_nudge(usages)
+    if nudge is not None:
+        print(nudge, file=out)
+
+
+# How many total uses of upstream-candidate features (see
+# `ExperimentalFeature.upstream_candidate`) in a single build trip the
+# heavy-reliance nudge. Deliberately a *use* count, not a distinct-
+# feature count: someone calling `Site.raw_postprocess(...)` five
+# times in one project is leaning on the escape hatch just as hard as
+# someone touching two different experimental features once each.
+# Picked small on purpose -- this is a normal, per-build console
+# nudge, not a rare event; it's fine for it to print on every build of
+# a project that's already decided to lean on an escape hatch.
+HEAVY_RELIANCE_THRESHOLD = 3
+
+
+def heavy_reliance_nudge(
+    usages: list[ExperimentalUsage], *, threshold: int = HEAVY_RELIANCE_THRESHOLD
+) -> str | None:
+    """
+    If this build's *upstream-candidate* experimental usages (features
+    with `upstream_candidate=True` -- i.e. ones that represent an
+    actual missing-feature gap, not a deliberate permanent tradeoff
+    like `css-media-queries`) meet `threshold`, return a short nudge
+    pointing at ARKlight's and ACC's GitHub repos as places to file the
+    missing feature instead of leaning on the escape hatch forever.
+    Returns `None` if the threshold isn't met -- most builds print
+    nothing extra here.
+
+    This is a single-build heuristic only: no on-disk log, no
+    across-build history. A project that hits the threshold once will
+    see this every build until its usage drops below it again, which
+    is the intended, non-naggy behavior -- it reflects the project's
+    current reliance, not a one-time trip.
+    """
+    eligible = [usage for usage in usages if FEATURES[usage.feature_id].upstream_candidate]
+    if len(eligible) < threshold:
+        return None
+
+    features_used = sorted({usage.feature_id for usage in eligible})
+    return "\n".join(
+        [
+            "[Rae ARK] Hey, just a heads up -- if you're relying on experimental APIs a lot",
+            f"[Rae ARK] ({len(eligible)} experimental-API uses this build, across: "
+            f"{', '.join(features_used)})",
+            "[Rae ARK] Might be a good idea to open a pull request for your missing feature",
+            "[Rae ARK] In either the ARKlight or ARKlight-Component-Collections GitHub repo",
+        ]
+    )
