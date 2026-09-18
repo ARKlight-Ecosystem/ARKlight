@@ -1,4 +1,4 @@
-from arklight import *
+# include <stdlib.ARKlight>
 
 site = Site()
 

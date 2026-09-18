@@ -36,6 +36,13 @@ def about():
     )
 """
 
+# Same site, written with the preamble syntax. `from arklight import *`
+# is retired and adds a notice to the stage stream, so tests asserting
+# the exact stage list use this one (the notice has its own tests in
+# tests/test_preamble.py).
+PREAMBLE_SITE = SIMPLE_SITE.replace("from arklight import *", "# include <stdlib.ARKlight>")
+
+
 
 def test_compile_site_file_returns_ir(tmp_path):
     path = write_site(tmp_path, SIMPLE_SITE)
@@ -199,7 +206,7 @@ def test_build_on_stage_reports_every_stage_in_order(tmp_path):
     per pipeline stage, in pipeline order, and doesn't change the
     result -- it's purely an observability hook.
     """
-    site_path = write_site(tmp_path, SIMPLE_SITE)
+    site_path = write_site(tmp_path, PREAMBLE_SITE)
     out_dir = tmp_path / "ARK"
 
     messages: list[str] = []
@@ -236,7 +243,7 @@ def test_build_without_on_stage_prints_nothing_and_behaves_as_before():
 
 
 def test_compile_site_file_on_stage_reports_its_own_stages(tmp_path):
-    site_path = write_site(tmp_path, SIMPLE_SITE)
+    site_path = write_site(tmp_path, PREAMBLE_SITE)
 
     messages: list[str] = []
     compile_site_file(site_path, on_stage=messages.append)

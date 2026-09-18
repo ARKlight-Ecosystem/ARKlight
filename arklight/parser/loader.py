@@ -21,22 +21,38 @@ import os
 import sys
 import types
 from pathlib import Path
+from typing import Callable
 
 from arklight.api import Site
 from arklight.parser.discover import DiscoveredSite, discover
-from arklight.parser.preamble import PreambleError, resolve_preamble
+from arklight.parser.preamble import (
+    PreambleError,
+    check_namespace_shadowing,
+    find_retired_star_imports,
+    resolve_preamble_detailed,
+    retired_star_import_notice,
+)
 
 
 class SiteLoadError(RuntimeError):
     pass
 
 
-def load_site(path: str | Path) -> tuple[Site, DiscoveredSite]:
+def load_site(
+    path: str | Path, *, on_notice: Callable[[str], None] | None = None
+) -> tuple[Site, DiscoveredSite]:
     """
     Read, statically discover, and execute the site file at `path`.
 
     Returns (site, discovered) where `site` is the live Site object and
     `discovered` is the static-analysis result from the Python AST stage.
+
+    `on_notice`, if given, is called with a message for anything the
+    compiler wants the author to know that isn't a failure -- currently
+    a `from arklight import *` line, which is retired in favor of the
+    preamble's `# include <stdlib.ARKlight>`. Nothing here prints on
+    its own; the pipeline passes its stage logger, so this reaches the
+    person running the build the same way every other notice does.
     """
     file_path = Path(path)
     if not file_path.exists():
@@ -51,10 +67,15 @@ def load_site(path: str | Path) -> tuple[Site, DiscoveredSite]:
     except ValueError as exc:
         raise SiteLoadError(str(exc)) from exc
 
+    if on_notice is not None:
+        for lineno in find_retired_star_imports(source):
+            on_notice(retired_star_import_notice(str(file_path), lineno))
+
     try:
-        preamble_bindings = resolve_preamble(source, filename=str(file_path))
+        preamble = resolve_preamble_detailed(source, filename=str(file_path))
     except PreambleError as exc:
         raise SiteLoadError(str(exc)) from exc
+    preamble_bindings = preamble.bindings
 
     module = types.ModuleType(file_path.stem)
     module.__file__ = str(file_path)
@@ -106,6 +127,17 @@ def load_site(path: str | Path) -> tuple[Site, DiscoveredSite]:
             mod_file = getattr(sys.modules.get(mod_name), "__file__", None)
             if mod_file and str(Path(mod_file).resolve()).startswith(site_dir + os.sep):
                 del sys.modules[mod_name]
+
+    # Everything above ran the file's own code, which is the one thing
+    # the preamble can't see in advance: a `def`/assignment/import in
+    # the file may have silently rebound a name the preamble bound.
+    # Compare, and fail loudly like every other collision.
+    try:
+        check_namespace_shadowing(
+            preamble, module.__dict__, source=source, filename=str(file_path)
+        )
+    except PreambleError as exc:
+        raise SiteLoadError(str(exc)) from exc
 
     site_obj = module.__dict__.get(discovered.variable_name)
     if not isinstance(site_obj, Site):

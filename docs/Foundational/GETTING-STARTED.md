@@ -42,7 +42,7 @@ reach for it instead.
 ## Example
 
 ```python
-from arklight import *
+# include <stdlib.ARKlight>
 
 site = Site()
 

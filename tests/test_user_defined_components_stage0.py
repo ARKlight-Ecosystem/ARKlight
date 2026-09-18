@@ -94,6 +94,43 @@ def test_re_registering_a_name_with_allow_redefine_overwrites():
     assert COMPONENT_REGISTRY["Thing"].render_fn() == Text("v2")
 
 
+def test_registering_a_builtin_name_raises_without_allow_redefine():
+    """Regression: `expand_ark_ast` looks a node up in the user registry
+    before the built-in schema, so a user component named `Button`
+    silently replaced every `Button(...)` in the site, ARKlight's own
+    included, with no diagnostic anywhere."""
+    with pytest.raises(DuplicateComponentError, match="would shadow the built-in"):
+        register_component("Button", lambda: Text("HIJACKED"))
+    assert "Button" not in COMPONENT_REGISTRY
+
+
+def test_component_decorator_raises_when_named_like_a_builtin():
+    with pytest.raises(DuplicateComponentError, match="would shadow the built-in"):
+        @component()
+        def Button():  # noqa: N802 -- component name convention
+            return Text("HIJACKED")
+
+
+def test_registering_a_builtin_name_with_allow_redefine_is_the_explicit_opt_in():
+    register_component("Button", lambda: Text("deliberate"), allow_redefine=True)
+    assert "Button" in COMPONENT_REGISTRY
+
+
+def test_component_decorator_marks_whether_redefinition_was_allowed():
+    from arklight.ir.components import ALLOW_REDEFINE_MARKER
+
+    @component()
+    def Plain():  # noqa: N802 -- component name convention
+        return Text("x")
+
+    @component(allow_redefine=True)
+    def Deliberate():  # noqa: N802 -- component name convention
+        return Text("x")
+
+    assert getattr(Plain, ALLOW_REDEFINE_MARKER) is False
+    assert getattr(Deliberate, ALLOW_REDEFINE_MARKER) is True
+
+
 def test_component_decorator_raises_on_redefinition_without_allow_redefine():
     @component()
     def Thing():  # noqa: N802 -- component name convention

@@ -57,6 +57,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.0648  | Docs-only incremental patch, part 2 of `v0.0647`: actually rewrote the root `README.md` (the previous pass had landed the supporting docs but left the README itself untouched, still carrying the full duplicated Install/Repository-layout/Running-tests content `GETTING-STARTED.md` now owns). Root `README.md` is now the landing page `v0.0647` described: centered logo + `# ARKlight Framework` heading (amends `v0.0647`'s row, which said `# ARKlight`), the pitch and quickstart kept, an Install section reduced to the one `pip` command plus a pointer, and every other topic -- CLI, compiler pipeline, authoring API, repository layout, tests, non-goals, backends, proposals, version history -- collapsed into a single `## Documentation` section pointing at `docs/README.md` as the one index, Chromium-`README.md`-style, rather than a separate two-line pointer per topic that would itself need upkeep. Fixed the one link this broke: `docs/Foundational/CLI-REFERENCE.md`'s `README.md#cli` anchor (that heading no longer exists) now points at the Documentation section instead; `docs/Foundational/AUTHORING-GUIDE.md`'s README description updated to match. No code changed. Alpha-branch only. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`-`v0.0647` | DONE |
 | v0.0649  | Docs-only incremental patch, part 3 of `v0.0647`: moved the root `README.md`'s inline site-example code block (`Page(Heading(...), Text(...), Button(...))` + `arklight build`/output lines) into a new "Example" section in `docs/Foundational/GETTING-STARTED.md`, between Install and Repository layout. The root README was the one place still restating actual component-API surface -- exactly the kind of content that drifts as the API grows, unlike a fixed `pip install -e .` command or a pointer link. Root `README.md`'s Install section now reads pitch, one install command, one pointer -- nothing left in it that the component API, CLI, or repository layout could make stale. Updated `GETTING-STARTED.md`'s own intro line (\"pitch and quickstart\" -> \"pitch\", since the quickstart moved here) and its repository-layout comment on `examples/hello_site/` (previously \"Example site matching the root README\", now stale since the README no longer holds an example to match; repointed at this doc's new Example section instead). No code changed. Alpha-branch only. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`-`v0.0648` | DONE |
 | v0.0650  | Capability fix: preamble directives -- `# include <stdlib.ARKlight>` / `# include <acc.<dotted.module.path>>` / `# define <alias> -> <target>`, reserved-shape comments ARKlight's own loader parses and resolves itself (`arklight/parser/preamble.py`, new module), replacing reliance on raw `from X import *` for the step that gets vocabulary names into a site file's namespace. Fixes the one namespace-binding step the compiler's existing "fail loudly, no silent winner" doctrine (`DuplicateComponentError`, `CapabilityError`) didn't yet cover: two includes disagreeing on a name now raise `PreambleCollisionError` naming both sources, instead of Python's own star-import silently keeping whichever ran last. `arklight/parser/loader.py` wires the resolved bindings in before `exec`; new "Preamble directives" section in `docs/Foundational/AUTHORING-GUIDE.md`. `from arklight import *` keeps working unchanged -- purely additive. `tests/test_preamble.py` (18 tests); full suite 1425 passed. `0.0641` -> `0.0650` version bump. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same "capability fixes take priority" treatment as `v0.0431`/`v0.0641` | DONE |
+| v0.06501 | Capability fix follow-up to `v0.0650`: `from arklight import *` retired (still works; every build logs a notice naming file/line and the `# include <stdlib.ARKlight>` replacement); the two things the preamble couldn't see now fail loudly -- a site file rebinding a name its own preamble bound (`def`/assignment/import/star import, checked after `exec`), and a user `@component` named like a built-in, which silently replaced every built-in of that name (`register_component` now refuses it unless `allow_redefine=True`); `# define` split the way the rest of the compiler is -- applied in normalization (a rename), raised in validation, plus a new duplicate-define check. `arklight/parser/preamble.py`/`loader.py`, `arklight/ir/components.py`; scaffolds/example/docs moved to the preamble syntax. `tests/test_preamble.py` 18 -> 43; full suite 1454 passed. `0.0650` -> `0.06501`; roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent as `v0.0650` | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -135,6 +136,70 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06501 -- Capability fix follow-up: the preamble's blind spots (DONE)
+
+Bug-fix follow-up to `v0.0650`, out-of-band, same slot-sharing
+precedent. Numbered as the in-progress roadmap version (`v0.065`)
+extended by extra decimals -- `0.0650` plus two -- so it never touches
+the version itself. Still a **capability fix**: `v0.0650` closed "how
+names get into a site file", but three things it was meant to cover
+stayed invisible to the compiler.
+
+**Retired, not removed.** `from arklight import *` keeps working, but
+each build now logs one notice per occurrence (file:line, and the
+`# include <stdlib.ARKlight>` line to use instead) through the
+pipeline's existing stage logger, in the always-print form the CLI
+already had for experimental-API banners. `load_site` gained an
+optional `on_notice` callback rather than printing, matching how every
+other stage reports. Deliberately scoped to the site file: the
+preamble is only ever read from the entry file, so `pages/*.py` /
+`components/*.py` in the production scaffold cannot adopt the new
+syntax and are not nagged about it.
+
+**Names the compiler couldn't see.** (a) The file's own definitions:
+the preamble binds names before `exec`, so a later `def Button`, an
+assignment, an import or a leftover star import silently won, and
+nothing earlier could notice. The fix compares the finished
+namespace to what the preamble bound, by identity -- which catches
+every way of rebinding, including ones no static scan can -- and only
+then reads the AST to say where. (b) User components: reproduced
+before fixing -- `@component() def Button` replaced every `Button(...)`
+in the site, ARKlight's own included, because `expand_ark_ast` checks
+`COMPONENT_REGISTRY` before the schema. `arklight search` had already
+decided the opposite ("built-ins always win"), so the compiler and its
+own search disagreed. Now refused at registration unless
+`allow_redefine=True`, the opt-in the earlier registration-collision
+fix introduced; `@component` records that choice on the callable it
+returns so the namespace check treats an opted-in override as
+deliberate.
+
+**`# define`, and where it belongs.** A define is "replace the left
+name with the right one": canonicalization, so it is *applied* in
+normalization. Normalization never raises -- it records what it
+couldn't apply -- and validation is the single place that fails,
+mirroring the compiler's own Normalization -> Validation order. This
+also let one missing check land cleanly: two `# define`s giving one
+alias two targets was a silent last-one-wins, now a collision. Kept as
+a preamble-local pair rather than folded into `ir/normalize.py`/
+`ir/validate.py`, because those run over the ARK AST *after* `exec`,
+while names have to be bound *before* it -- the ARK AST only holds
+already-resolved node types, so a post-`exec` pass can no longer see
+an alias.
+
+**Boundary, stated and pinned.** The preamble is recognised comments
+above the file's contents only. A directive-shaped comment between
+statements or at the end of the file is an ordinary comment.
+
+**Tests:** `tests/test_preamble.py` 18 -> 43;
+`test_user_defined_components_stage0.py` +4. Each new behaviour was
+mutation-checked (disabled -> its tests fail). Three older tests
+adjusted for the intended behaviour change, listed in `CHANGELOG.md`'s
+`[0.06501]`. Full suite: 1454 passed.
+
+**Not done, on purpose:** preamble support in *imported* modules
+(`pages/`, `components/`) -- would need an import hook; a separate
+capability fix if wanted.
 
 ## v0.0650 -- Capability fix: preamble directives (DONE)
 

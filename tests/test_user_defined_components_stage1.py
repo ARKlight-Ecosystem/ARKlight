@@ -92,7 +92,10 @@ def test_build_knowledge_base_never_lets_a_user_component_shadow_a_builtin():
     # A user component that happens to reuse a built-in's name doesn't
     # overwrite that name's real schema facts in the knowledge base --
     # SCHEMA stays the closed, canonical source for its own names.
-    register_component("Heading", lambda: None, props={"level": Prop()})
+    # `allow_redefine=True`: registering a built-in's name is refused by
+    # default now; this is the deliberate-override state the knowledge
+    # base still has to stay correct for.
+    register_component("Heading", lambda: None, props={"level": Prop()}, allow_redefine=True)
     facts = build_knowledge_base(components=COMPONENT_REGISTRY)
     assert facts["Heading"] == build_knowledge_base()["Heading"]
 
