@@ -6,6 +6,71 @@ ARK Bundle format, and `arklight.config.py`. The root
 [`README.md`](../../README.md) keeps only the quickstart example and
 points here, via its Documentation section, for everything else.
 
+## Preamble directives (`# include`, `# define`)
+
+`from arklight import *` still works exactly as it always has. But a
+site file can instead open with reserved-shape *comments* -- ARKlight
+reads these itself, before your code runs, rather than delegating to
+Python's own `from X import *`:
+
+```python
+# include <stdlib.ARKlight>
+
+site = Site()
+
+@site.page("/")
+def home():
+    return Page(Heading("Hi"))
+```
+
+`# include <stdlib.ARKlight>` binds ARKlight's own public vocabulary
+(`Page`, `Button`, `State`, everything `from arklight import *` gives
+you today) -- but ARKlight resolves and binds every name itself,
+remembering which include supplied each one, rather than handing the
+job to Python's star-import statement.
+
+That distinction matters once a second source is in play, e.g. an ACC
+collection:
+
+```python
+# include <stdlib.ARKlight>
+# include <acc.some_collection>
+```
+
+If both sources try to bind the same name to two genuinely different
+objects, ARKlight raises a `PreambleCollisionError` naming both
+sources, at load time -- instead of silently keeping whichever
+`from ... import *` happened to run last, which is exactly what plain
+Python import semantics would otherwise do with zero diagnostic. This
+is the same "fail loudly, no silent winner" doctrine the compiler
+already applies to duplicate `@component` registration
+(`DuplicateComponentError`) and duplicate ACC capability identities
+(`CapabilityError`) -- `# include` closes the one remaining gap, the
+step that gets names into the namespace in the first place.
+
+A collision is resolved explicitly with `# define`:
+
+```python
+# define Button -> acc.some_collection.Button
+```
+
+`# define <alias> -> <target>` binds `<alias>` to whichever object
+`<target>` resolves to. A bare target (`# define Btn -> Button`) must
+be unambiguous across everything included so far; a dotted target
+(`<include-label>.<name>`, using the exact label from that
+`# include <label>` line) picks one specific include's copy by name,
+for exactly the case where two sources disagree about what a name
+means.
+
+Only `<stdlib.ARKlight>` and `<acc.<dotted.module.path>>` are
+recognized include labels today. An `acc.` include must point at a
+real, importable module that defines `__all__` -- the same contract
+`arklight.__all__` itself follows -- otherwise ARKlight doesn't know
+what vocabulary that module is meant to contribute, and raises rather
+than guessing. See `arklight/parser/preamble.py` for the full
+resolution rules and `arklight/parser/loader.py` for how the resolved
+bindings land in a site file's namespace before its own code executes.
+
 ## Internal links are relative, not root-absolute
 
 `Link("About", href="/about")` refers to the *route* `"/about"`, the
