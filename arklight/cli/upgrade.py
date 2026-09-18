@@ -24,6 +24,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from arklight.cli.whats_new import read_version, show_release_notes_if_new
+
 _ALPHA_BRANCH = "alpha"
 _REMOTE = "origin"
 
@@ -126,4 +128,13 @@ def upgrade_to_alpha() -> int:
 
     new_version = _run(["git", "rev-parse", "--short", "HEAD"], cwd=repo_root)
     print(f"[ARKlight] now on '{_ALPHA_BRANCH}' @ {new_version}. Re-run `arklight --version` to confirm.")
+
+    # Read straight off the just-pulled pyproject.toml -- this
+    # process's already-imported `arklight.__version__` was cached
+    # before the `git pull`/reinstall above, so it's stale here, and
+    # it's PEP 440-normalized anyway (see whats_new.read_version).
+    version = read_version(repo_root)
+    if version is not None:
+        show_release_notes_if_new(version, force=True)
+
     return 0
