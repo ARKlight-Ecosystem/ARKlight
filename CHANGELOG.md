@@ -90,6 +90,64 @@ guards. Full suite: 1313 passed (2 pre-existing, unrelated
 `test_version.py` failures from a bare non-`pip install`ed checkout,
 present before this stage too), no regressions.
 
+## [0.0644] -- Docs-only incremental patch: "The Goal" + `V1-DEFINITION.md`
+
+Out-of-band, numbered inside the same `v0.064` -> `v0.065` gap as
+`[0.0431]`/`[0.0641]`/`[0.0642]`/`[0.0643]` below, but docs-only: no
+compiler code changed.
+
+**Added:** a new, unnumbered "The Goal" section to
+`docs/Foundational/WHAT-ARKLIGHT-IS.md` (placed before Section 1,
+deliberately left unnumbered so Sections 2-7's existing numbers, and
+`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`'s two existing references
+to "Section 4," stay valid) -- states the project's DX goal
+(comparable to React/Vue/Svelte's authoring ergonomics) alongside the
+constraint it won't trade away to get there
+(`SYSTEM-DESIGN-AGREEMENTS.md`'s "Compiler First, Runtime Last"), and
+names the two audiences ARKlight is built for: the Python Community
+and the Education Community.
+
+**Added:** `docs/Foundational/V1-DEFINITION.md` -- what
+`v1.0`/"Stable compiler" (a bare, unexplained `PLANNED` row in
+`ARCHITECTURE.md`'s Milestones table until now) concretely means:
+deterministic output, fails-loudly-at-build-time with no known
+exceptions in scope, no breaking closed-vocabulary changes without a
+deprecation path. Scoped explicitly to the Web Developing parts of the
+compiler only (parsing/AST, Normalization/Validation, the Website IR,
+HTML/CSS/JS backends -- everything `arklight build` exercises), with
+named exclusions: the Android/Desktop packaging backends, CLI
+conveniences beyond `build`, `arklight/experimental.py`-gated
+features, and `Provider`/Rei/Project Knowledge/`arklight assistant`.
+Names **ARKlight Component Collections** for the first time in this
+doc tree -- a not-yet-proposed concept for curated bundles of
+`@component`-registered content built on `USER-DEFINED-COMPONENTS.md`'s
+existing macro-expansion path -- and states why it's excluded from the
+`v1.0` promise rather than leaving that inferred. Also documents
+"capability fix" (first recognized at `v0.0641`) as the mechanism and
+evidence trail behind the `v1.0` reliability claim: each one landed is
+a checkable step toward the point where the supply of open capability
+fixes for the in-scope surface runs dry.
+
+**Changed:** `docs/Foundational/README.md`'s and `docs/README.md`'s
+index rows for `WHAT-ARKLIGHT-IS.md` updated to mention "The Goal";
+both gain a new row for `V1-DEFINITION.md`. `ARCHITECTURE.md`'s `v1.0`
+Milestones-table row now links to `V1-DEFINITION.md` instead of
+standing as an unexplained label. `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s
+"Current as of" marker bumped from `v0.0642` to `v0.0644` (it had
+drifted after `[0.0643]` shipped without a corresponding bump; fixed
+here).
+
+**Fixed** (housekeeping noticed while these files were already open,
+per `docs/README.md`'s own "do it in one pass" rule): `docs/README.md`'s
+Foundational Folder Guide table was missing rows for both
+`WHAT-ARKLIGHT-IS.md` and `PLATFORM-APIS.md`, despite both already
+having rows in `docs/Foundational/README.md`'s own index -- added.
+`PROGRESS.md`'s `[0.0643]` Snapshot-table row had a literal `\n`
+instead of a real line break, merging it with the row below it on one
+line -- fixed. A stray, leftover `<<<<<<< HEAD` merge-conflict marker
+in `PROGRESS.md`, sitting just above the `v0.0643` narrative section
+with no matching conflict in progress -- removed.
+
 ## [0.0643] -- Docs-only incremental patch: package docstring refresh
 
 Out-of-band, numbered inside the same `v0.064` -> `v0.065` gap as

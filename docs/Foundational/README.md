@@ -19,7 +19,8 @@ knowledge.
 
 | File | Covers |
 | --- | --- |
-| [`WHAT-ARKLIGHT-IS.md`](WHAT-ARKLIGHT-IS.md) | The project's own definition of itself -- a compiler framework, not a static-site generator, frontend framework, or UI framework -- verified against the `alpha` source, with an explicit account of which familiar label each part of ARKlight resembles and why none of them describe the whole thing. |
+| [`WHAT-ARKLIGHT-IS.md`](WHAT-ARKLIGHT-IS.md) | The project's own definition of itself -- a compiler framework, not a static-site generator, frontend framework, or UI framework -- verified against the `alpha` source, with an explicit account of which familiar label each part of ARKlight resembles and why none of them describe the whole thing. Opens with "The Goal": comparable-to-frontend-framework DX while enforcing ARKlight's own philosophy, for two named audiences -- the Python Community and the Education Community. |
+| [`V1-DEFINITION.md`](V1-DEFINITION.md) | What `v1.0 -- Stable compiler` (`ARCHITECTURE.md`'s Milestones table) concretely means: deterministic, fails-loudly, no-breaking-vocabulary-changes reliability for the Web Developing parts of the compiler only -- explicitly not the native packaging backends, not experimental/opt-in features, and not ARKlight Component Collections. Also documents "capability fix" as a recognized patch category and the evidence trail it leaves toward `v1.0`. |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
 | [`CONFIGURABILITY.md`](CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. |
 | [`CLI-REFERENCE.md`](CLI-REFERENCE.md) | The implemented, shipped `arklight` subcommands (`build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`) -- the single canonical CLI reference. |

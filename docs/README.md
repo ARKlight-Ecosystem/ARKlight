@@ -38,6 +38,8 @@ record for the project, updated in place rather than removed.
 
 | File | Covers |
 | --- | --- |
+| [`WHAT-ARKLIGHT-IS.md`](Foundational/WHAT-ARKLIGHT-IS.md) | The project's own definition of itself, opening with "The Goal" -- comparable-to-frontend-framework DX while enforcing ARKlight's own philosophy, for the Python Community and the Education Community specifically. |
+| [`V1-DEFINITION.md`](Foundational/V1-DEFINITION.md) | What `v1.0 -- Stable compiler` concretely means, and its scope boundary: the Web Developing parts of the compiler only -- not native backends, not experimental features, and not ARKlight Component Collections. |
 | [`ARCHITECTURE.md`](Foundational/ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
 | [`CONFIGURABILITY.md`](Foundational/CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. (For the `arklight.config.py` project-settings file itself, see `AUTHORING-GUIDE.md`'s "Configuration" section.) |
 | [`CLI-REFERENCE.md`](Foundational/CLI-REFERENCE.md) | The implemented, shipped `arklight` CLI: every subcommand, its flags, and worked examples. |
@@ -47,6 +49,7 @@ record for the project, updated in place rather than removed.
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`SYSTEM-DESIGN-AGREEMENTS.md`](Foundational/SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |
 | [`USER-DEFINED-COMPONENTS.md`](Foundational/USER-DEFINED-COMPONENTS.md) | User-defined, reusable components (v0.060, shipped in full) -- props, default styling, macro/registry modes, component-owned state, and scope boundaries. |
+| [`PLATFORM-APIS.md`](Foundational/PLATFORM-APIS.md) | Settled design record for the platform API interface layer (`PlatformAPI.notify`/`.clipboard_write`, `v0.065`): terminology, compiler-owns-interface/backend-owns-implementation, Web-as-default, native-implementations-are-earned. |
 
 ### [`docs/Backends/`](Backends/README.md) — working reference
 
