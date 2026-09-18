@@ -39,6 +39,7 @@ record for the project, updated in place rather than removed.
 | File | Covers |
 | --- | --- |
 | [`WHAT-ARKLIGHT-IS.md`](Foundational/WHAT-ARKLIGHT-IS.md) | The project's own definition of itself, opening with "The Goal" -- comparable-to-frontend-framework DX while enforcing ARKlight's own philosophy, for the Python Community and the Education Community specifically. |
+| [`PITCH.md`](Foundational/PITCH.md) | An informal, conversational pitch for what ARKlight is and why it exists -- the compiler-first/runtime-last philosophy, the closed component vocabulary, user-defined components, downstream packaging (PWAs, `.ark` bundles, Android, Linux desktop), and ACC -- as the tone-flipped companion to `WHAT-ARKLIGHT-IS.md`'s verified technical definition. |
 | [`V1-DEFINITION.md`](Foundational/V1-DEFINITION.md) | What `v1.0 -- Stable compiler` concretely means, and its scope boundary: the Web Developing parts of the compiler only -- not native backends, not experimental features, and not ARKlight Component Collections. |
 | [`ARCHITECTURE.md`](Foundational/ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
 | [`CONFIGURABILITY.md`](Foundational/CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. (For the `arklight.config.py` project-settings file itself, see `AUTHORING-GUIDE.md`'s "Configuration" section.) |
