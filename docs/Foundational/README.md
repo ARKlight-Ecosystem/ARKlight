@@ -24,6 +24,7 @@ knowledge.
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | High-level system design: how source is parsed, compiled to IR, and rendered by a backend. |
 | [`CONFIGURABILITY.md`](CONFIGURABILITY.md) | The "reachability rule" — which fixed internal values should grow into a per-site kwarg/CLI flag vs. stay a constant. |
 | [`CLI-REFERENCE.md`](CLI-REFERENCE.md) | The implemented, shipped `arklight` subcommands (`build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`) -- the single canonical CLI reference. |
+| [`GETTING-STARTED.md`](GETTING-STARTED.md) | Install (`pip install -e .` and the Debian/Ubuntu `arklight-installer` package), the annotated repository layout, and the `pytest` workflow -- moved out of the root `README.md` so it can't go stale there. |
 | [`AUTHORING-GUIDE.md`](AUTHORING-GUIDE.md) | The full public component/behavior/state API: routing, head metadata, layout, styling, behaviors, the component vocabulary, the ARK Bundle format, and `arklight.config.py`. |
 | [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) | **Design only, not implemented.** The planned `arklight deploy` subcommand: a thin wrapper intended to delegate to a hosting provider's own CLI (Cloudflare Workers/Wrangler by default) rather than reimplementing provider deployment logic. |
 | [`DESIGN-NOTES.md`](DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
