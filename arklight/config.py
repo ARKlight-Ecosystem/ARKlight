@@ -61,8 +61,34 @@ CONFIG_FILENAME = "arklight.config.py"
 # site file, for a project that's already made peace with leaning on
 # an escape hatch and doesn't want to be reminded every build. See
 # docs/Foundational/EXPERIMENTAL-APIS.md's "Heavy-reliance nudge"
-# section for the full key and default.
-_KNOWN_SECTIONS = {"live_streaming", "android", "desktop", "experimental"}
+# section for the full key and default. Also carries
+# "devtools_console_reminder" (default `True`): whether the generated
+# `arklight.js` mirrors the same compile-time "experimental feature
+# active" warnings into the browser's devtools console (`console.warn`,
+# deduplicated per feature, same as the end-of-build summary) --
+# see `arklight.backend.js.render._experimental_console_reminder_js`.
+# Set `False` for a project that would rather keep its shipped JS
+# free of this, or that already has its own devtools-console
+# conventions. There's no `Site(...)` kwarg for this one (same
+# reasoning as `heavy_reliance_nudge` having none) -- it's a build-tool
+# behavior toggle, not a design decision the site file itself makes.
+#
+# "csp" is also read by `arklight.cli.main` (`arklight build`) --
+# `{"strict_csp": True | False | None}`, default `None`. This is a
+# project-wide *override* for `Site(strict_csp=...)`
+# (`arklight/backend/html/csp.py`), not a second place that sets the
+# same default: `None` (the default here) means "no override, use
+# whatever each site file's own `Site(strict_csp=...)` already says"
+# -- a config file that never mentions "csp" changes nothing. Setting
+# it to `True`/`False` here forces that value for every build from
+# this project regardless of what any individual `Site(...)` call
+# says, for a CI pipeline or monorepo that wants one policy decision
+# made in one place rather than re-declared per site file. There is
+# deliberately no way to set "trusted_script_origins" here -- that
+# list is inherently per-site content (which external origins *this*
+# site actually trusts), not a project-wide policy, so it stays a
+# `Site(...)`-only kwarg with no config-file equivalent.
+_KNOWN_SECTIONS = {"live_streaming", "android", "desktop", "experimental", "csp"}
 
 
 class ConfigError(Exception):

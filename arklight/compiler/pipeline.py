@@ -132,6 +132,8 @@ def compile_site_file(
     on_stage: StageLogger | None = None,
     css_var_overrides: dict[str, str] | None = None,
     lang: str | None = None,
+    strict_csp_override: bool | None = None,
+    devtools_console_reminder: bool = True,
 ) -> WebsiteIR:
     """
     Run every stage up to (and including) Website IR construction, but
@@ -152,6 +154,24 @@ def compile_site_file(
 
     `lang`, if given, overrides the site file's own `Site(lang=...)`
     (or its "en" default) the same way -- for the CLI's `--lang` flag.
+
+    `strict_csp_override`, if not `None`, wins over whatever the site
+    file itself set via `Site(strict_csp=...)` -- an outer override,
+    same shape as `css_var_overrides`/`lang` above, for the CLI's
+    `arklight.config.py` (`CONFIG = {"csp": {"strict_csp": ...}}`)
+    project-wide policy knob (see `arklight.config`'s "csp" section
+    comment). `None` (the default) means "no override, defer entirely
+    to the site file's own `Site(strict_csp=...)` value" -- it is *not*
+    the same as passing `False`, which would force the policy off for
+    every site regardless of what the site file asked for.
+
+    `devtools_console_reminder` is `arklight.config.py`'s
+    `CONFIG = {"experimental": {"devtools_console_reminder": ...}}`
+    passthrough (see `WebsiteIR.devtools_console_reminder`'s comment in
+    `arklight/ir/build.py`) -- unlike `strict_csp_override` this has no
+    `Site(...)` kwarg to defer to, so it's a plain bool, not a
+    three-state override: `True` (the default) unless the project's
+    config file turns it off.
     """
     log = on_stage or _noop_stage_logger
 
@@ -259,8 +279,15 @@ def compile_site_file(
         # CLI flag equivalent, for the same reason `app_shell` has none:
         # this is a whole-site authoring decision, not a per-build
         # override a CI invocation would plausibly want to flip.
-        strict_csp=site.strict_csp,
+        # `strict_csp_override` (`arklight.config.py`'s "csp" section)
+        # wins over the site file's own `Site(strict_csp=...)` when the
+        # project's config explicitly set one -- `None` means the
+        # config had nothing to say, so the site file's own value
+        # passes through unchanged, same "outer override, absent by
+        # default" shape as `css_var_overrides`/`lang` above.
+        strict_csp=site.strict_csp if strict_csp_override is None else strict_csp_override,
         trusted_script_origins=site.trusted_script_origins,
+        devtools_console_reminder=devtools_console_reminder,
     )
 
 
@@ -272,6 +299,8 @@ def build(
     on_stage: StageLogger | None = None,
     css_var_overrides: dict[str, str] | None = None,
     lang: str | None = None,
+    strict_csp_override: bool | None = None,
+    devtools_console_reminder: bool = True,
 ) -> BuildResult:
     """
     Full pipeline: Python source file -> rendered files written to `output_dir`.
@@ -288,12 +317,23 @@ def build(
     `compile_site_file` (see there) -- this is how the CLI's
     `--max-width`/`--bg`/`--font-family`/`--lang` flags reach the
     design tokens and `<html lang>` without requiring a site-file edit.
+
+    `strict_csp_override`/`devtools_console_reminder` are also
+    forwarded to `compile_site_file` (see there) -- the CLI's
+    `arklight.config.py` `"csp"`/`"experimental"` sections reach the
+    generated CSP meta tag and the devtools console reminder the same
+    way, without requiring a site-file edit either.
     """
     log = on_stage or _noop_stage_logger
     backends = backends if backends is not None else default_backends()
 
     ir = compile_site_file(
-        entry_path, on_stage=log, css_var_overrides=css_var_overrides, lang=lang
+        entry_path,
+        on_stage=log,
+        css_var_overrides=css_var_overrides,
+        lang=lang,
+        strict_csp_override=strict_csp_override,
+        devtools_console_reminder=devtools_console_reminder,
     )
 
     output_files: dict[str, str] = {}
