@@ -35,6 +35,7 @@ from arklight.cli.android import AndroidError
 from arklight.cli.desktop import DesktopError
 from arklight.cli.doc_retrieval import DOC_FOLDERS, DocRetrievalError, ignored_flag_notices, run_retrieve_doc
 from arklight.cli.license_gate import ensure_license_accepted
+from arklight.cli.whats_new import read_version, show_release_notes_if_new
 from arklight.cli.scaffold import ScaffoldError, new_project
 from arklight.cli.search import record_acceptance, resolve_exact, search_component
 from arklight.cli.templates import TEMPLATES
@@ -1217,6 +1218,21 @@ def main(argv: list[str] | None = None) -> int:
     # at `pip install` time.
     if not ensure_license_accepted():
         return 1
+
+    # Once per version, a fresh/plain-reinstalled `arklight` prints its
+    # release note here on the first real command it runs -- same
+    # marker-file idea as the license gate just above, see
+    # arklight/cli/whats_new.py. `--upgrade-alpha` already prints its
+    # own copy immediately (force=True there), so this is a no-op for
+    # that path once the marker is recorded. Note this deliberately
+    # does NOT use the `__version__` imported above -- that's the
+    # PEP 440-normalized string from installed-package metadata (e.g.
+    # "0.641"), which would never match a "v0.0641.md" file; see
+    # whats_new.read_version for why the raw pyproject.toml spelling
+    # is what has to be looked up instead.
+    _current_version = read_version()
+    if _current_version is not None:
+        show_release_notes_if_new(_current_version)
 
     try:
         return args.func(args)
