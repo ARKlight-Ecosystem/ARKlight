@@ -115,7 +115,8 @@ def test_wire_click_interceptor_guards_action_dispatch_independently():
     # the shipped function now always carries both an action branch
     # and a behavior branch (each with its own try/catch), regardless
     # of which this particular page actually uses -- see
-    # tests/test_htmx_5.py.
+    # tests/test_htmx_5.py. `v0.065` adds a third, always-present
+    # platform branch the same way -- see tests/test_platform_api.py.
     pages = {
         "/": Page(
             State("count", 0),
@@ -126,8 +127,8 @@ def test_wire_click_interceptor_guards_action_dispatch_independently():
     wire_body = js.split("function wireClickInterceptor(getStore) {")[1].split(
         "function highlightActiveNavLink"
     )[0]
-    assert wire_body.count("try {") == 2
-    assert wire_body.count("catch (err)") == 2
+    assert wire_body.count("try {") == 3
+    assert wire_body.count("catch (err)") == 3
     assert "arkNotify(" in wire_body
 
 
@@ -145,7 +146,13 @@ def test_wire_click_interceptor_guards_behavior_dispatch_independently():
     wire_body = js.split("function wireClickInterceptor(getStore) {")[1].split(
         "function highlightActiveNavLink"
     )[0]
-    behavior_branch = wire_body.split('raw.indexOf("behavior:") === 0) {')[1]
+    # `v0.065` adds a trailing "platform:" branch after "behavior:", so
+    # bound the slice there rather than running to the end of
+    # wire_body -- otherwise the platform branch's own try/catch would
+    # be double-counted as part of the behavior branch.
+    behavior_branch = wire_body.split('raw.indexOf("behavior:") === 0) {')[1].split(
+        'raw.indexOf("platform:") === 0) {'
+    )[0]
     assert behavior_branch.count("try {") == 1
     assert behavior_branch.count("catch (err)") == 1
     assert "arkNotify(" in behavior_branch

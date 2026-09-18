@@ -244,9 +244,11 @@ category, because by the definition in Section 1 there isn't one yet.
   designed. `Provider` (`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`,
   accepted, staged `v0.065`-`v0.070`) is the accepted answer for
   *external services*; a Platform APIs layer
-  (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`, filed this revision,
-  not yet accepted) is a related but distinct answer for *execution-
-  platform* capabilities -- Section 25 of that proposal draws the
+  (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`, accepted and staged
+  in `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md` -- stage 1 of
+  2, the Web reference implementation, shipped as of `v0.065`) is a
+  related but distinct answer for *execution-platform* capabilities --
+  Section 25 of that proposal draws the
   line between the two explicitly.
 - **No slot/children-passing model for user-defined components** --
   `Card(Text("content"))` forwarding `"content"` into `Card`'s render

@@ -29,3 +29,4 @@ knowledge.
 | [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`SYSTEM-DESIGN-AGREEMENTS.md`](SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |
 | [`USER-DEFINED-COMPONENTS.md`](USER-DEFINED-COMPONENTS.md) | Design for user-defined, reusable components (v0.060). |
+| [`PLATFORM-APIS.md`](PLATFORM-APIS.md) | Settled design record for the platform API interface layer (`PlatformAPI.notify`/`.clipboard_write`, `v0.065`): terminology, the compiler-owns-interface/backend-owns-implementation architecture, Web-as-default, native-implementations-are-earned, and the explicit boundary against the pre-existing `copy` behavior. |

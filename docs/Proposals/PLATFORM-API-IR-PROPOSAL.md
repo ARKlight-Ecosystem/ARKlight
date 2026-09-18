@@ -2,12 +2,19 @@
 
 ## Status
 
-**Proposed.** Not yet accepted, not yet staged against a version-history
-milestone. Filed alongside a `docs/Foundational/WHAT-ARKLIGHT-IS.md`
-rewrite (`v0.0642`) that names this as the project's next capability
-gap worth closing, but naming a gap is not the same as accepting a
-design for closing it -- this document is the design under review, not
-a committed roadmap entry.
+**Accepted, staged as a two-stage implementation ladder** --
+[`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`](../Implementation/PLATFORM-API-IR-ADDENDUM.md)
+(`v0.065`). Stage 1 of 2 (the Web reference implementation -- the
+architecture itself, plus `notify`/`clipboard_write` as its first two
+capabilities) has shipped; Stage 2 (Android/Desktop native
+implementations) stays PLANNED until each of those backends is mature
+enough to earn a capability, per Section 6/22 below. The settled
+design decisions this proposal argues for -- terminology, the
+architecture model, the Web-default/native-earns-later split -- are
+recorded permanently in
+[`docs/Foundational/PLATFORM-APIS.md`](../Foundational/PLATFORM-APIS.md)
+once Stage 1 landed; this document is kept in full, unedited, as the
+proposal that design was accepted from.
 
 - **Type:** Architecture / compiler proposal
 - **Scope:** Compiler IR, platform API interfaces, backend

@@ -189,12 +189,16 @@ def test_guard_shape_is_one_try_catch_per_dispatch_branch():
     # try/catch" is no longer accurate now that there are two dispatch
     # kinds to guard independently. See test_htmx_5.py for the
     # behavior branch's own dedicated coverage.
+    #
+    # `v0.065` adds a third branch (platform), with its own try/catch
+    # the same shape -- see tests/test_platform_api.py for that
+    # branch's own dedicated coverage.
     js = JSBackend().render(_stateful_ir())[SCRIPT_PATH]
     body = js.split("function wireClickInterceptor(getStore) {")[1].split(
         "function highlightActiveNavLink"
     )[0]
-    assert body.count("try {") == 2
-    assert body.count("catch (err)") == 2
+    assert body.count("try {") == 3
+    assert body.count("catch (err)") == 3
     assert "arkNotify(" in body
 
 
