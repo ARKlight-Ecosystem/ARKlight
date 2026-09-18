@@ -223,7 +223,7 @@ def test_build_from_arklight_file_by_extension(tmp_path):
     about_html = (out_dir / "about.html").read_text()
     assert "<h1>Hi</h1>" in index_html
     assert "<h1>About</h1>" in about_html
-    assert len(rebuilt_result.written_paths) == 4  # index, about, styles.css, arklight.js
+    assert len(rebuilt_result.written_paths) == 5  # index, about, styles.css, arklight.js, sbom.txt
 
 
 def test_build_from_arklight_file_detected_by_magic_bytes_without_extension(tmp_path):

@@ -56,7 +56,7 @@ def test_build_writes_html_files(tmp_path):
     assert "<h1>ARKlight</h1>" in index_html
     assert "<button>Get Started</button>" in index_html
     assert "<h1>About</h1>" in about_html
-    assert len(result.written_paths) == 4  # index.html, about.html, styles.css, arklight.js
+    assert len(result.written_paths) == 5  # index.html, about.html, styles.css, arklight.js, sbom.txt
     assert (out_dir / "styles.css").exists()
     assert (out_dir / "arklight.js").exists()
 
@@ -217,6 +217,7 @@ def test_build_on_stage_reports_every_stage_in_order(tmp_path):
         "Postprocessing backend 'html'...",
         "Postprocessing backend 'css'...",
         "Postprocessing backend 'js'...",
+        "Generating build manifest (sbom.txt)...",
         f"Writing {len(result.output_files)} file(s) -> {out_dir}/...",
         "Copying assets...",
         f"Build complete -> {out_dir}/index.html",
