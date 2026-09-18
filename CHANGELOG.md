@@ -5,6 +5,29 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.0646] -- Docs-only: fixed a self-contradiction in `V1-DEFINITION.md`
+
+Docs-only, no compiler code changed.
+
+**Fixed:** `docs/Foundational/V1-DEFINITION.md` Section 5's "zero
+special-cased compiler support" bullet, which `[0.0645]` left
+contradicting that same section's own newly-amended opening paragraph
+(the capability-discovery hook landing as real, compiler-side code).
+Narrowed the bullet to Collection *content* specifically, naming the
+hook as the one already-acknowledged exception.
+
+**Added:** an explicit removal-side rule to `docs/README.md`'s
+"Adding a new doc" section -- deleting a file that leaves the
+Proposals/Implementation/Backends/Far Future Concern lifecycle must
+remove its index row(s), in the same pass, in both that folder's own
+index and `docs/README.md`'s Folder Guide table. Previously only the
+add/update direction was stated.
+
+**Fixed:** `PROGRESS.md`'s own `[0.0645]` Snapshot-table row, which
+had picked up a literal `\n` merging it with the row below --
+the same defect `[0.0644]` had already found and fixed one row
+earlier, for `[0.0643]`.
+
 ## [0.0645] -- Docs-only: documented the ACC capability-discovery hook
 
 Docs-only, no compiler code changed. Backfills documentation for

@@ -4,7 +4,7 @@ _A grounding, scope-defining document for `docs/Foundational/`, filed
 alongside `WHAT-ARKLIGHT-IS.md`'s "The Goal" section as the answer to
 the question that section raises but doesn't settle: what does
 "stable" actually mean for this project, and exactly where does that
-promise stop applying? Current as of **v0.0645** (latest shipped
+promise stop applying? Current as of **v0.0646** (latest shipped
 milestone on `alpha`); cross-check `PROGRESS.md`'s Snapshot table and
 `docs/Foundational/ARCHITECTURE.md`'s Milestones table -- where this
 file says `v1.0 | Stable compiler | PLANNED` in one line -- before
@@ -211,10 +211,18 @@ name, rather than simply not-yet-covered:
   Collection is a package of Python source that calls `component(...)`
   the same way any project's own code does -- it compiles through
   exactly the same macro-expansion path `USER-DEFINED-COMPONENTS.md`
-  already documents, with zero special-cased compiler support. Nothing
-  about shipping, updating, or removing a Collection touches
-  `arklight/parser/`, `arklight/ir/`, or any backend listed in
-  Section 3.
+  already documents, with zero special-cased compiler support for the
+  Collection's own content. (This is a narrower claim than it was
+  before the capability-discovery hook landed: `arklight/capabilities.py`
+  *is* special-cased, compiler-side code that exists solely to let ACC
+  packages be discovered -- its own docstring calls it "compiler-side
+  by definition." The distinction that still holds is between that one
+  narrow, ACC-authored discovery mechanism and the actual Collection
+  content it might one day let a component reach -- the hook ships no
+  Collection content itself, does nothing when no ACC package is
+  installed, and nothing about shipping, updating, or removing a
+  Collection's *content* touches `arklight/parser/`, `arklight/ir/`,
+  or any backend listed in Section 3.)
 - **Its release cadence and quality bar are independent of the
   compiler's.** A Collection can be versioned, expanded, split,
   renamed, deprecated, or pruned on its own schedule -- far faster and
