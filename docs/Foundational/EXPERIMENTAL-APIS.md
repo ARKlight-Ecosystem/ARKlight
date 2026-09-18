@@ -109,6 +109,43 @@ stage narration, an experimental-API warning is not "nice to have with
 more output," it's the entire point of gating the feature in the first
 place, so it always prints.
 
+### Heavy-reliance nudge
+
+A third, optional line prints after the end-of-run summary if a
+build's experimental-API usage looks less like "one escape hatch, used
+once" and more like "this project actually needs a feature ARKlight
+doesn't have yet":
+
+```
+[Rae ARK] Hey, just a heads up -- if you're relying on experimental APIs a lot
+[Rae ARK] (3 experimental-API uses this build, across: css-import, raw-postprocess)
+[Rae ARK] Might be a good idea to open a pull request for your missing feature
+[Rae ARK] In either the ARKlight or ARKlight-Component-Collections GitHub repo
+```
+
+`arklight.experimental.heavy_reliance_nudge` fires once per build when
+the count of uses of *upstream-candidate* features (see
+`ExperimentalFeature.upstream_candidate` below) reaches
+`HEAVY_RELIANCE_THRESHOLD` (currently 3), counted across every use in
+that build -- not deduplicated by feature the way the summary block
+above is, since five uses of one escape hatch is exactly as strong a
+signal as one use each of five different ones.
+
+Not every registered feature counts toward this: `css-media-queries`
+is a deliberate, permanent design tradeoff (ARKlight chose intrinsic
+layout on purpose), not a missing feature, so it's excluded
+(`upstream_candidate=False`) -- heavy use of it alone never trips the
+nudge. Most other features default to `upstream_candidate=True`,
+since they represent gaps that a real ARKlight or ACC feature could
+eventually close.
+
+This is a single-build heuristic only -- no on-disk log, no
+across-build history yet (`.arklight/`-style persistent usage tracking
+is a plausible future extension, not implemented here). A project that
+crosses the threshold sees the nudge on every build until its usage
+drops back down, which is intentional: it reflects current reliance,
+not a one-time trip.
+
 ## Android: why this matters more there, not less
 
 Media queries and other viewport-keyed logic are especially unreliable
@@ -152,7 +189,10 @@ the first time.
 ## Adding a new experimental feature
 
 1. Add an entry to `FEATURES` in `arklight/experimental.py` (id,
-   inline note, wrapped detail paragraph, legacy/back-compat note).
+   inline note, wrapped detail paragraph, legacy/back-compat note, and
+   `upstream_candidate` -- `False` only for a deliberate, permanent
+   design tradeoff like `css-media-queries`; leave the `True` default
+   for anything that represents an actual missing-feature gap).
 2. Call `arklight.experimental.emit(feature_id, on_warning=log, ...)`
    at the point the feature is detected (compile-time for build-time
    features, post-build for `arklight pwa`-style steps).
