@@ -146,6 +146,27 @@ crosses the threshold sees the nudge on every build until its usage
 drops back down, which is intentional: it reflects current reliance,
 not a one-time trip.
 
+**Turning it off.** A project that's already made a deliberate,
+informed choice to lean on an escape hatch doesn't need reminding
+every build. Silence it via `arklight.config.py` -- the same
+project-level settings file `live_streaming`/`android`/`desktop`
+already use (see `arklight/config.py`), not a CLI flag, so it's a
+one-time, versioned, per-project decision rather than something to
+remember to pass on every invocation:
+
+```python
+# arklight.config.py
+CONFIG = {
+    "experimental": {
+        "heavy_reliance_nudge": False,
+    },
+}
+```
+
+This only silences the nudge line. The per-feature warning blocks
+above it -- the actual "here's what this feature costs you" notice --
+always print regardless; there's no setting that turns those off.
+
 ## Android: why this matters more there, not less
 
 Media queries and other viewport-keyed logic are especially unreliable

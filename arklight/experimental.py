@@ -207,11 +207,19 @@ def emit(
     return usage
 
 
-def print_summary(usages: list[ExperimentalUsage], *, file=None) -> None:
+def print_summary(usages: list[ExperimentalUsage], *, file=None, show_nudge: bool = True) -> None:
     """Print one deduplicated end-of-run block per distinct feature
     id in `usages`, in first-seen order, followed by a heavy-reliance
     nudge (see `heavy_reliance_nudge`) if warranted. No-op for an empty
-    list."""
+    list.
+
+    `show_nudge=False` suppresses only the nudge line -- the per-
+    feature warning blocks above it always print regardless, since
+    those are the actual safety notice this module exists for. Callers
+    source `show_nudge` from a project's `arklight.config.py`
+    (`CONFIG = {"experimental": {"heavy_reliance_nudge": False}}`) --
+    see docs/Foundational/EXPERIMENTAL-APIS.md.
+    """
     import sys
 
     out = file or sys.stdout
@@ -222,6 +230,8 @@ def print_summary(usages: list[ExperimentalUsage], *, file=None) -> None:
         seen.add(usage.feature_id)
         print(format_summary_block(usage.feature_id), file=out)
 
+    if not show_nudge:
+        return
     nudge = heavy_reliance_nudge(usages)
     if nudge is not None:
         print(nudge, file=out)

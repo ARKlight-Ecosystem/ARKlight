@@ -150,6 +150,54 @@ def test_cli_build_without_verbose_prints_no_stage_lines(tmp_path, capsys):
     assert "[ARKlight]" not in captured.out
 
 
+NUDGE_SITE = """
+from arklight import *
+site = Site()
+site.import_style("https://fonts.googleapis.com/css2?family=Inter")
+site.import_style("https://fonts.googleapis.com/css2?family=Roboto")
+site.import_style("https://fonts.googleapis.com/css2?family=Lato")
+
+@site.page("/")
+def home():
+    return Page(Heading("Hi"))
+"""
+
+
+def write_nudge_site(tmp_path: Path) -> Path:
+    path = tmp_path / "site.py"
+    path.write_text(NUDGE_SITE)
+    return path
+
+
+def test_cli_build_shows_heavy_reliance_nudge_by_default(tmp_path, capsys):
+    site_path = write_nudge_site(tmp_path)
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
+    assert exit_code == 0
+    assert "[Rae ARK]" in capsys.readouterr().out
+
+
+def test_cli_build_hides_heavy_reliance_nudge_via_config(tmp_path, capsys):
+    site_path = write_nudge_site(tmp_path)
+    (tmp_path / "arklight.config.py").write_text(
+        'CONFIG = {"experimental": {"heavy_reliance_nudge": False}}\n', encoding="utf-8"
+    )
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "[Rae ARK]" not in out
+    # the per-feature warning blocks themselves are untouched by the
+    # config setting -- only the nudge is suppressed.
+    assert "Legacy API detected: css-import" in out
+
+
+def test_cli_build_invalid_config_fails_clearly(tmp_path, capsys):
+    site_path = write_nudge_site(tmp_path)
+    (tmp_path / "arklight.config.py").write_text("CONFIG = [1, 2]\n", encoding="utf-8")
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
+    assert exit_code == 1
+    assert "ARKlight build failed" in capsys.readouterr().err
+
+
 def test_cli_build_debug_prints_full_traceback_on_failure(tmp_path, capsys):
     bad_path = tmp_path / "site.py"
     bad_path.write_text(

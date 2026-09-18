@@ -40,6 +40,7 @@ from arklight.cli.search import record_acceptance, resolve_exact, search_compone
 from arklight.cli.templates import TEMPLATES
 from arklight.cli.upgrade import upgrade_to_alpha
 from arklight.compiler.pipeline import BuildResult, CompileError, build
+from arklight.config import ConfigError, load_config, section
 from arklight.ir import binary as binary_ir
 from arklight.packer.bundle import PackError, pack, unpack
 from arklight.pwa import PWAError, enable_pwa
@@ -233,6 +234,20 @@ def _cmd_build(args: argparse.Namespace) -> int:
     if args.button_text is not None:
         css_var_overrides["--ark-button-text"] = args.button_text
 
+    # arklight.config.py's "experimental" section is the only control
+    # for the heavy-reliance nudge (docs/EXPERIMENTAL-APIS.md) -- no
+    # CLI flag, on purpose: a project that's decided it's fine leaning
+    # on an escape hatch sets this once, next to the site file, the
+    # same place `live_streaming`/`android`/`desktop` project settings
+    # already live, rather than remembering a flag on every invocation.
+    try:
+        project_config = load_config(Path(args.entry).resolve().parent)
+    except ConfigError as exc:
+        print(f"ARKlight build failed: {exc}", file=sys.stderr)
+        return 1
+    experimental_cfg = section(project_config, "experimental", {"heavy_reliance_nudge": True})
+    show_experimental_nudge = bool(experimental_cfg["heavy_reliance_nudge"])
+
     try:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -270,7 +285,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
         print(f"  {arklight_path} ({len(payload)} bytes, binary IR)")
 
     _print_alpha_warnings(caught)
-    experimental.print_summary(result.ir.experimental_usages)
+    experimental.print_summary(result.ir.experimental_usages, show_nudge=show_experimental_nudge)
 
     if args.open:
         opened = open_in_browser(result, args.output)

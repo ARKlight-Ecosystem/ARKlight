@@ -52,3 +52,15 @@ def test_section_merges_project_values_over_defaults():
 def test_section_raises_when_section_not_a_dict():
     with pytest.raises(ConfigError):
         section({"live_streaming": "nope"}, "live_streaming", {})
+
+
+def test_section_experimental_heavy_reliance_nudge_defaults_true():
+    assert section({}, "experimental", {"heavy_reliance_nudge": True}) == {
+        "heavy_reliance_nudge": True
+    }
+
+
+def test_section_experimental_heavy_reliance_nudge_can_be_disabled():
+    config = {"experimental": {"heavy_reliance_nudge": False}}
+    merged = section(config, "experimental", {"heavy_reliance_nudge": True})
+    assert merged == {"heavy_reliance_nudge": False}
