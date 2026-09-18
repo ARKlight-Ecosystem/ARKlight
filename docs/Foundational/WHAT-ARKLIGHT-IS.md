@@ -2,9 +2,59 @@
 
 _A grounding document for `docs/Foundational/`. Written from the
 project's own source, its own design docs, and hands-on verification --
-not from the pitch alone. Current as of **v0.0642** (latest shipped
+not from the pitch alone. Current as of **v0.0644** (latest shipped
 milestone on `alpha`); cross-check `PROGRESS.md`'s Snapshot table
 before treating any version-specific claim here as still accurate._
+
+## The Goal
+
+ARKlight's goal is to give Python developers a web-development
+experience comparable, in day-to-day ergonomics, to what a frontend
+framework offers -- component calls, props, a reactive core, a real
+dev loop -- while enforcing the philosophy the rest of this document
+describes, not loosening it to get there faster. The DX bar is
+"comparable to React/Vue/Svelte," not "acceptable for a compiled
+language with a templating bolt-on" -- Section 5's comparison table
+exists precisely so that bar can be checked against the real thing
+rather than asserted. "Comparable ergonomics," not "equivalent
+capability": where a frontend framework resolves something at runtime
+with an expression evaluator, ARKlight resolves it at compile time
+through a fixed, closed primitive, or doesn't offer it yet at all
+(Section 6 lists what's still missing under that constraint). The DX
+goal is real, but it never licenses relaxing Section 2's "Compiler
+First, Runtime Last" agreement to get there.
+
+ARKlight is being built for two specific, named audiences -- not
+"developers" in the abstract:
+
+- **The Python Community** -- people who already think in Python and
+  are structurally unwilling, uninterested, or simply not equipped to
+  reach for `npm`, a JS build chain, or a second language just to put
+  a page on the web. Section 5's Astro comparison names this audience
+  directly: Astro accepts any JS framework as an island and still
+  expects JS/npm literacy for anything beyond bare content; ARKlight
+  asks for neither.
+- **The Education Community** -- classrooms, self-taught learners, and
+  anyone teaching or learning "how to build a website," for whom every
+  extra language, extra runtime, and extra failure mode between typing
+  code and seeing a result is a teaching cost, not just a developer
+  inconvenience. The closed vocabulary and the "fail loudly at build
+  time, not silently in the browser" posture (`docs/README.md`'s
+  Philosophy section) both cash out here specifically: a student's
+  mistake should raise a Python exception during `arklight build`,
+  never surface as silent broken behavior discovered only in a browser
+  console after the fact.
+
+Being a genuinely useful tool for both of those audiences, without
+bending the design agreement in Section 2 to do it, is the whole
+goal -- not "an SSG people happen to like," not "a frontend framework
+for people who already know JS." ARKlight is only worth building if it
+can be comparable-to-frontend-frameworks *and* philosophy-enforcing at
+the same time, for an audience the rest of the field is not currently
+building for. `docs/Foundational/V1-DEFINITION.md` picks up directly
+from this goal to answer the next question it raises: what "stable"
+and "just works" concretely mean, and exactly how far that promise is
+meant to reach.
 
 ## 1. The one-sentence definition
 
