@@ -54,7 +54,15 @@ CONFIG_FILENAME = "arklight.config.py"
 # "desktop" is read by `arklight.cli.desktop` (`arklight desktop
 # scaffold`) -- see docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md
 # for the full key list and defaults.
-_KNOWN_SECTIONS = {"live_streaming", "android", "desktop"}
+#
+# "experimental" is read by `arklight.cli.main` (`arklight build`) --
+# lets a project silence the heavy-reliance nudge
+# (`arklight.experimental.heavy_reliance_nudge`) without touching the
+# site file, for a project that's already made peace with leaning on
+# an escape hatch and doesn't want to be reminded every build. See
+# docs/Foundational/EXPERIMENTAL-APIS.md's "Heavy-reliance nudge"
+# section for the full key and default.
+_KNOWN_SECTIONS = {"live_streaming", "android", "desktop", "experimental"}
 
 
 class ConfigError(Exception):
