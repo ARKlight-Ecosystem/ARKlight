@@ -233,6 +233,27 @@ class WebsiteIR:
     # into "added an override" per CONFIGURABILITY.md's own rule.
     strict_csp: bool = True
     trusted_script_origins: list[str] = field(default_factory=list)
+    # Runtime policy enforcement, devtools mirror (arklight/backend/js/
+    # render.py's `_experimental_console_reminder_js`): a compile-time
+    # "[EXPERIMENTAL FEATURE ACTIVE]" banner (arklight/experimental.py)
+    # only ever reaches whoever ran `arklight build` -- anyone who
+    # opens the *shipped site* in a browser and pops devtools sees
+    # nothing about it at all. This mirrors the same deduplicated
+    # per-feature warning into a `console.warn(...)` block in the
+    # generated `arklight.js`, so an experimental feature stays visible
+    # to whoever's actually looking at the running page, not just
+    # whoever built it. `True` by default -- same "warn, don't hide"
+    # stance as the compile-time banner itself, which has no opt-out at
+    # all. This one *does* get an opt-out (arklight.config.py's
+    # `CONFIG = {"experimental": {"devtools_console_reminder": False}}`,
+    # read by `arklight.cli.main`) since, unlike the compile-time
+    # banner, it ships extra bytes into every page's JS and some
+    # projects may already have their own devtools-console conventions
+    # they don't want ARKlight talking over. No `Site(...)` kwarg
+    # equivalent, same reasoning as `heavy_reliance_nudge` having none
+    # (docs/Foundational/EXPERIMENTAL-APIS.md): this is a build-tool-
+    # behavior toggle, not a design decision the site file itself makes.
+    devtools_console_reminder: bool = True
     # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): `(output_files: dict[str,
     # str]) -> dict[str, str]` callables registered via
     # `site.raw_postprocess(...)`, in call order -- straight passthrough,
@@ -624,6 +645,7 @@ def build_website_ir(
     raw_postprocessors: list | None = None,
     strict_csp: bool = True,
     trusted_script_origins: list | None = None,
+    devtools_console_reminder: bool = True,
 ) -> WebsiteIR:
     """
     Build the Website IR from a normalized + validated ARK AST.
@@ -672,6 +694,14 @@ def build_website_ir(
     this function whose *default* (`strict_csp=True`) is new behavior,
     not "unchanged output for existing callers" -- see `WebsiteIR.
     strict_csp`'s own comment for why.
+
+    `devtools_console_reminder` is the CLI's `arklight.config.py`
+    (`CONFIG = {"experimental": {"devtools_console_reminder": ...}}`)
+    override passthrough -- see `WebsiteIR.devtools_console_reminder`'s
+    own comment for the full reasoning. Defaults to `True`, same "new
+    default, not silently unchanged" note as `strict_csp` above; unlike
+    `strict_csp` there's no `Site(...)` kwarg feeding this one, only
+    the config file.
     """
     collector = _ResponsiveStyleCollector()
     ir_pages = []
@@ -714,4 +744,5 @@ def build_website_ir(
         raw_postprocessors=list(raw_postprocessors) if raw_postprocessors else [],
         strict_csp=strict_csp,
         trusted_script_origins=list(trusted_script_origins) if trusted_script_origins else [],
+        devtools_console_reminder=devtools_console_reminder,
     )

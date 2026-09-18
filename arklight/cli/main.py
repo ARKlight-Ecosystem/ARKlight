@@ -234,19 +234,37 @@ def _cmd_build(args: argparse.Namespace) -> int:
     if args.button_text is not None:
         css_var_overrides["--ark-button-text"] = args.button_text
 
-    # arklight.config.py's "experimental" section is the only control
-    # for the heavy-reliance nudge (docs/EXPERIMENTAL-APIS.md) -- no
-    # CLI flag, on purpose: a project that's decided it's fine leaning
-    # on an escape hatch sets this once, next to the site file, the
-    # same place `live_streaming`/`android`/`desktop` project settings
-    # already live, rather than remembering a flag on every invocation.
+    # arklight.config.py's "experimental"/"csp" sections are the only
+    # control for the heavy-reliance nudge, the devtools console
+    # reminder (docs/EXPERIMENTAL-APIS.md), and a project-wide CSP
+    # override (arklight/backend/html/csp.py) -- no CLI flag for any of
+    # these, on purpose: a project that's decided it's fine leaning on
+    # an escape hatch (or wants one CSP policy for every site it
+    # builds) sets this once, next to the site file, the same place
+    # `live_streaming`/`android`/`desktop` project settings already
+    # live, rather than remembering a flag on every invocation.
     try:
         project_config = load_config(Path(args.entry).resolve().parent)
     except ConfigError as exc:
         print(f"ARKlight build failed: {exc}", file=sys.stderr)
         return 1
-    experimental_cfg = section(project_config, "experimental", {"heavy_reliance_nudge": True})
+    experimental_cfg = section(
+        project_config,
+        "experimental",
+        {"heavy_reliance_nudge": True, "devtools_console_reminder": True},
+    )
     show_experimental_nudge = bool(experimental_cfg["heavy_reliance_nudge"])
+    devtools_console_reminder = bool(experimental_cfg["devtools_console_reminder"])
+
+    csp_cfg = section(project_config, "csp", {"strict_csp": None})
+    strict_csp_override = csp_cfg["strict_csp"]
+    if strict_csp_override is not None and not isinstance(strict_csp_override, bool):
+        print(
+            f"ARKlight build failed: `CONFIG['csp']['strict_csp']` must be "
+            f"True, False, or None, got {strict_csp_override!r}.",
+            file=sys.stderr,
+        )
+        return 1
 
     try:
         with warnings.catch_warnings(record=True) as caught:
@@ -257,6 +275,8 @@ def _cmd_build(args: argparse.Namespace) -> int:
                 on_stage=on_stage,
                 css_var_overrides=css_var_overrides or None,
                 lang=args.lang,
+                strict_csp_override=strict_csp_override,
+                devtools_console_reminder=devtools_console_reminder,
             )
     except CompileError as exc:
         if args.debug:

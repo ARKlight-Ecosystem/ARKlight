@@ -291,6 +291,8 @@ registry currently knows about.
 
 from __future__ import annotations
 
+import json
+
 from arklight.ast.nodes import ActionRef, ModelBindSpec, PlatformAPIRef
 from arklight.backend.base import Backend
 from arklight.backend.js.actions import ACTION_FRAGMENTS
@@ -298,6 +300,7 @@ from arklight.backend.js.behaviors import BEHAVIOR_FRAGMENTS
 from arklight.backend.js.derivations import DERIVATION_FRAGMENTS
 from arklight.backend.js.htmx import HTMX_JS
 from arklight.backend.js.platform_apis import PLATFORM_API_FRAGMENTS
+from arklight.experimental import FEATURES
 from arklight.ir.platform_api import check_backend_support
 from arklight.backend.js.runtime import CLICK_INTERCEPTOR_JS as _CLICK_INTERCEPTOR_JS
 from arklight.backend.js.runtime import NAV_HIGHLIGHT_JS as _NAV_HIGHLIGHT_JS
@@ -543,6 +546,69 @@ def _derivations_object_js(used_derivations: set[str]) -> str:
     return "  var derivations = {\n" + entries + "\n  };\n"
 
 
+def _experimental_console_reminder_js(experimental_usages: list) -> str:
+    """
+    Devtools mirror of the compile-time "[EXPERIMENTAL FEATURE ACTIVE]"
+    banner (`arklight.experimental.format_inline_banner`/
+    `print_summary`) -- a `console.warn(...)` block naming every
+    *distinct* experimental feature this build actually used, so
+    whoever's looking at the shipped page's devtools console (not just
+    whoever ran `arklight build`) sees the same reminder. Deduplicated
+    by `feature_id`, first-seen order -- same rule `print_summary`
+    already follows, for the same reason: a feature used on five
+    different pages/components should print once, not five times.
+
+    Returns `""` (nothing to ship) for an empty `experimental_usages`
+    list, same "only ship what's used" discipline every other function
+    in this module already follows -- a site that never touches an
+    experimental feature gets zero extra bytes here, not an empty
+    no-op console call.
+
+    Static strings only, pulled straight from the same
+    `arklight.experimental.FEATURES` registry the compile-time banner
+    reads -- `json.dumps(...)` is used purely to produce a safely-
+    escaped JS string literal (registry text can contain a `'`/`"`),
+    never to construct or execute code: this stays a flat list of
+    `console.warn("...")` calls, nothing ever passed through `eval`/
+    `new Function`, same invariant as every other fragment this backend
+    generates.
+    """
+    seen: list[str] = []
+    for usage in experimental_usages:
+        if usage.feature_id not in seen:
+            seen.append(usage.feature_id)
+    if not seen:
+        return ""
+
+    lines = [
+        "  if (typeof console !== \"undefined\" && console.warn) {",
+        "    if (console.groupCollapsed) {",
+        "      console.groupCollapsed("
+        + json.dumps("%c\u26a0 ARKlight: experimental API(s) active in this build")
+        + ", "
+        + json.dumps("color: #b45309; font-weight: bold;")
+        + ");",
+        "    }",
+    ]
+    for feature_id in seen:
+        feature = FEATURES[feature_id]
+        lines.append(
+            "    console.warn("
+            + json.dumps(f"[{feature.id}] {feature.inline_note}")
+            + ");"
+        )
+    lines.append(
+        "    console.warn("
+        + json.dumps(
+            "These are also reported at build time -- see docs/EXPERIMENTAL-APIS.md."
+        )
+        + ");"
+    )
+    lines.append("    if (console.groupEnd) { console.groupEnd(); }")
+    lines.append("  }")
+    return "\n".join(lines) + "\n"
+
+
 def _build_runtime_js(ir: WebsiteIR) -> str:
     (
         used_behaviors,
@@ -676,6 +742,17 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     parts.append("(function () {")
     parts.append('  "use strict";')
     parts.append("")
+
+    if ir.devtools_console_reminder:
+        # Devtools mirror of the compile-time experimental-feature
+        # banner (see `_experimental_console_reminder_js`'s docstring).
+        # Placed first inside the IIFE, unconditionally of
+        # htmx/state/behaviors -- it needs nothing from the rest of
+        # this runtime and should run (or no-op, for a site with no
+        # experimental usage) before anything else does.
+        console_reminder = _experimental_console_reminder_js(ir.experimental_usages)
+        if console_reminder:
+            parts.append(console_reminder)
 
     needs_notify = needs_click_interceptor or has_state
     if needs_notify:
