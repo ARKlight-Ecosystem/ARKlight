@@ -26,6 +26,7 @@ can never be answered.
 ```bash
 arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--debug]
     [--max-width VALUE] [--bg VALUE] [--font-family VALUE] [--button-text VALUE] [--lang TAG]
+    [--emit-arklight[=PATH]]
 ```
 
 - `entry.py` -- your site file (must define `site = Site()` and at
@@ -84,6 +85,16 @@ arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--de
   These five flags exist specifically so CI (or a one-off variant
   build) can override a design token without editing the site file's
   `Site(...)` call; leaving all of them off changes nothing.
+- `--emit-arklight[=PATH]` -- also writes the compiled Website IR as a
+  binary `.arklight` file (`arklight.ir.binary` -- magic bytes, format
+  version, schema generation tag, deduped string table; see
+  [`ARCHITECTURE.md`](ARCHITECTURE.md#binary-ir-arklight) for the full
+  format). Bare flag writes `<output>/site.arklight`; pass a path to
+  choose your own, e.g. `--emit-arklight=build/site.arklight`. A
+  standalone, versioned snapshot of the IR that can be read back
+  (`arklight.ir.binary.decode_arklight`) without re-running the
+  compiler pipeline. Off by default -- a plain `arklight build` never
+  writes one.
 
 After a successful build (`--verbose` or not), the CLI always prints
 a one-line summary and every file it wrote:
