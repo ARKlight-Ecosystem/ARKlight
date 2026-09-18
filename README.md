@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="ARKlight-logo.png" alt="ARKlight logo" width="180">
-</p>
-
-# ARKlight Framework
+# <img src="ARKlight-logo.png" alt="ARKlight logo" width="40" height="40" align="middle"> ARKlight Framework
 
 **A Python-first compiler for building static websites where developers work
 with a structured component API, while the output remains ordinary, dependency-free HTML.**
@@ -14,34 +10,15 @@ inspectable, portable output that works anywhere static files are hosted.
 No Python runtime in production. No framework bloat. Just Python ergonomics at
 authorship time, and clean web artifacts at deployment time.
 
-```python
-from arklight import *
-
-site = Site()
-
-@site.page("/")
-def home():
-    return Page(
-        Heading("ARKlight"),
-        Text("Build websites with Python."),
-        Button("Get Started"),
-    )
-```
-
-```
-arklight build site.py
-```
-
-produces `ARK/index.html` -- plain, dependency-free HTML.
-
 ## Install
 
 ```bash
 pip install -e .
 ```
 
-Debian/Ubuntu package, upgrading an existing checkout, and everything
-else needed to get running: [`docs/Foundational/GETTING-STARTED.md`](docs/Foundational/GETTING-STARTED.md).
+A runnable example, the Debian/Ubuntu package, upgrading an existing
+checkout, and everything else needed to get running:
+[`docs/Foundational/GETTING-STARTED.md`](docs/Foundational/GETTING-STARTED.md).
 
 ## Status
 
