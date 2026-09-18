@@ -44,6 +44,7 @@ from html import escape
 from arklight.ast.nodes import ActionRef, ItemIndexRef, PredicateRef
 from arklight.backend.css.render import STYLESHEET_PATH
 from arklight.backend.html.attrs import _attr_string
+from arklight.backend.html.csp import _render_csp_meta_tag
 from arklight.backend.html.head_meta import _render_head_meta
 from arklight.backend.html.routing import _relative_asset_path
 from arklight.backend.html.tag_map import VOID_TAGS, _tag_for
@@ -275,6 +276,8 @@ def _render_page(
     *,
     site_lang: str,
     app_shell: bool = False,
+    strict_csp: bool = True,
+    trusted_script_origins: list[str] | None = None,
 ) -> str:
     """
     `app_shell` (htmx-4, docs/Backends/REFACTOR-INDEX.md row 9):
@@ -304,6 +307,14 @@ def _render_page(
        marker first and falls back to the `<body>` attribute, so it
        handles both shapes without needing to know `app_shell` was
        set.
+
+    `strict_csp`/`trusted_script_origins` (runtime policy enforcement,
+    `arklight/backend/html/csp.py`): `Site(strict_csp=..., trusted_
+    script_origins=...)`'s straight passthrough. `strict_csp` defaults
+    to `True` -- unlike every other default in this docstring, that is
+    new output for an unconfigured site (one more `<head>` `<meta>`
+    tag), not a byte-for-byte-unchanged default; see `WebsiteIR.
+    strict_csp`'s comment (arklight/ir/build.py) for why.
     """
     title = page.root.props.get("title", site_name)
     lang = page.root.props.get("lang", site_lang)
@@ -423,11 +434,21 @@ def _render_page(
     if app_shell:
         body_attr_parts.append(' hx-boost="true"')
     body_attrs = "".join(body_attr_parts)
+    # Runtime policy enforcement (arklight/backend/html/csp.py):
+    # charset stays the very first <head> tag (browsers sniff it before
+    # anything else), so CSP is the very next one -- applied as early as
+    # possible, before the stylesheet link or any other tag. Empty
+    # string when `strict_csp=False` (Site(strict_csp=False), the
+    # raw_postprocess escape valve -- see csp.py's module docstring),
+    # so a site that opts out gets exactly today's tag set back, byte
+    # for byte.
+    csp_meta = _render_csp_meta_tag(trusted_script_origins) if strict_csp else ""
     return (
         "<!DOCTYPE html>\n"
         f'<html lang="{escape(str(lang), quote=True)}">\n'
         "<head>\n"
         '  <meta charset="utf-8">\n'
+        f"{csp_meta}"
         '  <meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"  <title>{escape(str(title))}</title>\n"
         f'  <link rel="stylesheet" href="{escape(stylesheet_href, quote=True)}">\n'

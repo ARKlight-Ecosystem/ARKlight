@@ -1409,6 +1409,8 @@ class Site:
         center_gutter: str | None = None,
         reel_space: str | None = None,
         app_shell: bool = False,
+        strict_csp: bool = True,
+        trusted_script_origins: list[str] | None = None,
     ) -> None:
         self.name = name
         # <html lang="..."> for every page this site builds, unless a
@@ -1535,6 +1537,58 @@ class Site:
         # validation needed -- a plain bool, same as every other
         # `Site(...)` feature flag.
         self.app_shell = bool(app_shell)
+
+        # Runtime policy enforcement (docs/Foundational/RUNTIME-POLICY.md):
+        # closed-vocabulary/no-eval was already a *compile-time* guarantee
+        # (nothing ARKlight's own compiler emits ever constructs a
+        # function from a string -- see WHAT-ARKLIGHT-IS.md's "Closed-
+        # vocabulary" point). That says nothing about *runtime*: nothing
+        # stopped an injected/compromised script (a browser extension, a
+        # supply-chain-compromised CDN dependency, a future bug) from
+        # calling eval/Function/innerHTML-with-untrusted-content/
+        # document.write once the page is loaded. A strict
+        # Content-Security-Policy meta tag is the browser-enforced
+        # backstop for that gap -- see `arklight/backend/html/csp.py` for
+        # what it declares and, importantly, what it deliberately leaves
+        # alone (style-src is never touched: inline `style="..."` is a
+        # first-class, already-documented escape hatch --
+        # docs/Foundational/CONFIGURABILITY.md -- and restricting it here
+        # would be an unrelated regression, not hardening).
+        #
+        # `strict_csp` defaults to `True` (new default behavior, not
+        # gated behind an opt-in kwarg -- same precedent as htmx-5's
+        # unconditional `htmx.config.allowEval = false`, see
+        # arklight/backend/js/render.py). Per CONFIGURABILITY.md, the
+        # *disallowal* of eval/inline-script itself stays a "safety-
+        # critical, deliberately fixed" non-option -- there's no kwarg
+        # that reintroduces 'unsafe-eval' or 'unsafe-inline'. What a real
+        # site can legitimately need instead:
+        #   - `trusted_script_origins`: additive script-src origins for
+        #     a genuinely trusted external script (an analytics snippet,
+        #     a third-party embed SDK) -- reachability-rule-qualifying,
+        #     since nothing today lets a site add a CSP source at all.
+        #   - `strict_csp=False`: the escape valve for a site whose
+        #     `Site.raw_postprocess(...)` step (EXPERIMENTAL-APIS.md)
+        #     injects inline <script> content the default policy would
+        #     otherwise silently block -- see raw-postprocess's own
+        #     warning text in arklight/experimental.py for why this
+        #     can't be solved with a nonce (ARKlight ships static files;
+        #     a nonce baked into a static build is publicly readable and
+        #     provides no actual protection, unlike a real per-request
+        #     server-rendered nonce), so an explicit opt-out is the
+        #     honest mechanism here, matching how raw_postprocess itself
+        #     is already an explicit, warned, all-or-nothing escape
+        #     hatch rather than a partial one.
+        self.strict_csp = bool(strict_csp)
+        if trusted_script_origins is not None:
+            if not isinstance(trusted_script_origins, list) or not all(
+                isinstance(origin, str) and origin.strip() for origin in trusted_script_origins
+            ):
+                raise ValueError(
+                    "Site(trusted_script_origins=...) needs a list of non-empty strings "
+                    f"(script-src origins), got {trusted_script_origins!r}."
+                )
+        self.trusted_script_origins: list[str] = list(trusted_script_origins or [])
 
     def _set_css_var_override(self, kwarg_name: str, var_name: str, value: str) -> None:
         if not isinstance(value, str) or not value.strip():

@@ -657,6 +657,20 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # ever executed as code" invariant even for optional vendored-
         # dependency features ARKlight doesn't use.
         parts.append("htmx.config.allowEval = false;")
+        # Runtime policy enforcement (arklight/backend/html/csp.py):
+        # vendored HTMX's core swap path already avoids Trusted-Types-
+        # gated sinks (it parses via DOMParser, not `innerHTML=`), with
+        # one exception -- `Wn()`'s indicator-style injection calls
+        # `head.insertAdjacentHTML(...)`, which `require-trusted-types-
+        # for 'script'` (the CSP directive `csp.py` always sets) would
+        # otherwise block outright. ARKlight already ships its own
+        # generated stylesheet (`STYLESHEET_PATH`) that this feature's
+        # indicator CSS is redundant with, so disabling it here removes
+        # the one remaining incompatible sink instead of registering a
+        # Trusted Types policy to permit it -- same "close the path
+        # instead of trusting it" choice `allowEval = false` above
+        # already made for htmx's other optional features.
+        parts.append("htmx.config.includeIndicatorStyles = false;")
 
     parts.append("")
     parts.append("(function () {")

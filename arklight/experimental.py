@@ -124,6 +124,17 @@ FEATURES: dict[str, ExperimentalFeature] = {
             "shoot yourself in the foot: a typo can silently corrupt every",
             "page, strip a <script> tag, or ship broken CSS with no error",
             "at build time. Use it wisely, and proceed with caution.",
+            "",
+            "Interacts with ARKlight's default Content-Security-Policy",
+            "(arklight/backend/html/csp.py, Site(strict_csp=True) by",
+            "default): script-src 'self' blocks any inline <script> this",
+            "hook injects, silently, in the browser. A nonce doesn't fix",
+            "this -- ARKlight ships static files, so a nonce baked into a",
+            "static build is public and permanent, not a real per-request",
+            "secret. If your postprocess step injects inline scripts, pass",
+            "Site(strict_csp=False) to opt out of the policy entirely, or",
+            "Site(trusted_script_origins=[...]) if it instead loads an",
+            "external <script src=\"...\"> from a trusted origin.",
         ],
         legacy_note=(
             "Not a legacy API in the historical sense -- a raw, unchecked "
