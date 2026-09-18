@@ -50,6 +50,7 @@ record for the project, updated in place rather than removed.
 | [`SYSTEM-DESIGN-AGREEMENTS.md`](Foundational/SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |
 | [`USER-DEFINED-COMPONENTS.md`](Foundational/USER-DEFINED-COMPONENTS.md) | User-defined, reusable components (v0.060, shipped in full) -- props, default styling, macro/registry modes, component-owned state, and scope boundaries. |
 | [`PLATFORM-APIS.md`](Foundational/PLATFORM-APIS.md) | Settled design record for the platform API interface layer (`PlatformAPI.notify`/`.clipboard_write`, `v0.065`): terminology, compiler-owns-interface/backend-owns-implementation, Web-as-default, native-implementations-are-earned. |
+| [`ACC-CAPABILITIES.md`](Foundational/ACC-CAPABILITIES.md) | Settled design record for `arklight/capabilities.py`, the ACC (ARKlight Component Collections) capability-discovery hook -- the `arklight.capabilities` entry-point contract, diagnostics, and status against ACC's own five-stage implementation ladder. |
 
 ### [`docs/Backends/`](Backends/README.md) — working reference
 

@@ -51,7 +51,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.0642  | Docs-only incremental patch: rewrote `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s one-sentence definition (new `docs/Foundational/README.md` index row) so ARKlight is stated as a **compiler framework** rather than leaning on "static-site compiler" as the load-bearing noun -- Section 4 now names, explicitly, that ARKlight is not a static-site generator, not a frontend framework, and not a UI framework, instead of leaving that distinction implied. Filed alongside it: `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` (new `docs/Proposals/README.md` index row) -- the next capability fix identified against `SYSTEM-DESIGN-AGREEMENTS.md`'s "Compiler First, Runtime Last" rule: a platform API interface layer in the compiler IR (notifications, clipboard, filesystem, device info, ...), Web as the default implementation, Android/Desktop earning individual interfaces only once mature. Proposal filed as **Proposed**, not yet accepted; no code changed this patch. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641` | DONE |
 | v0.0643  | Docs-only incremental patch: rewrote `arklight/__init__.py`'s module docstring so it opens with the same **compiler framework** wording `v0.0642` gave `docs/Foundational/WHAT-ARKLIGHT-IS.md`, instead of the older "Python-first compiler for building static websites" framing; quickstart example swapped a stateless `Button` for `State`/`Action.increment` so the closed-vocabulary interactivity primitives are visible on first import. No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`/`v0.0642` | DONE |
 | v0.0644  | Docs-only incremental patch: added a new "The Goal" section to `docs/Foundational/WHAT-ARKLIGHT-IS.md` -- comparable-to-frontend-framework DX while enforcing ARKlight's own philosophy (`SYSTEM-DESIGN-AGREEMENTS.md`), for two named audiences, the Python Community and the Education Community. Filed alongside it: new `docs/Foundational/V1-DEFINITION.md` -- what `v1.0`/"Stable compiler" (`ARCHITECTURE.md`'s Milestones table) concretely means (deterministic, fails-loudly, no-breaking-vocabulary-change reliability), scoped explicitly to the Web Developing parts of the compiler only, with named exclusions (native backends, CLI conveniences beyond `build`, everything gated by `arklight/experimental.py`, `Provider`/Rei/Project Knowledge/`arklight assistant`, and -- called out specifically -- **ARKlight Component Collections**, a newly-named, not-yet-proposed concept for curated bundles of `@component`-registered content built on `USER-DEFINED-COMPONENTS.md`'s macro-expansion path, whose own release cadence is deliberately independent of the compiler's stability claim). Also documents "capability fix" (first recognized at `v0.0641`) as the mechanism and evidence trail behind `v1.0`'s reliability claim -- each capability fix landed is a checkable step toward the point where that supply runs dry. New index rows in `docs/Foundational/README.md` and `docs/README.md`; `ARCHITECTURE.md`'s `v1.0` milestone row now links to `V1-DEFINITION.md` instead of standing unexplained. Also fixed two pre-existing doc-index drifts noticed while editing `docs/README.md`'s Foundational Folder Guide table: `WHAT-ARKLIGHT-IS.md` and `PLATFORM-APIS.md` were both present in `docs/Foundational/README.md`'s own index but missing from this table, and this row's own predecessor (`v0.0643`) had a literal `\n` instead of a real line break, merging it with the `v0.064-v0.070 (remainder)` row below -- both fixed in this pass. No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`/`v0.0642`/`v0.0643` | DONE |
-| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
+| v0.0645  | Docs-only incremental patch: documented `arklight/capabilities.py` (the ACC capability-discovery hook, landed undocumented at `a4aa6b8`) for the first time anywhere in this doc tree -- new `docs/Foundational/ACC-CAPABILITIES.md` (settled design record: entry-point contract, diagnostics, API, its one current caller `compiler/sbom.py`, status against ACC's own five-stage implementation ladder). Corrects `V1-DEFINITION.md` Section 5's now-stale "no design doc yet, not-yet-proposed concept" framing, since ACC has since become a real repository (`Rae-ARK/ARKlight-Component-Collections`) with its own foundational design doc and a landed Stage 1. New index rows in `docs/Foundational/README.md` and `docs/README.md`; `README.md`'s repository-layout listing gains a `capabilities.py` line (previously missing despite the file existing since `a4aa6b8`). No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`/`v0.0642`/`v0.0643`/`v0.0644` | DONE |\n| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
@@ -423,6 +423,68 @@ afterward):
 - A stray, leftover `<<<<<<< HEAD` merge-conflict marker was sitting
   directly above the `v0.0643` narrative section header, just below.
   Removed -- it wasn't part of any real conflict still in progress.
+
+## v0.0645 -- Docs-only incremental patch: `ACC-CAPABILITIES.md` (DONE)
+
+Out-of-band, numbered inside the same v0.064 -> v0.065 gap as
+`v0.0431`/`v0.0641`/`v0.0642`/`v0.0643`/`v0.0644`. Docs-only: no
+compiler code changed.
+
+**What was missing.** `a4aa6b8` ("Separating concerns and letting ACC
+carry some burden") landed two things in the same commit:
+`arklight/ir/binary.py` (the `.arklight` binary IR format) and
+`arklight/capabilities.py` (the ACC capability-discovery hook). Only
+the first got a docs update in that commit --
+`docs/Foundational/ARCHITECTURE.md` gained a full "Binary IR" section
+and `docs/Foundational/CLI-REFERENCE.md` documented
+`--emit-arklight`. `capabilities.py` shipped with a thorough module
+docstring and `tests/test_capabilities.py` (9/9 passing) but no entry
+anywhere in `docs/`, `README.md`'s repository layout, `PROGRESS.md`,
+or `CHANGELOG.md` -- exactly the kind of drift
+`docs/README.md`'s own "why this section exists" postmortem warns
+about, just not yet caught there.
+
+**What changed.** New
+[`docs/Foundational/ACC-CAPABILITIES.md`](docs/Foundational/ACC-CAPABILITIES.md):
+the settled design record for the module -- the `arklight.capabilities`
+entry-point contract, the `Capability`/`CapabilityError` API,
+`compiler/sbom.py` as its one current caller (an ACC capability
+appears in a build's SBOM as its own SPDX entry, whether or not that
+build's IR uses it), and an explicit statement that nothing in the
+compiler pipeline itself consumes a discovered capability during a
+build yet. Also includes a status table cross-referencing ACC's own
+`docs/design/IMPLEMENTATION-LADDER.md`: Stage 1 (this hook) landed
+here; Stages 2-5 (package skeleton, `@acc/prism`, `@acc/common`,
+installability) remain unstarted, tracked in ACC's own repository, not
+this one.
+
+`docs/Foundational/V1-DEFINITION.md` Section 5 corrected: its original
+"no design doc yet -- defined here for the first time" framing for
+ARKlight Component Collections is now false -- ACC is a real
+repository (`Rae-ARK/ARKlight-Component-Collections`) with its own
+`docs/design/acc-foundational-design.md`, and one piece of its ladder
+has already shipped in `alpha`. The section's core exclusion argument
+(a Collection is content built on the compiler via the existing
+User-Defined Components macro-expansion path, versioned and curated on
+its own schedule, never implying anything about `v1.0`'s stability
+claim) is unchanged and still holds -- corrected the stale framing
+around it, not the boundary itself. Also notes, explicitly, that the
+capability-discovery hook is the one landed exception to "a real ACC
+feature needs its own `docs/Proposals/` entry first": it was proposed
+against `alpha` from ACC's side, not this repo's own Proposals folder,
+which is why no such entry exists for it -- named so this patch's own
+gap-closing isn't later mistaken for license to skip `docs/Proposals/`
+on anything else. Doc's own "Current as of" marker bumped from
+`v0.0644` to `v0.0645`.
+
+New index rows in `docs/Foundational/README.md` and `docs/README.md`
+(Foundational Folder Guide table) for `ACC-CAPABILITIES.md`, per
+`docs/README.md`'s own numbered "one pass, not several" checklist.
+Root `README.md`'s repository-layout listing gains a `capabilities.py`
+line under `arklight/` -- previously absent despite the file existing
+since `a4aa6b8`, the same class of gap `v0.0644` found and fixed for
+`WHAT-ARKLIGHT-IS.md`/`PLATFORM-APIS.md` in `docs/README.md`'s own
+table.
 
 ## v0.065 (interleaved fourth piece) -- Platform API IR, stage 1 of 2: Web reference implementation (DONE)
 

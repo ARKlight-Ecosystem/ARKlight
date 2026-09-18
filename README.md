@@ -115,6 +115,11 @@ arklight-framework/
     config.py          `arklight.config.py` project-config loader
                         (optional, per-project settings file -- see
                         docs/Foundational/AUTHORING-GUIDE.md#configuration-arklightconfigpy)
+    capabilities.py    ACC (ARKlight Component Collections) capability-
+                        discovery hook -- scans the `arklight.capabilities`
+                        entry-point group; zero effect on a build with no
+                        ACC packages installed -- see
+                        docs/Foundational/ACC-CAPABILITIES.md
     experimental.py    Registry + CLI-warning contract for opt-in,
                         outside-the-intrinsic-model features -- see
                         docs/Foundational/EXPERIMENTAL-APIS.md
