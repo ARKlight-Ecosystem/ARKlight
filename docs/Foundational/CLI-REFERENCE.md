@@ -2,8 +2,8 @@
 
 Full reference for every `arklight` subcommand: flags, defaults, and
 worked examples. This is the canonical CLI reference -- linked from
-the root [`README.md`](../../README.md#cli), which keeps only a short
-teaser and points here for the rest.
+the root [`README.md`](../../README.md)'s Documentation section, which
+keeps no CLI content of its own and points here for all of it.
 
 `build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`,
 `--version`, and `--upgrade-alpha` below are implemented and shipped.

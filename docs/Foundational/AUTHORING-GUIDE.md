@@ -4,8 +4,7 @@ The full public component/behavior/state API reference: routing, head
 metadata, layout, styling, behaviors, the component vocabulary, the
 ARK Bundle format, and `arklight.config.py`. The root
 [`README.md`](../../README.md) keeps only the quickstart example and
-points here for everything else, per its own "Status" section's
-two-line-pointer convention.
+points here, via its Documentation section, for everything else.
 
 ## Internal links are relative, not root-absolute
 
