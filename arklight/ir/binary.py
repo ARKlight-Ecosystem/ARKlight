@@ -56,6 +56,40 @@ site-wide style registrations, raw postprocessors, ...) is not yet
 round-tripped -- left for a follow-up once this format has soaked,
 same staged-rollout discipline the rest of the schema-generation
 model already uses.
+
+Uncharted territory, now charted: `encode_arklight`/`decode_arklight`
+existed on both sides of this round trip already, but nothing in
+ARKlight-py ever actually *consumed* a `.arklight` file it (or another
+tool) produced -- `arklight build` only ever accepted a Python site
+file, so the "build-once, ship-anywhere snapshot ... that doesn't
+require re-running the Python compiler pipeline to read back" promise
+above was only half true: you could ship the snapshot, but ARKlight
+itself couldn't read it back. `decoded_site_to_website_ir` (below)
+closes that -- it turns a `DecodedSite` back into a real `WebsiteIR`
+every backend already knows how to render, and `arklight build
+site.arklight` (detected by magic bytes/extension -- see
+`arklight.compiler.pipeline.build`) now runs that path instead of the
+Python compiler pipeline, exactly as this module's docstring always
+said it should. Everything this v1 format doesn't carry (see the scope
+note above, plus `custom_styles`/`css_var_overrides`/
+`experimental_usages`/`raw_postprocessors`/`strict_csp`/... -- every
+`WebsiteIR` field `encode_arklight` never writes) comes back at
+`WebsiteIR`'s own stock defaults on a rebuilt site, not an error --
+same "readable now, richer later" staging as the rest of this format.
+Props/state/computed_initial values tagged by `_json_default` (an
+`ActionRef`, `ClassBindSpec`, `ModelBindSpec`, `PlatformAPIRef`,
+`DerivationRef`, `PredicateRef`) are reconstructed back into live
+dataclass instances too, not left as inert tagged dicts -- so a page
+using `State`/`Action.*(...)`/`Bind.*(...)` still renders its
+interactive behavior after a round trip, not just its static markup.
+One known gap, inherited from `_json_default`/`dataclasses.asdict`
+rather than introduced here: a dataclass nested *inside* another
+dataclass's own field (e.g. an `ItemIndexRef` inside an `ActionRef.
+args` dict) loses its `__ark_type__` tag during encoding already --
+`dataclasses.asdict` flattens it to a plain `{}` before `_json_default`
+ever sees it -- so that one specific shape comes back as an inert
+empty dict rather than a live `ItemIndexRef`. Everything not nested
+inside another dataclass's field round-trips fully.
 """
 
 from __future__ import annotations
@@ -66,6 +100,14 @@ import struct
 from dataclasses import dataclass, field
 from typing import Any
 
+from arklight.ast.nodes import (
+    ActionRef,
+    ClassBindSpec,
+    DerivationRef,
+    ModelBindSpec,
+    PlatformAPIRef,
+    PredicateRef,
+)
 from arklight.ir.build import IRNode, IRPage, WebsiteIR
 
 # Deliberately *not* `from arklight import CHANNEL, __version__` at
@@ -381,3 +423,118 @@ def decode_arklight(data: bytes) -> DecodedSite:
         raise ArklightFormatError("trailing bytes after the last page")
 
     return DecodedSite(site_name=site_name, lang=lang, app_shell=app_shell, pages=pages)
+
+
+# --------------------------------------------------------------------------
+# DecodedSite -> WebsiteIR (closing the "emit but never consume" gap --
+# see the module docstring's "Uncharted territory, now charted" note)
+# --------------------------------------------------------------------------
+
+# Every `_json_default`-taggable dataclass this reader knows how to
+# reconstruct, keyed by the exact class name `_json_default` stamped
+# into `__ark_type__` (`type(obj).__name__`). `ItemIndexRef` is
+# deliberately absent -- it never actually reaches this table (see the
+# module docstring's "known gap" paragraph): it's only ever nested
+# inside another dataclass's field (an `ActionRef.args` value), and
+# `dataclasses.asdict` already flattens it to a bare `{}` before
+# `_json_default` runs, so there is no `__ark_type__` tag left on it by
+# the time a `.arklight` file exists for this function to read. Adding
+# it here would do nothing except risk matching a legitimate empty-dict
+# prop value against it, which is worse than leaving it alone.
+_RECONSTRUCTABLE_TYPES: dict[str, type] = {
+    "ActionRef": ActionRef,
+    "ClassBindSpec": ClassBindSpec,
+    "ModelBindSpec": ModelBindSpec,
+    "PlatformAPIRef": PlatformAPIRef,
+    "DerivationRef": DerivationRef,
+    "PredicateRef": PredicateRef,
+}
+
+
+def _decode_prop_value(value: Any) -> Any:
+    """
+    Recursively reconstruct any `_json_default`-tagged dict
+    (`{"__ark_type__": "ActionRef", ...fields}`) back into a live,
+    frozen `arklight.ast.nodes` dataclass instance -- the inverse of
+    `_json_default`. Recurses into plain dicts/lists so a tagged value
+    nested a level or two down (an `ActionRef` inside a list of
+    per-item props, say) still gets reconstructed, not just a
+    directly-tagged top-level value.
+
+    A dict with no `__ark_type__` key is an ordinary JSON object and
+    passes through (recursed into) unchanged. A dict whose
+    `__ark_type__` names something `_RECONSTRUCTABLE_TYPES` doesn't
+    know (an older reader against a newer ARKlight-py's new dataclass,
+    or a field-shape mismatch that makes `cls(**fields)` raise a
+    `TypeError`) is left as the plain dict it already is instead of
+    raising -- the same "degrade gracefully, don't hard-fail the
+    build" leniency `_json_default` itself extends on the encode side.
+    """
+    if isinstance(value, dict):
+        tag = value.get("__ark_type__")
+        if tag is not None and tag in _RECONSTRUCTABLE_TYPES:
+            cls = _RECONSTRUCTABLE_TYPES[tag]
+            fields = {k: _decode_prop_value(v) for k, v in value.items() if k != "__ark_type__"}
+            try:
+                return cls(**fields)
+            except TypeError:
+                return {k: _decode_prop_value(v) for k, v in value.items()}
+        return {k: _decode_prop_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_decode_prop_value(v) for v in value]
+    return value
+
+
+def _decoded_node_to_ir_node(node: DecodedNode) -> IRNode:
+    return IRNode(
+        type=node.type,
+        props=_decode_prop_value(node.props),
+        children=[
+            child if isinstance(child, str) else _decoded_node_to_ir_node(child)
+            for child in node.children
+        ],
+    )
+
+
+def _decoded_page_to_ir_page(page: DecodedPage) -> IRPage:
+    return IRPage(
+        route=page.route,
+        root=_decoded_node_to_ir_node(page.root),
+        state=_decode_prop_value(page.state),
+        computed_initial=_decode_prop_value(page.computed_initial),
+        # `computed`/`watch`/`persist`/`media`/`query` aren't part of
+        # the v1 `.arklight` format (see the module docstring's scope
+        # note) -- `IRPage`'s own stock defaults (all empty) apply,
+        # same as every `WebsiteIR` field `decoded_site_to_website_ir`
+        # below doesn't set either.
+    )
+
+
+def decoded_site_to_website_ir(decoded: DecodedSite) -> WebsiteIR:
+    """
+    Rebuild a real `WebsiteIR` -- the exact same in-process shape
+    `arklight.ir.build.build_website_ir` produces from a Python site
+    file -- from a `decode_arklight(...)` result, so every existing
+    `Backend` (`HTMLBackend`, `CSSBackend`, `JSBackend`, ...) can
+    render a `.arklight` file's contents with zero backend-side
+    changes: they only ever know how to render a `WebsiteIR`, and this
+    function is what hands them one.
+
+    Every `WebsiteIR` field the v1 `.arklight` format doesn't carry
+    (`custom_styles`, `media_queries`, `experimental_usages`,
+    `css_var_overrides`, `responsive_rules`, the CSS-at-rule
+    addendum fields, `raw_postprocessors`, `strict_csp`,
+    `trusted_script_origins`, `devtools_console_reminder`, ...) comes
+    back at `WebsiteIR`'s own dataclass defaults -- i.e. exactly what
+    a bare `Site(...)` with none of those set would have produced.
+    `arklight.compiler.pipeline.build`'s `strict_csp_override`/
+    `devtools_console_reminder`/`css_var_overrides`/`lang` CLI-level
+    overrides still apply on top of this the same way they apply on
+    top of a Python-source build -- see `compile_arklight_file`.
+    """
+    return WebsiteIR(
+        site_name=decoded.site_name,
+        pages=[_decoded_page_to_ir_page(page) for page in decoded.pages],
+        lang=decoded.lang,
+        app_shell=decoded.app_shell,
+    )

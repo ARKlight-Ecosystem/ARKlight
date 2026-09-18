@@ -42,6 +42,7 @@ from arklight.backend.base import Backend
 from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
+from arklight.ir import binary as binary_ir
 from arklight.ir.build import WebsiteIR, build_website_ir
 from arklight.ir.components import ComponentError, collect_default_styles, expand_ark_ast
 from arklight.ir.normalize import normalize_ark_ast
@@ -64,6 +65,30 @@ StageLogger = Callable[[str], None]
 
 def _noop_stage_logger(_message: str) -> None:
     return None
+
+
+def _looks_like_arklight_file(entry_path: str | Path) -> bool:
+    """
+    True if `entry_path` is a `.arklight` binary IR snapshot
+    (`arklight.ir.binary`) rather than a Python site file -- checked
+    by extension first (cheap, covers the ordinary `--emit-arklight`
+    default filename and anything a person names `something.arklight`
+    themselves), falling back to sniffing the file's first 4 bytes
+    against `binary_ir.MAGIC` for a differently-extensioned file (e.g.
+    `--emit-arklight=build/site` with no extension at all). Never
+    raises for a missing/unreadable path -- `build` surfaces that as
+    its own `CompileError` a few lines later regardless of which
+    branch it took, the same as it always has for a missing Python
+    site file.
+    """
+    path = Path(entry_path)
+    if path.suffix == ".arklight":
+        return True
+    try:
+        with open(path, "rb") as f:
+            return f.read(len(binary_ir.MAGIC)) == binary_ir.MAGIC
+    except OSError:
+        return False
 
 
 def _record_validation_feedback_best_effort(message: str) -> None:
@@ -291,6 +316,74 @@ def compile_site_file(
     )
 
 
+def compile_arklight_file(
+    entry_path: str | Path,
+    *,
+    on_stage: StageLogger | None = None,
+    css_var_overrides: dict[str, str] | None = None,
+    lang: str | None = None,
+    strict_csp_override: bool | None = None,
+    devtools_console_reminder: bool = True,
+) -> WebsiteIR:
+    """
+    The `.arklight`-file counterpart to `compile_site_file` above --
+    closes the "uncharted territory" `arklight.ir.binary`'s module
+    docstring calls out: `encode_arklight`/`decode_arklight` already
+    existed on both sides of this round trip, but nothing in
+    ARKlight-py ever ran the decode side to actually rebuild something
+    a backend could render. This does: reads a previously-`--emit-
+    arklight`'d snapshot straight off disk and hands back the same
+    `WebsiteIR` `compile_site_file` would have built from the original
+    Python source -- none of the Python-source stages (discovery, AST,
+    component expansion, normalization, validation) run at all, which
+    is the entire point of the format (see `arklight.ir.binary`'s
+    module docstring: "doesn't require re-running the Python compiler
+    pipeline to read back").
+
+    `on_stage`, if given, narrates the two stages this path actually
+    has (read+decode, then rebuild) -- `--verbose` parity with
+    `compile_site_file`'s own stage narration, even though there's
+    much less work happening here.
+
+    `css_var_overrides`/`lang`/`strict_csp_override`/
+    `devtools_console_reminder` are the exact same outer overrides
+    `compile_site_file` accepts (see its docstring) -- applied
+    directly to the rebuilt `WebsiteIR` here rather than to a `Site(
+    ...)` object, since a `.arklight` snapshot has no live `Site(...)`
+    to defer to; a rebuilt site's `strict_csp`/every other field
+    `encode_arklight` doesn't carry already starts at `WebsiteIR`'s
+    own stock default (see `decoded_site_to_website_ir`'s docstring),
+    so `strict_csp_override=None` here means "leave that default
+    alone", same as it meaning "defer to `Site(strict_csp=...)`" on
+    the Python-source path.
+    """
+    log = on_stage or _noop_stage_logger
+    path = Path(entry_path)
+
+    log(f"Reading .arklight snapshot from {path}...")
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise CompileError(f"Could not read .arklight file {path}: {exc}") from exc
+
+    try:
+        decoded = binary_ir.decode_arklight(data)
+    except binary_ir.ArklightFormatError as exc:
+        raise CompileError(f"{path} is not a valid .arklight file: {exc}") from exc
+
+    log(f"Rebuilding Website IR from {len(decoded.pages)} page(s)...")
+    ir = binary_ir.decoded_site_to_website_ir(decoded)
+
+    if css_var_overrides:
+        ir.css_var_overrides = {**ir.css_var_overrides, **css_var_overrides}
+    if lang is not None:
+        ir.lang = lang
+    if strict_csp_override is not None:
+        ir.strict_csp = strict_csp_override
+    ir.devtools_console_reminder = devtools_console_reminder
+    return ir
+
+
 def build(
     entry_path: str | Path,
     output_dir: str | Path,
@@ -323,18 +416,36 @@ def build(
     `arklight.config.py` `"csp"`/`"experimental"` sections reach the
     generated CSP meta tag and the devtools console reminder the same
     way, without requiring a site-file edit either.
+
+    `entry_path` may be a `.arklight` binary IR snapshot instead of a
+    Python site file (`_looks_like_arklight_file` detects which) -- in
+    that case `compile_arklight_file` runs instead of
+    `compile_site_file`, skipping the Python-source stages entirely;
+    every other argument here means the same thing either way (see
+    `compile_arklight_file`'s docstring for how the overrides apply
+    without a `Site(...)` to defer to).
     """
     log = on_stage or _noop_stage_logger
     backends = backends if backends is not None else default_backends()
 
-    ir = compile_site_file(
-        entry_path,
-        on_stage=log,
-        css_var_overrides=css_var_overrides,
-        lang=lang,
-        strict_csp_override=strict_csp_override,
-        devtools_console_reminder=devtools_console_reminder,
-    )
+    if _looks_like_arklight_file(entry_path):
+        ir = compile_arklight_file(
+            entry_path,
+            on_stage=log,
+            css_var_overrides=css_var_overrides,
+            lang=lang,
+            strict_csp_override=strict_csp_override,
+            devtools_console_reminder=devtools_console_reminder,
+        )
+    else:
+        ir = compile_site_file(
+            entry_path,
+            on_stage=log,
+            css_var_overrides=css_var_overrides,
+            lang=lang,
+            strict_csp_override=strict_csp_override,
+            devtools_console_reminder=devtools_console_reminder,
+        )
 
     output_files: dict[str, str] = {}
     for backend in backends:
