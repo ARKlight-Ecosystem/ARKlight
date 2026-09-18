@@ -5,6 +5,91 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased] -- Platform API IR, stage 1 of 2: Web reference implementation (`v0.065`)
+
+Accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` (filed as
+merely a candidate in `[0.0642]` below, now accepted and staged in the
+new `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`), interleaved
+into `v0.065`'s already-crowded slot as a fourth piece -- same "make
+room for one more" precedent Rei's own addition to that slot already
+set. Not yet its own numbered release: pyproject stays at `0.0641`
+until the whole `v0.065` slot (this piece plus the other three) has
+landed, same convention `[0.0642]`/`[0.0643]` (both docs-only) already
+followed.
+
+**What:** `PlatformAPI.notify(title, body=None)` and
+`PlatformAPI.clipboard_write(text)` (`arklight/api.py`) on `on_click=`,
+alongside named behaviors and `Action.*(...)`. Each builds a
+`PlatformAPIRef` (`arklight/ast/nodes.py`), validated against a new
+compiler-owned interface registry (`arklight/ir/platform_api.py`:
+`PlatformAPISpec`, `PLATFORM_API_REGISTRY`,
+`BACKEND_PLATFORM_API_SUPPORT`, `PlatformAPIError`,
+`check_backend_support`) that describes each capability's
+arguments/permissions and which backends currently implement it (`web`:
+both starter capabilities; `android`/`desktop`: neither yet) --
+independent of any backend's actual implementation, per the proposal's
+"the compiler defines the interface, each backend supplies its own
+implementation" split.
+
+**Implementation:** `arklight/ir/validate.py`
+(`_validate_platform_api`, wired into both `on_click` validation
+sites) -- unknown-capability and unexpected-keyword-argument
+diagnostics at build time. `arklight/backend/html/attrs.py` -- a
+`PlatformAPIRef` on `on_click=` compiles to
+`data-ark-on-click="platform:<capability>"` +
+`data-ark-platform-api-args`, reusing `ActionRef`'s attribute-slot
+convention. `arklight/backend/js/platform_apis/` (new package,
+`notify.py` + `clipboard_write.py`) -- the Web backend's own
+implementation, one module per capability mirroring the `actions`/
+`behaviors` fragment pattern exactly, only shipped when a site's IR
+actually references it; `clipboard_write` is deliberately not a
+duplicate of the pre-existing `copy` named behavior (`v0.063`) --
+see `docs/Foundational/PLATFORM-APIS.md`'s "Relationship to the
+`copy` behavior" section for that boundary. `arklight/backend/js/
+runtime/dispatch.py` -- a new `"platform:"` branch in
+`wireClickInterceptor`, its own try/catch guard mirroring the
+`"action:"`/`"behavior:"` branches. `arklight/backend/js/render.py` --
+`_collect_usage` tracks `used_platform_apis`; `_platform_apis_object_js`
+builds the "only ship what's used" `platformApis` dispatch object;
+`needs_click_interceptor` now also triggers on platform API usage;
+`check_backend_support(used_platform_apis, backend_name="web")` now
+actually runs during `_build_runtime_js` (previously defined but
+called from nowhere), failing the build with a named-capability
+diagnostic instead of silently accepting a request an unsupported
+backend can't fulfill.
+
+**Docs:** new `docs/Foundational/PLATFORM-APIS.md` -- the settled
+design record (terminology, architecture model, Web-default/
+native-earns-later, and the `copy`-vs-`clipboard_write` boundary).
+New `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md` -- the two-stage
+tracked ladder (Stage 1 shipped here; Stage 2, Android/Desktop native
+implementations, PLANNED and unscheduled). `docs/Proposals/
+PLATFORM-API-IR-PROPOSAL.md`'s status header and its
+`docs/Proposals/README.md` index row updated from "Proposed" to
+"Accepted, staged." `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s "filed
+this revision, not yet accepted" note updated to match. `docs/version
+history/v0.065.md` and its `README.md` index row updated to describe
+this piece as shipped (the slot's other three pieces stay PLANNED).
+`PROGRESS.md`'s Snapshot table and narrative section updated.
+
+**Tests:** `tests/test_platform_api.py` (new, 18 tests) -- API
+factory return values; validation errors (unknown capability,
+unexpected keyword argument); HTML attribute compilation; JS "only
+ship what's used" discipline for neither/one/both capabilities;
+click-interceptor dispatch wiring; the no-`eval`/`new Function`
+invariant; `check_backend_support` firing both standalone and from
+inside `JSBackend.render()`. Two pre-existing tests
+(`tests/test_htmx_3.py::test_guard_shape_is_one_try_catch_per_dispatch_branch`,
+`tests/test_js_error_handling.py::test_wire_click_interceptor_guards_action_dispatch_independently`/
+`test_wire_click_interceptor_guards_behavior_dispatch_independently`)
+that hard-coded "two dispatch branches" were updated to expect three
+(and one split boundary fixed so a trailing branch's own try/catch
+isn't double-counted), the same way those tests were themselves
+updated when `htmx-5` went from one shared guard to two per-branch
+guards. Full suite: 1313 passed (2 pre-existing, unrelated
+`test_version.py` failures from a bare non-`pip install`ed checkout,
+present before this stage too), no regressions.
+
 ## [0.0643] -- Docs-only incremental patch: package docstring refresh
 
 Out-of-band, numbered inside the same `v0.064` -> `v0.065` gap as

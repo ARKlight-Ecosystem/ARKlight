@@ -51,6 +51,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.0642  | Docs-only incremental patch: rewrote `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s one-sentence definition (new `docs/Foundational/README.md` index row) so ARKlight is stated as a **compiler framework** rather than leaning on "static-site compiler" as the load-bearing noun -- Section 4 now names, explicitly, that ARKlight is not a static-site generator, not a frontend framework, and not a UI framework, instead of leaving that distinction implied. Filed alongside it: `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` (new `docs/Proposals/README.md` index row) -- the next capability fix identified against `SYSTEM-DESIGN-AGREEMENTS.md`'s "Compiler First, Runtime Last" rule: a platform API interface layer in the compiler IR (notifications, clipboard, filesystem, device info, ...), Web as the default implementation, Android/Desktop earning individual interfaces only once mature. Proposal filed as **Proposed**, not yet accepted; no code changed this patch. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641` | DONE |
 | v0.0643  | Docs-only incremental patch: rewrote `arklight/__init__.py`'s module docstring so it opens with the same **compiler framework** wording `v0.0642` gave `docs/Foundational/WHAT-ARKLIGHT-IS.md`, instead of the older "Python-first compiler for building static websites" framing; quickstart example swapped a stateless `Button` for `State`/`Action.increment` so the closed-vocabulary interactivity primitives are visible on first import. No code changed. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`/`v0.0642` | DONE |\n| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
+| v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
@@ -303,6 +304,7 @@ are a separate, later decision -- same posture `docs/Proposals/
 README.md` already describes for every other filed-but-undecided
 proposal in that folder.
 
+<<<<<<< HEAD
 ## v0.0643 -- Docs-only incremental patch: package docstring refresh (DONE)
 
 Out-of-band, numbered inside the same v0.064 -> v0.065 gap as
@@ -327,6 +329,79 @@ it remains accurate.
 
 No other file quotes the docstring's opening sentence verbatim, so no
 further doc was out of sync with it.
+
+## v0.065 (interleaved fourth piece) -- Platform API IR, stage 1 of 2: Web reference implementation (DONE)
+
+The proposal `v0.0642` filed as merely a capability-fix candidate is
+now **accepted**, staged as a two-rung ladder in the new
+`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, and this session
+ships the first rung end to end -- interleaved into `v0.065`'s already
+crowded slot as a fourth piece, same "make room for one more"
+precedent Rei's own addition to that slot already set.
+
+**What shipped:** `PlatformAPI.notify(title, body=None)` and
+`PlatformAPI.clipboard_write(text)` (`arklight/api.py`), each building
+a `PlatformAPIRef` (`arklight/ast/nodes.py`) for `on_click=`, the same
+authoring shape `Action.*(...)`/`ActionRef` already established. A
+compiler-owned interface registry (`arklight/ir/platform_api.py`, new
+module) describes each capability's arguments/permissions and which
+backends currently implement it (`web`: both starter capabilities;
+`android`/`desktop`: neither yet), independent of any backend's actual
+implementation -- the split the proposal argues for throughout ("the
+compiler defines the interface, each backend supplies its own
+implementation"). Validation (`arklight/ir/validate.py`) catches an
+unknown capability or an unexpected keyword argument at build time,
+before any backend sees the reference at all. HTML compilation
+(`arklight/backend/html/attrs.py`) reuses the same
+`data-ark-on-click="<prefix>:<n>"` attribute slot `ActionRef` already
+established, with a new `"platform:"` prefix. The Web backend's own
+implementation (`arklight/backend/js/platform_apis/`, new package)
+mirrors the existing `actions`/`behaviors` per-capability-fragment
+pattern exactly -- one module per capability, only shipped when a
+site's IR actually references it -- dispatched through a new
+`"platform:"` branch in the click interceptor
+(`arklight/backend/js/runtime/dispatch.py`), itself dispatching into a
+new `platformApis` object `arklight/backend/js/render.py` assembles
+with the same "only ship what's used" discipline `actions`/
+`behaviors`/`derivations` already follow. `check_backend_support`
+(previously defined but called from nowhere) now actually runs during
+`_build_runtime_js`, failing the build with a named-capability
+diagnostic if a site's IR references a capability the selected backend
+doesn't implement -- today only reachable by deliberately narrowing
+`web`'s own support set in a test, since `web` implements everything
+currently registered.
+
+**Also settled, not just implemented:** the boundary between
+`PlatformAPI.clipboard_write` and the pre-existing `copy` named
+behavior (`v0.063`) -- both call `navigator.clipboard.writeText` on
+the Web backend, but answer different authoring questions ("copy
+whatever's currently in this other element" vs. "copy this exact,
+already-known string"). Recorded permanently in the new
+`docs/Foundational/PLATFORM-APIS.md`, alongside the terminology,
+architecture model, and Web-default/native-earns-later decisions the
+accepted proposal argues for. `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s
+own "filed this revision, not yet accepted" note about this proposal
+is updated to reflect acceptance and Stage 1 shipping.
+
+**Tests:** `tests/test_platform_api.py` (new, 18 tests) -- API factory
+return values, validation errors, HTML attribute compilation, JS
+"only ship what's used" discipline (neither/one/both capabilities),
+click-interceptor dispatch wiring, the no-`eval`/`new Function`
+invariant, and `check_backend_support` actually firing both
+standalone and from inside `JSBackend.render()`. Two pre-existing
+tests (`tests/test_htmx_3.py`,
+`tests/test_js_error_handling.py`) that hard-coded "the click
+interceptor has exactly two dispatch branches" were updated to expect
+three, the same way those tests were themselves updated when `htmx-5`
+went from one shared guard to two per-branch guards. Full suite: 1313
+passed (2 pre-existing, unrelated `test_version.py` failures from a
+bare non-`pip install`ed checkout, present before this stage too), no
+regressions.
+
+**Stage 2 (Android/Desktop native implementations)** stays PLANNED and
+deliberately unscheduled -- gated on each backend's own maturity per
+the proposal's Section 6/22, not on a fixed version number. See
+`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`.
 
 ## v0.061 -- JS vocabulary addendum, stage 1 of 10: math siblings (DONE)
 

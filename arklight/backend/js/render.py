@@ -266,16 +266,39 @@ clickable `Action.*(...)`/named behavior anywhere) ships `actions`
 without also shipping the click interceptor it would never use (see
 `needs_actions_object` vs. `needs_click_interceptor` in
 `_build_runtime_js`).
+
+`v0.065` (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) adds Platform
+APIs: `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)`
+(`arklight.api.PlatformAPI`), compiled to a `PlatformAPIRef` on
+`on_click=` the same way `Action.*(...)` compiles to an `ActionRef`.
+A page that references at least one gets one more closed-vocabulary
+object alongside `actions`/`behaviors` -- `platformApis`
+(`arklight/backend/js/platform_apis/`, only the capabilities that
+page's IR actually uses, same "only ship what's used" discipline) --
+dispatched by the same click interceptor's new `"platform:"` branch
+(`runtime/dispatch.py`). Unlike `Action.*(...)`, a Platform API call
+never targets `State(...)`, so it never touches `needs_actions_object`
+the way a `Watch(...)` does -- it only ever affects
+`needs_click_interceptor`, exactly like a named behavior. Before any
+of this runtime is assembled, `check_backend_support` (`arklight.ir.
+platform_api`) fails the build with a named-capability diagnostic if
+this site references a capability the "web" backend (this module,
+`arklight.backend.html`, `arklight.backend.css` together) doesn't yet
+implement -- currently only relevant for a future `android`/`desktop`
+backend, since "web" implements every capability the compiler-owned
+registry currently knows about.
 """
 
 from __future__ import annotations
 
-from arklight.ast.nodes import ActionRef, ModelBindSpec
+from arklight.ast.nodes import ActionRef, ModelBindSpec, PlatformAPIRef
 from arklight.backend.base import Backend
 from arklight.backend.js.actions import ACTION_FRAGMENTS
 from arklight.backend.js.behaviors import BEHAVIOR_FRAGMENTS
 from arklight.backend.js.derivations import DERIVATION_FRAGMENTS
 from arklight.backend.js.htmx import HTMX_JS
+from arklight.backend.js.platform_apis import PLATFORM_API_FRAGMENTS
+from arklight.ir.platform_api import check_backend_support
 from arklight.backend.js.runtime import CLICK_INTERCEPTOR_JS as _CLICK_INTERCEPTOR_JS
 from arklight.backend.js.runtime import NAV_HIGHLIGHT_JS as _NAV_HIGHLIGHT_JS
 from arklight.backend.js.runtime import NOTIFY_JS as _NOTIFY_JS
@@ -313,7 +336,7 @@ def _walk(node: IRNode):
 def _collect_usage(
     ir: WebsiteIR,
 ) -> tuple[
-    set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool, bool, bool
+    set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool, bool, bool, set[str]
 ]:
     """
     Inspect the site's IR for what the runtime actually needs to ship:
@@ -352,9 +375,22 @@ def _collect_usage(
     while `wireQuerySync` -- the `popstate` listener -- is genuinely
     new runtime surface only worth shipping when at least one page
     actually uses it.
+
+    Also returns `used_platform_apis` (`v0.065`) -- the set of
+    `PlatformAPI.*(...)` capability names referenced by any
+    `on_click=` anywhere, the `PlatformAPIRef` sibling of
+    `used_on_click_actions`'s `ActionRef` handling. Folded into
+    `needs_click_interceptor` in `_build_runtime_js` exactly like
+    `used_behaviors`/`used_on_click_actions` are, since a
+    `PlatformAPIRef` click is dispatched by that same interceptor
+    (see `arklight/backend/js/runtime/dispatch.py`'s `"platform:"`
+    branch) -- never folded into `used_actions`, since a Platform API
+    call never targets `State(...)` the way `Action.*(...)`/`Watch(...)`
+    do.
     """
     used_behaviors: set[str] = set()
     used_on_click_actions: set[str] = set()
+    used_platform_apis: set[str] = set()
     has_state = any(page.state for page in ir.pages)
     used_derivations: set[str] = {
         spec["kind"] for page in ir.pages for _name, spec in page.computed
@@ -374,6 +410,8 @@ def _collect_usage(
                 used_behaviors.add(on_click)
             elif isinstance(on_click, ActionRef):
                 used_on_click_actions.add(on_click.action)
+            elif isinstance(on_click, PlatformAPIRef):
+                used_platform_apis.add(on_click.capability)
             if isinstance(node.props.get("bind_value"), str) and node.props.get("bind_value"):
                 has_model_binding = True
             elif isinstance(node.props.get("bind_value"), ModelBindSpec):
@@ -411,6 +449,7 @@ def _collect_usage(
         has_show,
         has_reveal,
         has_query,
+        used_platform_apis,
     )
 
 
@@ -464,6 +503,25 @@ def _actions_object_js(used_actions: set[str]) -> str:
     return "  var actions = {\n" + entries + "\n  };\n"
 
 
+def _platform_apis_object_js(used_platform_apis: set[str]) -> str:
+    # `v0.065`: mirrors `_behaviors_object_js` exactly -- only the
+    # `PlatformAPI.*(...)` capabilities this site's IR actually
+    # references, assembled as a plain local `var` `wireClickInterceptor`
+    # (`runtime/dispatch.py`'s `"platform:"` branch) reads by closure.
+    # `check_backend_support` (called from `_build_runtime_js`) is
+    # what actually enforces that every capability here is one the
+    # "web" backend implements -- this function only ever emits
+    # fragments for capabilities `PLATFORM_API_FRAGMENTS` has, same
+    # "only ship what's used" discipline as its siblings.
+    fragments = [
+        PLATFORM_API_FRAGMENTS[name] for name in sorted(used_platform_apis) if name in PLATFORM_API_FRAGMENTS
+    ]
+    if not fragments:
+        return "  var platformApis = {};\n"
+    entries = ",\n".join(fragments)
+    return "  var platformApis = {\n" + entries + "\n  };\n"
+
+
 def _derivations_object_js(used_derivations: set[str]) -> str:
     # vdom-4 (docs/Backends/REFACTOR-INDEX.md row 12): mirrors
     # `_actions_object_js`/`_behaviors_object_js` exactly -- only the
@@ -499,7 +557,22 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         has_show,
         has_reveal,
         has_query,
+        used_platform_apis,
     ) = _collect_usage(ir)
+
+    # `v0.065`: every `PlatformAPI.*(...)` capability this site's IR
+    # references must be one the "web" backend (this JS backend, plus
+    # its HTML/CSS siblings -- see `arklight.ir.platform_api`'s module
+    # docstring for that naming) actually implements. Raises
+    # `PlatformAPIError` -- a `CompileError`-wrapping failure, per
+    # `arklight.compiler.pipeline.build` -- naming every unsupported
+    # capability at once rather than silently dropping the request or
+    # deferring the failure to runtime (Section 11 of the proposal).
+    # Deliberately run unconditionally, even when `used_platform_apis`
+    # is empty: `check_backend_support` is a no-op in that case, so
+    # this costs nothing on the common site that uses no Platform API
+    # at all.
+    check_backend_support(used_platform_apis, backend_name="web")
 
     # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): the click
     # interceptor now dispatches both actions and behaviors, and needs
@@ -511,7 +584,12 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # Action.*(...)`/named behavior anywhere needs the `actions`
     # object (see `needs_actions_object` below) but never the click
     # interceptor itself, since a watch effect never involves a click.
-    needs_click_interceptor = bool(used_behaviors) or bool(used_on_click_actions)
+    # `v0.065`: `used_platform_apis` joins `used_behaviors`/
+    # `used_on_click_actions` here -- a `PlatformAPI.*(...)` click is
+    # dispatched by this same interceptor's `"platform:"` branch (see
+    # `runtime/dispatch.py`), never involves `State(...)`, and so
+    # never needs `needs_actions_object` the way a `Watch(...)` does.
+    needs_click_interceptor = bool(used_behaviors) or bool(used_on_click_actions) or bool(used_platform_apis)
 
     # vdom-5: `actions` is needed whenever the click interceptor is
     # (unchanged) *or* whenever any page declares a `Watch(...)` --
@@ -626,6 +704,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         parts.append(_actions_object_js(used_actions))
     if needs_click_interceptor:
         parts.append(_behaviors_object_js(used_behaviors))
+        parts.append(_platform_apis_object_js(used_platform_apis))
         parts.append(_CLICK_INTERCEPTOR_JS)
         parts.append("")
     if has_watch:

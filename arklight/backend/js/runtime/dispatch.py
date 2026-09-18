@@ -138,6 +138,19 @@ single `try`/`catch` guard -- just now invoked either synchronously or
 from inside the debounce timer's callback, instead of always
 synchronously.
 
+**`v0.065`** (docs/Proposals/PLATFORM-API-IR-PROPOSAL.md): adds a
+third branch, `\"platform:<capability>\"`, dispatching
+`PlatformAPI.*(...)` references the same way the `\"action:\"` branch
+above dispatches `Action.*(...)` -- reading `data-ark-platform-api-
+args` (compiled by `arklight/backend/html/attrs.py`) and calling into
+`platformApis[capability]`, the closed dispatch object
+`arklight/backend/js/render.py`'s `_platform_apis_object_js` builds
+from `arklight.backend.js.platform_apis.PLATFORM_API_FRAGMENTS` --
+mirroring `behaviors` exactly. Deliberately no modifier/`hx-trigger`
+handling for this branch yet (Section 23 of the proposal keeps
+initial scope small): every platform click runs immediately,
+unconditionally, the same as an unmodified `Action.*(...)` click.
+
 `htmx-4` (docs/Backends/REFACTOR-INDEX.md row 9) changed this
 function's signature (then still named `wireActionInterceptor`) from
 `wireActionInterceptor(store)` to `wireActionInterceptor(getStore)`,
@@ -244,6 +257,22 @@ CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
           var behavior = behaviors[behaviorName];
           if (!behavior) return;
           behavior(el);
+        } catch (err) {
+          arkNotify("Something went wrong running this action -- an unsupported or unexpected case was hit.");
+        }
+      } else if (raw.indexOf("platform:") === 0) {
+        // `v0.065`: PlatformAPI.*(...) values. No modifiers/hx-trigger
+        // support yet (see arklight/backend/html/attrs.py's own note
+        // on this), so every platform click runs immediately, same as
+        // an unmodified Action.*(...) click above.
+        event.preventDefault();
+        try {
+          var capability = raw.slice("platform:".length);
+          var platformApi = platformApis[capability];
+          if (!platformApi) return;
+          var platformArgsRaw = el.getAttribute("data-ark-platform-api-args");
+          var platformArgs = platformArgsRaw ? JSON.parse(platformArgsRaw) : {};
+          platformApi(platformArgs);
         } catch (err) {
           arkNotify("Something went wrong running this action -- an unsupported or unexpected case was hit.");
         }
