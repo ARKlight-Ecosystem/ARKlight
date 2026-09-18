@@ -254,6 +254,13 @@ def compile_site_file(
         # is what actually runs these, after every backend's own
         # render()+postprocess() pass.
         raw_postprocessors=site.raw_postprocessors,
+        # Runtime policy enforcement (arklight/backend/html/csp.py):
+        # straight passthrough, same shape as `app_shell` above -- no
+        # CLI flag equivalent, for the same reason `app_shell` has none:
+        # this is a whole-site authoring decision, not a per-build
+        # override a CI invocation would plausibly want to flip.
+        strict_csp=site.strict_csp,
+        trusted_script_origins=site.trusted_script_origins,
     )
 
 

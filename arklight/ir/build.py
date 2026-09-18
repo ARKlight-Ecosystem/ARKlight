@@ -218,6 +218,21 @@ class WebsiteIR:
     # `arklight/backend/js/render.py`'s `needs_htmx`). Defaults to
     # `False`, unchanged output for every existing caller.
     app_shell: bool = False
+    # Runtime policy enforcement (arklight/backend/html/csp.py): straight
+    # passthrough of `Site(strict_csp=..., trusted_script_origins=...)`,
+    # same shape as `app_shell`/`lang` above. `HTMLBackend` reads both to
+    # decide whether/what CSP meta tag to emit per page -- see
+    # `Site.__init__`'s own comment (arklight/api.py) for the full
+    # reasoning, including why style-src is deliberately never touched
+    # and why `strict_csp=False` (not a nonce) is the escape valve for
+    # raw_postprocess-injected inline scripts. Defaults preserve today's
+    # (pre-feature) output only when explicitly disabled; the *default*
+    # for a new build is `strict_csp=True`, which is a deliberate,
+    # unconditional new-default addition -- see PROGRESS.md's entry for
+    # this feature for why that's called out rather than folded silently
+    # into "added an override" per CONFIGURABILITY.md's own rule.
+    strict_csp: bool = True
+    trusted_script_origins: list[str] = field(default_factory=list)
     # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): `(output_files: dict[str,
     # str]) -> dict[str, str]` callables registered via
     # `site.raw_postprocess(...)`, in call order -- straight passthrough,
@@ -607,6 +622,8 @@ def build_website_ir(
     style_imports: list | None = None,
     app_shell: bool = False,
     raw_postprocessors: list | None = None,
+    strict_csp: bool = True,
+    trusted_script_origins: list | None = None,
 ) -> WebsiteIR:
     """
     Build the Website IR from a normalized + validated ARK AST.
@@ -647,6 +664,14 @@ def build_website_ir(
     pipeline.build` runs, in order, after every backend's own
     render()+postprocess() pass. Defaults to `None` (empty list), so
     existing callers are unaffected.
+
+    `strict_csp`/`trusted_script_origins` are `Site(strict_csp=...,
+    trusted_script_origins=...)`'s straight passthrough (runtime policy
+    enforcement -- see `Site.__init__`'s comment in arklight/api.py and
+    arklight/backend/html/csp.py). Note this is the one field pair in
+    this function whose *default* (`strict_csp=True`) is new behavior,
+    not "unchanged output for existing callers" -- see `WebsiteIR.
+    strict_csp`'s own comment for why.
     """
     collector = _ResponsiveStyleCollector()
     ir_pages = []
@@ -687,4 +712,6 @@ def build_website_ir(
         style_imports=list(style_imports) if style_imports else [],
         app_shell=app_shell,
         raw_postprocessors=list(raw_postprocessors) if raw_postprocessors else [],
+        strict_csp=strict_csp,
+        trusted_script_origins=list(trusted_script_origins) if trusted_script_origins else [],
     )

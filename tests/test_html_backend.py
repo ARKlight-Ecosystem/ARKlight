@@ -608,12 +608,18 @@ def test_page_links_is_html_escaped():
 
 
 def test_page_without_meta_or_links_renders_unchanged():
-    # No meta/links supplied -> no extra <meta>/<link> tags beyond the
-    # fixed charset/viewport/stylesheet ones every page already emits.
+    # No meta/links supplied -> no extra <meta>/<link> tags from
+    # head_meta.py's own optional props, beyond the fixed charset/CSP/
+    # viewport/stylesheet ones every page already emits. The CSP meta
+    # tag (arklight/backend/html/csp.py) is a deliberate new default
+    # (Site(strict_csp=True) by default) -- see csp.py's module
+    # docstring -- so the expected count here is 3, not the pre-feature
+    # 2: charset + Content-Security-Policy + viewport.
     html = render({"/": Page(Heading("Hi"), title="My Page")})["index.html"]
     assert '<meta name="viewport"' in html
+    assert '<meta http-equiv="Content-Security-Policy"' in html
     assert '<link rel="stylesheet"' in html
-    assert html.count("<meta") == 2
+    assert html.count("<meta") == 3
     assert html.count("<link") == 1
 
 

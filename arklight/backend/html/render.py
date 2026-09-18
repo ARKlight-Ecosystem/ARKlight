@@ -169,6 +169,12 @@ class HTMLBackend(Backend):
         for page in ir.pages:
             path = route_to_path[page.route]
             output[path] = _render_page(
-                page, ir.site_name, route_to_path, site_lang=ir.lang, app_shell=ir.app_shell
+                page,
+                ir.site_name,
+                route_to_path,
+                site_lang=ir.lang,
+                app_shell=ir.app_shell,
+                strict_csp=ir.strict_csp,
+                trusted_script_origins=ir.trusted_script_origins,
             )
         return output
