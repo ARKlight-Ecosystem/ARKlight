@@ -8,10 +8,11 @@ points here, via its Documentation section, for everything else.
 
 ## Preamble directives (`# include`, `# define`)
 
-`from arklight import *` still works exactly as it always has. But a
-site file can instead open with reserved-shape *comments* -- ARKlight
-reads these itself, before your code runs, rather than delegating to
-Python's own `from X import *`:
+`from arklight import *` is **retired**. It still works, but the
+compiler now logs a notice for it (file, line, and what to write
+instead) on every build. A site file opens with reserved-shape
+*comments* instead -- ARKlight reads these itself, before your code
+runs, rather than delegating to Python's own `from X import *`:
 
 ```python
 # include <stdlib.ARKlight>
@@ -61,6 +62,41 @@ be unambiguous across everything included so far; a dotted target
 `# include <label>` line) picks one specific include's copy by name,
 for exactly the case where two sources disagree about what a name
 means.
+
+**What counts as the preamble.** Only recognised directive comments
+*above the file's contents* -- the scan ends at the first line of
+actual code (a docstring counts as code). The same comment between
+statements, or at the end of the file, is an ordinary comment to
+ARKlight and is never acted on.
+
+**`# define` is a rename, applied in normalization and checked in
+validation.** ARKlight handles the preamble in the same three steps as
+the rest of the compiler: it reads the directives, *normalizes* them
+(includes fill the name table; `# define A -> B` replaces `A` with
+what `B` means), then *validates* the result. Normalization never
+fails on its own; validation is where problems surface -- a define
+whose target doesn't exist or is ambiguous, two defines giving one
+alias two different meanings, or a name still bound to two different
+objects.
+
+**Names your own file defines.** Python lets a `def Button(...)`,
+`Button = ...`, `from x import Button`, or a leftover `from x import
+*` further down the file silently replace a name the preamble already
+bound. ARKlight checks for that after your file runs, and a name that
+was rebound is the same kind of collision as two includes disagreeing:
+the load fails, naming the include the name came from and the line
+that rebound it. Rename yours. (Re-importing the *same* object is
+harmless, and a `@component(..., allow_redefine=True)` is a deliberate
+override, so neither is flagged.) The same rule now applies to
+`@component` names themselves: one that matches a built-in
+(`Button`, `Container`, ...) is refused at registration unless
+`allow_redefine=True`, since it would otherwise silently take over
+every built-in of that name in the site.
+
+**Scope.** The preamble is read from the site file `arklight build`
+is pointed at. Other modules that file imports (`pages/`,
+`components/`) are ordinary Python and don't read one, so they keep
+their own imports; the retirement notice is about the site file.
 
 Only `<stdlib.ARKlight>` and `<acc.<dotted.module.path>>` are
 recognized include labels today. An `acc.` include must point at a

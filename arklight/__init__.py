@@ -3,7 +3,7 @@ ARKlight -- a compiler framework: author in ordinary Python, compile to
 a static site (plus optional wrapped native/PWA targets), with its own
 batteries-included developer workflow.
 
-    from arklight import *
+    # include <stdlib.ARKlight>
 
     site = Site()
 

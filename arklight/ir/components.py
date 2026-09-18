@@ -91,6 +91,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
 from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, ModelBindSpec
+from arklight.ir.schema import SCHEMA
 
 # A component render function: takes resolved keyword props, returns
 # the ARKNode subtree (built entirely out of other components -- built-in
@@ -318,6 +319,14 @@ class ComponentOrigin:
 # the closed built-in schema (see the design doc's Option A writeup).
 COMPONENT_REGISTRY: dict[str, ComponentSpec] = {}
 
+# Attribute `arklight.api.component` sets on the callable it returns,
+# recording whether the author passed `allow_redefine=True`. The site
+# loader's namespace-shadowing check (`arklight.parser.preamble.
+# check_namespace_shadowing`) reads it, so a *deliberate* override of a
+# name a preamble already bound isn't flagged as an accident -- the
+# same explicit opt-in `register_component` itself honors.
+ALLOW_REDEFINE_MARKER = "__ark_allow_redefine__"
+
 
 def register_component(
     name: str,
@@ -351,6 +360,23 @@ def register_component(
     already-normalized into `{local_name: ComponentState}` by
     `arklight.api._validate_component_state`, stored verbatim here.
     """
+    if name in SCHEMA and not allow_redefine:
+        # `expand_ark_ast` resolves a node by `COMPONENT_REGISTRY.get(
+        # node.type)` *before* anything consults the built-in schema,
+        # so a user component named after a built-in (`Button`,
+        # `Card`, ...) used to silently take over every node of that
+        # type in the whole site -- including ones the site's own
+        # vocabulary produced -- with no diagnostic anywhere. Same
+        # "fail loudly, opt in explicitly" rule as the duplicate-
+        # registration check just below.
+        raise DuplicateComponentError(
+            f"A component named {name!r} would shadow the built-in "
+            f"{name!r} component: every {name}(...) in the site, "
+            "including ARKlight's own, would silently be replaced by "
+            "yours. Rename it, or if overriding the built-in is "
+            "deliberate, pass allow_redefine=True: @component(..., "
+            "allow_redefine=True)."
+        )
     if name in COMPONENT_REGISTRY and not allow_redefine:
         raise DuplicateComponentError(
             f"A component named {name!r} is already registered. "

@@ -203,7 +203,7 @@ def compile_site_file(
 
     log("Discovering site and compiling AST trees...")
     try:
-        site, _discovered = load_site(entry_path)
+        site, _discovered = load_site(entry_path, on_notice=log)
     except SiteLoadError as exc:
         raise CompileError(str(exc)) from exc
 

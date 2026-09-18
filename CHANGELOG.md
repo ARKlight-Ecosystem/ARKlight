@@ -5,6 +5,91 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06501] -- Capability fix follow-up: retire `from arklight import *`, see names a file defines itself, split `# define` into normalize/validate
+
+Bug-fix follow-up to `[0.0650]`, numbered by the same rule as the
+fixes before it: the roadmap's in-progress version (`v0.065`) extended
+by extra decimals, never touched itself -- `0.0650` plus two decimals.
+Treated as a **capability fix**, not a new feature: `[0.0650]` moved
+"get names into this file" onto compiler-owned ground, but three
+things it should have covered were still invisible to the compiler.
+
+**1. `from arklight import *` is retired.** It still works, but every
+build now logs a notice naming the file and line and telling the site
+to put `# include <stdlib.ARKlight>` above its code instead. The
+notice starts with the warning glyph the CLI already treats as
+"always print", so it shows without `--verbose`. Only the site file is
+checked: it is the only file whose preamble ARKlight reads.
+
+**2. Names the compiler couldn't see.** The preamble binds names
+*before* `exec`, so anything the file then did to them was Python's
+silent default. Two cases, both now fail loudly:
+
+- *The file rebinding an included name* -- `def Button(...)`,
+  `Button = ...`, `from x import Button`, a leftover `from x import
+  *`, a loop variable. After the file runs, the finished namespace is
+  compared, by identity, against what the preamble bound; a rebound
+  name is a `PreambleCollisionError` (surfaced as `SiteLoadError`)
+  naming the include it came from and the line that rebound it.
+  Re-importing the same object, or deleting a name, is not a
+  collision.
+- *A user `@component` named like a built-in.* Reproduced first:
+  `expand_ark_ast` looks a node up in `COMPONENT_REGISTRY` before the
+  built-in schema, so `@component() def Button` silently replaced every
+  `Button(...)` in the site, ARKlight's own included. (`arklight
+  search` already applied "built-ins always win" to the same
+  situation, so the compiler and its own search disagreed.)
+  `register_component` now raises `DuplicateComponentError` for a
+  built-in name unless `allow_redefine=True` -- the same explicit
+  opt-in the previous registration-collision fix introduced. A
+  component registered with that opt-in is also exempt from the
+  namespace check above; `@component` marks the callable it returns
+  (`ALLOW_REDEFINE_MARKER`) so the loader can tell.
+
+**3. `# define` split across normalization and validation.** A define
+is a rename -- the left name now means the right one -- which is
+canonicalization, so `normalize_preamble` applies it, and never raises;
+anything it can't apply is recorded. `validate_preamble` is the one
+place that raises. `resolve_preamble` keeps its signature and messages
+and is now `parse_preamble` -> `normalize_preamble` ->
+`validate_preamble`. Validation also gained the one define check that
+was missing: two `# define`s giving one alias two different targets is
+a collision, not a silent last-one-wins. The preamble's own boundary
+is unchanged and now stated and pinned by test: only recognised
+comments above the file's contents; the same comment between
+statements or at the end of the file is an ordinary comment.
+
+**Implementation:** `arklight/parser/preamble.py` -- `Directive`,
+`NormalizedPreamble`, `ResolvedPreamble`, `parse_preamble`,
+`normalize_preamble`, `validate_preamble`, `resolve_preamble_detailed`,
+`check_namespace_shadowing`, `find_retired_star_imports`,
+`retired_star_import_notice`. `arklight/parser/loader.py` --
+`load_site(..., on_notice=None)` (silent by default, like every other
+stage callback), and the post-`exec` shadowing check.
+`arklight/compiler/pipeline.py` -- passes its stage logger as
+`on_notice`. `arklight/ir/components.py` / `arklight/api.py` -- the
+built-in-name guard and `ALLOW_REDEFINE_MARKER`. `arklight new`'s
+`simple` and `production` scaffolds, `examples/hello_site/site.py`,
+`GETTING-STARTED.md`'s example, and `arklight/__init__.py`'s quickstart
+now open with `# include <stdlib.ARKlight>` (production's
+`pages/`/`components/` modules are not site files and keep their
+imports). `AUTHORING-GUIDE.md`'s "Preamble directives" section
+rewritten to match.
+
+**Tests:** `tests/test_preamble.py` 18 -> 43 (preamble boundary,
+normalize/validate split, duplicate defines, each way of shadowing,
+the `allow_redefine` exemption, the notice through `load_site`, the
+pipeline log and the CLI's no-`--verbose` printing);
+`tests/test_user_defined_components_stage0.py` +4 (built-in name
+guard, opt-in, marker). Three existing tests changed because they
+depended on the old behavior: the two that registered a component
+named `Container`/`Heading` to exercise search's "built-ins win" path
+now pass `allow_redefine=True`, and the pipeline's exact-stage-list
+tests use a preamble-syntax site so the new notice isn't in the list.
+Full suite: 1454 passed.
+
+`0.0650` -> `0.06501` (`pyproject.toml`).
+
 ## [0.0650] -- Capability fix: preamble directives (`# include`/`# define`)
 
 Out-of-band alpha maintenance release (numbered inside the v0.064 ->

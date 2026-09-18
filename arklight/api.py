@@ -313,6 +313,7 @@ NoScript = node("NoScript")
 # ---------------------------------------------------------------------------
 
 from arklight.ir.components import (  # noqa: E402
+    ALLOW_REDEFINE_MARKER,
     ComponentState,
     Prop,
     register_backend_render,
@@ -434,6 +435,9 @@ def component(
         marker.__name__ = name
         marker.__qualname__ = name
         marker.__doc__ = render_fn.__doc__
+        # Read by the site loader's namespace-shadowing check -- see
+        # `arklight.ir.components.ALLOW_REDEFINE_MARKER`.
+        setattr(marker, ALLOW_REDEFINE_MARKER, allow_redefine)
 
         def register_backend(
             backend_name: str, *, allow_redefine: bool = False

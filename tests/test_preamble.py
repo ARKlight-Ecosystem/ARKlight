@@ -3,11 +3,16 @@ import types
 
 import pytest
 
+from arklight.ir.components import COMPONENT_REGISTRY
 from arklight.parser.loader import SiteLoadError, load_site
 from arklight.parser.preamble import (
     PreambleCollisionError,
     PreambleError,
+    find_retired_star_imports,
+    normalize_preamble,
+    parse_preamble,
     resolve_preamble,
+    validate_preamble,
 )
 
 
@@ -233,3 +238,276 @@ def home():
     )
     site, _discovered = load_site(path)
     assert "/" in site.routes
+
+
+# ---------------------------------------------------------------------------
+# what counts as the preamble
+# ---------------------------------------------------------------------------
+
+
+def test_directive_shaped_comments_in_between_or_at_end_are_not_preamble():
+    """Only recognised comments *above the file's contents* are
+    preamble. The same comment between statements, or at the end of
+    the file, is an ordinary comment to ARKlight."""
+    source = (
+        "# include <stdlib.ARKlight>\n"
+        "x = 1\n"
+        "# include <acc.does_not_exist_anywhere>\n"  # in between
+        "y = 2\n"
+        "# define Btn -> Button\n"  # at the end
+    )
+    assert parse_preamble(source) == parse_preamble("# include <stdlib.ARKlight>\n")
+    bindings = resolve_preamble(source)  # would raise if the ones below counted
+    assert "Btn" not in bindings
+
+
+def test_a_module_docstring_ends_the_preamble():
+    source = '"""Docs."""\n# include <stdlib.ARKlight>\n'
+    assert parse_preamble(source) == []
+
+
+# ---------------------------------------------------------------------------
+# normalization handles `# define`; validation is what raises
+# ---------------------------------------------------------------------------
+
+
+def test_normalization_applies_define_as_a_rename():
+    import arklight
+
+    normalized = normalize_preamble(
+        parse_preamble("# include <stdlib.ARKlight>\n# define Btn -> Button\n")
+    )
+    assert normalized.problems == []
+    assert [b.value for b in normalized.bindings["Btn"]] == [arklight.Button]
+
+
+def test_normalization_records_a_bad_define_instead_of_raising():
+    normalized = normalize_preamble(
+        parse_preamble("# include <stdlib.ARKlight>\n# define Btn -> NoSuchName\n")
+    )
+    assert len(normalized.problems) == 1
+    assert "Btn" not in normalized.bindings  # left out, not half-applied
+
+
+def test_validation_is_what_raises_a_recorded_define_problem():
+    normalized = normalize_preamble(
+        parse_preamble("# include <stdlib.ARKlight>\n# define Btn -> NoSuchName\n")
+    )
+    with pytest.raises(PreambleError, match="NoSuchName"):
+        validate_preamble(normalized)
+
+
+def test_normalization_records_a_failed_include_instead_of_raising():
+    normalized = normalize_preamble(parse_preamble("# include <nonsense>\n"))
+    assert len(normalized.problems) == 1
+    with pytest.raises(PreambleError, match="unrecognized"):
+        validate_preamble(normalized)
+
+
+def test_two_defines_disagreeing_about_one_alias_is_a_collision():
+    source = (
+        "# include <stdlib.ARKlight>\n"
+        "# define Thing -> Button\n"
+        "# define Thing -> Text\n"
+    )
+    with pytest.raises(PreambleCollisionError, match="already defined at line 2"):
+        resolve_preamble(source)
+
+
+def test_repeating_the_same_define_is_harmless():
+    source = (
+        "# include <stdlib.ARKlight>\n"
+        "# define Thing -> Button\n"
+        "# define Thing -> Button\n"
+    )
+    import arklight
+
+    assert resolve_preamble(source)["Thing"] is arklight.Button
+
+
+# ---------------------------------------------------------------------------
+# names the site file itself rebinds after the preamble bound them
+# ---------------------------------------------------------------------------
+
+_SITE_TAIL = """
+site = Site()
+
+@site.page("/")
+def home():
+    return Page(Heading("Hi"))
+"""
+
+
+@pytest.fixture
+def clean_component_registry():
+    saved = dict(COMPONENT_REGISTRY)
+    yield
+    COMPONENT_REGISTRY.clear()
+    COMPONENT_REGISTRY.update(saved)
+
+
+def test_own_function_shadowing_included_vocabulary_is_rejected(tmp_path):
+    path = write_site(
+        tmp_path,
+        "# include <stdlib.ARKlight>\n\ndef Button(label):\n    return label\n" + _SITE_TAIL,
+    )
+    with pytest.raises(SiteLoadError) as excinfo:
+        load_site(path)
+    message = str(excinfo.value)
+    assert "`Button`" in message
+    assert "stdlib.ARKlight" in message
+    assert "line 3: function definition" in message
+
+
+def test_own_assignment_shadowing_included_vocabulary_is_rejected(tmp_path):
+    path = write_site(tmp_path, "# include <stdlib.ARKlight>\nText = 5\n" + _SITE_TAIL)
+    with pytest.raises(SiteLoadError, match="line 2: assignment"):
+        load_site(path)
+
+
+def test_import_of_a_different_object_shadowing_vocabulary_is_rejected(tmp_path, monkeypatch):
+    fake = types.ModuleType("fake_shadow_import")
+    fake.Button = object()
+    monkeypatch.setitem(sys.modules, "fake_shadow_import", fake)
+    path = write_site(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nfrom fake_shadow_import import Button\n" + _SITE_TAIL,
+    )
+    with pytest.raises(SiteLoadError, match="line 2: import"):
+        load_site(path)
+
+
+def test_leftover_star_import_shadowing_vocabulary_is_rejected(tmp_path, monkeypatch):
+    fake = types.ModuleType("fake_shadow_star")
+    fake.Button = object()
+    fake.__all__ = ["Button"]
+    monkeypatch.setitem(sys.modules, "fake_shadow_star", fake)
+    path = write_site(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nfrom fake_shadow_star import *\n" + _SITE_TAIL,
+    )
+    with pytest.raises(SiteLoadError, match="from fake_shadow_star import"):
+        load_site(path)
+
+
+def test_shadowing_a_define_alias_names_the_define_as_the_origin(tmp_path):
+    path = write_site(
+        tmp_path,
+        "# include <stdlib.ARKlight>\n# define Btn -> Button\nBtn = 1\n" + _SITE_TAIL,
+    )
+    with pytest.raises(SiteLoadError, match=r"`Btn` \(bound by `# define \(line 2\)`"):
+        load_site(path)
+
+
+def test_importing_the_same_object_again_is_not_shadowing(tmp_path):
+    path = write_site(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nfrom arklight import Button\n" + _SITE_TAIL,
+    )
+    site, _ = load_site(path)
+    assert "/" in site.routes
+
+
+def test_names_that_dont_collide_with_vocabulary_are_untouched(tmp_path):
+    path = write_site(
+        tmp_path,
+        "# include <stdlib.ARKlight>\n\ndef my_helper():\n    return 1\n\nTAGLINE = 'x'\n"
+        + _SITE_TAIL,
+    )
+    site, _ = load_site(path)
+    assert "/" in site.routes
+
+
+def test_component_with_allow_redefine_is_a_deliberate_override(tmp_path, clean_component_registry):
+    path = write_site(
+        tmp_path,
+        "# include <stdlib.ARKlight>\n\n"
+        "@component(allow_redefine=True)\ndef Container():\n    return Text('x')\n" + _SITE_TAIL,
+    )
+    site, _ = load_site(path)
+    assert "/" in site.routes
+
+
+def test_component_without_allow_redefine_cannot_take_a_builtin_name(tmp_path, clean_component_registry):
+    path = write_site(
+        tmp_path,
+        "# include <stdlib.ARKlight>\n\n@component()\ndef Container():\n    return Text('x')\n"
+        + _SITE_TAIL,
+    )
+    with pytest.raises(SiteLoadError, match="would shadow the built-in"):
+        load_site(path)
+
+
+def test_sites_without_a_preamble_get_no_shadowing_check(tmp_path):
+    """Nothing was bound by a preamble, so there is nothing to shadow --
+    unchanged behavior for a site that never adopts `# include`."""
+    path = write_site(
+        tmp_path,
+        "from arklight import *\n\ndef Container():\n    return 1\n" + _SITE_TAIL,
+    )
+    site, _ = load_site(path)
+    assert "/" in site.routes
+
+
+# ---------------------------------------------------------------------------
+# retired: `from arklight import *`
+# ---------------------------------------------------------------------------
+
+
+def test_find_retired_star_imports_reports_line_numbers():
+    source = "x = 1\nfrom arklight import *\n"
+    assert find_retired_star_imports(source) == [2]
+
+
+def test_find_retired_star_imports_ignores_everything_else():
+    source = (
+        "import arklight\n"
+        "from arklight import Button\n"
+        "from arklight.api import *\n"
+        "from other_pkg import *\n"
+    )
+    assert find_retired_star_imports(source) == []
+
+
+def test_load_site_reports_star_import_through_on_notice_and_still_loads(tmp_path):
+    path = write_site(tmp_path, "from arklight import *\n" + _SITE_TAIL)
+    notices: list[str] = []
+    site, _ = load_site(path, on_notice=notices.append)
+    assert "/" in site.routes  # still works
+    assert len(notices) == 1
+    assert f"{path}:1" in notices[0]
+    assert "# include <stdlib.ARKlight>" in notices[0]
+    assert "retired" in notices[0]
+
+
+def test_preamble_site_produces_no_notice(tmp_path):
+    path = write_site(tmp_path, "# include <stdlib.ARKlight>\n" + _SITE_TAIL)
+    notices: list[str] = []
+    load_site(path, on_notice=notices.append)
+    assert notices == []
+
+
+def test_load_site_without_on_notice_stays_silent_about_star_import(tmp_path, capsys):
+    path = write_site(tmp_path, "from arklight import *\n" + _SITE_TAIL)
+    load_site(path)
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
+
+
+def test_star_import_notice_reaches_the_build_log(tmp_path):
+    from arklight.compiler.pipeline import compile_site_file
+
+    path = write_site(tmp_path, "from arklight import *\n" + _SITE_TAIL)
+    messages: list[str] = []
+    compile_site_file(path, on_stage=messages.append)
+    assert any("`from arklight import *` is retired" in m for m in messages)
+
+
+def test_star_import_notice_prints_without_verbose(capsys):
+    """The CLI shows any message starting with the warning glyph
+    regardless of --verbose; the notice must qualify."""
+    from arklight.cli.main import _stage_logger
+    from arklight.parser.preamble import retired_star_import_notice
+
+    _stage_logger(retired_star_import_notice("site.py", 1), verbose=False)
+    assert "retired" in capsys.readouterr().out

@@ -24,7 +24,7 @@ def build(name: str) -> dict[str, str]:
 
 
 _SITE_PY = '''\
-from arklight import *
+# include <stdlib.ARKlight>
 
 site = Site()
 

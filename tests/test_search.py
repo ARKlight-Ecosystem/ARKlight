@@ -92,7 +92,15 @@ def test_search_builtin_wins_name_collision_over_user_component():
     # Same "built-ins always win" rule build_knowledge_base() already
     # applies -- a user component reusing a built-in's name must never
     # shadow the built-in's real schema facts here.
-    register_component("Container", _dummy_render, props={"only_on_user_version": Prop()})
+    # `allow_redefine=True`: registering a built-in's name is refused by
+    # default now; this is the deliberate-override state the search
+    # layer still has to stay correct for.
+    register_component(
+        "Container",
+        _dummy_render,
+        props={"only_on_user_version": Prop()},
+        allow_redefine=True,
+    )
 
     result = search_component("Container")
 
