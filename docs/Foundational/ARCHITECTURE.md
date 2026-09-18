@@ -106,6 +106,59 @@ Each node contains:
 
 The IR models website intent rather than HTML.
 
+## Binary IR (`.arklight`)
+
+`arklight/ir/binary.py` defines `.arklight`: a small, portable,
+versioned binary encoding of the Website IR, separate from the
+in-memory `WebsiteIR`/`IRNode` tree above. Where `WebsiteIR` is "IR for
+humans" (the legible, in-process form every backend consumes), a
+`.arklight` file is "IR for machines" -- a build-once, ship-anywhere
+snapshot that can be read back without re-running the Python compiler
+pipeline.
+
+Produced optionally, alongside the normal backend outputs, via
+`arklight build --emit-arklight[=PATH]` (see
+[`CLI-REFERENCE.md`](CLI-REFERENCE.md)); nothing about a plain
+`arklight build` changes if the flag is never passed.
+
+Format (little-endian, hand-rolled and zero-dependency -- the same
+house style `arklight.packer`'s `.ark` bundle format follows, rather
+than reaching for protobuf/flatbuffers/etc.):
+
+```
+magic bytes           4   b"ARKL"
+format version        u16 FORMAT_VERSION (independent of ARKlight's
+                           own __version__)
+schema generation tag str "arklight v{__version__} ({CHANNEL})" --
+                           self-declares which ARKlight build produced
+                           the file, so a reader can tell
+                           "older/newer schema" apart from "corrupt
+                           file"
+string table           u32 count, then `count` length-prefixed UTF-8
+                           strings -- every string used anywhere below
+                           (site name, routes, node types, JSON-encoded
+                           props/state blobs, text content) is stored
+                           once and referenced everywhere else by u32
+                           index
+body                       site_name, lang, app_shell flag, then page
+                           count and each page's IR tree
+```
+
+`encode_arklight(ir) -> bytes` and `decode_arklight(data) ->
+DecodedSite` are the round-trip pair; `peek_header(data) ->
+ArklightHeader` reads just the magic/version/schema-tag prefix without
+decoding the full body. Malformed or wrong-version input raises
+`ArklightFormatError` rather than failing silently or guessing.
+
+Scope note (v1): covers the structural IR tree (site/page/node shape)
+plus each page's route, `state`, and `computed_initial` -- enough to
+rebuild what a backend actually renders from. The long tail of
+page-level bookkeeping on `WebsiteIR`/`IRPage` (watch/persist/media/
+query specs, site-wide style registrations, raw postprocessors, ...)
+is not yet round-tripped; a follow-up once this format has soaked, same
+staged-rollout discipline the rest of the schema-generation model
+already uses. See `tests/test_binary_ir.py` for the current coverage.
+
 ## Backend Interface
 
 Current:
