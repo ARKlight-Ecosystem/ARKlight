@@ -7,6 +7,7 @@ build/
 .venv/
 *.patch
 *.bundle
+*.txt
 
 ARKlight-gh-pages/
 ARKlight-installer/
