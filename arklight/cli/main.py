@@ -769,7 +769,13 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=False)
 
     build_parser = subparsers.add_parser("build", help="Compile a site file to static HTML + CSS.")
-    build_parser.add_argument("entry", help="Path to the Python site file (e.g. site.py)")
+    build_parser.add_argument(
+        "entry",
+        help="Path to the Python site file (e.g. site.py), or a previously "
+        "--emit-arklight'd .arklight binary IR snapshot (detected by "
+        "extension or magic bytes) -- rebuilds straight from the snapshot, "
+        "skipping the Python compiler pipeline entirely.",
+    )
     build_parser.add_argument(
         "-o", "--output", default="ARK", help="Output directory (default: ARK)"
     )
@@ -865,8 +871,9 @@ def main(argv: list[str] | None = None) -> int:
         "generation tag, deduped string table). Bare flag writes "
         "<output>/site.arklight; pass a path to choose your own, e.g. "
         "--emit-arklight=build/site.arklight. A standalone, versioned "
-        "snapshot of the IR that can be read back (arklight.ir.binary."
-        "decode_arklight) without re-running the compiler pipeline.",
+        "snapshot of the IR that can be read back and rebuilt into a full "
+        "site (`arklight build <that file>.arklight`) without re-running "
+        "the Python compiler pipeline.",
     )
     build_parser.set_defaults(func=_cmd_build)
 

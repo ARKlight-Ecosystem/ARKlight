@@ -9,6 +9,7 @@ from arklight.ir.binary import (
     DecodedPage,
     DecodedSite,
     decode_arklight,
+    decoded_site_to_website_ir,
     encode_arklight,
     peek_header,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "KNOWN_BEHAVIORS",
     "encode_arklight",
     "decode_arklight",
+    "decoded_site_to_website_ir",
     "peek_header",
     "ArklightFormatError",
     "ArklightHeader",
