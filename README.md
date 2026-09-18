@@ -1,4 +1,4 @@
-# <img src="ARKlight-logo.png" alt="ARKlight logo" width="70" height="70" align="middle"> ARKlight Framework
+# <img src="ARKlight-logo.png" alt="ARKlight logo" width="68" height="68" align="middle"> ARKlight Framework
 
 **A Python-first compiler for building static websites where developers work
 with a structured component API, while the output remains ordinary, dependency-free HTML.**
