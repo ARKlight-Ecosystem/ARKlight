@@ -5,6 +5,31 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.0645] -- Docs-only: documented the ACC capability-discovery hook
+
+Docs-only, no compiler code changed. Backfills documentation for
+`arklight/capabilities.py`, which landed undocumented (outside its own
+module docstring and `tests/test_capabilities.py`) at `a4aa6b8`.
+
+**Added:** `docs/Foundational/ACC-CAPABILITIES.md` -- the settled
+design record for the ACC (ARKlight Component Collections)
+capability-discovery hook: the `arklight.capabilities` entry-point
+contract, `Capability`/`CapabilityError`/`discover_capabilities`/
+`require_capability`, `arklight/compiler/sbom.py` as its one current
+caller, and status against ACC's own `docs/design/
+IMPLEMENTATION-LADDER.md` (Stage 1 landed here; Stages 2-5 tracked in
+the separate `Rae-ARK/ARKlight-Component-Collections` repository).
+
+**Changed:** `docs/Foundational/V1-DEFINITION.md` Section 5 -- removed
+the now-stale "no design doc yet, not-yet-proposed concept" framing
+for ARKlight Component Collections now that ACC is a real repository
+with its own foundational design doc and a landed implementation
+stage; the section's underlying exclusion-from-`v1.0` argument is
+unchanged. `README.md`'s repository-layout listing -- added the
+previously-missing `capabilities.py` line. `docs/Foundational/
+README.md` and `docs/README.md` -- new index rows for
+`ACC-CAPABILITIES.md`.
+
 ## [Unreleased] -- Platform API IR, stage 1 of 2: Web reference implementation (`v0.065`)
 
 Accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` (filed as

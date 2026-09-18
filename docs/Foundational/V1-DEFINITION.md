@@ -4,7 +4,7 @@ _A grounding, scope-defining document for `docs/Foundational/`, filed
 alongside `WHAT-ARKLIGHT-IS.md`'s "The Goal" section as the answer to
 the question that section raises but doesn't settle: what does
 "stable" actually mean for this project, and exactly where does that
-promise stop applying? Current as of **v0.0644** (latest shipped
+promise stop applying? Current as of **v0.0645** (latest shipped
 milestone on `alpha`); cross-check `PROGRESS.md`'s Snapshot table and
 `docs/Foundational/ARCHITECTURE.md`'s Milestones table -- where this
 file says `v1.0 | Stable compiler | PLANNED` in one line -- before
@@ -173,11 +173,24 @@ Named individually, not left to be inferred from Section 3's silence:
 
 ## 5. ARKlight Component Collections: named here specifically because it is excluded
 
-**ARKlight Component Collections** (no design doc yet -- defined here
-for the first time, and only for the purpose of drawing this
-boundary correctly) is the working name for curated, distributable
-bundles of ready-to-use, `@component`-registered components, built on
-top of the User-Defined Components system
+**ARKlight Component Collections** (ACC) now has its own repository
+and foundational design document --
+[`Rae-ARK/ARKlight-Component-Collections`](https://github.com/Rae-ARK/ARKlight-Component-Collections),
+`docs/design/acc-foundational-design.md` there -- superseding this
+section's original "no design doc yet, defined here for the first
+time" framing. One piece of ACC's own five-stage implementation
+ladder, the capability-discovery hook, has already landed in `alpha`
+as `arklight/capabilities.py`; see
+[`ACC-CAPABILITIES.md`](ACC-CAPABILITIES.md) for that module's own
+settled design record. That does not move the boundary this section
+draws: the discovery hook is a small, inert compiler-side entry point
+that does nothing when no ACC package is installed -- not a capability
+or component itself, and not the actual capability/component packages
+ACC exists to distribute.
+
+ACC is the working name for curated, distributable bundles of
+ready-to-use, `@component`-registered components, built on top of the
+User-Defined Components system
 (`docs/Foundational/USER-DEFINED-COMPONENTS.md`, `v0.060`) rather than
 inside the compiler itself. The idea: a Python-Community or
 Education-Community author should be able to `import` a collection --
@@ -230,11 +243,19 @@ own lifecycle rule (`docs/Far Future Concern/` -> `docs/Proposals/` ->
 `docs/Implementation/` -> `docs/Foundational/`), a real ARKlight
 Component Collections feature -- registries, distribution mechanism,
 versioning policy, a curation process -- would need its own proposal
-filed in `docs/Proposals/` before any of it is real. Nothing here
-authorizes that work; this section exists only so the exclusion isn't
-left to be inferred later, after some Collection-shaped feature has
-already started drifting into "the compiler," the way
-`docs/README.md`'s own "why this section exists" postmortem describes
+filed in `docs/Proposals/` before any of it is real. The one landed
+exception is the capability-discovery hook itself
+(`arklight/capabilities.py`, `ACC-CAPABILITIES.md`): it shipped
+directly, without a `docs/Proposals/` entry in this repo, because it
+was filed as a proposal against `alpha` from ACC's own
+`docs/design/IMPLEMENTATION-LADDER.md` rather than something this
+repo proposed to itself -- a real doc-index gap this patch closes, not
+a precedent for skipping `docs/Proposals/` on anything else. Nothing
+here authorizes any further Collections work; this section exists
+only so the exclusion isn't left to be inferred later, after some
+Collection-shaped feature has already started drifting into "the
+compiler," the way `docs/README.md`'s own "why this section exists"
+postmortem describes
 happening to other undocumented boundaries in this project's history.
 
 ## 6. Why the boundary is drawn this way
