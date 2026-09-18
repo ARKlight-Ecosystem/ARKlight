@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import functools
 import mimetypes
+import os
 import re
 import sys
 import traceback
@@ -39,6 +40,7 @@ from arklight.cli.search import record_acceptance, resolve_exact, search_compone
 from arklight.cli.templates import TEMPLATES
 from arklight.cli.upgrade import upgrade_to_alpha
 from arklight.compiler.pipeline import BuildResult, CompileError, build
+from arklight.ir import binary as binary_ir
 from arklight.packer.bundle import PackError, pack, unpack
 from arklight.pwa import PWAError, enable_pwa
 from arklight.search.endpoint import serve_stdio
@@ -258,6 +260,14 @@ def _cmd_build(args: argparse.Namespace) -> int:
     print(f"ARKlight v{__version__} built {len(result.written_paths)} file(s) -> {args.output}/")
     for path in result.written_paths:
         print(f"  {path}")
+
+    if args.emit_arklight is not None:
+        arklight_path = args.emit_arklight or os.path.join(args.output, "site.arklight")
+        os.makedirs(os.path.dirname(arklight_path) or ".", exist_ok=True)
+        payload = binary_ir.encode_arklight(result.ir)
+        with open(arklight_path, "wb") as f:
+            f.write(payload)
+        print(f"  {arklight_path} ({len(payload)} bytes, binary IR)")
 
     _print_alpha_warnings(caught)
     experimental.print_summary(result.ir.experimental_usages)
@@ -807,6 +817,21 @@ def main(argv: list[str] | None = None) -> int:
         "Takes precedence over Site(button_text=...) in the site file. "
         "Default: '#ffffff' -- worth setting explicitly if you also choose a "
         "light --ark-accent, since button background follows accent.",
+    )
+    build_parser.add_argument(
+        "--emit-arklight",
+        dest="emit_arklight",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="PATH",
+        help="Also write the compiled Website IR as a binary .arklight file "
+        "(arklight.ir.binary -- magic bytes, format version, schema "
+        "generation tag, deduped string table). Bare flag writes "
+        "<output>/site.arklight; pass a path to choose your own, e.g. "
+        "--emit-arklight=build/site.arklight. A standalone, versioned "
+        "snapshot of the IR that can be read back (arklight.ir.binary."
+        "decode_arklight) without re-running the compiler pipeline.",
     )
     build_parser.set_defaults(func=_cmd_build)
 
