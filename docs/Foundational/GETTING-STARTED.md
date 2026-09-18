@@ -5,10 +5,11 @@ _Current as of **v0.063** (latest shipped milestone) -- see
 detail might have moved since this was last updated._
 
 Everything a newcomer needs once they've read the root
-[`README.md`](../../README.md)'s pitch and quickstart: installing
-`arklight`, the annotated repository layout, and running the test
-suite. Kept here rather than in the README so the README stays a
-landing page -- a two-line pointer, not a restated copy -- per
+[`README.md`](../../README.md)'s pitch: installing `arklight`, a
+runnable example, the annotated repository layout, and running the
+test suite. Kept here rather than in the README so the README stays a
+landing page -- a short pitch and a pointer, not a restated copy that
+drifts out of sync with the real component API -- per
 [`docs/README.md`](../README.md)'s "Adding a new doc" rule.
 
 ## Install
@@ -37,6 +38,31 @@ Already on a git checkout or editable (`pip install -e .`) install?
 `arklight --upgrade-alpha` switches it over in place -- see
 [`CLI-REFERENCE.md`](CLI-REFERENCE.md) for what that does and when to
 reach for it instead.
+
+## Example
+
+```python
+from arklight import *
+
+site = Site()
+
+@site.page("/")
+def home():
+    return Page(
+        Heading("ARKlight"),
+        Text("Build websites with Python."),
+        Button("Get Started"),
+    )
+```
+
+```bash
+arklight build site.py
+```
+
+produces `ARK/index.html` -- plain, dependency-free HTML. A fuller
+version of this same site, with a shared nav bar and a real behavior
+wired up, lives in
+[`examples/hello_site/site.py`](../../examples/hello_site/site.py).
 
 ## Repository layout
 
@@ -89,7 +115,7 @@ arklight-framework/
                         schema lookup, typo-tolerant suggestions, and
                         doc-tree retrieval (`--retrieve-doc`)
   examples/
-    hello_site/        Example site matching the root README
+    hello_site/        Fuller version of this doc's "Example" section
   tests/               Unit + end-to-end tests for every pipeline stage
   docs/                Documentation tree -- see docs/README.md
   PROGRESS.md          What's done, what's next
