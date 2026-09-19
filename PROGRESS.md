@@ -59,6 +59,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.0650  | Capability fix: preamble directives -- `# include <stdlib.ARKlight>` / `# include <acc.<dotted.module.path>>` / `# define <alias> -> <target>`, reserved-shape comments ARKlight's own loader parses and resolves itself (`arklight/parser/preamble.py`, new module), replacing reliance on raw `from X import *` for the step that gets vocabulary names into a site file's namespace. Fixes the one namespace-binding step the compiler's existing "fail loudly, no silent winner" doctrine (`DuplicateComponentError`, `CapabilityError`) didn't yet cover: two includes disagreeing on a name now raise `PreambleCollisionError` naming both sources, instead of Python's own star-import silently keeping whichever ran last. `arklight/parser/loader.py` wires the resolved bindings in before `exec`; new "Preamble directives" section in `docs/Foundational/AUTHORING-GUIDE.md`. `from arklight import *` keeps working unchanged -- purely additive. `tests/test_preamble.py` (18 tests); full suite 1425 passed. `0.0641` -> `0.0650` version bump. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same "capability fixes take priority" treatment as `v0.0431`/`v0.0641` | DONE |
 | v0.06501 | Capability fix follow-up to `v0.0650`: `from arklight import *` retired (still works; every build logs a notice naming file/line and the `# include <stdlib.ARKlight>` replacement); the two things the preamble couldn't see now fail loudly -- a site file rebinding a name its own preamble bound (`def`/assignment/import/star import, checked after `exec`), and a user `@component` named like a built-in, which silently replaced every built-in of that name (`register_component` now refuses it unless `allow_redefine=True`); `# define` split the way the rest of the compiler is -- applied in normalization (a rename), raised in validation, plus a new duplicate-define check. `arklight/parser/preamble.py`/`loader.py`, `arklight/ir/components.py`; scaffolds/example/docs moved to the preamble syntax. `tests/test_preamble.py` 18 -> 43; full suite 1454 passed. `0.0650` -> `0.06501`; roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent as `v0.0650` | DONE |
 | v0.06502 | Capability fix follow-up to `v0.06501`: `# define` is now C's `#define` (name replaced by text, token-based, per file, one pass; no longer an alias between included objects), the preamble is read in **every** Python file ARKlight takes in (project modules via an import hook scoped to the site directory; `arklight.config.py`) instead of the site file only, and `# include <stdlib.ARKlight>` is the whole public API (`CSSSyntaxError`, `DuplicateStyleNameError`, `ComponentError`, `DuplicateComponentError` added to `__all__`, with a structural test). Preamble parser is now a directive registry; `# use` is reserved and refused, with `docs/Proposals/USE-PREAMBLE-PROPOSAL.md` (discussion, **not accepted**). `arklight/parser/preamble.py`/`loader.py`, `arklight/config.py`; production scaffold migrated. Collision-picking `# define` removed (behavior change, in `CHANGELOG.md`). Tests: `test_preamble_define.py` +41, `test_preamble_scope.py` +18, 11 obsolete removed; full suite 1502 passed. `0.06501` -> `0.06502`; roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent | DONE |
+| v0.06503 | Capability fix: live-input -> action-value -- `Bind("name")` accepted as `Action.set`/`Action.append`'s `value` (`{"__state__": name}` marker, opt-in per argument via `ActionSpec.state_args`, build-time validated, resolved by `resolveActionArgs` at dispatch time), so `[type a task] [Add]` is expressible with `bind_value=Bind.model(...)` + `Watch(..., then=Action.reset(...))`. Issue-register #7; `docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`. Also fixes a raw `TypeError` on `Action.append(name, Bind(...))`. `tests/test_action_value_from_state.py` (31 tests); full suite 1538 passed. `0.06502` -> `0.06503`; roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -137,6 +138,40 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06503 -- Capability fix: live-input -> action-value (DONE)
+
+Out-of-band, same slot-sharing precedent as `v0.0650`-`v0.06502`; numbered
+`0.0650` plus decimals, roadmap `v0.065` untouched. Picked from the issue
+register (#7) as the one open item it labels a *capability* gap.
+
+**Reproduced first:** `Action.append("tasks", Bind("draft"))` passed
+Validation and then raised `TypeError: Object of type ARKNode is not JSON
+serializable` in the HTML backend.
+
+**Decisions.** Spelling is `Bind("draft")` in an argument position (no new
+name; `Bind`'s docstring already promised "wherever a literal value is
+accepted"). Wire shape is a plain dict, `{"__state__": name}`, not a
+dataclass, because dataclasses nested in `ActionRef.args` lose their tag in
+`.arklight` encoding (the known `ItemIndexRef` gap). Opt-in per argument
+(`ActionSpec.state_args`) and only `set`/`append`'s `value`: `increment`'s
+delta from an input would string-concatenate. Resolution is at dispatch
+time and returns a fresh object. The resolver is inlined in both
+dispatchers rather than a new top-level function because existing
+Node-driven tests evaluate `WIRE_WATCHERS_JS` standalone, and
+`test_htmx_3` forbids `forEach` in the interceptor body (hence a `for`
+loop).
+
+**Verified.** 31 new tests, two of them Node-driven against the real
+fragments (mutation-checked: disabling resolution fails both). One-off
+jsdom run of a fully built site: add, add again, input cleared by the
+`Watch`, debounced click reading the value at fire time. jsdom prints
+XPath errors from vendored HTMX; they also occur on a literal-only page.
+
+**Not done, on purpose:** `Bind` nested inside list/dict arguments;
+Enter-to-submit; numeric actions reading state (`increment`'s `delta` from
+a numeric `State` would be safe, but is not distinguishable from an
+input-bound string, since `State`s are untyped to the compiler).
 
 ## v0.06502 -- Capability fix follow-up: `# define` fixed, preamble everywhere, stdlib complete (DONE)
 

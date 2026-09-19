@@ -5,6 +5,54 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06503] -- Capability fix: live-input -> action-value (`Bind(...)` as an `Action.set`/`Action.append` argument)
+
+Numbered by the same rule as `[0.06501]`/`[0.06502]` (`0.0650` plus
+decimals; the roadmap's `v0.065` is never touched). A **capability fix**:
+`bind_value=Bind.model(...)` could put an input's text into state and
+`Action.append(...)` could add to a list, but nothing could pass the one to
+the other, so `[type a task] [Add]` wasn't expressible (issue register #7).
+Full design record: `docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`.
+
+```python
+Input(bind_value=Bind.model("draft"))
+Button("Add", on_click=Action.append("tasks", Bind("draft")))
+Watch("tasks", then=Action.reset("draft"))
+```
+
+- `Action.set`/`Action.append` accept `Bind("name")` as `value`: the value
+  `name` holds when the action runs (after any `.debounce(...)`). Stored as
+  the JSON marker `{"__state__": "name"}` (`arklight/ast/nodes.py`) -- a
+  plain dict so it survives the `.arklight` round trip.
+- New `ActionSpec.state_args` opts arguments in; only `set`/`append`'s
+  `value` do. `increment`/`decrement`/`remove` reject `Bind(...)` at build
+  time (input text is a string: `0 + "5"` is `"05"`).
+- Validation (`_validate_action_args`): named state must be a `State`/
+  `Computed` on the page; the marker must be well-formed; `__state__` is a
+  reserved key in literal dict arguments. Runs for `on_click=`, `Watch`
+  `then=`, and `Repeat` templates (`page_state` is now threaded through
+  those validators).
+- JS: `arklight/backend/js/runtime/action_args.py`'s `resolveActionArgs`,
+  inlined into `wireClickInterceptor` and `wireWatchers`. Returns a fresh
+  object (a `Watch`'s args live for the whole page). Action fragments are
+  unchanged. No eval.
+- Component-owned state: markers are renamed with the action's target.
+- `arklight search` shows which action arguments accept `Bind(...)`.
+
+**Fixed along the way:** `Action.append("tasks", Bind("draft"))` used to
+pass Validation and crash the HTML backend with a raw `TypeError: Object of
+type ARKNode is not JSON serializable`.
+
+**Known limits:** debouncing the `Bind.model(...)` a submit button reads
+from means a click inside the delay reads the previous value; only
+top-level argument values are read; no Enter-to-submit.
+
+**Tests:** `tests/test_action_value_from_state.py` (31), including two
+Node-driven tests of the real dispatch fragments (both fail with
+resolution disabled). Full suite: 1538 passed.
+
+`0.06502` -> `0.06503` (`pyproject.toml`).
+
 ## [0.06502] -- Capability fix: `# define` is a real define; the preamble reaches every Python file; the stdlib is the whole API
 
 Second follow-up to `[0.0650]`, numbered by the same rule as

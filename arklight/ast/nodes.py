@@ -26,6 +26,35 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 
+# `Action.*(...)` arg values that read live state: the wire-level shape
+# of "the value `State`/`Computed` `name` holds at the moment this action
+# runs" is the plain JSON object `{"__state__": "<name>"}`. A plain
+# dict -- not a dataclass -- on purpose: it must survive the
+# `.arklight` binary round trip (`dataclasses.asdict` flattens a
+# dataclass nested inside `ActionRef.args`, losing its type tag; see
+# `ItemIndexRef`'s known gap in `arklight/ir/binary.py`), pass straight
+# through `json.dumps` in every place an `ActionRef`'s args are
+# serialized (HTML attrs, `IRPage.watch`, Repeat template specs), and
+# be recognized by the JS runtime with no per-backend translation.
+# Authors never write this by hand: `Action.append("tasks", Bind("draft"))`
+# builds it (`arklight.api`), `arklight.ir.validate` checks it,
+# `arklight/backend/js/runtime/action_args.py` resolves it.
+STATE_REF_KEY = "__state__"
+
+
+def state_ref(name: str) -> dict[str, str]:
+    """Build the `{"__state__": name}` marker (see `STATE_REF_KEY`)."""
+    return {STATE_REF_KEY: name}
+
+
+def is_state_ref(value: Any) -> bool:
+    """True for any dict carrying the reserved `__state__` key --
+    well-formed or not, so validation can reject a malformed one
+    (extra keys, non-string name) instead of letting it through as a
+    literal dict the runtime would then misread."""
+    return isinstance(value, dict) and STATE_REF_KEY in value
+
+
 @dataclass(frozen=True)
 class ClassBindSpec:
     """

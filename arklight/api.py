@@ -28,6 +28,7 @@ from arklight.ast.nodes import (
     PlatformAPIRef,
     PredicateRef,
     node,
+    state_ref,
 )
 from arklight.backend.css import selectors as css_selectors
 
@@ -696,6 +697,23 @@ def _bind_model(name: str, *, debounce: int | None = None, throttle: int | None 
 Bind.model = _bind_model
 
 
+def _action_arg(value: Any) -> Any:
+    """
+    A `Bind(name)` handed to an `Action.*(...)` as an argument means
+    "the value `name` holds when the action runs", not a literal --
+    the same reading `Text(Bind("count"))` already gives it wherever a
+    literal value is accepted. Converted here, at construction, to the
+    JSON-safe `{"__state__": name}` marker
+    (`arklight.ast.nodes.state_ref`) so every later stage carries it
+    like any other arg value. Anything else passes through untouched.
+    Whether a given action's argument may take one is decided in
+    Validation (`ActionSpec.state_args`), not here.
+    """
+    if isinstance(value, ARKNode) and value.type == "Bind":
+        return state_ref(value.props["name"])
+    return value
+
+
 class Action:
     """
     A closed vocabulary of state-mutating actions for `on_click=`,
@@ -716,19 +734,38 @@ class Action:
     reads the store's own captured initial value). Only the most
     commonly needed additions; see docs/DESIGN-NOTES.md for what's
     deliberately left for a future version.
+
+    Capability fix (live-input -> action-value): `set`'s and
+    `append`'s `value` may be a `Bind("name")` instead of a literal --
+    "whatever `name` holds when the click happens". Paired with
+    `bind_value=Bind.model("draft")` on an `Input`, that is the
+    conventional `[type a task] [Add]` workflow:
+
+        State("draft", "")
+        State("tasks", [])
+        Input(bind_value=Bind.model("draft"))
+        Button("Add", on_click=Action.append("tasks", Bind("draft")))
+        Watch("tasks", then=Action.reset("draft"))   # clear after adding
+
+    Still closed vocabulary: the target must be a `State(...)` or
+    `Computed(...)` declared on the same page (checked at build time),
+    and it is read by name from the store -- never evaluated as an
+    expression. Other actions' arguments (`increment`'s `delta`,
+    `remove`'s `index`) reject a `Bind(...)` at build time. See
+    `docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`.
     """
 
     @staticmethod
     def set(name: str, value: Any) -> ActionRef:
-        return ActionRef(action="set", state=name, args={"value": value})
+        return ActionRef(action="set", state=name, args={"value": _action_arg(value)})
 
     @staticmethod
     def increment(name: str, delta: Any = 1) -> ActionRef:
-        return ActionRef(action="increment", state=name, args={"delta": delta})
+        return ActionRef(action="increment", state=name, args={"delta": _action_arg(delta)})
 
     @staticmethod
     def decrement(name: str, delta: Any = 1) -> ActionRef:
-        return ActionRef(action="decrement", state=name, args={"delta": delta})
+        return ActionRef(action="decrement", state=name, args={"delta": _action_arg(delta)})
 
     @staticmethod
     def toggle_bool(name: str) -> ActionRef:
@@ -741,12 +778,12 @@ class Action:
     @staticmethod
     def append(name: str, value: Any) -> ActionRef:
         """Appends `value` to a list-valued `State(...)`."""
-        return ActionRef(action="append", state=name, args={"value": value})
+        return ActionRef(action="append", state=name, args={"value": _action_arg(value)})
 
     @staticmethod
     def remove(name: str, index: Any) -> ActionRef:
         """Removes the element at `index` from a list-valued `State(...)`."""
-        return ActionRef(action="remove", state=name, args={"index": index})
+        return ActionRef(action="remove", state=name, args={"index": _action_arg(index)})
 
     @staticmethod
     def geolocate(name: str) -> ActionRef:

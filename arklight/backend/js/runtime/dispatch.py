@@ -182,7 +182,10 @@ that always returns `null`, which the action branch's existing
 
 from __future__ import annotations
 
+from arklight.backend.js.runtime.action_args import RESOLVE_ACTION_ARGS_JS
+
 CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
+""" + RESOLVE_ACTION_ARGS_JS + """
     var debounceTimers = new WeakMap();
     var throttleLast = new WeakMap();
     var onceFired = new WeakSet();
@@ -235,7 +238,7 @@ CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
             var args = argsRaw ? JSON.parse(argsRaw) : {};
             var action = actions[actionName];
             if (!action) return;
-            action(store, stateKey, args);
+            action(store, stateKey, resolveActionArgs(store, args));
           } catch (err) {
             arkNotify("Something went wrong updating this page -- an unsupported or unexpected case was hit.");
           }

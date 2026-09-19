@@ -323,10 +323,21 @@ KNOWN_REVEAL_BEHAVIORS = frozenset(REVEAL_REGISTRY)
 @dataclass
 class ActionSpec:
     args: tuple[str, ...] = field(default_factory=tuple)
+    # Capability fix (live-input -> action-value): the subset of `args`
+    # that may be fed from live state instead of a compile-time
+    # literal -- `Action.append("tasks", Bind("draft"))` reads
+    # `State("draft")`'s current value when the click happens. Empty
+    # by default: an action opts a given argument in explicitly, so
+    # `Bind(...)` in any other position (e.g. `increment`'s `delta`,
+    # where an input-bound *string* would silently concatenate rather
+    # than add) is a build-time error, not a runtime surprise. See
+    # `arklight.ast.nodes.STATE_REF_KEY` for the wire shape and
+    # `arklight/backend/js/runtime/action_args.py` for the resolution.
+    state_args: tuple[str, ...] = field(default_factory=tuple)
 
 
 ACTION_REGISTRY: dict[str, ActionSpec] = {
-    "set": ActionSpec(args=("value",)),
+    "set": ActionSpec(args=("value",), state_args=("value",)),
     "increment": ActionSpec(args=("delta",)),
     "toggle_bool": ActionSpec(),
     # ------------------------------------------------------------------
@@ -351,7 +362,7 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
     # value, remove by index), not a full list-editing vocabulary. See
     # docs/DESIGN-NOTES.md for what's still left for a future version.
     # ------------------------------------------------------------------
-    "append": ActionSpec(args=("value",)),
+    "append": ActionSpec(args=("value",), state_args=("value",)),
     "remove": ActionSpec(args=("index",)),
     # ------------------------------------------------------------------
     # `v0.063` (docs/version history/v0.063.md): JS vocabulary addendum
