@@ -5,6 +5,92 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06502] -- Capability fix: `# define` is a real define; the preamble reaches every Python file; the stdlib is the whole API
+
+Second follow-up to `[0.0650]`, numbered by the same rule as
+`[0.06501]` (`0.0650` plus decimals; the roadmap's `v0.065` is never
+touched). Still a **capability fix**. Three things, none of them new
+surface.
+
+**1. `# define` is C's `#define`.** In `[0.06501]` it was an alias
+between *included objects* (`# define Btn -> Button` looked `Button` up
+among the includes; `# define Button -> acc.x.Button` picked one
+include's copy). That was a second, quieter way to bind names, which is
+what `# include` is for. It is now what the word means: `# define
+<name> -> <text>` replaces the name with the text at compile time. Both
+sides are strings; the right one is the rest of the line, verbatim, so
+it can be a number, a string literal, another name, any text that is
+valid Python where it lands. It binds nothing and needs no include --
+the exception among the directives, on purpose.
+
+- The left side is one Python identifier (not a keyword), matched as a
+  whole *token* of code: `Btn` never touches `Btn2`; nothing inside a
+  string literal (f-strings included, the same on every supported
+  Python) or a comment is replaced.
+- One pass, no rescanning. A define whose text mentions another
+  define's name is refused instead, so the missing rescan can't turn
+  into a surprise.
+- Per file. A define may not take the name of included vocabulary
+  (that would silently override the API), two defines for one name must
+  agree, an empty right side is refused (it used to be silently taken
+  for a comment), and the file must still parse afterwards -- if not,
+  the error names the defines in effect. No line ever moves.
+- `load_site` now runs `discover` and `exec` on the define-applied
+  source; that is the source that actually runs.
+
+Behavior change, stated plainly: the collision-picking form
+(`# define Button -> acc.some_collection.Button`) is gone, and the
+collision message no longer suggests it. Two includes binding one name
+to different objects still fail loudly; the way out is to drop one
+include or have one side export another name. No directive resolves a
+collision today (see the `use` proposal, Q5).
+
+**2. Every Python file ARKlight takes in gets its preamble.** Reproduced
+first: in the production scaffold, `pages/home.py` with `# include
+<stdlib.ARKlight>` failed with `NameError: name 'Page' is not defined`,
+because only the site file's preamble was ever read (which is why the
+scaffold's sibling files kept `from arklight import *`). Now an import
+hook, installed for the duration of `load_site` and scoped to the site
+file's own directory, reads the preamble of each project module the site
+imports; `arklight.config.py` goes through the same `run_source` step.
+The standard library and pip-installed packages (ACC ones included) are
+untouched and never see the hook. Consequences:
+
+- Each file needs its own `# include`, and defines are per file.
+- The shadowing check and the `from arklight import *` notice cover
+  project modules too.
+- The site's directory is on `sys.path` (and the hook installed) while
+  the site's own preamble resolves, so an `# include <acc.x>` for a
+  module that lives in the project now resolves, and that module gets
+  its own preamble. Everything is removed again afterward, including
+  after a failed load.
+- The production scaffold's `components/nav.py` and `pages/*.py` moved
+  to `# include <stdlib.ARKlight>`.
+- The hook bypasses the bytecode cache for project modules on purpose:
+  what runs is the define-applied source.
+
+**3. `# include <stdlib.ARKlight>` is the whole public API.** It binds
+`arklight.__all__`, which lacked four names: `CSSSyntaxError` and
+`DuplicateStyleNameError` (defined in `arklight/api.py`), and
+`ComponentError` and `DuplicateComponentError` (what the exported
+`component(...)` raises). Added. A file that happens to define one of
+those names itself now gets the ordinary loud shadowing error. A test
+now fails if `arklight.api` gains a public name that `__all__` lacks.
+
+**Also.** The preamble parser is now a small registry (one recogniser
+plus one handler per directive) so more directives can be added without
+touching the rest; `# use <...>` is *reserved* and refused with a
+pointer to `docs/Proposals/USE-PREAMBLE-PROPOSAL.md` (a discussion
+document, **not accepted**) rather than silently ignored.
+
+**Tests:** 11 alias-semantics tests in `tests/test_preamble.py` removed
+(they encoded the old behavior); `tests/test_preamble_define.py` (41)
+and `tests/test_preamble_scope.py` (18) added. Disabling the import
+hook makes the project-module tests fail with the `NameError` above.
+Full suite: 1502 passed.
+
+`0.06501` -> `0.06502` (`pyproject.toml`).
+
 ## [0.06501] -- Capability fix follow-up: retire `from arklight import *`, see names a file defines itself, split `# define` into normalize/validate
 
 Bug-fix follow-up to `[0.0650]`, numbered by the same rule as the

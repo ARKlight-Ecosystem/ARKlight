@@ -58,6 +58,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.0649  | Docs-only incremental patch, part 3 of `v0.0647`: moved the root `README.md`'s inline site-example code block (`Page(Heading(...), Text(...), Button(...))` + `arklight build`/output lines) into a new "Example" section in `docs/Foundational/GETTING-STARTED.md`, between Install and Repository layout. The root README was the one place still restating actual component-API surface -- exactly the kind of content that drifts as the API grows, unlike a fixed `pip install -e .` command or a pointer link. Root `README.md`'s Install section now reads pitch, one install command, one pointer -- nothing left in it that the component API, CLI, or repository layout could make stale. Updated `GETTING-STARTED.md`'s own intro line (\"pitch and quickstart\" -> \"pitch\", since the quickstart moved here) and its repository-layout comment on `examples/hello_site/` (previously \"Example site matching the root README\", now stale since the README no longer holds an example to match; repointed at this doc's new Example section instead). No code changed. Alpha-branch only. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same slot-sharing precedent as `v0.0431`/`v0.0641`-`v0.0648` | DONE |
 | v0.0650  | Capability fix: preamble directives -- `# include <stdlib.ARKlight>` / `# include <acc.<dotted.module.path>>` / `# define <alias> -> <target>`, reserved-shape comments ARKlight's own loader parses and resolves itself (`arklight/parser/preamble.py`, new module), replacing reliance on raw `from X import *` for the step that gets vocabulary names into a site file's namespace. Fixes the one namespace-binding step the compiler's existing "fail loudly, no silent winner" doctrine (`DuplicateComponentError`, `CapabilityError`) didn't yet cover: two includes disagreeing on a name now raise `PreambleCollisionError` naming both sources, instead of Python's own star-import silently keeping whichever ran last. `arklight/parser/loader.py` wires the resolved bindings in before `exec`; new "Preamble directives" section in `docs/Foundational/AUTHORING-GUIDE.md`. `from arklight import *` keeps working unchanged -- purely additive. `tests/test_preamble.py` (18 tests); full suite 1425 passed. `0.0641` -> `0.0650` version bump. Out-of-band, numbered inside the v0.064 -> v0.065 gap, same "capability fixes take priority" treatment as `v0.0431`/`v0.0641` | DONE |
 | v0.06501 | Capability fix follow-up to `v0.0650`: `from arklight import *` retired (still works; every build logs a notice naming file/line and the `# include <stdlib.ARKlight>` replacement); the two things the preamble couldn't see now fail loudly -- a site file rebinding a name its own preamble bound (`def`/assignment/import/star import, checked after `exec`), and a user `@component` named like a built-in, which silently replaced every built-in of that name (`register_component` now refuses it unless `allow_redefine=True`); `# define` split the way the rest of the compiler is -- applied in normalization (a rename), raised in validation, plus a new duplicate-define check. `arklight/parser/preamble.py`/`loader.py`, `arklight/ir/components.py`; scaffolds/example/docs moved to the preamble syntax. `tests/test_preamble.py` 18 -> 43; full suite 1454 passed. `0.0650` -> `0.06501`; roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent as `v0.0650` | DONE |
+| v0.06502 | Capability fix follow-up to `v0.06501`: `# define` is now C's `#define` (name replaced by text, token-based, per file, one pass; no longer an alias between included objects), the preamble is read in **every** Python file ARKlight takes in (project modules via an import hook scoped to the site directory; `arklight.config.py`) instead of the site file only, and `# include <stdlib.ARKlight>` is the whole public API (`CSSSyntaxError`, `DuplicateStyleNameError`, `ComponentError`, `DuplicateComponentError` added to `__all__`, with a structural test). Preamble parser is now a directive registry; `# use` is reserved and refused, with `docs/Proposals/USE-PREAMBLE-PROPOSAL.md` (discussion, **not accepted**). `arklight/parser/preamble.py`/`loader.py`, `arklight/config.py`; production scaffold migrated. Collision-picking `# define` removed (behavior change, in `CHANGELOG.md`). Tests: `test_preamble_define.py` +41, `test_preamble_scope.py` +18, 11 obsolete removed; full suite 1502 passed. `0.06501` -> `0.06502`; roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -136,6 +137,55 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06502 -- Capability fix follow-up: `# define` fixed, preamble everywhere, stdlib complete (DONE)
+
+Out-of-band, same slot-sharing precedent as `v0.0650`/`v0.06501`;
+numbered `0.0650` plus decimals, roadmap `v0.065` untouched.
+
+**`# define`.** `v0.06501` made it an alias between included objects --
+a second way to bind names, next to the one directive that exists for
+that. It is now what the word says, lifted from C: the left name is
+replaced by the right text before the file runs, nothing is bound.
+Implemented on tokens (`tokenize`), not regex, so strings, comments and
+f-strings are never touched and `Btn` never matches `Btn2`; f-string
+contents are skipped explicitly so behavior is identical on Python
+3.10-3.13 (3.12 tokenizes f-strings into real NAME tokens, earlier
+versions do not). One pass, no rescan, with a validation rule making the
+missing rescan loud instead of surprising. The loader now discovers and
+executes the define-applied source; every substitution is one line, so
+line numbers still match. A post-substitution parse check turns "syntax
+error in code I never wrote" into an error naming the defines in effect.
+
+**Every Python file.** Reproduced first (`NameError: name 'Page' is not
+defined` in a scaffolded `pages/home.py`). An import hook
+(`sys.meta_path`, front) swaps the loader only for modules whose source
+is inside the site file's directory and runs the shared `run_source`
+step; everything else falls through to Python. Installed for the
+duration of `load_site`, removed in `finally`. `arklight.config.py` uses
+the same step. The site directory is now on `sys.path` before the
+preamble resolves, so project-local ACC modules can be included.
+Third-party ACC packages are deliberately outside the boundary.
+
+**Stdlib.** Four names missing from `__all__`; added, and a structural
+test compares `arklight.api`'s public names to `__all__` so it cannot
+drift again.
+
+**Directive registry, `use` reserved.** One recogniser + one handler per
+directive; `# use <...>` refused with a pointer to the proposal, which
+records the maintainer's stated thinking and seven open questions and
+decides none of them.
+
+**Removed, on purpose:** the collision-picking form of `# define`. No
+directive resolves an include collision now (proposal Q5).
+
+**Tests:** `test_preamble_define.py` (41) and `test_preamble_scope.py`
+(18) added; 11 alias-semantics tests removed. Hook disabled -> the
+project-module tests fail. Full suite: 1502 passed.
+
+**Not done, on purpose:** `# use`/`UI.ARKlight`/`UX.ARKlight` (proposal
+only); ACC packages installed outside the project; retiring
+`from arklight import *` beyond the existing notice.
 
 ## v0.06501 -- Capability fix follow-up: the preamble's blind spots (DONE)
 

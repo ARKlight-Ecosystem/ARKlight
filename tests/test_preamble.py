@@ -126,55 +126,6 @@ def test_two_includes_disagreeing_on_a_name_raises_collision(monkeypatch):
         )
 
 
-def test_define_disambiguates_a_collision(monkeypatch):
-    fake_a = types.ModuleType("fake_acc_define_a")
-    marker_a = object()
-    fake_a.Button = marker_a
-    fake_a.__all__ = ["Button"]
-    fake_b = types.ModuleType("fake_acc_define_b")
-    fake_b.Button = object()
-    fake_b.__all__ = ["Button"]
-    monkeypatch.setitem(sys.modules, "fake_acc_define_a", fake_a)
-    monkeypatch.setitem(sys.modules, "fake_acc_define_b", fake_b)
-
-    bindings = resolve_preamble(
-        "# include <acc.fake_acc_define_a>\n"
-        "# include <acc.fake_acc_define_b>\n"
-        "# define Button -> acc.fake_acc_define_a.Button\n"
-    )
-    assert bindings["Button"] is marker_a
-
-
-def test_define_bare_target_must_be_unambiguous():
-    with pytest.raises(PreambleError, match="nothing included"):
-        resolve_preamble("# define Alias -> Nonexistent\n")
-
-
-def test_define_dotted_target_unknown_label_raises():
-    with pytest.raises(PreambleError, match="no `# include"):
-        resolve_preamble(
-            "# include <stdlib.ARKlight>\n# define X -> acc.never_included.Foo\n"
-        )
-
-
-def test_define_dotted_target_unknown_name_raises():
-    with pytest.raises(PreambleError, match="has no"):
-        resolve_preamble(
-            "# include <stdlib.ARKlight>\n"
-            "# define X -> stdlib.ARKlight.NotARealName\n"
-        )
-
-
-def test_define_alias_from_stdlib_include():
-    bindings = resolve_preamble(
-        "# include <stdlib.ARKlight>\n# define Btn -> Button\n"
-    )
-    import arklight
-
-    assert bindings["Btn"] is arklight.Button
-    assert bindings["Button"] is arklight.Button
-
-
 # ---------------------------------------------------------------------------
 # integration through load_site
 # ---------------------------------------------------------------------------
@@ -271,58 +222,11 @@ def test_a_module_docstring_ends_the_preamble():
 # ---------------------------------------------------------------------------
 
 
-def test_normalization_applies_define_as_a_rename():
-    import arklight
-
-    normalized = normalize_preamble(
-        parse_preamble("# include <stdlib.ARKlight>\n# define Btn -> Button\n")
-    )
-    assert normalized.problems == []
-    assert [b.value for b in normalized.bindings["Btn"]] == [arklight.Button]
-
-
-def test_normalization_records_a_bad_define_instead_of_raising():
-    normalized = normalize_preamble(
-        parse_preamble("# include <stdlib.ARKlight>\n# define Btn -> NoSuchName\n")
-    )
-    assert len(normalized.problems) == 1
-    assert "Btn" not in normalized.bindings  # left out, not half-applied
-
-
-def test_validation_is_what_raises_a_recorded_define_problem():
-    normalized = normalize_preamble(
-        parse_preamble("# include <stdlib.ARKlight>\n# define Btn -> NoSuchName\n")
-    )
-    with pytest.raises(PreambleError, match="NoSuchName"):
-        validate_preamble(normalized)
-
-
 def test_normalization_records_a_failed_include_instead_of_raising():
     normalized = normalize_preamble(parse_preamble("# include <nonsense>\n"))
     assert len(normalized.problems) == 1
     with pytest.raises(PreambleError, match="unrecognized"):
         validate_preamble(normalized)
-
-
-def test_two_defines_disagreeing_about_one_alias_is_a_collision():
-    source = (
-        "# include <stdlib.ARKlight>\n"
-        "# define Thing -> Button\n"
-        "# define Thing -> Text\n"
-    )
-    with pytest.raises(PreambleCollisionError, match="already defined at line 2"):
-        resolve_preamble(source)
-
-
-def test_repeating_the_same_define_is_harmless():
-    source = (
-        "# include <stdlib.ARKlight>\n"
-        "# define Thing -> Button\n"
-        "# define Thing -> Button\n"
-    )
-    import arklight
-
-    assert resolve_preamble(source)["Thing"] is arklight.Button
 
 
 # ---------------------------------------------------------------------------
@@ -387,15 +291,6 @@ def test_leftover_star_import_shadowing_vocabulary_is_rejected(tmp_path, monkeyp
         "# include <stdlib.ARKlight>\nfrom fake_shadow_star import *\n" + _SITE_TAIL,
     )
     with pytest.raises(SiteLoadError, match="from fake_shadow_star import"):
-        load_site(path)
-
-
-def test_shadowing_a_define_alias_names_the_define_as_the_origin(tmp_path):
-    path = write_site(
-        tmp_path,
-        "# include <stdlib.ARKlight>\n# define Btn -> Button\nBtn = 1\n" + _SITE_TAIL,
-    )
-    with pytest.raises(SiteLoadError, match=r"`Btn` \(bound by `# define \(line 2\)`"):
         load_site(path)
 
 
