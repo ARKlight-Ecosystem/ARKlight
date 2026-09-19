@@ -102,6 +102,25 @@ the supply of capability fixes (and, ideally, bug fixes) for the
 in-scope surface below has run dry, not the point at which someone
 decides to stop looking for them.
 
+### Issue triage during Alpha
+
+Every incoming issue sorts into exactly one of three buckets, and only
+two of them are accepted:
+
+- **Bug fix.** The compiler broke a contract it had already made (see
+  `v0.0431` above). Accepted, and gets its own multistage
+  implementation doc under `docs/Proposals/` before any code lands.
+- **Capability fix.** The compiler shipped no authored answer for
+  something the existing vocabulary implied it should have (see
+  `v0.0641` above). Accepted, and likewise gets its own multistage
+  implementation doc under `docs/Proposals/` before any code lands.
+- **Everything else.** Feature requests, scope expansions, and
+  anything not traceable to a broken or missing contract as defined
+  above. Not accepted during Alpha -- not because the idea lacks
+  merit, but because it isn't the current focus of ARKlight Alpha,
+  which is closing the supply of bug fixes and capability fixes for
+  the in-scope surface in Section 3, not opening new surface.
+
 ## 3. Scope: the Web Developing parts, and nothing wider
 
 **The v1.0 promise applies to one thing: the Web Developing parts of
