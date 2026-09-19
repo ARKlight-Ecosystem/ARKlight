@@ -5,20 +5,19 @@
 <img src="https://raw.githubusercontent.com/ARKlight-Ecosystem/ARKlight/alpha/ARKlight-logo.png" alt="ARKlight" width="160" height="160">
 
 </td>
-<td align="centre">
-<div align = "centre">
+<td valign="middle">
+<div align="center">
 
-# ARKlight
+# ARKlight Framework
 
-A Python-first compiler for building beautiful static websites.
-
-Users write Python. ARKlight produces standard HTML. **The browser never
-executes Python.**
+**A Python-first compiler for building static websites where developers work
+with a structured component API, while the output remains ordinary, dependency-free `Hyper Text Markup Language` `Casscading Style Sheets` `JavaScript`.**
 
 </div>
 </td>
 </tr>
 </table>
+
 
 ```python
 from arklight import *
