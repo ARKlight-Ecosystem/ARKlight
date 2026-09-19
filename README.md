@@ -15,7 +15,7 @@ authorship time, and clean web artifacts at deployment time.
 If you're new to ARKlight or evaluating whether it fits your needs, start with the
 documentation in this order:
 
-1. **[The Pitch](docs/PITCH.md)** — the problem ARKlight is trying to solve,
+1. **[The Pitch](docs/foundational/PITCH.md)** — the problem ARKlight is trying to solve,
    its intended use, and the larger idea behind the project.
 
 2. **[What is ARKlight?](docs/Foundational/WHAT-IS-ARKLIGHT.md)** — a concise
