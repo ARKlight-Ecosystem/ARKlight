@@ -5,6 +5,33 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06504] -- Bug fix: `trusted_script_origins` CSP directive injection
+
+**DRAFT ENTRY -- version slot not confirmed by a maintainer.** Filed to
+close a gap found during a docs-consistency pass: this fix landed in
+`arklight/api.py`/`tests/test_csp.py` and its own design record
+(`docs/Proposals/CSP-TRUSTED-ORIGIN-INJECTION-BUGFIX.md`) already says
+"Implemented, alpha," but -- unlike every other out-of-band fix in this
+range (`0.0431`, `0.0641`, `0.0650`-`0.06503`) -- it never got a
+`pyproject.toml` version bump, a `CHANGELOG.md` entry, or a
+`PROGRESS.md` snapshot row. Numbered `0.06504` here on the same
+`0.0650` + decimals precedent as its neighbors; a maintainer should
+confirm the slot before this ships. Out-of-band, numbered inside the
+`v0.064` -> `v0.065` gap, same "capability fixes take priority"
+treatment as `0.0431`/`0.0641`-`0.06503`.
+
+`_render_csp_meta_tag` (`arklight/backend/html/csp.py`) spliced every
+`Site(trusted_script_origins=...)` entry verbatim into the `script-src`
+directive. `Site.__init__`'s only check was "non-empty string" --
+nothing validated *what* the string contained, so
+`trusted_script_origins=["'unsafe-inline'"]` silently defeated the
+strict-CSP guarantee the module's own docstring promises. Fixed by
+rejecting `'unsafe-inline'`/`'unsafe-eval'` (quoted or not, case-
+insensitive) and any origin containing a directive-breaking character
+(`;`, whitespace) at `Site.__init__` time, so the failure is a build-time
+`ValueError`, not a silent hole. Full design record:
+`docs/Proposals/CSP-TRUSTED-ORIGIN-INJECTION-BUGFIX.md`.
+
 ## [0.06503] -- Capability fix: live-input -> action-value (`Bind(...)` as an `Action.set`/`Action.append` argument)
 
 Numbered by the same rule as `[0.06501]`/`[0.06502]` (`0.0650` plus
