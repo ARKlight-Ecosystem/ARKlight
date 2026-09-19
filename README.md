@@ -10,6 +10,26 @@ inspectable, portable output that works anywhere static files are hosted.
 No Python runtime in production. No framework bloat. Just Python ergonomics at
 authorship time, and clean web artifacts at deployment time.
 
+## New here?
+
+If you're new to ARKlight or evaluating whether it fits your needs, start with the
+documentation in this order:
+
+1. **[The Pitch](docs/PITCH.md)** — the problem ARKlight is trying to solve,
+   its intended use, and the larger idea behind the project.
+
+2. **[What is ARKlight?](docs/Foundational/WHAT-IS-ARKLIGHT.md)** — a concise
+   explanation of what ARKlight is, how it works, and what it currently provides.
+
+3. **[Foundational Documentation](docs/Foundational/)** — the deeper technical
+   documentation covering ARKlight's architecture, compiler model, capabilities,
+   design decisions, limitations, and roadmap.
+
+Start with the pitch if you want to understand the *why*. Read *What is ARKlight?*
+for the practical picture. If you're still interested, the foundational
+documentation is the place to understand ARKlight in enough depth to decide
+whether it fits your project.
+
 ## Install
 
 ```bash
