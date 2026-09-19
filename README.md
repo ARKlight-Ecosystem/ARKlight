@@ -5,7 +5,7 @@
 <img src="https://raw.githubusercontent.com/ARKlight-Ecosystem/ARKlight/alpha/ARKlight-logo.png" alt="ARKlight" width="160" height="160">
 
 </td>
-<td valign="middle">
+<td valign="middle" align="centre">
 
 # ARKlight
 
