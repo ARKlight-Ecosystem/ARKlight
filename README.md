@@ -15,10 +15,10 @@ authorship time, and clean web artifacts at deployment time.
 If you're new to ARKlight or evaluating whether it fits your needs, start with the
 documentation in this order:
 
-1. **[The Pitch](docs/foundational/PITCH.md)** — the problem ARKlight is trying to solve,
+1. **[The Pitch](docs/Foundational/PITCH.md)** — the problem ARKlight is trying to solve,
    its intended use, and the larger idea behind the project.
 
-2. **[What is ARKlight?](docs/Foundational/WHAT-IS-ARKLIGHT.md)** — a concise
+2. **[What is ARKlight?](docs/Foundational/WHAT-ARKLIGHT-IS.md)** — a concise
    explanation of what ARKlight is, how it works, and what it currently provides.
 
 3. **[Foundational Documentation](docs/Foundational/)** — the deeper technical
