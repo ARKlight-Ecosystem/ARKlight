@@ -56,8 +56,11 @@ whether it fits your project.
 [Rae ARK] for a while for personal reasons. It's
 [Rae ARK] clearly not ready for anything involving
 [Rae ARK] ⚠️ Production and until the compiler
-[Rae ARK] reaches v3. It is only recommended for
-[Rae ARK] Informal, personal, hobby projects.
+[Rae ARK] reaches a stable stage. It is only recommended
+[Rae ARK] for informal, personal, hobby projects.
+[Rae ARK] So if there's an audience waiting for it?
+[Rae ARK] Showing their support (eg: Stars, Forks, and such?)
+[Rae ARK] it motivates me. 
 ```
 
 ## Install
