@@ -271,6 +271,87 @@ one -- and each one is wrong in a specific, checkable way, not just
 
 ## 5. Where it sits against the rest of the field
 
+ARKlight's authoring ideas come from frontend/UI-framework lineage; its compiled artifacts are SSG-like in principle. That combination is not itself a recognized category -- the table below compares ARKlight against the *nearest* tool on each axis, not against a peer in its own category, because by the definition in Section 1 there isn't one yet.
+
+| Category | Closest relative | The real difference |
+|---|---|---|
+| Static-site generators | Astro (component-authored, JS only where needed) | Astro accepts any JS framework as an island and requires npm/JS knowledge for anything beyond bare content; ARKlight has exactly one, Python-only, closed vocabulary and serves an audience (Python-only developers, structurally unwilling to touch JS) that Astro doesn't attempt to serve at all. |
+| Compiler-first UI frameworks | Svelte (reactivity resolved at compile time, not via a shipped runtime) | Svelte still ships a real, if small, named runtime (`svelte`'s own docs draw this line explicitly) and lets you write arbitrary JS inside a component. ARKlight's macro-expanded components ship *zero* bytes for the abstraction itself, and the vocabulary is closed by construction -- no expression evaluation exists anywhere in the pipeline. |
+| Native-wrapper tooling | Tauri / Capacitor (system WebView, not bundled Chromium) | Tauri/Capacitor wrap an arbitrary, independently-trusted web app. ARKlight's native shells package the compiler's *own* closed-vocabulary output -- there's no second layer of arbitrary code to trust, because there isn't a mechanism to introduce one. |
+| Python-to-native-app tools | Kivy / BeeWare | Both bundle an actual Python interpreter into the shipped artifact. ARKlight ships zero Python anywhere in any artifact, web or native -- Python exists only at build time, on the developer's machine. |
+
+### What can you build with ARKlight?
+
+The following is the practical capability boundary for the current alpha. These categories describe what ARKlight can reasonably produce today, rather than what may exist on the roadmap.
+
+#### Content, marketing, and documentation
+
+| Client need | Feasible today? | Why / mechanism |
+|---|---|---|
+| Marketing site, landing page, portfolio | Yes | Full HTML vocabulary including `Section`, `Article`, `Table`, `Form`, `Picture`, and other built-in components. |
+| Documentation site | Yes | Static routes and structured content compile directly to deployable HTML/CSS/JS. |
+| Blog or publication-style site | Yes | Independently compiled pages, reusable components, styling, routing, and static output fit the content-oriented model. |
+| Responsive content pages | Yes | Responsive state and CSS generation can adapt the output without requiring handwritten `@media` rules in ordinary use. |
+
+#### Interactive websites and widgets
+
+| Client need | Feasible today? | Why / mechanism |
+|---|---|---|
+| Accordions, toggles, tabs, dismissible UI | Yes | Closed `BEHAVIOR_REGISTRY` primitives such as `toggle`, `scroll-to`, `copy`, and `dismiss`. |
+| Copy-to-clipboard interactions | Yes | `copy` behavior is represented through the compiler's registered behavior vocabulary. |
+| Local reactive UI | Yes | `State`, `Computed`/`Derive.*`, `Watch`, `Show`, and related primitives provide synchronous in-memory reactivity. |
+| Interactive forms with local state | Yes | Form elements can bind values to state and participate in the supported action/derivation vocabulary. |
+| Deep-linkable UI state | Yes | `State(..., query=..., history=...)` synchronizes state with URL query parameters and browser history. |
+| Persisted user preferences | Yes | `State(..., persist=True)` uses `localStorage` for supported client-side persistence. |
+| Viewport-responsive behavior | Yes | `State(..., media="...")` can expose media-query state to the closed reactive vocabulary. |
+| Lists rendered from data | Yes | `Repeat`/`RepeatItem` provides data-driven repeated rendering. |
+
+#### Packaged and offline experiences
+
+| Client need | Feasible today? | Why / mechanism |
+|---|---|---|
+| Installable PWA | Yes | `arklight pwa` adds the manifest and service-worker machinery to an existing build. |
+| Single-file website artifact | Yes | `arklight pack` produces a sealed `.ark` bundle containing the website and its package data. |
+| Website that can be distributed without a web server | Yes | The compiled output is static, and `.ark` bundles are designed to be opened by the corresponding viewer tooling. |
+| Air-gapped or offline content delivery | Yes | Static output and packaged `.ark` artifacts do not require a server at request time. |
+
+#### Native-wrapped applications
+
+| Client need | Feasible today? | Why / mechanism |
+|---|---|---|
+| Android wrapper around an ARKlight site | Alpha | Android backend uses AndroidX/WebView infrastructure and `WebViewAssetLoader` to provide the packaged site through a stable HTTPS-style asset origin. |
+| Linux desktop wrapper | Alpha | Desktop backend uses GTK3 + WebKit2GTK and packages the compiled web output in a native shell. |
+| Cross-platform native distribution | Partially | Android and Linux desktop backends exist, but the native target surface is still alpha and does not provide a general native plugin/API ecosystem. |
+| iOS application | No | There is no iOS backend, and the current native-shell architecture does not provide an equivalent implementation. |
+
+#### Applications ARKlight does not currently target
+
+| Client need | Feasible today? | Why / mechanism |
+|---|---|---|
+| Backend-driven application with authentication | No | ARKlight has no server runtime, authentication system, or account model. |
+| Database-backed application | No | There is no database/server integration in the current closed vocabulary. |
+| Checkout or payment application | No | No sanctioned backend/payment-service integration exists in the current compiler vocabulary. |
+| API-driven application requiring arbitrary HTTP requests | No | There is currently no general fetch/HTTP primitive in the closed vocabulary. `Provider` is the accepted direction for external services, but that does not make arbitrary API consumption available today. |
+| Large SPA-shaped application | No | ARKlight does not provide a persistent application-level component tree, general client-side router, or fine-grained reactive dependency graph. |
+| Complex multi-view client application | Not currently targeted | Pages remain independently compiled documents; `app_shell=True` improves navigation behavior but does not turn the output into a conventional SPA. |
+| Arbitrary custom JavaScript | No | Client behavior is intentionally restricted to the closed vocabulary. There is no general JavaScript escape hatch in the normal authoring model. |
+
+### Practical fit
+
+The current capability boundary can therefore be summarized as:
+
+**Strong fit:** static/content sites, marketing sites, documentation, portfolios, responsive pages, interactive widgets, locally reactive interfaces, URL-addressable state, persisted preferences, PWAs, and packaged/offline websites.
+
+**Possible but alpha:** Android and Linux desktop wrappers.
+
+**Outside the current model:** backend-heavy applications, authentication/account systems, database-backed applications, arbitrary API-driven applications, large SPA-shaped systems, and projects whose development model depends on unrestricted client-side JavaScript.
+
+The purpose of this boundary is not to imply that the unsupported categories are inherently undesirable or impossible to implement. They require capabilities that ARKlight's current closed-vocabulary and compiler-first design does not provide.
+
+For evaluation purposes, the important question is therefore not simply whether ARKlight can produce a website. It is whether the application's requirements fall inside the capability boundary that the current compiler, runtime vocabulary, and available targets actually support.
+
+## 6. Where it sits against the rest of the field
+
 ARKlight's authoring ideas come from frontend/UI-framework lineage;
 its compiled artifacts are SSG-like in principle. That combination is
 not itself a recognized category -- the table below compares ARKlight
@@ -284,7 +365,7 @@ category, because by the definition in Section 1 there isn't one yet.
 | Native-wrapper tooling | Tauri / Capacitor (system WebView, not bundled Chromium) | Tauri/Capacitor wrap an arbitrary, independently-trusted web app. ARKlight's native shells package the compiler's *own* closed-vocabulary output -- there's no second layer of arbitrary code to trust, because there isn't a mechanism to introduce one. |
 | Python-to-native-app tools | Kivy / BeeWare | Both bundle an actual Python interpreter into the shipped artifact. ARKlight ships zero Python anywhere in any artifact, web or native -- Python exists only at build time, on the developer's machine. |
 
-## 6. Honest, currently-unresolved gaps
+## 7. Honest, currently-unresolved gaps
 
 - **No fetch/HTTP primitive anywhere in the closed vocabulary** -- a
   real, checkable wall (verified against `ACTION_REGISTRY` and
@@ -313,7 +394,7 @@ category, because by the definition in Section 1 there isn't one yet.
   discussion found under the project's own name at any point this was
   checked.
 
-## 7. One line to leave this document on
+## 8. One line to leave this document on
 
 ARKlight's real bet is not "a faster Jekyll" or "a smaller Vue" -- it's
 a specific, narrower claim: **that a tool can be Python-only,
