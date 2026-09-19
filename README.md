@@ -35,7 +35,7 @@ def home():
 ```
 
 ```
-arklight build site.py -o ARK
+arklight build site.py
 ```
 
 produces `ARK/index.html` -- plain, dependency-free HTML.
