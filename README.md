@@ -1,4 +1,22 @@
-# <img src="ARKlight-logo.png" alt="Rei ARKlight" width="82" height="82" align="middle"> ARKlight Framework
+<table width="100%">
+<tr>
+<td width="180" valign="middle" align="center">
+
+<img src="ARKlight-logo.png" alt="Rei ARKlight" width="160" height="160">
+
+</td>
+<td valign="middle">
+<div align="center">
+
+# ARKlight Alpha Framework
+
+**A Python-first compiler for building static websites where developers work
+with a structured component API, while the output remains ordinary, dependency-free HTML.**
+
+</div>
+</td>
+</tr>
+</table>
 
 **A Python-first compiler for building static websites where developers work
 with a structured component API, while the output remains ordinary, dependency-free HTML.**
