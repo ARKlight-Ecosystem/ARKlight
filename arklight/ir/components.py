@@ -90,7 +90,7 @@ import itertools
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
-from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, ModelBindSpec
+from arklight.ast.nodes import STATE_REF_KEY, ActionRef, ARKNode, ClassBindSpec, ModelBindSpec, is_state_ref
 from arklight.ir.schema import SCHEMA
 
 # A component render function: takes resolved keyword props, returns
@@ -644,7 +644,8 @@ def _rewrite_component_state_refs(value: Any, name_map: dict[str, str]) -> Any:
     """
     v0.060, Stage 4: recursively rewrite every reference to one of
     `name_map`'s local component-state names -- a `Bind(name)` node, an
-    `on_click=Action.*(...)` (`ActionRef.state`), a
+    `on_click=Action.*(...)` (`ActionRef.state`, and any arg fed from
+    state via `Bind(name)`, i.e. a `{"__state__": name}` marker), a
     `bind_class=Bind.when(...)` (`ClassBindSpec.state`), or a
     `bind_value=Bind.model(...)` (a plain string prop) -- into that
     name's instance-namespaced page-state key. Runs once, on a
@@ -682,11 +683,32 @@ def _rewrite_component_state_refs(value: Any, name_map: dict[str, str]) -> Any:
     props_changed = False
 
     on_click = new_props.get("on_click")
-    if isinstance(on_click, ActionRef) and on_click.state in name_map:
-        if not props_changed:
-            new_props = dict(new_props)
-            props_changed = True
-        new_props["on_click"] = replace(on_click, state=name_map[on_click.state])
+    if isinstance(on_click, ActionRef):
+        # The action's *target* (`state`) and, for the live-input ->
+        # action-value capability fix, any arg that *reads* state
+        # (`Action.append("tasks", Bind("draft"))` ->
+        # `{"__state__": "draft"}`) both name component-local state
+        # that has to move to its namespaced page key together -- a
+        # target renamed while its value-source wasn't would read a
+        # name that no longer exists on the page.
+        rewritten_args = {
+            key: (
+                {STATE_REF_KEY: name_map[val[STATE_REF_KEY]]}
+                if is_state_ref(val) and val[STATE_REF_KEY] in name_map
+                else val
+            )
+            for key, val in on_click.args.items()
+        }
+        args_changed = rewritten_args != on_click.args
+        if on_click.state in name_map or args_changed:
+            if not props_changed:
+                new_props = dict(new_props)
+                props_changed = True
+            new_props["on_click"] = replace(
+                on_click,
+                state=name_map.get(on_click.state, on_click.state),
+                args=rewritten_args,
+            )
 
     bind_class = new_props.get("bind_class")
     if isinstance(bind_class, ClassBindSpec) and bind_class.state in name_map:

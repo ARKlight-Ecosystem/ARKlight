@@ -155,7 +155,10 @@ conventional `[type task here] [Add]` workflow isn't naturally expressible
 vocabulary simply doesn't currently provide the operation.
 `Action.set_from_input` is explicitly deferred.
 
-**Status:** deliberate current capability gap.
+**Status:** addressed in `0.06503` -- `Action.set`/`Action.append` now accept
+`Bind("name")` as their `value`; see
+[`ACTION-VALUE-FROM-STATE-PROPOSAL.md`](ACTION-VALUE-FROM-STATE-PROPOSAL.md).
+(Originally: deliberate current capability gap.)
 
 ### 8. No general-purpose arbitrary expression layer
 

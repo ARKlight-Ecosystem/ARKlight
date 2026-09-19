@@ -357,6 +357,30 @@ The current page's nav link is also highlighted automatically (an
 `is-active` class added to any `<a>` inside `.nav` whose target matches
 the current page) -- no props needed for that one.
 
+## Passing live state to an action (`Bind(...)` as an argument)
+
+`Action.set(...)` and `Action.append(...)` take a `value`. Give it
+`Bind("name")` instead of a literal and it means "whatever `name` holds
+when the click happens" -- which, next to an input bound with
+`bind_value=`, is the usual `[type a task] [Add]` control:
+
+```python
+State("draft", "")
+State("tasks", [])
+Input(bind_value=Bind.model("draft"))
+Button("Add", on_click=Action.append("tasks", Bind("draft")))
+Watch("tasks", then=Action.reset("draft"))      # empty the input after adding
+Repeat("tasks", template=lambda: Text(RepeatItem.value()))
+```
+
+The name must be a `State(...)` or `Computed(...)` on the same page, and
+only `set`/`append`'s `value` accept it -- `increment`, `decrement` and
+`remove` reject a `Bind(...)` at build time (an input's value is a string,
+which would concatenate or never match rather than do arithmetic). Don't
+put `debounce=` on the `Bind.model(...)` a submit button reads from: a
+click inside the delay would read the previous value. Design record:
+[`../Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`](../Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md).
+
 ## Public API (v0.003)
 
 Components -- every one of these is a plain Python function that

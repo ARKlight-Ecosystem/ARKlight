@@ -57,8 +57,10 @@ fragment also makes).
 
 from __future__ import annotations
 
+from arklight.backend.js.runtime.action_args import RESOLVE_ACTION_ARGS_JS
+
 WIRE_WATCHERS_JS = """  function wireWatchers(store, specs) {
-    if (!store || !specs || !specs.length) return;
+""" + RESOLVE_ACTION_ARGS_JS + """    if (!store || !specs || !specs.length) return;
     var last = specs.map(function (spec) { return store.get(spec.name); });
     store.subscribe(function () {
       specs.forEach(function (spec, i) {
@@ -68,7 +70,7 @@ WIRE_WATCHERS_JS = """  function wireWatchers(store, specs) {
         try {
           var action = actions[spec.then.action];
           if (!action) return;
-          action(store, spec.then.state, spec.then.args || {});
+          action(store, spec.then.state, resolveActionArgs(store, spec.then.args || {}));
         } catch (err) {
           arkNotify("Something went wrong updating this page -- an unsupported or unexpected case was hit.");
         }

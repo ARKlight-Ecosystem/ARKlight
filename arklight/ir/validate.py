@@ -120,13 +120,31 @@ Checks performed:
     history="...")`, if present, must be a known mode
     (`arklight.ir.schema.KNOWN_QUERY_HISTORY_MODES`) and requires
     `query=` to be set alongside it.
+18. An `Action.*(...)` argument that reads state (`Bind("name")`, stored
+    as `{"__state__": "name"}`; `0.06503`, `docs/Proposals/
+    ACTION-VALUE-FROM-STATE-PROPOSAL.md`) must be an argument the
+    action opts in (`ActionSpec.state_args`), be a well-formed marker,
+    and name a `State(...)`/`Computed(...)` declared on the same page --
+    see `_validate_action_args`. Applies wherever an `ActionRef` is
+    validated: `on_click=`, a `Watch(...)`'s `then=`, a `Repeat(...)`
+    template.
 """
 
 from __future__ import annotations
 
 import re
 
-from arklight.ast.nodes import ActionRef, ARKNode, ClassBindSpec, DerivationRef, ModelBindSpec, PlatformAPIRef, PredicateRef
+from arklight.ast.nodes import (
+    STATE_REF_KEY,
+    ActionRef,
+    ARKNode,
+    ClassBindSpec,
+    DerivationRef,
+    ModelBindSpec,
+    PlatformAPIRef,
+    PredicateRef,
+    is_state_ref,
+)
 from arklight.ir.platform_api import PLATFORM_API_REGISTRY
 from arklight.ir.schema import (
     ACTION_REGISTRY,
@@ -246,7 +264,75 @@ def _validate_platform_api(ref: PlatformAPIRef, *, path: str) -> None:
         )
 
 
-def _validate_action(action: ActionRef, *, path: str, mutable_state: frozenset[str]) -> None:
+def _validate_action_args(
+    action: ActionRef, *, path: str, readable_state: frozenset[str]
+) -> None:
+    """
+    Capability fix (live-input -> action-value): checks each of an
+    `ActionRef`'s arg values that reads live state
+    (`Action.append("tasks", Bind("draft"))` -> `{"__state__":
+    "draft"}`, see `arklight.ast.nodes.STATE_REF_KEY`). Three rules,
+    each failing the build instead of misbehaving in the browser:
+
+    - the argument must be one the action's `ActionSpec.state_args`
+      opts in (a `Bind(...)` as `increment`'s `delta` would silently
+      string-concatenate for input-bound state, so it's refused);
+    - the marker must be well-formed -- exactly `{"__state__": <name>}`
+      (`__state__` is reserved, so a literal dict that merely carries
+      that key can't be mistaken for a reference by the runtime);
+    - the named state must be a `State(...)`/`Computed(...)` declared
+      on this page (`readable_state` -- reading needs no independent
+      value to mutate, unlike an action's *target*).
+
+    A leftover `Bind(...)` *node* in args (an `ActionRef` built by hand
+    rather than through `Action.*`) gets a pointed message rather than
+    a raw `TypeError` from JSON serialization at render time.
+    """
+    spec = ACTION_REGISTRY[action.action]
+    for arg_name, value in action.args.items():
+        label = f"on_click at {path} (Action.{action.action}(...), argument {arg_name!r})"
+        if isinstance(value, ARKNode):
+            raise ValidationError(
+                f"{label} holds a {value.type!r} node, which can't be serialized "
+                f"as an action argument. Build the action with Action."
+                f"{action.action}(...) so Bind(\"name\") is converted, or pass "
+                f"a plain value."
+            )
+        if not is_state_ref(value):
+            continue
+        name = value[STATE_REF_KEY] if len(value) == 1 else None
+        if not isinstance(name, str) or not name:
+            raise ValidationError(
+                f"{label} uses the reserved key {STATE_REF_KEY!r} in a dict "
+                f"that isn't a state reference. Use Bind(\"name\") to read "
+                f"state; {STATE_REF_KEY!r} can't appear in a literal dict "
+                f"argument."
+            )
+        if arg_name not in spec.state_args:
+            accepting = sorted(
+                f"{n}({', '.join(sp.state_args)})" for n, sp in ACTION_REGISTRY.items() if sp.state_args
+            )
+            raise ValidationError(
+                f"{label} was given Bind({name!r}), but Action.{action.action}'s "
+                f"{arg_name!r} argument can't be read from state. Actions that "
+                f"accept Bind(...) as an argument: {', '.join(accepting)}."
+            )
+        if name not in readable_state:
+            known = ", ".join(sorted(readable_state)) or "(none declared)"
+            raise ValidationError(
+                f"{label} reads Bind({name!r}), which isn't declared on this "
+                f"page as State(...) or Computed(...). State/Computed declared "
+                f"on this page: {known}."
+            )
+
+
+def _validate_action(
+    action: ActionRef,
+    *,
+    path: str,
+    mutable_state: frozenset[str],
+    page_state: frozenset[str] | None = None,
+) -> None:
     if action.action not in ACTION_REGISTRY:
         known = ", ".join(sorted(ACTION_REGISTRY))
         raise ValidationError(
@@ -263,6 +349,12 @@ def _validate_action(action: ActionRef, *, path: str, mutable_state: frozenset[s
             f"State declared on this page: {known}."
         )
     _validate_modifiers(action, path=path)
+    # `page_state` is the wider bindable set (State + Computed). Callers
+    # that haven't been threaded it fall back to `mutable_state`, which
+    # is always a subset -- stricter, never looser.
+    _validate_action_args(
+        action, path=path, readable_state=mutable_state if page_state is None else page_state
+    )
 
 
 def _validate_class_bind(node: ARKNode, *, path: str, page_state: frozenset[str]) -> None:
@@ -459,13 +551,19 @@ def _validate_shell_persistent(node: ARKNode, *, path: str) -> None:
         )
 
 
-def _validate_behavior_props(node: ARKNode, *, path: str, mutable_state: frozenset[str]) -> None:
+def _validate_behavior_props(
+    node: ARKNode,
+    *,
+    path: str,
+    mutable_state: frozenset[str],
+    page_state: frozenset[str] | None = None,
+) -> None:
     on_click = node.props.get("on_click")
     if on_click is None:
         return
 
     if isinstance(on_click, ActionRef):
-        _validate_action(on_click, path=path, mutable_state=mutable_state)
+        _validate_action(on_click, path=path, mutable_state=mutable_state, page_state=page_state)
         return
 
     if isinstance(on_click, PlatformAPIRef):
@@ -717,7 +815,7 @@ def _validate_watch_declaration(
             f"Watch({name!r}) at {path} has then={then!r}, which isn't an "
             f"Action.*(...) reference."
         )
-    _validate_action(then, path=path, mutable_state=mutable_state)
+    _validate_action(then, path=path, mutable_state=mutable_state, page_state=page_state)
 
 
 def _validate_predicate_ref(
@@ -783,7 +881,13 @@ def _validate_show_declaration(
             )
 
 
-def _validate_repeat_template(node: ARKNode, *, path: str, mutable_state: frozenset[str]) -> None:
+def _validate_repeat_template(
+    node: ARKNode,
+    *,
+    path: str,
+    mutable_state: frozenset[str],
+    page_state: frozenset[str] | None = None,
+) -> None:
     """`vdom-7`: validates a `Repeat(...)`'s per-item template --
     structurally the same as `validate_node`'s generic path (unknown
     types/missing required props/`on_click` still get checked), except
@@ -810,7 +914,7 @@ def _validate_repeat_template(node: ARKNode, *, path: str, mutable_state: frozen
             )
     on_click = node.props.get("on_click")
     if isinstance(on_click, ActionRef):
-        _validate_action(on_click, path=path, mutable_state=mutable_state)
+        _validate_action(on_click, path=path, mutable_state=mutable_state, page_state=page_state)
     elif isinstance(on_click, PlatformAPIRef):
         _validate_platform_api(on_click, path=path)
     elif isinstance(on_click, str) and on_click not in KNOWN_BEHAVIORS:
@@ -824,7 +928,10 @@ def _validate_repeat_template(node: ARKNode, *, path: str, mutable_state: frozen
     for i, child in enumerate(node.children):
         if isinstance(child, ARKNode):
             _validate_repeat_template(
-                child, path=f"{path}/{child.type}[{i}]", mutable_state=mutable_state
+                child,
+                path=f"{path}/{child.type}[{i}]",
+                mutable_state=mutable_state,
+                page_state=page_state,
             )
         elif not isinstance(child, str):
             raise ValidationError(
@@ -859,7 +966,12 @@ def _validate_repeat_declaration(
             f"Repeat({name!r}) at {path} needs exactly one item template -- "
             f"pass template=lambda: ... to Repeat(...)."
         )
-    _validate_repeat_template(node.children[0], path=f"{path}/template", mutable_state=mutable_state)
+    _validate_repeat_template(
+        node.children[0],
+        path=f"{path}/template",
+        mutable_state=mutable_state,
+        page_state=page_state,
+    )
 
 
 def validate_node(
@@ -926,7 +1038,7 @@ def validate_node(
                 f"{node.type!r} at {path} is missing required prop {prop_name!r}."
             )
 
-    _validate_behavior_props(node, path=path, mutable_state=mutable_state)
+    _validate_behavior_props(node, path=path, mutable_state=mutable_state, page_state=page_state)
     _validate_reveal_props(node, path=path)
     _validate_class_bind(node, path=path, page_state=page_state)
     _validate_model_bind(node, path=path, mutable_state=mutable_state)

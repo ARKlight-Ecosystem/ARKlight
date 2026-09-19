@@ -218,6 +218,8 @@ def _format_action_spec(name: str, spec: ActionSpec) -> str:
         lines.append(f"  args           : {', '.join(spec.args)}")
     else:
         lines.append("  args           : (none)")
+    if spec.state_args:
+        lines.append(f"  Bind(...) args : {', '.join(spec.state_args)} (read from state when the action runs)")
     return "\n".join(lines)
 
 
