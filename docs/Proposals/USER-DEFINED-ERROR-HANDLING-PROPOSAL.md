@@ -12,13 +12,17 @@ is already reserved in `PROGRESS.md` for `arklight assistant` Miko MVP,
 Stage A. This document does not schedule anything; if it is accepted
 at `v0.079` it would be interleaved into that slot, the same "make
 room for one more" precedent `v0.065` used for Rei and Platform API IR.
-That is a maintainer decision (open question 10).
+That is a maintainer decision (open question 8).
 
-**Origin:** the maintainer's design statement, in one message. Section
-"The design, as stated" records it in the maintainer's own terms and
-separates it from what this document adds. Everything under "Design
-sketch" is **mine**, offered so there is something concrete to accept,
-change or kill -- none of it is decided.
+**How to read this file.** Three labels are used throughout:
+
+- **Stated** -- the maintainer said it. Recorded in "The design, as
+  stated" and in the clarification below.
+- **Proposed** -- the author's suggestion, offered so there is
+  something concrete to accept, change or kill. Nothing marked
+  *Proposed* is decided.
+- **Open** -- a question only the maintainer can answer. Each one is
+  numbered in "Open questions". Question 1 blocks the rest.
 
 ## The design, as stated
 
@@ -27,18 +31,23 @@ change or kill -- none of it is decided.
 # include <errhanlib.ARKlight>
 
 # [{Catch What?}] [ARKlight Log] [{error message}]
-Site.site(.....)
+def home():
+    ...
 ```
 
-In the maintainer's words, reduced to claims:
+Claims, reduced from the maintainer's words:
 
 1. **Opt-in.** A user chooses to print custom error logs, "in js or
    arklight compiler."
 2. **Three brackets are the syntax.** "Three [] is a syntax for user
    defined error handling."
-3. **Per function.** The logging is "per function which exists in a
-   site made by ARKlight," and is meant to make error logs easy to
-   handle.
+3. **Any recognised function.** It applies to any function ARKlight
+   recognises, not only site-level ones. The line goes as a special
+   comment **directly above the function it wraps**. The target is
+   implicit: it is the function beneath the comment, so no function
+   name is written. This works because ARKlight sites are a Python
+   DSL, where a comment directly above a `def` already reads as
+   belonging to it. The goal is error logs that are easy to handle.
 4. **No collision with Python.** It "doesn't collide with try catch
    method of python." ARKlight owns this representation because it is
    simpler, easier and aligned with ARKlight's philosophy.
@@ -48,8 +57,9 @@ In the maintainer's words, reduced to claims:
    site can reach cross-platform targets. `errhanlib` for error
    handling follows that spirit.
 
-(The example's `Site.site(.....)` is read as shorthand for the site
-construction that follows the preamble, `site = Site(...)`.)
+(The earlier draft of this file read the example's `Site.site(.....)`
+as a site construction and treated slot 1 as a *function name*. Claim 3
+corrects that: the function is not named at all.)
 
 ## What exists today (checked against the source)
 
@@ -62,16 +72,20 @@ construction that follows the preamble, `site = Site(...)`.)
   `winlib` or `maclib` anywhere in the source or docs. They are the
   maintainer's stated direction, not shipped.
 - **Directives are a registry.** One recogniser plus one normalization
-  handler each (`_DIRECTIVE_PARSERS`, `_HANDLERS`); the module says the
-  door is open for more. Only comments *above the first statement* are
-  ever read as directives.
+  handler each (`_DIRECTIVE_PARSERS`, `_HANDLERS`). Today only comments
+  *above the first statement* are read (`_leading_comment_lines`).
+  A directive that sits above a function, in the middle of a file, is
+  a new place to look; it does not exist yet.
 - **Loud by construction.** Anything malformed or unresolved is recorded
   during normalization and raised by validation, never skipped.
 - **`# use <...>` is reserved and refused**, pointing at
   `USE-PREAMBLE-PROPOSAL.md`, precisely so nobody builds on its shape
-  before it is designed. That proposal's open questions (what `include`
-  vs `use` mean, what `something.ARKlight` names, the label grammar)
-  overlap with this one; see open questions 7 and 9.
+  before it is designed. That proposal's open questions overlap with
+  this one; see open questions 6 and 7.
+- **Functions are registered at definition time.** `@site.page(route)`
+  stores the function object in `Site.routes` the moment the decorator
+  runs, and `@component(...)` registers its render function the same
+  way. This matters for the compiler sink (section D).
 - **Runtime errors already have one funnel** (`0.06505`):
   `arkReportError(message, err)` logs to the console, calls the
   optional `window.ARKLIGHT_ON_ERROR(message, err)`, then shows
@@ -81,33 +95,37 @@ construction that follows the preamble, `site = Site(...)`.)
   lines (`--verbose`/`--debug`); Rei's `--narrate` (accepted, planned)
   is a second presentation of the same stages.
 
-## Reading the syntax (mine -- confirm or correct)
+## The syntax
 
-| Slot | Written as | Reading |
-| --- | --- | --- |
-| 1 | `[{Catch What?}]` | The function to watch: a function defined in the site. |
-| 2 | `[ARKlight Log]` | A fixed keyword naming the *sink*: the ARKlight compiler's own log. |
-| 3 | `[{error message}]` | The text to print. |
-
-Under this reading the braces are placeholder notation ("put your thing
-here"), and a concrete line has none:
+A concrete use, with the target implicit:
 
 ```python
 # include <stdlib.ARKlight>
 # include <errhanlib.ARKlight>
 
-# [home] [ARKlight Log] [The home page failed to build]
-# [nav] [ARKlight Log] [The shared nav bar raised while building]
-# [cart_summary] [JS Log] [The cart total could not be shown]
+# [{Catch What?}] [ARKlight Log] [The home page failed to build]
+@site.page("/")
+def home():
+    ...
 
-site = Site()
+# [{Catch What?}] [JS Log] [The cart total could not be shown]
+@component()
+def cart_summary():
+    ...
 ```
 
-The maintainer named only the `ARKlight Log` sink, but said "in js or
-arklight compiler." `JS Log` is my working name for the JS side. Whether
-the braces are literal is open question 1.
+| Slot | Written as | Reading | Status |
+| --- | --- | --- | --- |
+| 1 | `[{Catch What?}]` | What to catch. **Meaning unresolved** (open question 1). | Open |
+| 2 | `[ARKlight Log]` | A fixed keyword naming the *sink*: the ARKlight compiler's own log. | Stated |
+| 3 | `[{error message}]` | The text to print. | Stated |
 
-## Design sketch (mine)
+The maintainer named only the `ARKlight Log` sink, but said "in js or
+arklight compiler." `JS Log` is the author's **proposed** name for the
+JS side (open question 2). Whether the braces are literal is open
+question 3.
+
+## Design sketch (Proposed)
 
 **A. The include is the switch.** `# include <errhanlib.ARKlight>`
 turns on the three-bracket recogniser for that file. Without it, a
@@ -116,25 +134,38 @@ structural and existing files cannot be affected. It would be the first
 include that binds *no vocabulary names*; it activates a directive
 family instead (relevant to `USE-PREAMBLE-PROPOSAL.md` Q1).
 
-**B. Recognition.** Same rules as every directive: preamble only, per
-file. A line in an activated preamble that looks like three brackets but
-is malformed (two groups, an empty slot, an unknown sink) is a
-diagnostic, not a silent comment.
+**B. Placement and attachment.** In an activated file, a three-bracket
+comment attaches to the function definition whose **first line is the
+very next line**. No blank line and no other statement may sit between
+them. Consecutive directive comments above one function all attach to
+it. Comments are read with `tokenize`, because `ast` discards them.
+When the function has decorators, the function's first line is its
+topmost decorator, so the directive goes above `@site.page(...)` or
+`@component(...)`, as in the example. (Open question 5: confirm this
+placement.)
 
-**C. The target must exist.** After the file executes, slot 1 must name
-a module-level function (or registered page/component) the file
-defines. An unknown name raises, naming the line -- a typo must not turn
-into a handler that never fires. This is the same post-`exec` step
-`check_namespace_shadowing` already uses.
+**C. Attachment errors are loud.** In an activated file, each of the
+following raises and names the line. A typo must not become a handler
+that never fires.
+- A three-bracket comment that is not directly above a function.
+- A line that looks like three brackets but is malformed (two groups,
+  an empty slot, an unknown sink).
+- A directive above a function ARKlight does not recognise (open
+  question 4 decides which functions count).
 
-**D. Compiler sink.** After `exec`, ARKlight replaces each named
-function in the module namespace with a wrapper that calls the original,
-and if it raises, prints the author's message through the compiler's log
-channel and **re-raises the original exception**. A wrapper rather than a
-source rewrite, so line numbers stay true and the author writes no
-`try`/`except`. Calls between module-level functions go through module
-globals, so they hit the wrapper. Not covered: nested functions,
-methods, references captured before the swap.
+**D. Compiler sink.** Because the target is the function directly
+beneath the comment, ARKlight can wrap it *where it is defined*. The
+sketch: the compiler inserts an internal wrapper as the innermost
+decorator of that `def` (directly below any user decorators), which
+calls the original and, if it raises, prints the author's message
+through the compiler's log channel and **re-raises the original
+exception**. Doing it at definition time is not optional. `@site.page`
+and `@component` store the function they are handed at the moment they
+run, so swapping a name in the module after the file has executed would
+leave the registry holding the unwrapped original and the handler would
+never fire. A wrapper rather than a source rewrite means line numbers
+stay true and the author writes no `try`/`except`. Nested functions and
+methods are covered whenever they are recognised (open question 4).
 
 **E. JS sink.** This is the hard half. The generated JS is closed
 vocabulary and has no idea which site function produced a node. The
@@ -151,7 +182,7 @@ The catch: some runtime failures are not tied to an element. A
 `Computed(...)` recompute or a `Watch(...)` effect is per state name, so
 attributing it means the compiler must also stamp State/Computed/Watch
 declarations with the function that produced them. That is new IR
-provenance and is the real cost of this feature (open question 6).
+provenance and is the real cost of this feature (open question 9).
 
 **F. Author text reaches the runtime.** `RUNTIME-ERROR-HANDLING-PROPOSAL.md`
 section 4 deliberately kept site-authored strings out of `arkNotify`.
@@ -165,12 +196,18 @@ failure into success. A build with a caught error still fails; the JS
 guards still keep the rest of the page running exactly as they do now.
 Anything that recovers or retries is a different feature (out of scope).
 
+**H. Nested calls.** If a wrapped function calls another wrapped
+function and the inner one raises, each wrapper that sees the exception
+prints its own message, innermost first, then the original exception
+propagates unchanged. (Open question 10: confirm, or print only the
+innermost.)
+
 ## Philosophy fit
 
 Checked against `docs/README.md`'s philosophy list and
 `SYSTEM-DESIGN-AGREEMENTS.md` (sections 1, 8, 16):
 
-- **Fail loudly at build time.** Unknown targets and malformed lines
+- **Fail loudly at build time.** Misplaced or malformed directives
   raise; handlers do not suppress errors.
 - **Compiler first, runtime last.** The compiler sink is pure compiler.
   For JS the compiler decides which nodes, which messages and whether
@@ -188,47 +225,59 @@ Checked against `docs/README.md`'s philosophy list and
 
 ## Open questions
 
-1. **Are the braces literal, and can the message interpolate?**
+1. **What is slot 1, `[{Catch What?}]`, now that the function is
+   implicit?** The function is no longer named, so this slot must mean
+   something else. Two readings: (a) **which error to catch**, e.g. an
+   exception type such as `ValueError`, with some keyword for "any";
+   (b) **dropped**, leaving `[sink] [message]`, which contradicts "three
+   brackets." This document currently lists exception-type filtering as
+   out of scope, which only holds under a reading that is not (a). This
+   blocks everything below; nothing should be built before it is
+   answered.
+2. **Which sinks, and what are they called?** `ARKlight Log` is given;
+   `JS Log` is the author's guess, and "ARKlight Log" is ambiguous when
+   ARKlight also emits the JS (`Compiler Log`/`Build Log` would pair
+   more clearly with `JS Log`). Are there levels (warn vs error), or
+   more sinks later?
+3. **Are the braces literal, and can the message interpolate?**
    `{Catch What?}` reads like a placeholder, but if a message can also
    carry the error text or function name (`{error}`, `{function}`), the
-   same braces would mean two things. Pick one notation before anything
-   is built.
-2. **Which sinks, and what are they called?** `ARKlight Log` is given;
-   `JS Log` is my guess. Are there levels (warn vs error), or more sinks
-   later?
-3. **Where does a directive live?** In the preamble naming a function
-   (as in the example) it can only see the file it is in; a function in
-   another module needs that module's own preamble. Or should it sit
-   directly above the function it names? Per-file scope, like
-   `# define`, is my default.
-4. **What counts as "a function in a site"?** Page functions and
-   `@component`s clearly. Plain helpers like `nav()`? Nested functions?
-   A component that is defined but never used never runs; is a handler
-   on it an error?
-5. **Log-only, confirmed?** Sketch G says a handler never swallows. If
-   the maintainer wants "handle" to mean more than "log", that needs its
-   own design.
-6. **JS attribution granularity.** Elements only, or also State,
-   Computed and Watch? The second is more useful and a much larger IR
-   change.
-7. **Is this an `include` or a `use`?** An include that binds no names
+   same braces would mean two things. Also unspecified: how a message
+   contains a literal `]`, for example `[Failed on items[0]]`. Pick one
+   notation and an escape rule before anything is built.
+4. **What counts as "a function ARKlight recognises"?** Page functions
+   (`@site.page`) and `@component`s clearly. Plain helpers like `nav()`?
+   Nested functions and methods? A component that is defined but never
+   used never runs; is a handler on it an error? A directive above an
+   unrecognised function raises (section C); the set needs a definition.
+5. **Placement with decorators.** Section B puts the directive above the
+   topmost decorator. Confirm, or specify between-decorator-and-`def`.
+   Either way, the other placement should be an error, not a silent
+   second meaning.
+6. **Is this an `include` or a `use`?** An include that binds no names
    stretches the word. Related: `errhanlib.ARKlight` follows
    `stdlib.ARKlight`'s `<x>.ARKlight` shape, but nothing resolves such a
    label besides the built-in stdlib today. Built into the `arklight`
    package, or resolved some other way? (And it is spelled `errhanlib`
    throughout the maintainer's message; kept as written, but if
    `errhandlib` was meant, the label changes by a letter.)
-8. **Several lines for one function.** Two handlers for the same target
-   and sink: refuse, allow both, or must they agree, as duplicate
-   `# define`s must?
-9. **Do `androidlib`/`linuxlib`/`winlib`/`maclib` belong here?** This
+7. **Do `androidlib`/`linuxlib`/`winlib`/`maclib` belong here?** This
    proposal only borrows their naming. A documented `<x>lib.ARKlight`
    label family, and how backend-specific libs relate to
    `PlatformAPI` and `check_backend_support`
    (`docs/Foundational/PLATFORM-APIS.md`), is bigger than error handling
    and probably wants its own proposal.
-10. **The version slot.** `v0.079` is held by Miko Stage A. Interleave
-    (as Rei was into `v0.065`), or take another slot?
+8. **The version slot, and one release or two.** `v0.079` is held by
+   Miko Stage A. Interleave (as Rei was into `v0.065`), or take another
+   slot? The compiler sink is small; the JS sink needs new IR
+   provenance. Should they ship separately, compiler sink first?
+9. **JS attribution granularity.** Elements only, or also State,
+   Computed and Watch? The second is more useful and a much larger IR
+   change.
+10. **Nested and duplicate handlers.** Section H proposes that every
+    wrapper in the call chain prints. Confirm or change. Separately:
+    two directives for the same function and sink: refuse, allow both,
+    or must they agree, as duplicate `# define`s must?
 11. **Does Rei narrate it?** Should `--narrate` mention a handler's
     message when it fires, and does Project Knowledge's diagnostics
     integration (`v0.076`) record it?
@@ -237,11 +286,13 @@ Checked against `docs/README.md`'s philosophy list and
 
 - Recovering from, retrying or swallowing an error.
 - New exception classes, or any `try`/`except`-like syntax.
-- Filtering by exception type (`[ValidationError] ...`); the slot is
-  "what function", per the stated design.
 - Remote reporting or analytics; `window.ARKLIGHT_ON_ERROR` (`0.06505`)
   remains the seam for that.
 - Designing the platform libs themselves.
+
+(Filtering by exception type was listed here in an earlier draft. It is
+removed from this list because open question 1 may make it the meaning
+of slot 1.)
 
 ## Relationship to other work
 
@@ -253,4 +304,4 @@ Checked against `docs/README.md`'s philosophy list and
 - **`REI-COMPILER-NARRATOR-PROPOSAL.md`, `PROJECT-KNOWELEDGE-PROPOSAL.md`:**
   possible consumers of a handler's messages (question 11).
 - **`PLATFORM-API-IR-PROPOSAL.md`:** the backend-specific-libs direction
-  overlaps it (question 9).
+  overlaps it (question 7).
