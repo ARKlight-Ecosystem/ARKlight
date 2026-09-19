@@ -11,7 +11,7 @@
 # ARKlight Framework
 
 **A Python-first compiler for building static websites where developers work
-with a structured component API, while the output remains ordinary, dependency-free HTML.**
+with a structured component API, while the output remains ordinary, dependency-free `Hyper Text Markup Language` `Casscading Style Sheets` `JavaScript`.**
 
 </div>
 </td>
