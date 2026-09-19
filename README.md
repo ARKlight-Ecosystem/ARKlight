@@ -48,6 +48,18 @@ for the practical picture. If you're still interested, the foundational
 documentation is the place to understand ARKlight in enough depth to decide
 whether it fits your project.
 
+## Status
+
+```text
+[Rae ARK] Hey just a heads-up from the maintained.
+[Rae ARK] ARKlight is tool I have been working on
+[Rae ARK] for a while for personal reasons. It's
+[Rae ARK] clearly not ready for anything involving
+[Rae ARK] ⚠️ Production and until the compiler
+[Rae ARK] reaches v3. It is only recommended for
+[Rae ARK] Informal, personal, hobby projects.
+```
+
 ## Install
 
 ```bash
