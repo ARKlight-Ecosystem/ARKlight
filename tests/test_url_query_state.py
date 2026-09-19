@@ -400,6 +400,7 @@ var windowListeners = {};
 var window = { addEventListener: function (name, fn) { windowListeners[name] = fn; } };
 
 function arkNotify(msg) { /* no-op in this harness */ }
+function arkReportError(msg) { arkNotify(msg); }
 function renderBindings(store) { /* no DOM in this harness */ }
 function renderClassBindings(store) { /* no DOM in this harness */ }
 

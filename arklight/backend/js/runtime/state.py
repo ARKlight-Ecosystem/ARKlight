@@ -206,10 +206,18 @@ CREATE_STATE_JS = """  function createState(initial, computed) {
     var listeners = [];
     function recomputeAll() {
       (computed || []).forEach(function (entry) {
-        var name = entry[0];
-        var spec = entry[1];
-        var derive = derivations[spec.kind];
-        if (derive) { state[name] = derive(state, spec.names, spec.args); }
+        // 0.06505: per-entry guard -- one throwing Computed(...) must not
+        // stop every other computed value (or the set()/reset() that
+        // triggered this pass) from finishing. See RUNTIME-ERROR-HANDLING-
+        // PROPOSAL.md, 3a.
+        try {
+          var name = entry[0];
+          var spec = entry[1];
+          var derive = derivations[spec.kind];
+          if (derive) { state[name] = derive(state, spec.names, spec.args); }
+        } catch (err) {
+          arkReportError("A calculated value couldn't be updated -- some values on this page may be out of date.", err);
+        }
       });
     }
     recomputeAll();
@@ -396,7 +404,7 @@ INIT_STATE_JS = """  function initState() {
       if (typeof wireWatchers === "function") { wireWatchers(store, watch); }
       return store;
     } catch (err) {
-      arkNotify("This page's saved state couldn't be loaded -- interactive features on this page may not work.");
+      arkReportError("This page's saved state couldn't be loaded -- interactive features on this page may not work.", err);
       return null;
     }
   }

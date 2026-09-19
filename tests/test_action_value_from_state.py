@@ -357,6 +357,7 @@ def _run_node(script: str) -> str:
 
 _STORE_STUB = """
 function arkNotify(msg) { throw new Error(msg); }
+function arkReportError(msg) { arkNotify(msg); }
 function createState(initial) {
   var state = Object.assign({}, initial);
   var listeners = [];

@@ -105,28 +105,35 @@ RENDER_REPEAT_JS = """  function arkAdoptVnode(vnode, realElm) {
 
   function renderRepeat(store) {
     document.querySelectorAll("[data-ark-repeat]").forEach(function (container) {
-      var name = container.getAttribute("data-ark-repeat");
-      var spec = JSON.parse(container.getAttribute("data-ark-repeat-template"));
-      var list = store.get(name) || [];
-      var vnodes = list.map(function (item, index) { return arkBuildRepeatVnode(spec, item, index); });
-      if (!container.__arkRepeatInit) {
-        // First call: the server already rendered exactly these items --
-        // adopt the real DOM as the baseline vnode tree instead of
-        // patching, so hydration never duplicates or discards
-        // server-rendered content. Every later call (after a real
-        // Action.append(...)/Action.remove(...)) patches for real.
-        var real = container.children;
-        for (var i = 0; i < vnodes.length && i < real.length; i++) {
-          arkAdoptVnode(vnodes[i], real[i]);
+      // 0.06505: per-container guard (RUNTIME-ERROR-HANDLING-PROPOSAL.md,
+      // 3a) -- a malformed data-ark-repeat-template on one container must
+      // not stop the other lists, or Show(...), from updating.
+      try {
+        var name = container.getAttribute("data-ark-repeat");
+        var spec = JSON.parse(container.getAttribute("data-ark-repeat-template"));
+        var list = store.get(name) || [];
+        var vnodes = list.map(function (item, index) { return arkBuildRepeatVnode(spec, item, index); });
+        if (!container.__arkRepeatInit) {
+          // First call: the server already rendered exactly these items --
+          // adopt the real DOM as the baseline vnode tree instead of
+          // patching, so hydration never duplicates or discards
+          // server-rendered content. Every later call (after a real
+          // Action.append(...)/Action.remove(...)) patches for real.
+          var real = container.children;
+          for (var i = 0; i < vnodes.length && i < real.length; i++) {
+            arkAdoptVnode(vnodes[i], real[i]);
+          }
+          container.__arkVnode = snabbdom.h(arkSelectorFor(container), {}, vnodes);
+          container.__arkVnode.elm = container;
+          container.__arkRepeatInit = true;
+          return;
         }
-        container.__arkVnode = snabbdom.h(arkSelectorFor(container), {}, vnodes);
-        container.__arkVnode.elm = container;
-        container.__arkRepeatInit = true;
-        return;
+        var next = snabbdom.h(arkSelectorFor(container), {}, vnodes);
+        arkPatch(container.__arkVnode, next);
+        container.__arkVnode = next;
+      } catch (err) {
+        arkReportError("A list on this page couldn't be updated -- it may be out of date.", err);
       }
-      var next = snabbdom.h(arkSelectorFor(container), {}, vnodes);
-      arkPatch(container.__arkVnode, next);
-      container.__arkVnode = next;
     });
   }
 

@@ -64,8 +64,13 @@ RENDER_SHOW_JS = """  function arkEvalPredicate(store, spec) {
 
   function renderShow(store) {
     document.querySelectorAll("[data-ark-show]").forEach(function (el) {
-      var spec = JSON.parse(el.getAttribute("data-ark-show"));
-      el.hidden = !arkEvalPredicate(store, spec);
+      // 0.06505: per-element guard (RUNTIME-ERROR-HANDLING-PROPOSAL.md, 3a).
+      try {
+        var spec = JSON.parse(el.getAttribute("data-ark-show"));
+        el.hidden = !arkEvalPredicate(store, spec);
+      } catch (err) {
+        arkReportError("A conditional section on this page couldn't be updated -- it may be showing stale content.", err);
+      }
     });
   }
 

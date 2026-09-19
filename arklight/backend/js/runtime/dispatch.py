@@ -240,7 +240,7 @@ CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
             if (!action) return;
             action(store, stateKey, resolveActionArgs(store, args));
           } catch (err) {
-            arkNotify("Something went wrong updating this page -- an unsupported or unexpected case was hit.");
+            arkReportError("Something went wrong updating this page -- an unsupported or unexpected case was hit.", err);
           }
         };
         if (mods.debounce !== null) {
@@ -261,7 +261,7 @@ CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
           if (!behavior) return;
           behavior(el);
         } catch (err) {
-          arkNotify("Something went wrong running this action -- an unsupported or unexpected case was hit.");
+          arkReportError("Something went wrong running this action -- an unsupported or unexpected case was hit.", err);
         }
       } else if (raw.indexOf("platform:") === 0) {
         // `v0.065`: PlatformAPI.*(...) values. No modifiers/hx-trigger
@@ -277,7 +277,7 @@ CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
           var platformArgs = platformArgsRaw ? JSON.parse(platformArgsRaw) : {};
           platformApi(platformArgs);
         } catch (err) {
-          arkNotify("Something went wrong running this action -- an unsupported or unexpected case was hit.");
+          arkReportError("Something went wrong running this action -- an unsupported or unexpected case was hit.", err);
         }
       }
     });

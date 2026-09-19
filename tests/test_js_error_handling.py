@@ -103,7 +103,7 @@ def test_init_state_is_guarded_against_malformed_json():
     init_state_body = js.split("function initState() {")[1].split("function wireClickInterceptor")[0]
     assert "try {" in init_state_body
     assert "catch (err)" in init_state_body
-    assert "arkNotify(" in init_state_body
+    assert "arkReportError(" in init_state_body
 
 
 def test_wire_click_interceptor_guards_action_dispatch_independently():
@@ -129,7 +129,7 @@ def test_wire_click_interceptor_guards_action_dispatch_independently():
     )[0]
     assert wire_body.count("try {") == 3
     assert wire_body.count("catch (err)") == 3
-    assert "arkNotify(" in wire_body
+    assert "arkReportError(" in wire_body
 
 
 def test_wire_click_interceptor_guards_behavior_dispatch_independently():
@@ -155,7 +155,7 @@ def test_wire_click_interceptor_guards_behavior_dispatch_independently():
     )[0]
     assert behavior_branch.count("try {") == 1
     assert behavior_branch.count("catch (err)") == 1
-    assert "arkNotify(" in behavior_branch
+    assert "arkReportError(" in behavior_branch
 
 
 def test_copy_behavior_handles_clipboard_rejection():

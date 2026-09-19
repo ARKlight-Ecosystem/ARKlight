@@ -5,6 +5,43 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06505] -- Capability fix: JS runtime error-handling coverage (`ARKLIGHT_ON_ERROR`)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06503]`
+(the roadmap's `v0.065` is never touched). It skips `0.06504`, which is
+still the unconfirmed draft slot above. A **capability fix**: `[0.041]`
+guarded the runtime as it then stood, but the five stateful primitives
+that shipped afterward (`Computed`, `Repeat`, `Show`, `bind_value`,
+watchers) got no equivalent audit, so one bad element threw an uncaught
+exception and silently skipped every render pass after it. Full design
+record: `docs/Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md`.
+
+- Per-element guards (proposal 3a) in `recomputeAll` (per `Computed`),
+  `renderBindings`, `renderClassBindings`, `renderModelBindings`,
+  `renderRepeat` (per container), `renderShow`, and `wireModelBinding`'s
+  write-back including the debounce/throttle paths. One failure reports;
+  the rest of the pass continues.
+- `wireErrorBoundary()` (3b): page-level `error`/`unhandledrejection`
+  floor, registered once at `DOMContentLoaded`, ignoring `ResizeObserver
+  loop` notices.
+- `arkReportError(message, err)` (3c): the single funnel -- console
+  line, then `window.ARKLIGHT_ON_ERROR(message, err)` if defined, then
+  `arkNotify(message)` unless the hook returned exactly `false`. The
+  existing `[0.041]` guards (`initState`, click dispatch, watchers) now
+  go through it too. `arkNotify` is unchanged.
+- **Behavior change:** guarded failures now log `[ARKlight] ...` to the
+  console, and the page-level boundary shows a notice for uncaught
+  errors that previously showed nothing.
+- Shipped only where `arkNotify` already ships; a page with no
+  `State(...)` and no click interceptor is byte-for-byte unchanged.
+- Not implemented: `Site(on_error=...)` and a message registry (see the
+  proposal's implementation notes).
+
+`tests/test_runtime_error_handling.py` (31 tests, Node-driven for the
+fragments); four assertions in `test_js_error_handling.py`/`test_htmx_3.py`
+now expect `arkReportError(` where they expected `arkNotify(`. Full
+suite 1538 -> 1569 passed. `0.06503` -> `0.06505`.
+
 ## [0.06504] -- Bug fix: `trusted_script_origins` CSP directive injection
 
 **DRAFT ENTRY -- version slot not confirmed by a maintainer.** Filed to

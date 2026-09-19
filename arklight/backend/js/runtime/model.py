@@ -61,10 +61,15 @@ from __future__ import annotations
 
 RENDER_MODEL_BINDINGS_JS = """  function renderModelBindings(store) {
     document.querySelectorAll("[data-ark-model]").forEach(function (el) {
-      var key = el.getAttribute("data-ark-model");
-      var value = store.get(key);
-      if (el.value !== String(value == null ? "" : value)) {
-        el.value = value == null ? "" : value;
+      // 0.06505: per-element guard (RUNTIME-ERROR-HANDLING-PROPOSAL.md, 3a).
+      try {
+        var key = el.getAttribute("data-ark-model");
+        var value = store.get(key);
+        if (el.value !== String(value == null ? "" : value)) {
+          el.value = value == null ? "" : value;
+        }
+      } catch (err) {
+        arkReportError("An input couldn't be updated to match this page's state.", err);
       }
     });
   }
@@ -97,12 +102,23 @@ WIRE_MODEL_BINDING_JS = """  function wireModelBinding(getStore) {
       var key = el.getAttribute("data-ark-model");
       var mods = parseModelModifiers(el);
       var value = el.value;
+      // 0.06505: every store.set(...) below goes through setGuarded --
+      // the same per-call try/catch wireClickInterceptor's runAction
+      // already puts around action(...) (RUNTIME-ERROR-HANDLING-
+      // PROPOSAL.md, 3a), including the deferred debounce write.
+      function setGuarded() {
+        try {
+          store.set(key, value);
+        } catch (err) {
+          arkReportError("That input couldn't be saved to this page's state -- what you typed may not have taken effect.", err);
+        }
+      }
       if (mods.throttle !== null) {
         var now = Date.now();
         var lastRun = throttleLast.get(el) || 0;
         if (now - lastRun < mods.throttle) return;
         throttleLast.set(el, now);
-        store.set(key, value);
+        setGuarded();
         return;
       }
       if (mods.debounce !== null) {
@@ -110,11 +126,11 @@ WIRE_MODEL_BINDING_JS = """  function wireModelBinding(getStore) {
         if (existingTimer) clearTimeout(existingTimer);
         debounceTimers.set(el, setTimeout(function () {
           debounceTimers.delete(el);
-          store.set(key, value);
+          setGuarded();
         }, mods.debounce));
         return;
       }
-      store.set(key, value);
+      setGuarded();
     });
   }
 """

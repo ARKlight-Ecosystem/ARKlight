@@ -381,6 +381,33 @@ put `debounce=` on the `Bind.model(...)` a submit button reads from: a
 click inside the delay would read the previous value. Design record:
 [`../Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`](../Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md).
 
+## Runtime errors (`ARKLIGHT_ON_ERROR`)
+
+On a page that ships ARKlight's runtime (any `State(...)` or click
+behavior), a failure in one binding, list, `Show(...)`, `Computed(...)`
+or bound input no longer stops the rest of the page: that one thing
+reports and everything else keeps updating. The report is a console
+line (`[ARKlight] ...`) plus ARKlight's small on-page notice. A page-level
+`error`/`unhandledrejection` listener catches anything that still
+escapes. A page with no runtime JS ships none of this.
+
+To log to your own analytics, restyle the notice, or silence it,
+define `window.ARKLIGHT_ON_ERROR` in a script of your own (a strict-CSP
+page can't take it inline):
+
+```js
+window.ARKLIGHT_ON_ERROR = function (message, err) {
+  myLogger.send(message, err);
+  return false;   // exactly `false` suppresses ARKlight's on-page notice
+};
+```
+
+Anything other than `false` (or no hook at all) leaves the notice
+showing. A throwing hook is ignored. The `message` is always one of
+ARKlight's own fixed strings. The hook also sees every uncaught error on
+the page, including from your own scripts. Design record:
+[`../Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md`](../Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md).
+
 ## Public API (v0.003)
 
 Components -- every one of these is a plain Python function that

@@ -155,6 +155,7 @@ _NODE_HARNESS = """
 {create_state_js}
 {init_state_js}
 function arkNotify(msg) {{ notified.push(msg); }}
+function arkReportError(msg) {{ arkNotify(msg); }}
 var renderBindings = function () {{}};
 var renderClassBindings = function () {{}};
 """

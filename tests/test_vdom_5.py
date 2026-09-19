@@ -310,6 +310,7 @@ def test_node_wire_watchers_dispatches_action_on_change():
 
     script = f"""
     function arkNotify(msg) {{ throw new Error(msg); }}
+    function arkReportError(msg) {{ arkNotify(msg); }}
     var actions = {{
       set: function (store, key, args) {{ store.set(key, args.value); }}
     }};
@@ -367,6 +368,7 @@ def test_node_wire_watchers_self_referential_action_does_not_infinite_loop():
     script = f"""
     var callCount = 0;
     function arkNotify(msg) {{ throw new Error(msg); }}
+    function arkReportError(msg) {{ arkNotify(msg); }}
     var actions = {{
       set: function (store, key, args) {{ callCount++; store.set(key, args.value); }}
     }};
