@@ -41,6 +41,16 @@ produces `ARK/index.html` -- plain, dependency-free HTML.
 
 ## Status
 
+```text
+[Rae ARK] Hey just a heads-up from the maintained.
+[Rae ARK] ARKlight is tool I have been working on
+[Rae ARK] for a while for personal reasons. It's
+[Rae ARK] clearly not ready for anything involving
+[Rae ARK] ⚠️ Production and until the compiler
+[Rae ARK] reaches v3. It is only recommended for
+[Rae ARK] Informal, personal, hobby projects.
+```
+
 **Current release: 0.54.0 -- alpha catch-up.** Brings `main` up to
 parity with `alpha`'s CSS `@media`/`<head>` extension, an HTML backend
 refactor, a reactive JS core (computed state, watch effects, two-way
