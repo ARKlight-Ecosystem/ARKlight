@@ -6,6 +6,7 @@
 
 </td>
 <td align="centre">
+<div align = "centre">
 
 # ARKlight
 
@@ -14,6 +15,7 @@ A Python-first compiler for building beautiful static websites.
 Users write Python. ARKlight produces standard HTML. **The browser never
 executes Python.**
 
+</div>
 </td>
 </tr>
 </table>
