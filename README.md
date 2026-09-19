@@ -47,7 +47,7 @@ produces `ARK/index.html` -- plain, dependency-free HTML.
 [Rae ARK] for a while for personal reasons. It's
 [Rae ARK] clearly not ready for anything involving
 [Rae ARK] ⚠️ Production and until the compiler
-[Rae ARK] reaches v3. It is only recommended for
+[Rae ARK] reaches a stable stage. It is only recommended for
 [Rae ARK] Informal, personal, hobby projects.
 ```
 
