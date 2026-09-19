@@ -1592,6 +1592,44 @@ class Site:
                     "Site(trusted_script_origins=...) needs a list of non-empty strings "
                     f"(script-src origins), got {trusted_script_origins!r}."
                 )
+            # Bugfix: each origin is spliced verbatim, space-separated,
+            # straight into the `script-src` directive's value
+            # (csp.py::_render_csp_meta_tag) -- so an origin containing
+            # whitespace or a `;` doesn't stay a single script-src
+            # source the way the kwarg's own docs (above) promise it
+            # will. Whitespace silently splits one entry into what
+            # *looks* like two origins; a `;` terminates the `script-src`
+            # directive early and starts an entirely new CSP directive
+            # this module never intended to emit (e.g.
+            # `["evil.example.com; frame-ancestors *"]` adds a
+            # `frame-ancestors` directive from a kwarg that is only
+            # supposed to add script-src origins). Separately, this
+            # comment block states directly that "there's no kwarg that
+            # reintroduces 'unsafe-eval' or 'unsafe-inline'" -- but
+            # nothing enforced that until now, so
+            # `trusted_script_origins=["'unsafe-inline'"]` silently did
+            # exactly that. All three are the same class of bug: a
+            # contract this docstring/comment already makes, that the
+            # code didn't actually keep. Caught here, at Site()
+            # construction (build time), per this project's
+            # fails-loudly-at-build-time-or-not-at-all rule
+            # (docs/README.md's Philosophy section) -- not deferred to
+            # a broken/weakened CSP discovered later in a real browser.
+            for origin in trusted_script_origins:
+                if any(ch.isspace() for ch in origin) or ";" in origin:
+                    raise ValueError(
+                        "Site(trusted_script_origins=...) entries must be a single "
+                        "script-src source with no whitespace or ';' -- "
+                        f"{origin!r} would split into multiple sources or inject a "
+                        "new CSP directive when rendered."
+                    )
+                if origin.strip("'\"").lower() in {"unsafe-inline", "unsafe-eval"}:
+                    raise ValueError(
+                        "Site(trusted_script_origins=...) can't include "
+                        f"{origin!r} -- ARKlight's strict CSP deliberately has no "
+                        "kwarg that reintroduces 'unsafe-inline'/'unsafe-eval' "
+                        "into script-src."
+                    )
         self.trusted_script_origins: list[str] = list(trusted_script_origins or [])
 
     def _set_css_var_override(self, kwarg_name: str, var_name: str, value: str) -> None:
