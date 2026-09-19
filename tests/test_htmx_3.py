@@ -199,7 +199,7 @@ def test_guard_shape_is_one_try_catch_per_dispatch_branch():
     )[0]
     assert body.count("try {") == 3
     assert body.count("catch (err)") == 3
-    assert "arkNotify(" in body
+    assert "arkReportError(" in body
 
 
 # ---------------------------------------------------------------------------

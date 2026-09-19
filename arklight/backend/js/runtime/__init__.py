@@ -97,7 +97,11 @@ from arklight.backend.js.runtime.model import (
     WIRE_MODEL_BINDING_JS,
 )
 from arklight.backend.js.runtime.nav import NAV_HIGHLIGHT_JS
-from arklight.backend.js.runtime.notify import NOTIFY_JS
+from arklight.backend.js.runtime.notify import (
+    ERROR_BOUNDARY_JS,
+    ERROR_REPORT_JS,
+    NOTIFY_JS,
+)
 from arklight.backend.js.runtime.query import WIRE_QUERY_SYNC_JS
 from arklight.backend.js.runtime.repeat import RENDER_REPEAT_JS
 from arklight.backend.js.runtime.reveal import WIRE_REVEAL_JS
@@ -118,6 +122,8 @@ __all__ = [
     "STATE_CORE_JS",
     "CLICK_INTERCEPTOR_JS",
     "NOTIFY_JS",
+    "ERROR_REPORT_JS",
+    "ERROR_BOUNDARY_JS",
     "NAV_HIGHLIGHT_JS",
     "WIRE_WATCHERS_JS",
     "RENDER_MODEL_BINDINGS_JS",

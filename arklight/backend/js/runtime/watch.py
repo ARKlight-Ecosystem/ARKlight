@@ -72,7 +72,7 @@ WIRE_WATCHERS_JS = """  function wireWatchers(store, specs) {
           if (!action) return;
           action(store, spec.then.state, resolveActionArgs(store, spec.then.args || {}));
         } catch (err) {
-          arkNotify("Something went wrong updating this page -- an unsupported or unexpected case was hit.");
+          arkReportError("Something went wrong updating this page -- an unsupported or unexpected case was hit.", err);
         }
       });
     });

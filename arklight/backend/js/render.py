@@ -305,6 +305,8 @@ from arklight.experimental import FEATURES
 from arklight.ir.platform_api import check_backend_support
 from arklight.backend.js.runtime import CLICK_INTERCEPTOR_JS as _CLICK_INTERCEPTOR_JS
 from arklight.backend.js.runtime import NAV_HIGHLIGHT_JS as _NAV_HIGHLIGHT_JS
+from arklight.backend.js.runtime import ERROR_BOUNDARY_JS as _ERROR_BOUNDARY_JS
+from arklight.backend.js.runtime import ERROR_REPORT_JS as _ERROR_REPORT_JS
 from arklight.backend.js.runtime import NOTIFY_JS as _NOTIFY_JS
 from arklight.backend.js.runtime import RENDER_MODEL_BINDINGS_JS as _RENDER_MODEL_BINDINGS_JS
 from arklight.backend.js.runtime import RENDER_REPEAT_JS as _RENDER_REPEAT_JS
@@ -806,6 +808,14 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     if needs_notify:
         parts.append(_NOTIFY_JS)
         parts.append("")
+        # `0.06505` (RUNTIME-ERROR-HANDLING-PROPOSAL.md): the shared
+        # error funnel and the page-level boundary ship wherever
+        # `arkNotify` does -- a page with no State(...) and no click
+        # interceptor ships neither, unchanged from before.
+        parts.append(_ERROR_REPORT_JS)
+        parts.append("")
+        parts.append(_ERROR_BOUNDARY_JS)
+        parts.append("")
 
     if has_state:
         parts.append(SNABBDOM_CORE_JS)
@@ -920,6 +930,11 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     getter = "function () { return arkStore; }" if has_state else "function () { return null; }"
 
     ready_calls = ["    arkInitPage();"]
+    if needs_notify:
+        # Registered exactly once here, never from arkInitPage(): window
+        # is never replaced by an hx-boost swap, so a second registration
+        # would double-report every error.
+        ready_calls.append("    wireErrorBoundary();")
     if needs_click_interceptor:
         # Registered exactly once, here -- never from inside
         # arkInitPage() itself, and never again on a later boosted

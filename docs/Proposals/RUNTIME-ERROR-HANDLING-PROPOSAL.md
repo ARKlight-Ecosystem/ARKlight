@@ -2,9 +2,13 @@
 
 ## Status
 
-**Proposal -- not yet accepted, not yet staged.** Per
-`docs/Proposals/README.md`'s own definition, this describes something
-that does not exist yet and could be rejected outright. Unlike
+**Implemented, alpha (`0.06505`) -- sections 3a, 3b and 3c. Not
+implemented: the `Site(on_error=...)` spelling (open question 1) and
+a message registry (open question 3). See "Implementation notes
+(`0.06505`)" at the end for what was decided.** Out-of-band, numbered
+capability fix per `docs/Foundational/V1-DEFINITION.md`'s "Issue
+triage during Alpha" section. The rest of this document is the
+original proposal text, kept as the design record. Unlike
 `PROVIDER-SDK-PROPOSAL.md`, this is **not** proposed as an
 experimental feature: nothing here steps outside the intrinsic layout
 model `docs/Foundational/EXPERIMENTAL-APIS.md` gates against (see
@@ -279,3 +283,60 @@ spirit, not mechanism: both argue for a closed, ARKlight-owned
 interface with zero shipped opinion about what a site author does on
 the other side of it -- there, an external service; here, what
 "something broke" should look like to an end user.
+
+## Implementation notes (`0.06505`)
+
+What shipped, and how the three open questions were answered.
+
+**3a -- per-element guards.** `recomputeAll` (per `Computed(...)`
+entry), `renderBindings`, `renderClassBindings`, `renderModelBindings`,
+`renderRepeat` (per container), `renderShow`, and `wireModelBinding`'s
+`store.set(...)` write-back (including the debounced and throttled
+paths) each catch inside their own loop iteration, so one bad case
+reports and the rest of the pass -- and the rest of the
+`store.subscribe` callback -- keeps running. Each path has its own
+fixed message; no site-authored text reaches the notice.
+
+**3b -- page-level boundary.** `wireErrorBoundary()` registers `window`
+`error` and `unhandledrejection` listeners once, at `DOMContentLoaded`
+next to `wireClickInterceptor` (never from `arkInitPage()`, so an
+`app_shell` boosted swap can't double-register it). It ships wherever
+`arkNotify` ships, so a page with no `State(...)` and no click
+interceptor is byte-for-byte unchanged. Browser-generated
+`ResizeObserver loop` notices are ignored -- benign, and not a page
+fault. Note the boundary sees *every* uncaught error on the page,
+including ones from a site author's own scripts; that is the intended
+floor, and `ARKLIGHT_ON_ERROR` returning `false` is how a site opts out
+of the toast.
+
+**3c -- the override hook.** `arkReportError(message, err)` is the one
+funnel: console first (a guarded failure is no longer an uncaught
+exception, so the console line is the developer's only trace), then
+`window.ARKLIGHT_ON_ERROR(message, err)` if it is a function, then
+`arkNotify(message)` unless the hook returned exactly `false`. Every
+step is independently guarded, so a broken hook, console or notice
+never blocks the next step or becomes a second failure. ARKlight ships
+no implementation of the hook.
+
+**Open question 1 (`Site(on_error=...)`).** Not implemented. The hook
+is a plain `window` function a site supplies through its own script
+file (a strict-CSP page can't take it inline), which needs nothing
+from the compiler. A Python-side spelling can be added later without
+changing the runtime contract.
+
+**Open question 2 (funnel everything?).** Yes. The existing v0.041
+guards (`initState`, both `wireClickInterceptor` dispatch branches,
+`wireWatchers`) and the platform-API branch now call `arkReportError`
+too, so an author has exactly one override point. Feature-availability
+notices (clipboard/geolocation/paste unavailable, `PlatformAPI.notify`'s
+fallback) are not errors and still call `arkNotify` directly. `arkNotify`
+itself is unchanged.
+
+**Open question 3 (message registry).** Not done; the per-path count is
+still small. Revisit if it grows.
+
+A failing element reports on every pass that hits it (each state
+change), not once. `arkNotify` reuses one on-page element and restarts
+its timer, so the notice doesn't stack; a hook receives every call.
+
+Tests: `tests/test_runtime_error_handling.py`.
