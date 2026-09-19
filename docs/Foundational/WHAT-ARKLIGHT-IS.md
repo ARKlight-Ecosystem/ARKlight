@@ -350,22 +350,7 @@ The purpose of this boundary is not to imply that the unsupported categories are
 
 For evaluation purposes, the important question is therefore not simply whether ARKlight can produce a website. It is whether the application's requirements fall inside the capability boundary that the current compiler, runtime vocabulary, and available targets actually support.
 
-## 6. Where it sits against the rest of the field
-
-ARKlight's authoring ideas come from frontend/UI-framework lineage;
-its compiled artifacts are SSG-like in principle. That combination is
-not itself a recognized category -- the table below compares ARKlight
-against the *nearest* tool on each axis, not against a peer in its own
-category, because by the definition in Section 1 there isn't one yet.
-
-| Category | Closest relative | The real difference |
-|---|---|---|
-| Static-site generators | Astro (component-authored, JS only where needed) | Astro accepts any JS framework as an island and requires npm/JS knowledge for anything beyond bare content; ARKlight has exactly one, Python-only, closed vocabulary and serves an audience (Python-only developers, structurally unwilling to touch JS) that Astro doesn't attempt to serve at all. |
-| Compiler-first UI frameworks | Svelte (reactivity resolved at compile time, not via a shipped runtime) | Svelte still ships a real, if small, named runtime (`svelte`'s own docs draw this line explicitly) and lets you write arbitrary JS inside a component. ARKlight's macro-expanded components ship *zero* bytes for the abstraction itself, and the vocabulary is closed by construction -- no expression evaluation exists anywhere in the pipeline. |
-| Native-wrapper tooling | Tauri / Capacitor (system WebView, not bundled Chromium) | Tauri/Capacitor wrap an arbitrary, independently-trusted web app. ARKlight's native shells package the compiler's *own* closed-vocabulary output -- there's no second layer of arbitrary code to trust, because there isn't a mechanism to introduce one. |
-| Python-to-native-app tools | Kivy / BeeWare | Both bundle an actual Python interpreter into the shipped artifact. ARKlight ships zero Python anywhere in any artifact, web or native -- Python exists only at build time, on the developer's machine. |
-
-## 7. Honest, currently-unresolved gaps
+## 6. Honest, currently-unresolved gaps
 
 - **No fetch/HTTP primitive anywhere in the closed vocabulary** -- a
   real, checkable wall (verified against `ACTION_REGISTRY` and
@@ -394,7 +379,7 @@ category, because by the definition in Section 1 there isn't one yet.
   discussion found under the project's own name at any point this was
   checked.
 
-## 8. One line to leave this document on
+## 7. One line to leave this document on
 
 ARKlight's real bet is not "a faster Jekyll" or "a smaller Vue" -- it's
 a specific, narrower claim: **that a tool can be Python-only,
