@@ -8,7 +8,7 @@
 <td valign="middle">
 <div align="center">
 
-# ARKlight Alpha Framework
+# ARKlight Framework
 
 **A Python-first compiler for building static websites where developers work
 with a structured component API, while the output remains ordinary, dependency-free HTML.**
