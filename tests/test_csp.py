@@ -149,3 +149,40 @@ def test_site_trusted_script_origins_rejects_empty_string_entry():
 def test_site_trusted_script_origins_rejects_non_string_entry():
     with pytest.raises(ValueError):
         Site(trusted_script_origins=[123])
+
+
+# Bugfix regression: an origin was previously spliced verbatim into the
+# `script-src` directive (csp.py::_render_csp_meta_tag), so whitespace or
+# a `;` inside one "origin" could split it into multiple sources or
+# terminate `script-src` early and inject an unrelated CSP directive.
+# See arklight/api.py's Site.__init__ for the full writeup.
+
+
+def test_site_trusted_script_origins_rejects_semicolon_injection():
+    with pytest.raises(ValueError):
+        Site(trusted_script_origins=["https://cdn.example.com; frame-ancestors *"])
+
+
+def test_site_trusted_script_origins_rejects_whitespace_in_entry():
+    with pytest.raises(ValueError):
+        Site(trusted_script_origins=["https://cdn.example.com evil.example.com"])
+
+
+def test_site_trusted_script_origins_rejects_unsafe_inline():
+    with pytest.raises(ValueError):
+        Site(trusted_script_origins=["'unsafe-inline'"])
+
+
+def test_site_trusted_script_origins_rejects_unsafe_eval():
+    with pytest.raises(ValueError):
+        Site(trusted_script_origins=["'unsafe-eval'"])
+
+
+def test_site_trusted_script_origins_accepts_multiple_clean_origins():
+    site = Site(
+        trusted_script_origins=["https://cdn.example.com", "https://analytics.example.com"]
+    )
+    assert site.trusted_script_origins == [
+        "https://cdn.example.com",
+        "https://analytics.example.com",
+    ]
