@@ -82,7 +82,7 @@ _COMPONENTS_INIT_PY = '''\
 '''
 
 _COMPONENTS_NAV_PY = '''\
-from arklight import *
+# include <stdlib.ARKlight>
 
 
 def nav():
@@ -101,7 +101,7 @@ which imports these and wires them up (see site.py for why)."""
 '''
 
 _PAGES_HOME_PY = '''\
-from arklight import *
+# include <stdlib.ARKlight>
 
 from components.nav import nav
 from content.site_content import TAGLINE, TITLE
@@ -117,7 +117,7 @@ def home():
 '''
 
 _PAGES_ABOUT_PY = '''\
-from arklight import *
+# include <stdlib.ARKlight>
 
 from components.nav import nav
 from content.site_content import TITLE

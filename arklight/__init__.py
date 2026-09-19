@@ -149,7 +149,12 @@ from arklight.api import (
     ClassBindSpec,
     ModelBindSpec,
     ARKNode,
+    CSSSyntaxError,
+    DuplicateStyleNameError,
 )
+
+# What `component(...)` raises is part of its API, so it travels with it.
+from arklight.ir.components import ComponentError, DuplicateComponentError
 
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _installed_version
@@ -303,6 +308,12 @@ __all__ = [
     "ClassBindSpec",
     "ModelBindSpec",
     "ARKNode",
+    # Errors the names above raise -- part of the same API surface, so a
+    # file that `# include <stdlib.ARKlight>` can `except` them by name.
+    "CSSSyntaxError",
+    "DuplicateStyleNameError",
+    "ComponentError",
+    "DuplicateComponentError",
     "__version__",
     "CHANNEL",
 ]

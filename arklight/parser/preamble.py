@@ -1,7 +1,8 @@
 """
 Preamble directives -- ARKlight's own, compiler-owned answer to the
 "last import wins" problem with `from arklight import *` (and the same
-star-import pattern against any other vocabulary source, ACC included).
+star-import pattern against any other vocabulary source, ACC included),
+plus the one directive that is not about vocabulary at all: `# define`.
 
 A site file's `from X import *` line is *Python's* import statement:
 Python resolves it and Python binds every name into the module
@@ -14,12 +15,12 @@ identities (`CapabilityError`, not a coin toss) and
 `arklight/ir/components.py` already refuses for `@component`
 registration (`DuplicateComponentError`) -- but neither of those
 guards touch the *first* step, getting names into the namespace to
-begin with. That step still runs on raw Python import semantics, with
-zero ARKlight involvement, which is exactly the gap this module closes.
+begin with. That step still runs on raw Python import semantics,
+with zero ARKlight involvement, which is exactly the gap this module closes.
 
 Preamble directives move "get names into this module" itself onto
 compiler-owned ground. Written as reserved-shape comments before the
-first executable statement in a site file:
+first executable statement in a file:
 
     # include <stdlib.ARKlight>
     # include <acc.some_collection>
@@ -33,24 +34,65 @@ already bound to a *different* object, that is a collision:
 time -- fails loudly, per `V1-DEFINITION.md`'s reliability doctrine,
 instead of silently overwriting.
 
+`# define`, the exception
+-------------------------
+    # define ROWS -> 3
     # define Btn -> Button
-    # define Button -> acc.some_collection.Button
 
-`# define <alias> -> <target>` resolves a collision explicitly (or
-just adds a local alias). A bare target name must resolve unambiguously
-across everything included so far; a dotted target
-(`<include-label>.<name>`) picks one specific include's copy by name,
-for exactly the case where two includes disagree about what a name
-means.
+`# define <name> -> <text>` is lifted straight from C's `#define`: at
+compile time the left-hand name is replaced by the right-hand text.
+Both sides are strings -- the right one is *whatever the rest of the
+line says*, so it can be a number, a string literal, another name, any
+text that is valid Python where it lands. That makes it different in
+kind from `# include` (and from the not-yet-accepted `# use`, see
+`docs/Proposals/USE-PREAMBLE-PROPOSAL.md`): an include *binds
+vocabulary*, a define *rewrites the file's own source*. It binds
+nothing, resolves nothing, and needs no include to exist.
 
-`from arklight import *` keeps working exactly as it always has --
-this module only ever acts on comments matching the two directive
-shapes above, so raw Python import statements are completely
-untouched and this is purely additive. But a site file that uses
-`# include`/`# define` instead of writing its own `from ... import *`
-lines gets ARKlight's own collision detection for free, and that is
-the intended migration path (see `AUTHORING-GUIDE.md`'s "Preamble
-directives" section).
+The rules, all of them small on purpose:
+
+* The left side is a single Python identifier (not a keyword). It is
+  matched as a whole *token* of the file's code, so `Btn` never
+  touches `Btn2` or `xBtn`, and nothing inside a string literal (an
+  f-string included, on every supported Python) or a comment is ever
+  replaced. Exactly C's rule for identifiers.
+* The right side is taken verbatim, from after `->` to the end of the
+  line, trimmed. It must not be empty.
+* One pass, no rescanning: replaced text is not scanned again. C
+  rescans; here a define whose text mentions another define's name is
+  refused instead (`validate_preamble`), so the missing rescan can
+  never turn into a silent surprise.
+* Per file. A define never leaks into another module, like a C
+  translation unit.
+* A define may not use the name of something an include already
+  provides. Replacing `Button` everywhere would silently override the
+  vocabulary -- the "no silent winner" rule again.
+* Two defines for one name must agree; a repeat of the same one is
+  harmless.
+* The file must still parse once the defines are applied; if it
+  doesn't, the error names the defines in effect instead of pointing
+  at a line of rewritten code the author never wrote.
+
+Substitution keeps every line where it was (the text is one line), so
+line numbers in tracebacks and diagnostics still match the source.
+
+Which files
+-----------
+Every Python file ARKlight takes in: the site file, each project
+module it imports (`pages/`, `components/`, ...), and
+`arklight.config.py`. See `arklight.parser.loader` for how -- an
+import hook scoped to the project directory, so third-party packages
+(ACC ones installed with pip included) stay ordinary Python.
+
+Adding a directive later
+------------------------
+The door is deliberately open. A directive is one recogniser
+(`_DIRECTIVE_PARSERS`) plus one normalization handler
+(`_HANDLERS`), and, only if it has a rule that spans the whole
+preamble, one check in `validate_preamble`. Nothing else in the module
+knows how many kinds there are. `# use` is already reserved (see
+`_RESERVED_DIRECTIVES`) so nobody can build on its shape before it is
+designed.
 
 What counts as the preamble
 ---------------------------
@@ -66,19 +108,17 @@ split (`arklight/ir/normalize.py`, `arklight/ir/validate.py`)
 -------------------------------------------------------------------
 `parse_preamble` reads the directives, `normalize_preamble` *handles*
 them, and `validate_preamble` is the only place anything *raises*.
+Normalization fills the binding table from includes and collects the
+define table; it never raises -- anything wrong (an unresolvable
+include, a malformed or conflicting define, a reserved directive) is
+recorded on the `NormalizedPreamble` instead. Validation then inspects
+the result: first recorded problem, then any name still bound to two
+different objects (`PreambleCollisionError`), then the cross-checks a
+define needs the whole table for. `prepare_source` finally applies the
+defines to the source text -- the one step that needs a validated
+table -- and is what loaders call.
 
-`# define <alias> -> <target>` is a rename -- replace the left name
-with the right one -- which is canonicalization, so normalization is
-where it is applied: an include's names go into the binding table, a
-define replaces its alias's entry, and that is all normalization does.
-It never raises; anything wrong (an unresolvable include, a define
-whose target doesn't exist or is ambiguous, two defines disagreeing
-about one alias) is recorded on the `NormalizedPreamble` instead.
-Validation then inspects the normalized table and is what actually
-fails the load -- first recorded problem, then any name still bound to
-two different objects (`PreambleCollisionError`).
-
-One check has to run *after* the site file executes, because it is
+One check has to run *after* the file executes, because it is
 about what the file itself did: `check_namespace_shadowing`. Python
 lets a file's own `def Button(...)`, `Button = ...`, `from x import
 Button`, or a leftover `from x import *` rebind a name the preamble
@@ -98,16 +138,35 @@ from __future__ import annotations
 import ast
 import importlib
 import io
+import keyword
 import re
 import tokenize
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable, Iterator, Mapping
 
 from arklight.ir.components import ALLOW_REDEFINE_MARKER
 
 _INCLUDE_RE = re.compile(r"^#\s*include\s*<\s*([^<>\s]+)\s*>\s*$")
-_DEFINE_RE = re.compile(r"^#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\s*->\s*([A-Za-z_][A-Za-z0-9_.]*)\s*$")
+
+# `# define <name> -> <text>`. The name is captured loosely (any run of
+# non-space) and judged afterwards, so `# define a-b -> 3` gets a
+# diagnostic about `a-b` instead of being silently mistaken for an
+# ordinary comment. The text is the rest of the line, trimmed, and may
+# be empty here -- normalization is what refuses that, so it is
+# reported rather than ignored.
+_DEFINE_RE = re.compile(r"^#\s*define\s+(\S+?)\s*->\s*(.*?)\s*$")
+
+# Directive words that are claimed but not built. Each maps to the
+# proposal that owns the design. A recognised shape (`# use <...>`)
+# for one of these is refused, not skipped: silently ignoring it would
+# let someone write it believing it does something.
+_RESERVED_DIRECTIVES: dict[str, str] = {
+    "use": "docs/Proposals/USE-PREAMBLE-PROPOSAL.md",
+}
+_RESERVED_RE = re.compile(
+    r"^#\s*(" + "|".join(re.escape(word) for word in _RESERVED_DIRECTIVES) + r")\s*<"
+)
 
 # The one `# include <...>` label that always resolves, with no import
 # needed: ARKlight's own public vocabulary, i.e. exactly what
@@ -121,6 +180,13 @@ _STDLIB_LABEL = "stdlib.ARKlight"
 # registration.
 _ACC_PREFIX = "acc."
 
+# Python 3.12 tokenizes an f-string into FSTRING_START ... FSTRING_END
+# with real NAME tokens inside its `{}`; earlier versions hand back one
+# STRING token. A define must behave the same on both, so names inside
+# any f-string are skipped either way.
+_FSTRING_START = getattr(tokenize, "FSTRING_START", None)
+_FSTRING_END = getattr(tokenize, "FSTRING_END", None)
+
 
 class PreambleError(SyntaxError):
     """Raised for a malformed, unresolved, or ambiguous preamble
@@ -129,19 +195,26 @@ class PreambleError(SyntaxError):
 
 class PreambleCollisionError(PreambleError):
     """Raised when two `# include` directives bind the same name to
-    two different objects and no `# define` disambiguates it.
+    two different objects, or two `# define`s give one name two
+    different texts.
 
-    This is the specific failure `# include`/`# define` exist to make
-    loud: the equivalent situation with two raw `from X import *`
-    statements is silently resolved by Python itself, in the second
-    import's favor, with no error and no trace of what was lost.
+    This is the specific failure the preamble exists to make loud: the
+    equivalent situation with two raw `from X import *` statements is
+    silently resolved by Python itself, in the second import's favor,
+    with no error and no trace of what was lost.
     """
 
 
 @dataclass(frozen=True)
 class _Binding:
     value: Any
-    source: str  # the include label (or "# define (line N)") it came from
+    source: str  # the include label it came from
+
+
+@dataclass(frozen=True)
+class _Define:
+    text: str
+    lineno: int
 
 
 def _leading_comment_lines(source: str) -> list[tuple[int, str]]:
@@ -207,167 +280,222 @@ def _resolve_include_source(label: str, *, filename: str) -> dict[str, Any]:
     )
 
 
-def _resolve_define_target(
-    target: str,
-    *,
-    sources: dict[str, dict[str, Any]],
-    bindings: dict[str, list[_Binding]],
-    filename: str,
-    lineno: int,
-) -> Any:
-    if "." in target:
-        label, _, name = target.rpartition(".")
-        source = sources.get(label)
-        if source is None:
-            raise PreambleError(
-                f"{filename}:{lineno}: `# define ... -> {target}` refers to "
-                f"include label `{label}`, but no `# include <{label}>` has "
-                "appeared yet in this file's preamble."
-            )
-        if name not in source:
-            raise PreambleError(
-                f"{filename}:{lineno}: `{label}` has no `{name}` to define "
-                f"from (`# include <{label}>`)."
-            )
-        return source[name]
-
-    candidates = bindings.get(target)
-    if not candidates:
-        raise PreambleError(
-            f"{filename}:{lineno}: `# define ... -> {target}` refers to "
-            f"`{target}`, which nothing included so far provides."
-        )
-    distinct_values = {id(candidate.value) for candidate in candidates}
-    if len(distinct_values) > 1:
-        raise PreambleError(
-            f"{filename}:{lineno}: `{target}` is ambiguous -- bound by more "
-            f"than one include to different objects. Use `<label>.{target}` "
-            "to pick one explicitly."
-        )
-    return candidates[0].value
-
-
 @dataclass(frozen=True)
 class Directive:
     """One recognised preamble directive, as written -- nothing
-    resolved yet. `kind` is `"include"` (`label` set) or `"define"`
-    (`alias` and `target` set)."""
+    resolved yet. `kind` is `"include"` (`label` set), `"define"`
+    (`name` and `text` set) or `"reserved"` (`name` is the reserved
+    word)."""
 
     kind: str
     lineno: int
     label: str = ""
-    alias: str = ""
-    target: str = ""
+    name: str = ""
+    text: str = ""
 
 
 @dataclass
 class NormalizedPreamble:
     """What normalization produced: the binding table with every
-    `# include` applied and every `# define` substituted in, plus
-    `problems` -- everything normalization couldn't apply, in the
-    order it was met, *not raised*. Validation decides what to do
-    about them."""
+    `# include` applied, the table of `# define`s, plus `problems` --
+    everything normalization couldn't apply, in the order it was met,
+    *not raised*. Validation decides what to do about them."""
 
     filename: str
     bindings: dict[str, list[_Binding]] = field(default_factory=dict)
-    sources: dict[str, dict[str, Any]] = field(default_factory=dict)
+    defines: dict[str, _Define] = field(default_factory=dict)
     problems: list[PreambleError] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class ResolvedPreamble:
     """A validated preamble: `bindings` is what the loader binds into
-    the module namespace; `origins` records which include (or
-    `# define` line) each name came from, so a later shadowing
-    diagnostic can say what was overridden."""
+    the module namespace; `origins` records which include each name
+    came from, so a later shadowing diagnostic can say what was
+    overridden; `defines` is the validated `# define` table."""
 
     bindings: dict[str, Any]
     origins: dict[str, str]
+    defines: dict[str, _Define] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PreparedSource:
+    """A file ready to run: its validated preamble, and its source
+    with every `# define` applied (identical to the input when the
+    file has none)."""
+
+    resolved: ResolvedPreamble
+    source: str
+
+
+# ---------------------------------------------------------------------------
+# Phase 1: parse -- one recogniser per directive shape
+# ---------------------------------------------------------------------------
+
+
+def _parse_include(text: str, lineno: int) -> Directive | None:
+    match = _INCLUDE_RE.match(text)
+    return Directive("include", lineno, label=match.group(1)) if match else None
+
+
+def _parse_define(text: str, lineno: int) -> Directive | None:
+    match = _DEFINE_RE.match(text)
+    if not match:
+        return None
+    name, body = match.groups()
+    return Directive("define", lineno, name=name, text=body)
+
+
+def _parse_reserved(text: str, lineno: int) -> Directive | None:
+    match = _RESERVED_RE.match(text)
+    return Directive("reserved", lineno, name=match.group(1)) if match else None
+
+
+# A new directive is registered here (and in `_HANDLERS` below).
+_DIRECTIVE_PARSERS: tuple[Callable[[str, int], Directive | None], ...] = (
+    _parse_include,
+    _parse_define,
+    _parse_reserved,
+)
 
 
 def parse_preamble(source: str) -> list[Directive]:
-    """Phase 1: read every recognised `# include`/`# define` comment
-    in the source's preamble, in order. Pure text -- nothing is
-    imported, resolved, or checked. Anything that isn't one of the two
-    directive shapes is just a comment and is skipped."""
+    """Phase 1: read every recognised directive comment in the
+    source's preamble, in order. Pure text -- nothing is imported,
+    resolved, or checked. Anything that isn't one of the directive
+    shapes is just a comment and is skipped."""
     directives: list[Directive] = []
     for lineno, text in _leading_comment_lines(source):
         stripped = text.strip()
-
-        include_match = _INCLUDE_RE.match(stripped)
-        if include_match:
-            directives.append(Directive("include", lineno, label=include_match.group(1)))
-            continue
-
-        define_match = _DEFINE_RE.match(stripped)
-        if define_match:
-            alias, target = define_match.groups()
-            directives.append(Directive("define", lineno, alias=alias, target=target))
+        for parser in _DIRECTIVE_PARSERS:
+            directive = parser(stripped, lineno)
+            if directive is not None:
+                directives.append(directive)
+                break
     return directives
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: normalize -- handle each directive; record, never raise
+# ---------------------------------------------------------------------------
+
+
+def _apply_include(directive: Directive, result: NormalizedPreamble) -> None:
+    try:
+        resolved = _resolve_include_source(directive.label, filename=result.filename)
+    except PreambleError as exc:
+        result.problems.append(exc)
+        return
+    for name, value in resolved.items():
+        result.bindings.setdefault(name, []).append(_Binding(value, directive.label))
+
+
+def _apply_define(directive: Directive, result: NormalizedPreamble) -> None:
+    where = f"{result.filename}:{directive.lineno}"
+    name, text = directive.name, directive.text
+
+    if not name.isidentifier() or keyword.iskeyword(name):
+        result.problems.append(
+            PreambleError(
+                f"{where}: `# define {name} -> ...` -- the left side must be a "
+                "single Python identifier that isn't a keyword; a define "
+                "replaces whole names in the file's code."
+            )
+        )
+        return
+    if not text:
+        result.problems.append(
+            PreambleError(
+                f"{where}: `# define {name} ->` has nothing on the right. "
+                "Write the text that should replace the name."
+            )
+        )
+        return
+
+    earlier = result.defines.get(name)
+    if earlier is not None:
+        if earlier.text != text:
+            result.problems.append(
+                PreambleCollisionError(
+                    f"{where}: `{name}` is already defined at line "
+                    f"{earlier.lineno} as `{earlier.text}` -- two `# define`s "
+                    "for one name would leave the later one silently winning. "
+                    "Keep one."
+                )
+            )
+        return  # an identical repeat is harmless
+    result.defines[name] = _Define(text, directive.lineno)
+
+
+def _apply_reserved(directive: Directive, result: NormalizedPreamble) -> None:
+    result.problems.append(
+        PreambleError(
+            f"{result.filename}:{directive.lineno}: `# {directive.name} <...>` is "
+            "reserved for a proposal that has not been accepted "
+            f"({_RESERVED_DIRECTIVES[directive.name]}). It has no effect today, "
+            "so ARKlight refuses it instead of silently ignoring it."
+        )
+    )
+
+
+_HANDLERS: dict[str, Callable[[Directive, NormalizedPreamble], None]] = {
+    "include": _apply_include,
+    "define": _apply_define,
+    "reserved": _apply_reserved,
+}
 
 
 def normalize_preamble(
     directives: list[Directive], *, filename: str = "<site>"
 ) -> NormalizedPreamble:
     """Phase 2: handle the directives. Includes fill the binding
-    table; a `# define` replaces its alias's entry with its target's
-    value (the left name now means the right one). Never raises --
-    a directive that can't be applied is recorded in `problems` and
-    left out, so `validate_preamble` can report it."""
+    table; defines fill the define table. Never raises -- a directive
+    that can't be applied is recorded in `problems` and left out, so
+    `validate_preamble` can report it."""
     result = NormalizedPreamble(filename=filename)
-    defined_at: dict[str, tuple[int, Any]] = {}
-
     for directive in directives:
-        if directive.kind == "include":
-            try:
-                resolved = _resolve_include_source(directive.label, filename=filename)
-            except PreambleError as exc:
-                result.problems.append(exc)
-                continue
-            result.sources[directive.label] = resolved
-            for name, value in resolved.items():
-                result.bindings.setdefault(name, []).append(_Binding(value, directive.label))
-            continue
-
-        try:
-            value = _resolve_define_target(
-                directive.target,
-                sources=result.sources,
-                bindings=result.bindings,
-                filename=filename,
-                lineno=directive.lineno,
-            )
-        except PreambleError as exc:
-            result.problems.append(exc)
-            continue
-
-        earlier = defined_at.get(directive.alias)
-        if earlier is not None and earlier[1] is not value:
-            result.problems.append(
-                PreambleCollisionError(
-                    f"{filename}:{directive.lineno}: `{directive.alias}` is "
-                    f"already defined at line {earlier[0]} as a different "
-                    "object -- two `# define`s for one alias would leave "
-                    "the later one silently winning. Keep one."
-                )
-            )
-            continue
-        defined_at[directive.alias] = (directive.lineno, value)
-
-        # A `# define` is the author's own explicit disambiguation
-        # for `alias` -- it replaces (not appends to) whatever
-        # `alias` currently holds, rather than becoming one more
-        # candidate that could itself collide.
-        result.bindings[directive.alias] = [
-            _Binding(value, f"# define (line {directive.lineno})")
-        ]
+        _HANDLERS[directive.kind](directive, result)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: validate -- the only place the preamble fails
+# ---------------------------------------------------------------------------
+
+
+def _code_name_tokens(source: str) -> Iterator[tokenize.TokenInfo]:
+    """Every NAME token of `source`'s code -- never one inside a
+    string literal, f-strings included, whichever Python this is."""
+    depth = 0
+    for tok in tokenize.generate_tokens(io.StringIO(source).readline):
+        if _FSTRING_START is not None:
+            if tok.type == _FSTRING_START:
+                depth += 1
+                continue
+            if tok.type == _FSTRING_END:
+                depth -= 1
+                continue
+        if tok.type == tokenize.NAME and depth == 0:
+            yield tok
+
+
+def _names_in_text(text: str) -> list[str]:
+    """Names a define's right-hand text mentions. A fragment that
+    won't tokenize on its own (an unbalanced bracket, say) mentions
+    none we can see; the parse check after substitution is what
+    catches text that is actually wrong."""
+    try:
+        return [tok.string for tok in _code_name_tokens(text)]
+    except (tokenize.TokenError, SyntaxError):
+        return []
 
 
 def validate_preamble(normalized: NormalizedPreamble) -> None:
     """Phase 3: the only place the preamble fails. Raises the first
     problem normalization recorded, then `PreambleCollisionError` for
-    any name still bound to two different objects."""
+    any name still bound to two different objects, then the two rules
+    a `# define` can only be checked against the whole table for."""
     if normalized.problems:
         raise normalized.problems[0]
 
@@ -377,40 +505,149 @@ def validate_preamble(normalized: NormalizedPreamble) -> None:
             named_sources = ", ".join(f"`{candidate.source}`" for candidate in candidates)
             raise PreambleCollisionError(
                 f"{normalized.filename}: `{name}` is bound by more than one "
-                f"`# include` to different objects ({named_sources}). Add "
-                f"`# define {name} -> <label>.{name}` to pick one "
-                "explicitly, or rename one side's export."
+                f"`# include` to different objects ({named_sources}). ARKlight "
+                "won't pick a winner: drop one of the includes, or have one "
+                "side export a different name."
             )
+
+    for name, define in normalized.defines.items():
+        where = f"{normalized.filename}:{define.lineno}"
+        provided = normalized.bindings.get(name)
+        if provided:
+            raise PreambleError(
+                f"{where}: `# define {name} -> ...` -- `{name}` is already "
+                f"provided by `# include <{provided[0].source}>`. Replacing it "
+                "everywhere in this file would silently override that "
+                "vocabulary. Pick a different name (for a component that is "
+                "meant to override, use `@component(..., allow_redefine=True)`)."
+            )
+        for mentioned in _names_in_text(define.text):
+            if mentioned in normalized.defines:
+                raise PreambleError(
+                    f"{where}: `# define {name} -> {define.text}` mentions "
+                    f"`{mentioned}`, which is itself a `# define`. Defines are "
+                    "applied in one pass and are not expanded again -- write "
+                    f"out what `{mentioned}` stands for instead."
+                )
+
+
+# ---------------------------------------------------------------------------
+# Applying the defines
+# ---------------------------------------------------------------------------
+
+
+def apply_defines(source: str, defines: Mapping[str, str]) -> tuple[str, int]:
+    """Replace every whole-name token of `source`'s code that is a key
+    of `defines` with its text; return `(new_source, replacements)`.
+
+    Token-based, so a name inside a string literal or a comment is
+    never touched, and `Btn` never matches inside `Btn2`. One pass:
+    replaced text is not scanned again. Every replacement is one line
+    of text, so no line moves.
+    """
+    if not defines:
+        return source, 0
+    lines = io.StringIO(source).readlines()
+    edits: dict[int, list[tuple[int, int, str]]] = defaultdict(list)
+    count = 0
+    for tok in _code_name_tokens(source):
+        text = defines.get(tok.string)
+        if text is None:
+            continue
+        (row, col), (_end_row, end_col) = tok.start, tok.end
+        edits[row].append((col, end_col, text))
+        count += 1
+    for row, spans in edits.items():
+        line = lines[row - 1]
+        for col, end_col, text in sorted(spans, reverse=True):  # right to left
+            line = line[:col] + text + line[end_col:]
+        lines[row - 1] = line
+    return "".join(lines), count
+
+
+def _apply_defines_checked(
+    source: str, defines: Mapping[str, _Define], *, filename: str
+) -> str:
+    if not defines:
+        return source
+    try:
+        ast.parse(source)
+    except SyntaxError:
+        # Not the defines' doing, and not ours to report: the loader's
+        # own parse of this file says so, with its usual message.
+        return source
+    try:
+        new_source, count = apply_defines(
+            source, {name: define.text for name, define in defines.items()}
+        )
+    except (tokenize.TokenError, SyntaxError) as exc:
+        raise PreambleError(
+            f"{filename}: could not read the file's tokens to apply its "
+            f"`# define`s: {exc}"
+        ) from exc
+    if count == 0:
+        return source
+    try:
+        ast.parse(new_source, filename=filename)
+    except SyntaxError as exc:
+        in_effect = ", ".join(
+            f"`{name} -> {define.text}` (line {define.lineno})"
+            for name, define in defines.items()
+        )
+        raise PreambleError(
+            f"{filename}: the file no longer parses once its `# define`s are "
+            f"applied ({exc.msg}, line {exc.lineno}). Defines in effect: "
+            f"{in_effect}. A define replaces the name everywhere it appears "
+            "as a name -- attribute and keyword-argument names included."
+        ) from exc
+    return new_source
+
+
+# ---------------------------------------------------------------------------
+# Entry points
+# ---------------------------------------------------------------------------
 
 
 def resolve_preamble_detailed(source: str, *, filename: str = "<site>") -> ResolvedPreamble:
     """Parse, normalize, and validate `source`'s preamble; return the
-    bindings plus where each one came from."""
+    bindings plus where each one came from, and the define table."""
     normalized = normalize_preamble(parse_preamble(source), filename=filename)
     validate_preamble(normalized)
     return ResolvedPreamble(
         bindings={name: cands[0].value for name, cands in normalized.bindings.items()},
         origins={name: cands[0].source for name, cands in normalized.bindings.items()},
+        defines=dict(normalized.defines),
     )
 
 
 def resolve_preamble(source: str, *, filename: str = "<site>") -> dict[str, Any]:
     """
-    Parse and resolve every `# include`/`# define` directive in
-    `source`'s preamble comments, returning the flat `{name: value}`
-    mapping the loader should bind into the module namespace *before*
-    executing the rest of the file -- ARKlight's own replacement for
-    letting raw `from X import *` statements silently fight it out.
+    Parse and resolve every directive in `source`'s preamble comments,
+    returning the flat `{name: value}` mapping the loader should bind
+    into the module namespace *before* executing the rest of the file
+    -- ARKlight's own replacement for letting raw `from X import *`
+    statements silently fight it out. (`# define`s bind nothing; see
+    `prepare_source` for the whole job.)
 
     Raises `PreambleError` for a malformed or unresolvable directive,
     and `PreambleCollisionError` (a `PreambleError` subclass) when two
-    includes bind the same name to two different objects and no
-    `# define` picks one.
+    includes bind the same name to two different objects.
 
     A file with no recognized directives resolves to `{}` -- callers
     keep working exactly as before if they never adopt this syntax.
     """
     return resolve_preamble_detailed(source, filename=filename).bindings
+
+
+def prepare_source(source: str, *, filename: str = "<site>") -> PreparedSource:
+    """Everything a loader needs before it can run `source`: the
+    validated preamble (names to bind) and the source with every
+    `# define` applied. This is the one call each loader makes."""
+    resolved = resolve_preamble_detailed(source, filename=filename)
+    return PreparedSource(
+        resolved=resolved,
+        source=_apply_defines_checked(source, resolved.defines, filename=filename),
+    )
 
 
 # ---------------------------------------------------------------------------

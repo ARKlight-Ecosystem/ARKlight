@@ -49,19 +49,51 @@ already applies to duplicate `@component` registration
 (`CapabilityError`) -- `# include` closes the one remaining gap, the
 step that gets names into the namespace in the first place.
 
-A collision is resolved explicitly with `# define`:
+There is deliberately no directive that picks a winner. Drop one of
+the includes, or have one side export a different name.
+
+### `# define` -- replace a name with text, at compile time
 
 ```python
-# define Button -> acc.some_collection.Button
+# include <stdlib.ARKlight>
+# define LEVEL -> 2
+# define Btn -> Button
+
+Heading("Hi", level=LEVEL)   # runs as Heading("Hi", level=2)
+Btn("Go")                    # runs as Button("Go")
 ```
 
-`# define <alias> -> <target>` binds `<alias>` to whichever object
-`<target>` resolves to. A bare target (`# define Btn -> Button`) must
-be unambiguous across everything included so far; a dotted target
-(`<include-label>.<name>`, using the exact label from that
-`# include <label>` line) picks one specific include's copy by name,
-for exactly the case where two sources disagree about what a name
-means.
+`# define <name> -> <text>` is lifted straight from C's `#define`: the
+left-hand name is replaced by the right-hand text before the file
+runs. Both sides are strings -- the right side is *whatever the rest of
+the line says* (a number, a string literal, another name, any text
+that is valid Python where it lands). That makes `# define` different
+in kind from `# include`: an include binds vocabulary, a define
+rewrites the file's own source. It binds nothing, resolves nothing, and
+needs no include.
+
+The rules are small on purpose:
+
+- **The left side is one Python identifier** (not a keyword), matched
+  as a whole name in the file's *code*. `Btn` never touches `Btn2`,
+  and nothing inside a string literal (f-strings included) or a
+  comment is ever replaced -- C's rule for identifiers. An attribute
+  or keyword-argument name is code too, so `# define size -> 12` also
+  rewrites `f(size=1)`.
+- **The right side is taken verbatim**, from after `->` to the end of
+  the line, trimmed. It can't be empty.
+- **One pass.** Replaced text is not scanned again (C rescans; here a
+  define whose text mentions another define's name is refused, so the
+  missing rescan can't turn into a surprise).
+- **Per file.** A define never leaks into another module.
+- **It can't take the name of included vocabulary.** `# define Button
+  -> 5` next to `# include <stdlib.ARKlight>` is an error -- replacing
+  `Button` everywhere would silently override the API.
+- **Two defines for one name must agree** (repeating the same one is
+  harmless).
+- **The file must still parse afterwards.** If it doesn't, the error
+  lists the defines in effect rather than pointing at rewritten code
+  you never wrote. Line numbers never move.
 
 **What counts as the preamble.** Only recognised directive comments
 *above the file's contents* -- the scan ends at the first line of
@@ -69,15 +101,13 @@ actual code (a docstring counts as code). The same comment between
 statements, or at the end of the file, is an ordinary comment to
 ARKlight and is never acted on.
 
-**`# define` is a rename, applied in normalization and checked in
-validation.** ARKlight handles the preamble in the same three steps as
-the rest of the compiler: it reads the directives, *normalizes* them
-(includes fill the name table; `# define A -> B` replaces `A` with
-what `B` means), then *validates* the result. Normalization never
-fails on its own; validation is where problems surface -- a define
-whose target doesn't exist or is ambiguous, two defines giving one
-alias two different meanings, or a name still bound to two different
-objects.
+**Normalization records, validation raises.** ARKlight handles the
+preamble in the same three steps as the rest of the compiler: it reads
+the directives, *normalizes* them (includes fill the name table;
+defines fill the define table), then *validates* the result.
+Normalization never fails on its own; validation is where problems
+surface -- an unresolvable include, a malformed or conflicting define,
+a name still bound to two different objects.
 
 **Names your own file defines.** Python lets a `def Button(...)`,
 `Button = ...`, `from x import Button`, or a leftover `from x import
@@ -87,25 +117,45 @@ was rebound is the same kind of collision as two includes disagreeing:
 the load fails, naming the include the name came from and the line
 that rebound it. Rename yours. (Re-importing the *same* object is
 harmless, and a `@component(..., allow_redefine=True)` is a deliberate
-override, so neither is flagged.) The same rule now applies to
+override, so neither is flagged.) The same rule applies to
 `@component` names themselves: one that matches a built-in
 (`Button`, `Container`, ...) is refused at registration unless
 `allow_redefine=True`, since it would otherwise silently take over
 every built-in of that name in the site.
 
-**Scope.** The preamble is read from the site file `arklight build`
-is pointed at. Other modules that file imports (`pages/`,
-`components/`) are ordinary Python and don't read one, so they keep
-their own imports; the retirement notice is about the site file.
+**Scope: every Python file ARKlight takes in.** The site file, each
+project module it imports (`pages/`, `components/`, `content/`, an ACC
+module that lives in your project), and `arklight.config.py` all get
+their preamble read, each on its own -- a file needs its own
+`# include <stdlib.ARKlight>` line, exactly like a C file needs its own
+`#include`. This is done with an import hook that exists only while the
+site loads and only covers files inside the site file's own directory;
+the standard library and pip-installed packages (ACC packages
+included) are imported by Python exactly as before. The retirement
+notice for `from arklight import *` covers every one of those files
+too.
+
+**`# include <stdlib.ARKlight>` is the whole public API**: everything
+`arklight.api` defines, including the errors it raises
+(`CSSSyntaxError`, `DuplicateStyleNameError`, `ComponentError`,
+`DuplicateComponentError`). A test keeps it that way.
 
 Only `<stdlib.ARKlight>` and `<acc.<dotted.module.path>>` are
 recognized include labels today. An `acc.` include must point at a
 real, importable module that defines `__all__` -- the same contract
 `arklight.__all__` itself follows -- otherwise ARKlight doesn't know
 what vocabulary that module is meant to contribute, and raises rather
-than guessing. See `arklight/parser/preamble.py` for the full
-resolution rules and `arklight/parser/loader.py` for how the resolved
-bindings land in a site file's namespace before its own code executes.
+than guessing.
+
+**`# use` is reserved, not implemented.** A `# use <...>` line in the
+preamble is refused with an error pointing at the proposal
+([`USE-PREAMBLE-PROPOSAL.md`](../Proposals/USE-PREAMBLE-PROPOSAL.md),
+*not accepted*), because silently ignoring it would let you write it
+believing it does something. More directives can be added later: each
+is one recogniser plus one handler in `arklight/parser/preamble.py`.
+See that file for the full resolution rules and
+`arklight/parser/loader.py` for how the resolved bindings land in each
+file's namespace before its own code executes.
 
 ## Internal links are relative, not root-absolute
 

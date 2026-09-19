@@ -121,11 +121,22 @@ def load_config(start_dir: str | Path) -> dict[str, Any]:
     if path is None:
         return {}
 
+    # Imported here, not at module level: the loader pulls in the whole
+    # compiler front end, which nothing else in this module needs.
+    from arklight.parser.loader import run_source
+    from arklight.parser.preamble import PreambleError
+
     namespace: dict[str, Any] = {"__file__": str(path)}
     try:
         source = path.read_text(encoding="utf-8")
-        code = compile(source, str(path), "exec")
-        exec(code, namespace)  # noqa: S102 -- same trust model as a site.py load
+        # Same trust model as a site.py load, and the same front door:
+        # every Python file ARKlight takes in gets its preamble read, so
+        # `# define PORT -> 8347` works here like anywhere else.
+        run_source(namespace, source, filename=str(path))
+    except PreambleError as exc:
+        # A PreambleError is a SyntaxError subclass; catch it first so a
+        # bad directive isn't reported as "invalid Python".
+        raise ConfigError(f"{path}: {exc}") from exc
     except SyntaxError as exc:
         raise ConfigError(f"{path}: invalid Python -- {exc}") from exc
     except Exception as exc:  # noqa: BLE001 -- surface any load-time error clearly
