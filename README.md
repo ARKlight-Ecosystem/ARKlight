@@ -84,6 +84,8 @@ for what's still queued.
 See [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the full
 milestone roadmap.
 
+Refer to [`docs/Foundational/EXPERIMENTAL-APIS.md`](./docs/Foundational/EXPERIMENTAL-APIS.md) if you wished to use escape hatches.
+
 ## Install
 
 ```bash
