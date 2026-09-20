@@ -102,7 +102,8 @@ _STAGE_PATTERNS: tuple[_StagePattern, ...] = (
     _pat(
         r"Running raw postprocess function (?P<i>\d+)/(?P<n>\d+)\.\.\.",
         lambda m: _line(
-            f"Running your raw_postprocess function ({m.group('i')} of {m.group('n')})."
+            f"Running your registered ScriptExtension/postprocess function "
+            f"({m.group('i')} of {m.group('n')})."
         ),
     ),
     _pat(

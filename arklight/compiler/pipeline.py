@@ -472,25 +472,27 @@ def build(
         except Exception as exc:  # noqa: BLE001 -- surface backend errors clearly
             raise CompileError(f"Backend {backend.name!r} failed to postprocess: {exc}") from exc
 
-    # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): `site.raw_postprocess(...)`
-    # functions get the exact same second pass every `Backend.postprocess()`
-    # just got above, run last and in registration order, over the fully
-    # combined output of every backend. Each already recorded its own
-    # `ExperimentalUsage` at *registration* time (see `Site.raw_postprocess`),
-    # printed by the inline-banner loop in `compile_site_file` above -- this
-    # is just where the function itself actually runs. A no-op loop (as
-    # before) for sites that never called `site.raw_postprocess(...)`.
+    # `site.raw_postprocessors` -- functions registered here get the
+    # exact same second pass every `Backend.postprocess()` just got
+    # above, run last and in registration order, over the fully
+    # combined output of every backend. This list is no longer
+    # user-facing: `Site.raw_postprocess(fn)` is deprecated and never
+    # appends to it anymore (see `arklight/experimental.py`'s
+    # `raw-postprocess` entry) -- the only thing that populates it now
+    # is `arklight.backend.script_extension.register()`, via
+    # `site.register_script_extension(...)`. A no-op loop (as before)
+    # for sites that never call it.
     for i, raw_fn in enumerate(ir.raw_postprocessors, start=1):
         log(f"Running raw postprocess function {i}/{len(ir.raw_postprocessors)}...")
         try:
             result = raw_fn(output_files)
         except Exception as exc:  # noqa: BLE001 -- surface user code errors clearly
             raise CompileError(
-                f"site.raw_postprocess(...) function #{i} raised an error: {exc}"
+                f"raw postprocess function #{i} raised an error: {exc}"
             ) from exc
         if not isinstance(result, dict):
             raise CompileError(
-                f"site.raw_postprocess(...) function #{i} must return a "
+                f"raw postprocess function #{i} must return a "
                 f"dict[str, str] of {{relative_path: contents}}, got "
                 f"{type(result).__name__!r}."
             )

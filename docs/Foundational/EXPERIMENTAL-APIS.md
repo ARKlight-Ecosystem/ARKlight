@@ -35,21 +35,41 @@ experimental API.** That currently means:
   Model until it resolves. Prefer `Page(links=[{"rel": "stylesheet",
   "href": ...}])` where possible; reach for `import_style` only when a
   stylesheet truly isn't reachable that way.
-- `raw-postprocess` -- `Site.raw_postprocess(fn)`, the widest escape
-  hatch in the project: `fn` is handed the *entire* combined
-  `{relative_path: contents}` output dict, after every backend's own
-  `render()`/`postprocess()` pass (see
-  `arklight.backend.base.Backend.postprocess`), and whatever it
-  returns is written to disk verbatim -- nothing about it is
-  validated, normalized, or checked the way every other generated
-  file is. It's the user-facing equivalent of a `Backend.postprocess()`
-  override, offered directly on `Site` for one-off transformations
-  that don't warrant a whole `Backend` subclass. Flagged loudly (both
-  the inline banner and the end-of-build summary spell out the "million
-  different ways to shoot yourself in the foot" warning) because unlike
-  every other experimental feature above, this one isn't scoped to CSS
-  at all -- it's arbitrary user code with unchecked write access to
-  every output file the build produces.
+- `raw-postprocess` -- **officially deprecated and removed.**
+  `Site.raw_postprocess(fn)` no longer registers or runs `fn` at all;
+  calling it only prints a log pointing at its replacement. It used to
+  be the widest escape hatch in the project: `fn` was handed the
+  *entire* combined `{relative_path: contents}` output dict, after
+  every backend's own `render()`/`postprocess()` pass, with whatever
+  it returned written to disk verbatim -- nothing about it validated,
+  normalized, or checked the way every other generated file is. That
+  surface is gone. Its `FEATURES` entry (`arklight/experimental.py`)
+  stays registered only so `experimental.emit("raw-postprocess")`
+  keeps working for historical/documentation purposes -- nothing in
+  `Site` emits it anymore. If you needed hand-written JS alongside
+  `arklight.js`, use `script-extension` below, its replacement. If you
+  needed something else `raw_postprocess` used to do (rewriting an
+  arbitrary output file), reach for a real `Backend` subclass
+  overriding `postprocess()` (`arklight.backend.base.Backend`)
+  instead.
+- `script-extension` -- `arklight.backend.script_extension.ScriptExtension`,
+  registered via `site.register_script_extension(...)`. The (sole
+  surviving) class-based successor to `raw-postprocess`, covering the
+  one job most `raw_postprocess` uses were actually for: adding
+  hand-written JS alongside `arklight.js`. Deliberately different in
+  *kind*, not just degree, from ARKlight's normal declarative/
+  functional API -- you subclass `ScriptExtension` (plain Python
+  inheritance, the "oops way"), and its `script` is restricted to the
+  `<script>` portion of Svelte single-file-component syntax
+  (`<template>`/`<style>` are refused outright, not just warned).
+  ARKlight lowers only that block to plain JS text and appends it to
+  `arklight.js` -- never an arbitrary output file the way
+  `raw_postprocess` used to. Still gated: the JS itself is unchecked
+  (no `eval`, no `new Function`, but also no guarantee it's
+  syntactically valid). Usage is expected to carry a
+  `#include <expapilib.ARKlight>` marker comment in the subclass's own
+  source file -- its absence doesn't block anything, it just adds one
+  more warning on top of the normal experimental banner.
 - `provider-integration` -- `Site(provider=Provider.declare(name=...,
   capabilities=[...]))`, a site declaring that it talks to an external
   service at runtime (a hosted database, an auth service, its own API).

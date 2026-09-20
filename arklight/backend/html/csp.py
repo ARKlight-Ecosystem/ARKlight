@@ -76,19 +76,20 @@ browser that doesn't parse `<meta http-equiv="Content-Security-
 Policy">` at all: the tag is inert, the page renders exactly as if it
 weren't there.
 
-**`raw_postprocess` interaction (see `docs/EXPERIMENTAL-APIS.md`,
-`arklight/experimental.py`'s `raw-postprocess` entry for the full
-warning text).** `Site.raw_postprocess(fn)` hands `fn` the *entire*
-final output dict, unchecked -- if `fn` injects an inline `<script>`,
-this policy's `script-src 'self'` (no `'unsafe-inline'`) blocks it from
-running, silently, in the browser. A nonce doesn't fix this: ARKlight
-ships static files built once, ahead of time, so a nonce baked into
-that static HTML is public and permanent the moment the build is
-published -- it authenticates nothing, unlike a real per-request,
-server-generated nonce. The honest fix is `Site(strict_csp=False)`, an
-explicit, all-or-nothing opt-out -- consistent with `raw_postprocess`
-already being exactly that kind of explicit, warned, all-or-nothing
-escape hatch itself.
+**`raw_postprocess` interaction -- historical note (see
+`docs/EXPERIMENTAL-APIS.md`, `arklight/experimental.py`'s
+`raw-postprocess` entry for the full deprecation text).**
+`Site.raw_postprocess(fn)` is officially deprecated and no longer runs
+anything, so it can no longer inject an inline `<script>` that this
+policy's `script-src 'self'` (no `'unsafe-inline'`) would then block.
+Its replacement, `site.register_script_extension(...)`
+(`arklight.backend.script_extension.ScriptExtension`), doesn't have
+this problem at all: it only ever appends to `arklight.js`, an
+*external* script this policy already allows under `script-src 'self'`
+by default -- no inline `<script>`, no CSP conflict, no need for
+`Site(strict_csp=False)`. `Site(strict_csp=False)` remains available
+as a general, explicit, all-or-nothing opt-out for anything else that
+still needs it.
 """
 
 from __future__ import annotations
