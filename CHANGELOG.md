@@ -8,10 +8,12 @@ SemVer.
 ## [0.06515] -- `arklight deploy`: the deployment CLI (Cloudflare Workers via Wrangler)
 
 Implements `docs/Foundational/DEPLOYMENT-CLI.md`, which had been design-only
-since it was written. Numbered next in the `0.0650` + decimals sequence, but
-this is not one of the `v0.065` slot's pieces and the deployment CLI has no
-roadmap row of its own, so the number is the maintainer's to confirm (same
-situation as the `0.06504` draft). Roadmap `v0.065` untouched.
+since it was written. Numbered by the same `0.0650` + decimals rule as
+`[0.06501]`-`[0.06514]`. Like most of those (`0.06503`, `0.06505`-`0.06507`,
+...) it is an out-of-band increment tracked here and in `PROGRESS.md`, not a
+roadmap row: `ARCHITECTURE.md`'s Milestones table has none for it, and
+`V1-DEFINITION.md` scopes CLI conveniences beyond `build` out of `v1.0`.
+Roadmap `v0.065` untouched.
 
 - **`arklight deploy [cloudflare] [entry] [-o OUTPUT_DIR] [--name NAME]
   [--skip-build] [--dry-run]`**, in the new `arklight/cli/deploy.py` plus
@@ -67,8 +69,12 @@ situation as the `0.06504` draft). Roadmap `v0.065` untouched.
   section; the two "`arklight deploy` is not implemented" statements removed),
   the index rows in `docs/README.md` and `docs/Foundational/README.md` (both
   said "Design only, not implemented"), and `GETTING-STARTED.md`'s layout line
-  for `cli/`. No `docs/version history/` file: the deployment CLI belongs to no
-  milestone yet, and that directory's rule is one file per coherent milestone.
+  for `cli/`. New `docs/version history/v0.06515.md` and its Index row. Unlike
+  the other `0.0650x` increments, which fold into `v0.065.md` or none, deploy is
+  a whole new user-facing subcommand outside that slot's four pieces, and
+  `v0.0431.md`/`v0.0641.md` are the precedent for a standalone file for an
+  out-of-band user-facing patch. `arklight --upgrade-alpha` prints it once
+  (`arklight/cli/whats_new.py` looks files up by exact version).
 
 `tests/test_deploy.py` (56 tests; a stand-in `wrangler` on `PATH` records argv
 and working directory, and `PATH` is restricted so a real Wrangler or `npx` can
