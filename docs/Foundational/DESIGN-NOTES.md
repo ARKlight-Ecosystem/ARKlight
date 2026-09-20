@@ -203,8 +203,8 @@ reactivity the whole project is currently built around avoiding.
 
 A sharper, and legitimate, alternative framing: ARKlight isn't trying
 to be the frontend -- it's the Python-authoring layer in front of
-*other* frontend frameworks, via `v0.100`'s planned Vue/Svelte
-backends. There's real precedent: **Mitosis** (Builder.io) compiles one
+*other* frontend frameworks, via Vue/Svelte backends (once slotted at
+`v0.100`; see the decision at the end of this section). There's real precedent: **Mitosis** (Builder.io) compiles one
 component definition to React, Vue, Angular, Svelte, Solid, Alpine,
 Qwik, and more, and is used in production for design-system syncing and
 Figma-to-code pipelines. So "single authoring layer, many framework
@@ -251,6 +251,12 @@ this reaches v0.010" doesn't get meaningfully closer to it by itself.
 The missing piece for that vision isn't component reuse, it's
 reactivity, and that deserves its own named milestone rather than being
 assumed inside v0.100.
+
+**Decision (2026-09-20): Vue and Svelte backends will not be built.** This
+section is kept as the reasoning that led there, not as a plan. Nothing in
+the roadmap schedules them, and `v0.100` is the Desktop backend. ARKlight's
+output stays plain HTML/CSS/JS, and its native targets are packaging
+backends over an already-built `build-dir`.
 
 ## v0.0035 / v0.048 design: stateful JS, CLI scaffolding, responsive + head extension (v0.0035 + v0.004a + v0.048 all DONE)
 
@@ -1280,8 +1286,8 @@ plain browser HTTP a page is served from.
   Console API integration, or release-track promotion on the user's
   behalf.
 - **Any change to the HTML/CSS/JS backends themselves.** This is a
-  packaging backend, not a template/codegen backend like the future
-  `v0.100` Vue/Svelte target -- it consumes an existing `build-dir`
+  packaging backend, not a template/codegen backend -- it consumes an
+  existing `build-dir`
   as opaque input, same as `arklight.packer` already does for `.ark`
   bundles.
 
@@ -1323,8 +1329,8 @@ reactivity... to match Vue 3's breadth." This section is the design
 doc for that, written before any of it is built, same discipline as
 every other PLANNING section in this file when it was written. Status
 has moved on since: design complete, and every capability below has
-now shipped, renumbered to `v0.054` (see "Re-renumbered again" in
-`ARCHITECTURE.md`'s Milestones section for why) -- via the `vdom-1`
+now shipped, renumbered to `v0.054` (the renumbering is recorded in
+`CHANGELOG.md`) -- via the `vdom-1`
 through `vdom-8` staging ladder described above. See `PROGRESS.md`'s
 Snapshot table for the per-stage implementation record.
 
@@ -1626,11 +1632,9 @@ this file already uses for `v0.048`:
 - Lifecycle hooks (`onMounted`/`onUpdated`) -- no concrete forcing
   use case identified yet; noted as a candidate for a future
   addendum rather than spec'd speculatively now.
-- Alternate framework backends (`v0.100`) -- this milestone is
-  a step toward the state/event-semantics prerequisite
-  `DESIGN-NOTES.md`'s "authoring layer" section above already
-  names for that milestone, but does not itself complete it (no
-  Vue/Svelte codegen ships as part of v0.044).
+- Alternate framework backends (Vue/Svelte codegen) -- dropped; they
+  will not be built (see the decision at the end of the "authoring
+  layer that compiles to real frameworks" section above).
 
 ### Staging
 

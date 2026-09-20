@@ -2052,10 +2052,9 @@ assumed-in-scope later, same convention this file already uses for
   backend/schema's job (the two vocabulary addenda), not this one.
 - Lifecycle hooks (`onMounted`/`onUpdated`) -- no concrete forcing use
   case yet; deferred rather than added speculatively.
-- Alternate framework backends (Vue/Svelte codegen) -- still `v0.100`,
-  still blocked on the same state/event-semantics prerequisite
-  `docs/DESIGN-NOTES.md` already names, which this milestone is a
-  step towards but does not itself complete.
+- Alternate framework backends (Vue/Svelte codegen) -- dropped; they
+  will not be built (see `docs/Foundational/DESIGN-NOTES.md`'s
+  "authoring layer that compiles to real frameworks" section).
 
 ## v0.041 -- JS runtime error-handling hardening (DONE)
 

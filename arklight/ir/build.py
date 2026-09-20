@@ -8,7 +8,7 @@ AST, even though in v0.001 they look structurally similar
 - ARK AST is "what the user's Python called" -- it's shaped by the
   public API's function-call ergonomics.
 - Website IR is "what the website *means*" -- backend-independent
-  intent that any backend (HTML today; CSS/JS/Vue/Svelte later) can
+  intent that any backend (HTML, CSS and JS today) can
   consume without knowing anything about ARKlight's Python API.
 
 Keeping them separate now means later milestones can let the IR diverge
