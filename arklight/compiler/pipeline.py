@@ -47,7 +47,7 @@ from arklight.ir import binary as binary_ir
 from arklight.ir.build import WebsiteIR, build_website_ir
 from arklight.ir.components import ComponentError, collect_default_styles, expand_ark_ast
 from arklight.ir.normalize import normalize_ark_ast
-from arklight.ir.validate import ValidationError, validate_ark_ast
+from arklight.ir.validate import ValidationError, validate_ark_ast, validate_provider
 from arklight.parser.loader import SiteLoadError, load_site
 from arklight.search.engine import default_engine
 from arklight.search.feedback import record_name_error_feedback, record_validation_feedback
@@ -243,6 +243,12 @@ def compile_site_file(
     log("Running validation...")
     try:
         validate_ark_ast(normalized)
+        # `Provider` stage 2 of 6 (`v0.066`): `Site(provider=...)` isn't
+        # a node in `normalized`, so it isn't covered by the tree walk
+        # above -- checked here, in the same stage, so a bad
+        # declaration fails the build the same way a bad node does
+        # (see `arklight.ir.validate.validate_provider`'s docstring).
+        validate_provider(site.provider)
     except ValidationError as exc:
         _record_validation_feedback_best_effort(str(exc))
         raise CompileError(str(exc)) from exc
@@ -314,6 +320,11 @@ def compile_site_file(
         strict_csp=site.strict_csp if strict_csp_override is None else strict_csp_override,
         trusted_script_origins=site.trusted_script_origins,
         devtools_console_reminder=devtools_console_reminder,
+        # `Provider` stage 2 of 6 (`v0.066`): straight passthrough, same
+        # shape as `app_shell`/`raw_postprocessors` above -- already
+        # validated by `validate_provider` a few lines up, in this same
+        # `build` call, before this IR-build stage runs.
+        provider=site.provider,
     )
 
 

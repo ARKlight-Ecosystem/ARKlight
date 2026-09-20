@@ -5,6 +5,60 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06516] -- Capability fix: `Provider`, stage 2/6, IR and validation integration (the `v0.066` slot's first piece)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06515]`.
+`v0.066`'s slot has two independent pieces (`docs/version history/v0.066.md`);
+this ships only `Provider` stage 2 of 6. JS vocabulary addendum stage 6/10
+(the predicates catalog), sharing the same slot, is still PLANNED. Roadmap
+`v0.066` untouched.
+
+- **`WebsiteIR.provider: ProviderDeclaration | None`** (`arklight/ir/build.py`)
+  -- straight passthrough of `Site(provider=...)`, same shape as
+  `media_queries`/`app_shell`; `build_website_ir(...)` gained a matching
+  `provider=` keyword. Stage 1 (`0.06514`) only recorded the declaration's
+  *experimental usage* on the IR (`experimental_usages`); this is the first
+  point the declaration itself reaches `WebsiteIR`.
+- **`arklight.ir.validate.validate_provider(provider)`** -- re-checks
+  `provider.capabilities` against the closed, provisional
+  `arklight.provider.PROVIDER_CAPABILITIES` vocabulary at the pipeline's own
+  "Running validation..." stage (called directly from
+  `arklight/compiler/pipeline.py`, alongside `validate_ark_ast` -- `Site(provider=...)`
+  isn't a node in the ARK AST tree, so it isn't reached by that function's
+  tree walk). Raises this module's shared `ValidationError`, not
+  `ProviderDeclaration`'s own `ValueError`. In ordinary use this can never
+  actually fire -- `Provider.declare(...)`/`ProviderDeclaration.__post_init__`
+  already reject an invalid value at construction time, long before it could
+  reach here -- so this is explicit defense in depth: the officially
+  designated validation stage independently re-confirming a value built
+  elsewhere in the pipeline, the same discipline every other check in that
+  module already follows. Documented as check 19 in the module's docstring.
+- **`arklight/ir/binary.py`**'s `decoded_site_to_website_ir` docstring now
+  lists `provider` among the `WebsiteIR` fields the v1 `.arklight` binary
+  format doesn't round-trip yet -- same known-gap list `media_queries`/
+  `raw_postprocessors`/etc. are already on. No code change needed there:
+  the dataclass default (`None`) already does the right thing.
+- **Still nothing is emitted.** A build with a declared `Provider` stays
+  byte-identical to one without, apart from the reports every gated
+  experimental feature already gets (unchanged from stage 1) -- stage 2 is
+  purely a compiler-internal threading/validation change.
+- **Not done**, per the later previews (unchanged from stage 1): the config
+  blob and any emission (stage 3), the external `<script src>` prop
+  (stage 4), `arklight search` integration (stage 5), the final capability
+  enum (stage 6). No CSP change, one provider per `Site`, no concrete
+  provider.
+
+`tests/test_provider.py` gained 8 new tests (47 -> 55): `validate_provider`'s
+no-op path for `None`/a valid declaration, catching a declaration whose
+`capabilities` were forced invalid by going around its own frozen dataclass
+`__post_init__` (`object.__setattr__` -- the only way to reach this path,
+since `Provider.declare(...)` itself can never produce an invalid one),
+singular/plural wording, confirming the raised error carries no
+`component_name` (reserved for SCHEMA-lookup sites, which this isn't),
+`ir.provider` holding the real declaration end-to-end through
+`compile_site_file`, and `WebsiteIR`'s own default. Full suite 2170 passed
+(was 2162 on `0.06515`). `0.06515` -> `0.06516`.
+
 ## [0.06515] -- `arklight deploy`: the deployment CLI (Cloudflare Workers via Wrangler)
 
 Implements `docs/Foundational/DEPLOYMENT-CLI.md`, which had been design-only

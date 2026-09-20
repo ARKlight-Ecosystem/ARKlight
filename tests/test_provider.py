@@ -16,6 +16,7 @@ import pytest
 import arklight
 from arklight import Page, Heading, Provider, Site, experimental
 from arklight.compiler.pipeline import build, compile_site_file
+from arklight.ir.validate import ValidationError, validate_provider
 from arklight.provider import PROVIDER_CAPABILITIES, ProviderDeclaration
 
 
@@ -198,6 +199,73 @@ def test_provider_integration_never_trips_the_heavy_reliance_nudge():
     assert experimental.FEATURES["provider-integration"].upstream_candidate is False
     usages = [experimental.emit("provider-integration") for _ in range(10)]
     assert experimental.heavy_reliance_nudge(usages) is None
+
+
+# ---------------------------------------------------------------------------
+# `Provider` stage 2 of 6 (v0.066): IR threading + `ir/validate.py`
+# ---------------------------------------------------------------------------
+
+
+def test_validate_provider_is_a_no_op_for_none():
+    validate_provider(None)  # must not raise
+
+
+def test_validate_provider_is_a_no_op_for_a_valid_declaration():
+    validate_provider(_declare(capabilities=["auth", "write"]))  # must not raise
+
+
+def test_validate_provider_catches_a_declaration_built_around_its_own_post_init():
+    # `Provider.declare(...)`/`ProviderDeclaration(...)` can never hold an
+    # invalid value (see the "hand-built declaration" tests above) -- the
+    # only way to reach this path is going around the frozen dataclass's
+    # own `__post_init__`, e.g. via `object.__setattr__`. `validate_provider`
+    # is the pipeline's defense-in-depth check for exactly that case.
+    decl = _declare()
+    object.__setattr__(decl, "capabilities", ("nope", "also-nope"))
+    with pytest.raises(ValidationError, match=r"unknown capabilities \['also-nope', 'nope'\]"):
+        validate_provider(decl)
+
+
+def test_validate_provider_names_a_single_unknown_capability_in_the_singular():
+    decl = _declare()
+    object.__setattr__(decl, "capabilities", ("auth", "nope"))
+    with pytest.raises(ValidationError, match=r"unknown capability \['nope'\]"):
+        validate_provider(decl)
+
+
+def test_validate_provider_raises_the_shared_validation_error_not_value_error():
+    decl = _declare()
+    object.__setattr__(decl, "capabilities", ("nope",))
+    with pytest.raises(ValidationError):
+        validate_provider(decl)
+    # And, being the shared type every other schema check in this module
+    # raises, it is not left with a `component_name` -- that field is
+    # reserved for SCHEMA-lookup sites (unknown component type / missing
+    # required prop), which this isn't.
+    try:
+        validate_provider(decl)
+    except ValidationError as exc:
+        assert exc.component_name is None
+
+
+def test_ir_threads_the_declaration_itself_not_just_the_usage(tmp_path):
+    site_file = tmp_path / "site.py"
+    site_file.write_text(_SITE_WITH)
+    ir = compile_site_file(site_file)
+    assert ir.provider == ProviderDeclaration(name="firebase", capabilities=("auth", "read"))
+
+
+def test_ir_provider_is_none_when_the_site_declares_none(tmp_path):
+    site_file = tmp_path / "site.py"
+    site_file.write_text(_SITE_WITHOUT)
+    ir = compile_site_file(site_file)
+    assert ir.provider is None
+
+
+def test_website_ir_defaults_provider_to_none():
+    from arklight.ir.build import WebsiteIR
+
+    assert WebsiteIR(site_name="Test").provider is None
 
 
 # ---------------------------------------------------------------------------
