@@ -84,7 +84,7 @@ for what's still queued.
 See [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the full
 milestone roadmap.
 
-Refer to [`docs/Foundational/EXPERIMENTAL-APIS.md`](./docs/Foundational/EXPERIMENTAL-APIS.md) if you wished to use escape hatches.
+Refer to [`docs/Foundational/EXPERIMENTAL-APIS.md`](./docs/Foundational/EXPERIMENTAL-APIS.md) if you wished to use escape hatches. But Also check the alpha branch for features that isn't in main or pypi version.
 
 ## Install
 
