@@ -5,6 +5,75 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06514] -- Capability fix: `Provider`, stage 1/6, the contract itself (the `v0.065` slot's last piece)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06513]`
+(the roadmap's `v0.065` is still untouched). This is the fourth and last of
+the four pieces sharing the `v0.065` slot (Rei `0.06510`, Platform API IR,
+JS vocabulary stage 5 `0.06513`, and this); whether to close the roadmap row
+now that all four have shipped is left to the maintainer.
+
+- **`Provider.declare(name=..., capabilities=[...])`** (`arklight.api.Provider`,
+  contract in the new `arklight/provider.py`, exported from `arklight`), attached
+  with **`Site(provider=...)`** as in the proposal's sketch. Returns a frozen,
+  hashable `ProviderDeclaration`; validation lives on the dataclass, so a
+  hand-built one cannot hold an invalid value either. Keyword-only.
+- **Closed, provisional vocabulary.** `PROVIDER_CAPABILITIES = ("auth", "read",
+  "write", "subscribe")`, the four the proposal itself lists (section 7, question
+  2); the ladder finalizes it in its last stage. `name` is a free label (not a
+  fixed list of vendors) and must be non-empty. `capabilities` must be a
+  non-empty list/tuple of known, non-repeated strings; every unknown name is
+  reported at once with the known ones listed; a bare string (`"auth"`, which
+  would iterate as four letters) is rejected explicitly. All errors are
+  `ValueError`, like the other `Site(...)` keyword checks.
+- **Gated as `provider-integration`** in `arklight/experimental.py`, with the
+  proposal's wording (ARKlight "does not implement, audit, or guarantee" the
+  service). Recorded on `Site.experimental_usages` at construction, like
+  `css-import`/`raw-postprocess` at registration, so the pipeline's existing
+  loop prints the inline banner and the CLI prints the summary block with no
+  pipeline change. `upstream_candidate=False`: a Provider is a deliberate
+  boundary, not a missing feature, so it never trips the heavy-reliance nudge's
+  "open a pull request for your missing feature" advice (same reasoning as
+  `css-media-queries`).
+- **Adds no markup, config or script of its own.** A build with and without a
+  Provider is byte-identical for every page and the stylesheet. The only two
+  files that change are the reports every gated feature already gets: the
+  devtools console reminder in `arklight.js` and an entry in `sbom.txt` (a
+  test pins exactly that set). The feature's note therefore also appears in
+  visitors' devtools console, as it does for every gated feature.
+- **Overlap with stage 2, on purpose.** Stage 2's preview
+  (`docs/version history/v0.066.md`) lists "a declared `Provider` recorded on
+  `Site`". That is done here, because without it the `provider-integration`
+  gate cannot fire on a real build and `Provider.declare(...)` would return a
+  value with nowhere to go. What stays in stage 2: build-time enforcement in
+  `arklight/ir/validate.py` and threading through `WebsiteIR`. Here the
+  vocabulary is checked when `declare(...)` runs, so a bad capability is a
+  `ValueError` from the site file.
+- **Not in this stage** (per the `v0.066`-`v0.070` previews): IR threading and
+  `ir/validate.py` enforcement (stage 2), the config blob / any emission from
+  the declaration (stage 3), an external `<script src>` prop (stage 4; proposal
+  section 7, question 1), `arklight search` integration (stage 5), the final
+  capability enum (stage 6). No change to the Content-Security-Policy, no second
+  provider per site, no concrete provider of any kind. `ProviderDeclaration` is
+  not exported from `arklight` (only `Provider` is), to keep the experimental
+  surface small.
+- **Spec gap.** The proposal and twelve other docs point at
+  `docs/Implementation/PROVIDER-SDK-ADDENDUM.md` for the six-stage ladder, but
+  that file was never committed to any branch. The stage list was recovered from
+  the per-version previews (`v0.065.md`-`v0.070.md`), each of which describes its
+  own stage; anything the addendum itself said beyond those previews is unknown.
+- **Upgrade note.** `Provider` is a new name in `arklight.__all__`, so a site
+  file that uses `# include <stdlib.ARKlight>` and defines its own `Provider`
+  now fails to build with the preamble's "rebinds name(s) its preamble already
+  bound" message. Rename it.
+
+`tests/test_provider.py` (47 tests; deliberately breaking the implementation six
+ways -- no usage recorded, unknown names accepted, duplicates accepted, bare
+string accepted, nudge-eligible, list not normalized -- each fails at least one).
+Full suite 2094 passed (was 2047; the 2 `test_version.py` failures are
+environmental, from a checkout that is not `pip install`ed). `0.06513` ->
+`0.06514`; roadmap `v0.065` untouched.
+
 ## [0.06513] -- Capability fix: JS vocabulary stage 5/10, the string derivations catalog (the `v0.065` slot's first piece)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06512]`

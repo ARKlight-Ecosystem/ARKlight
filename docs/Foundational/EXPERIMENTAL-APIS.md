@@ -50,6 +50,23 @@ experimental API.** That currently means:
   every other experimental feature above, this one isn't scoped to CSS
   at all -- it's arbitrary user code with unchecked write access to
   every output file the build produces.
+- `provider-integration` -- `Site(provider=Provider.declare(name=...,
+  capabilities=[...]))`, a site declaring that it talks to an external
+  service at runtime (a hosted database, an auth service, its own API).
+  Unlike the features above this isn't a layout or output escape hatch:
+  it's flagged because the service on the other end is entirely outside
+  anything ARKlight can validate. The contract is only an interface --
+  ARKlight ships no vendor SDK, makes no network calls, has no opinion
+  about auth, and does not implement, audit, or guarantee the service; the
+  concrete implementation is the site author's own code. `capabilities`
+  is checked against a closed vocabulary (`auth`, `read`, `write`,
+  `subscribe`), which is **provisional** until the last stage of the
+  Provider ladder finalizes it. At this stage a declared Provider adds no
+  markup, config or script of its own (see `arklight/provider.py`); like
+  every gated feature it appears in the devtools console reminder in
+  `arklight.js` and in `sbom.txt`. Excluded from the heavy-reliance nudge
+  (`upstream_candidate=False`): a Provider is a deliberate boundary, not a
+  missing feature. Design record: `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`.
 
 This list grows as new escape hatches are added. **There is no
 "experimental by convention" bucket** -- if a feature isn't in

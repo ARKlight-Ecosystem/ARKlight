@@ -32,6 +32,7 @@ from arklight.ast.nodes import (
     state_ref,
 )
 from arklight.backend.css import selectors as css_selectors
+from arklight.provider import ProviderDeclaration
 
 # v0.042: custom CSS class names must look like a real, single CSS class
 # identifier -- letters/digits/hyphens/underscores, not starting with a
@@ -888,6 +889,43 @@ class PlatformAPI:
         isn't available rather than failing silently.
         """
         return PlatformAPIRef(capability="clipboard_write", args={"text": text})
+
+
+class Provider:
+    """
+    EXPERIMENTAL (`docs/Foundational/EXPERIMENTAL-APIS.md`, feature
+    `provider-integration`). A way for a site to declare that it talks
+    to an external service at runtime (`v0.065`, stage 1 of 6; accepted
+    from `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`):
+
+        site = Site(
+            provider=Provider.declare(name="firebase", capabilities=["auth", "read"]),
+        )
+
+    This is a **contract only**. `name` is a free label (not a fixed list
+    of vendors); `capabilities` is drawn from a closed vocabulary
+    (`arklight.provider.PROVIDER_CAPABILITIES`) so a typo fails the build.
+    ARKlight ships no vendor SDK, makes no network calls, has no opinion
+    about auth, and does not implement, audit or guarantee the service
+    the declaration points at -- the concrete implementation is your own
+    code. At this stage a declared Provider adds no markup, config or
+    script of its own to the generated site; passing one to
+    `Site(provider=...)` is what flags the build as experimental (an
+    inline banner, an end-of-build summary block, and the reports every
+    experimental feature already gets in `arklight.js` and `sbom.txt`).
+
+    The capability vocabulary is provisional until the last stage of the
+    Provider ladder finalizes it.
+    """
+
+    @staticmethod
+    def declare(*, name: str, capabilities: list[str]) -> ProviderDeclaration:
+        """
+        Build a validated `ProviderDeclaration` for `Site(provider=...)`.
+        Raises `ValueError` for an empty `name`, and for `capabilities`
+        that isn't a non-empty list of known, non-repeated names.
+        """
+        return ProviderDeclaration(name=name, capabilities=capabilities)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -1759,6 +1797,7 @@ class Site:
         app_shell: bool = False,
         strict_csp: bool = True,
         trusted_script_origins: list[str] | None = None,
+        provider: ProviderDeclaration | None = None,
     ) -> None:
         self.name = name
         # <html lang="..."> for every page this site builds, unless a
@@ -1975,6 +2014,24 @@ class Site:
                         "into script-src."
                     )
         self.trusted_script_origins: list[str] = list(trusted_script_origins or [])
+
+        # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md, feature
+        # `provider-integration`; `v0.065` `Provider` stage 1): a site
+        # declaring that it talks to an external service. Recorded as
+        # an `ExperimentalUsage` at construction, like `css-import` and
+        # `raw-postprocess` are at registration, so the pipeline's
+        # existing loop prints the inline banner and the CLI's summary
+        # prints the block -- nothing else in the pipeline needs to know.
+        # Stage 1 stores the declaration and emits nothing from it.
+        self.provider: ProviderDeclaration | None = None
+        if provider is not None:
+            if not isinstance(provider, ProviderDeclaration):
+                raise ValueError(
+                    "Site(provider=...) needs the value Provider.declare(name=..., "
+                    f"capabilities=[...]) returns, got {provider!r}."
+                )
+            self.provider = provider
+            self.experimental_usages.append(experimental.emit("provider-integration"))
 
     def _set_css_var_override(self, kwarg_name: str, var_name: str, value: str) -> None:
         if not isinstance(value, str) or not value.strip():
