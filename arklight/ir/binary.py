@@ -524,9 +524,10 @@ def decoded_site_to_website_ir(decoded: DecodedSite) -> WebsiteIR:
     (`custom_styles`, `media_queries`, `experimental_usages`,
     `css_var_overrides`, `responsive_rules`, the CSS-at-rule
     addendum fields, `raw_postprocessors`, `strict_csp`,
-    `trusted_script_origins`, `devtools_console_reminder`, ...) comes
-    back at `WebsiteIR`'s own dataclass defaults -- i.e. exactly what
-    a bare `Site(...)` with none of those set would have produced.
+    `trusted_script_origins`, `devtools_console_reminder`, `provider`,
+    ...) comes back at `WebsiteIR`'s own dataclass defaults -- i.e.
+    exactly what a bare `Site(...)` with none of those set would have
+    produced.
     `arklight.compiler.pipeline.build`'s `strict_csp_override`/
     `devtools_console_reminder`/`css_var_overrides`/`lang` CLI-level
     overrides still apply on top of this the same way they apply on

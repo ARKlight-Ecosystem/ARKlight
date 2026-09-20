@@ -29,6 +29,7 @@ from arklight import experimental
 from arklight.ast.nodes import ActionRef, ARKNode, DerivationRef
 from arklight.ir import js_numeric, js_string
 from arklight.ir.components import COMPONENT_ORIGIN_PROP_KEY, ComponentOrigin
+from arklight.provider import ProviderDeclaration
 
 
 @dataclass
@@ -166,6 +167,19 @@ class WebsiteIR:
     # (deduplicated by feature id) to print the end-of-build summary
     # block via `arklight.experimental.print_summary`.
     experimental_usages: list = field(default_factory=list)
+    # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md, feature
+    # `provider-integration`; `Provider` stage 2 of 6, `v0.066` -- see
+    # `docs/version history/v0.066.md` and `arklight/provider.py`):
+    # straight passthrough of `Site(provider=...)`, same shape as
+    # `media_queries`/`app_shell` above. Stage 1 (`0.06514`) only
+    # stored the declaration on `Site` and emitted the experimental
+    # banner; this is the first point a declared `Provider` reaches
+    # the IR at all. Still nothing is emitted from it here -- no
+    # backend reads this field yet, so a build with a Provider stays
+    # byte-identical to one without, apart from the reports every
+    # gated experimental feature already gets. `None` for sites that
+    # never call `Site(provider=...)`.
+    provider: ProviderDeclaration | None = None
     # CSS backend refactor: `--ark-*` custom property overrides
     # registered via `Site(max_width=..., bg=...)` -- var name (e.g.
     # "--ark-max-width") -> value. Empty for sites that pass neither,
@@ -732,6 +746,7 @@ def build_website_ir(
     strict_csp: bool = True,
     trusted_script_origins: list | None = None,
     devtools_console_reminder: bool = True,
+    provider: ProviderDeclaration | None = None,
 ) -> WebsiteIR:
     """
     Build the Website IR from a normalized + validated ARK AST.
@@ -789,6 +804,13 @@ def build_website_ir(
     default, not silently unchanged" note as `strict_csp` above; unlike
     `strict_csp` there's no `Site(...)` kwarg feeding this one, only
     the config file.
+
+    `provider` is `Site(provider=...)`'s straight passthrough
+    (`Provider` stage 2 of 6, `v0.066` -- see `WebsiteIR.provider`'s
+    own comment). Defaults to `None`, unchanged output for existing
+    callers. Callers are expected to have already run
+    `arklight.ir.validate.validate_provider` on it, the same ordering
+    `validate_ark_ast` already has relative to this function.
     """
     collector = _ResponsiveStyleCollector()
     ir_pages = []
@@ -832,4 +854,5 @@ def build_website_ir(
         strict_csp=strict_csp,
         trusted_script_origins=list(trusted_script_origins) if trusted_script_origins else [],
         devtools_console_reminder=devtools_console_reminder,
+        provider=provider,
     )

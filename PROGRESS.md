@@ -72,6 +72,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06513 | Capability fix: JS vocabulary addendum stage 5/10 (the string derivations catalog, the `v0.065` slot's first-listed piece) -- 18 `Derive.*` kinds (`capitalize`, `title_case`, `trim_start`, `trim_end`, `pad_start`, `pad_end`, `repeat`, `slice_string`, `char_at`, `replace_first`, `replace_all`, `split_count`, `reverse_string`, `string_length`, `includes_substring`, `starts_with`, `ends_with`, `is_empty`), one fragment file + one registry line each; literal arguments range/type-checked at build time (`LITERAL_ARG_RULES`); `replace_first`/`replace_all` are literal-text only (no `RegExp`, `$&`-style patterns not expanded). The four predicate-shaped kinds ship as boolean derivations (recorded decision). New `arklight/ir/js_string.py` reproduces JavaScript's UTF-16 indexing, `String(x)` coercion and whitespace set at build time. Also fixes `Bind(...)` pre-fill for booleans (`true`/`false`) and lone surrogates. `tests/test_js_vocabulary_v0065.py` (231 tests, Node parity sweep); full suite 2047 passed. `0.06512` -> `0.06513`; roadmap `v0.065` untouched (`Provider` stage 1 still PLANNED) | DONE |
 | v0.06514 | Capability fix: `Provider`, stage 1 of 6 (the contract itself; the `v0.065` slot's last piece) -- `Provider.declare(name=..., capabilities=[...])` and `Site(provider=...)`, a frozen self-validating `ProviderDeclaration` (`arklight/provider.py`), a closed, provisional capability vocabulary (`auth`, `read`, `write`, `subscribe`), and the gated `provider-integration` experimental feature (inline banner + end-of-build summary through the existing pipeline; `upstream_candidate=False`). A declared Provider adds no markup, config or script of its own: pages and stylesheet are byte-identical, only `arklight.js`'s console reminder and `sbom.txt` change, as for every gated feature. No config blob, no external-script prop, no concrete provider. `docs/Implementation/PROVIDER-SDK-ADDENDUM.md` is referenced but never committed, so scope follows the per-version previews (`v0.065.md`-`v0.070.md`); pulls stage 2's "recorded on `Site`" bullet forward (the gate needs it to fire), leaving IR threading and `ir/validate.py` enforcement to stage 2. `tests/test_provider.py` (47 tests); full suite 2094 passed. `0.06513` -> `0.06514`; roadmap `v0.065` untouched | DONE |
 | v0.06515 | CLI: `arklight deploy` -- the deployment CLI, design-only until now (`docs/Foundational/DEPLOYMENT-CLI.md`). `arklight deploy [cloudflare] [entry] [-o OUTPUT_DIR] [--name NAME] [--skip-build] [--dry-run]` (`arklight/cli/deploy.py`, `_cmd_deploy` in `arklight/cli/main.py`): builds with `arklight build --no-open`, finds `wrangler` on `PATH`, runs one `wrangler deploy` and returns its exit code unchanged, with Wrangler's output inherited rather than captured. Never installs Wrangler (no `npx`/`npm` fallback), never touches credentials or the network. No project Wrangler config -> `wrangler deploy --assets <output> --name <name> --compatibility-date <today>`; a `wrangler.jsonc`/`.json`/`.toml` in the project directory -> plain `wrangler deploy`, the config is the user's. Cloudflare Workers is the only provider; `--skip-build`/`--dry-run` are additions beyond the spec. **No real deploy run** (no Cloudflare account): the command form was checked under a real Wrangler 4.135.0's `--dry-run`. `tests/test_deploy.py` (56 tests); full suite 2162 passed. `0.06514` -> `0.06515`; out-of-band, no roadmap row, roadmap `v0.065` untouched | DONE |
+| v0.06516 | Capability fix: `Provider`, stage 2 of 6 (the `v0.066` slot's first-shipped piece; JS vocabulary stage 6/10 in the same slot is still PLANNED) -- IR and validation integration. `WebsiteIR.provider: ProviderDeclaration \| None` (`arklight/ir/build.py`), a straight passthrough of `Site(provider=...)` threaded through `build_website_ir(...)`/`arklight/compiler/pipeline.py`, so `ir.provider` now carries the real declaration, not just its recorded experimental usage. New `arklight.ir.validate.validate_provider(provider)` re-checks the closed `PROVIDER_CAPABILITIES` vocabulary at the pipeline's own validation stage, raising the module's shared `ValidationError` instead of `ProviderDeclaration`'s own `ValueError` -- defense in depth, since `Provider.declare(...)` already can't hold an invalid value by construction; called directly from `pipeline.build` since `Site(provider=...)` isn't a node in the ARK AST tree. `arklight/ir/binary.py`'s known-gap comment updated to list `provider` alongside `media_queries`/etc. (still not round-tripped by the `.arklight` binary format). Still nothing is emitted from a declared Provider -- a build with one stays byte-identical to one without, apart from the reports every gated feature already gets. `tests/test_provider.py` (47 -> 55 tests); full suite 2170 passed. `0.06515` -> `0.06516`; out-of-band, no roadmap row, roadmap `v0.066` untouched (its JS vocabulary piece remains) | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 6-10 of 10 (predicates catalog, list-scalar derivation catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots; stage 1 shipped as `0.06514`, stages 2-6 PLANNED | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -150,6 +151,78 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06516 -- Capability fix: `Provider`, stage 2 of 6 (DONE)
+
+The `v0.066` slot has two independent pieces (see `docs/version
+history/v0.066.md`); this ships only the first, `Provider` stage 2 of
+6. JS vocabulary addendum stage 6/10 (the predicates catalog) stays
+PLANNED in the same slot, same "ship what's ready, leave a row note
+for the rest" precedent `v0.065.md` already set for its own four
+pieces.
+
+**What went in.** Stage 1 (`0.06514`) stored `Site(provider=...)`'s
+declaration on `Site` and recorded the `provider-integration`
+experimental usage, but never let that declaration itself reach the
+IR -- only its usage record did. Stage 2 closes that gap:
+
+1. `WebsiteIR.provider: ProviderDeclaration | None = None`
+   (`arklight/ir/build.py`) -- passthrough field, same shape as
+   `media_queries`/`app_shell`. `build_website_ir(...)` gained a
+   matching `provider=` keyword.
+2. `arklight/compiler/pipeline.py` passes `provider=site.provider`
+   into that call, and calls a new `validate_provider(site.provider)`
+   in the existing "Running validation..." stage, right after
+   `validate_ark_ast`.
+3. `arklight.ir.validate.validate_provider(provider)` -- re-checks
+   `provider.capabilities` against `arklight.provider.
+   PROVIDER_CAPABILITIES`, raising this module's `ValidationError`
+   (not `ProviderDeclaration`'s own `ValueError`) on an unknown
+   capability. A no-op for `provider=None`. In the ordinary
+   `Provider.declare(...)` path this can never actually fire --
+   `ProviderDeclaration.__post_init__` already rejects an invalid
+   value at construction, long before `Site(provider=...)` or this
+   function ever see it -- so this is explicitly defense in depth:
+   the officially designated validation stage independently
+   re-confirming a value the pipeline received from elsewhere,
+   matching every other check in that module, rather than trusting
+   the object that produced it. Documented as check 19 in
+   `arklight/ir/validate.py`'s module docstring.
+4. `arklight/ir/binary.py`'s `decoded_site_to_website_ir` docstring
+   now lists `provider` among the `WebsiteIR` fields the v1
+   `.arklight` binary format doesn't round-trip yet (same known-gap
+   list `media_queries`/`raw_postprocessors`/etc. are already on) --
+   no code change needed there since the dataclass default (`None`)
+   already does the right thing.
+
+**Why `Site(provider=...)`'s own tree-walk validation wasn't enough.**
+`validate_ark_ast`/`validate_page` only ever see the ARK AST tree
+`site.build_ark_ast()` produces -- `Site(provider=...)` is a
+constructor-time attribute on the `Site` object itself, never a node
+in that tree. So unlike every other numbered check in
+`arklight/ir/validate.py`'s docstring, `validate_provider` isn't
+reached by recursion; `pipeline.build` calls it directly, alongside
+(not inside) `validate_ark_ast`.
+
+**Not done.** Per `docs/version history/v0.066.md`'s own "Not in this
+stage" note -- unchanged from stage 1: the config blob and any
+emission (stage 3), the external `<script src>` prop (stage 4),
+`arklight search` integration (stage 5), the final capability enum
+(stage 6). No CSP change, one provider per `Site`, no concrete
+provider.
+
+`tests/test_provider.py` gained 8 tests (47 -> 55): `validate_provider`
+no-op for `None`/a valid declaration, catching a declaration whose
+`capabilities` were forced invalid by going around its own frozen
+dataclass `__post_init__` (`object.__setattr__`, since
+`Provider.declare(...)` itself can never produce an invalid one),
+singular/plural wording, confirming the raised error carries no
+`component_name` (that field is reserved for SCHEMA-lookup sites this
+isn't), `ir.provider` holding the real declaration end-to-end through
+`compile_site_file`, and `WebsiteIR`'s own default. Full suite 2170
+passed (was 2162 on `0.06515`). `0.06515` -> `0.06516`; out-of-band,
+no roadmap row, roadmap `v0.066` untouched (its JS vocabulary piece
+remains PLANNED).
 
 ## v0.06515 -- CLI: `arklight deploy`, the deployment CLI (DONE)
 

@@ -128,6 +128,23 @@ Checks performed:
     see `_validate_action_args`. Applies wherever an `ActionRef` is
     validated: `on_click=`, a `Watch(...)`'s `then=`, a `Repeat(...)`
     template.
+19. `Site(provider=...)` (`Provider` stage 2 of 6, `v0.066` -- see
+    `docs/version history/v0.066.md` and `arklight/provider.py`), if
+    present, is re-checked against the same closed, provisional
+    capability vocabulary (`arklight.provider.PROVIDER_CAPABILITIES`)
+    `ProviderDeclaration.__post_init__` already enforces at
+    construction time -- see `validate_provider`. Unlike every other
+    check in this module, a `Provider` declaration is not part of the
+    ARK AST tree (`Site(...)` is a build-time object, not a node), so
+    `arklight.compiler.pipeline.build` calls `validate_provider`
+    directly, alongside `validate_ark_ast`, rather than this function
+    walking a tree to find it. An unknown capability fails the build
+    the same way an unknown component prop does elsewhere in this
+    module: a `ValidationError`, not the `ValueError`
+    `ProviderDeclaration` itself raises -- this is defense in depth,
+    not the first line of defense, since a `Provider.declare(...)`
+    call already can't hold an invalid value by the time it reaches
+    here.
 """
 
 from __future__ import annotations
@@ -146,6 +163,7 @@ from arklight.ast.nodes import (
     is_state_ref,
 )
 from arklight.ir.platform_api import PLATFORM_API_REGISTRY
+from arklight.provider import PROVIDER_CAPABILITIES, ProviderDeclaration
 from arklight.ir.schema import (
     ACTION_REGISTRY,
     COMPARE_OPS,
@@ -1275,3 +1293,45 @@ def validate_ark_ast(pages: dict[str, ARKNode]) -> None:
     """Validate every page. Raises ValidationError on the first problem found."""
     for route, page in pages.items():
         validate_page(route, page)
+
+
+def validate_provider(provider: ProviderDeclaration | None) -> None:
+    """
+    Re-check a declared `Site(provider=...)` against the closed,
+    provisional capability vocabulary (`Provider` stage 2 of 6,
+    `v0.066` -- see this module's docstring, check 19, and
+    `arklight/provider.py`).
+
+    A no-op when `provider` is `None` (the common case -- most sites
+    never declare a Provider). `ProviderDeclaration.__post_init__`
+    already validates `capabilities` against
+    `arklight.provider.PROVIDER_CAPABILITIES` at construction time, so
+    in the ordinary `Provider.declare(...)` path this check can never
+    actually fire -- an invalid declaration is rejected long before it
+    could reach `Site(provider=...)`, let alone this function. This
+    exists anyway for the same reason `arklight.ir.validate` re-checks
+    other build-time-constructed values instead of trusting the
+    object that produced them: the officially designated validation
+    stage (`arklight.compiler.pipeline.build`'s "Running validation..."
+    step) is where every build-time schema violation is supposed to
+    surface as this module's `ValidationError`, not a `ValueError`
+    raised earlier from somewhere else in the pipeline. It also covers
+    the one case `ProviderDeclaration`'s own `__post_init__` can't: a
+    frozen dataclass built by going around its own constructor (e.g.
+    `object.__setattr__`), which is possible in Python but not
+    something ARKlight itself does.
+
+    Not part of `validate_ark_ast`/`validate_page`'s tree walk --
+    `Site(provider=...)` isn't a node in the ARK AST, so
+    `arklight.compiler.pipeline.build` calls this directly, right
+    alongside `validate_ark_ast`, rather than this module discovering
+    it by recursing into a tree that never contains it.
+    """
+    if provider is None:
+        return
+    unknown = sorted({cap for cap in provider.capabilities if cap not in PROVIDER_CAPABILITIES})
+    if unknown:
+        raise ValidationError(
+            f"Site(provider=...) declares unknown capabilit{'y' if len(unknown) == 1 else 'ies'} "
+            f"{unknown!r}. Known capabilities are: {', '.join(PROVIDER_CAPABILITIES)}."
+        )
