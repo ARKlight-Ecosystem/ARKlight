@@ -908,11 +908,14 @@ class Provider:
     ARKlight ships no vendor SDK, makes no network calls, has no opinion
     about auth, and does not implement, audit or guarantee the service
     the declaration points at -- the concrete implementation is your own
-    code. At this stage a declared Provider adds no markup, config or
-    script of its own to the generated site; passing one to
-    `Site(provider=...)` is what flags the build as experimental (an
-    inline banner, an end-of-build summary block, and the reports every
-    experimental feature already gets in `arklight.js` and `sbom.txt`).
+    code. A declared Provider adds nothing to the generated pages or
+    stylesheet. Its one output is a small read-only config object in
+    `arklight.js`, `window.ARKLIGHT_PROVIDER`
+    (`{name, capabilities}`, deep-frozen), for your own script to read
+    (`Provider` stage 3 of 6). Passing one to `Site(provider=...)` also
+    flags the build as experimental (an inline banner, an end-of-build
+    summary block, and the reports every experimental feature already
+    gets in `arklight.js` and `sbom.txt`).
 
     The capability vocabulary is provisional until the last stage of the
     Provider ladder finalizes it.

@@ -1,9 +1,11 @@
 """
-Tests for `Provider`, stage 1 of 6 (`v0.065`, see `arklight/provider.py`
-and `docs/version history/v0.065.md`): the contract itself --
-`Provider.declare(name=..., capabilities=[...])`, validated against a
-closed vocabulary, attached with `Site(provider=...)`, and gated as the
-`provider-integration` experimental feature.
+Tests for `Provider`, stages 1-3 of 6 (`v0.065`-`v0.067`, see
+`arklight/provider.py` and `docs/version history/v0.065.md`): the
+contract itself -- `Provider.declare(name=..., capabilities=[...])`,
+validated against a closed vocabulary, attached with
+`Site(provider=...)`, and gated as the `provider-integration`
+experimental feature -- plus (stage 3) the read-only
+`window.ARKLIGHT_PROVIDER` config object in `arklight.js`.
 """
 
 from __future__ import annotations
@@ -333,12 +335,11 @@ def test_an_invalid_declaration_in_a_site_file_fails_the_build_with_the_message(
         compile_site_file(site_file)
 
 
-def test_a_declared_provider_adds_no_markup_config_or_script_of_its_own(tmp_path):
-    # Stage 1 is the contract only: the pages and stylesheet are
-    # byte-identical with and without a Provider. The only two files that
-    # change are the reports every gated experimental feature already
-    # gets -- the devtools console reminder in arklight.js and an entry
-    # in sbom.txt.
+def test_a_declared_provider_changes_only_arklight_js_and_sbom(tmp_path):
+    # The pages and stylesheet are byte-identical with and without a
+    # Provider. The only two files that change are arklight.js (the
+    # devtools console reminder and, from stage 3, the config object)
+    # and sbom.txt (the experimental-feature entry).
     (tmp_path / "with.py").write_text(_SITE_WITH)
     (tmp_path / "without.py").write_text(_SITE_WITHOUT)
     build(tmp_path / "with.py", tmp_path / "out_with")
@@ -389,3 +390,127 @@ def test_the_provider_module_holds_no_network_or_vendor_code():
         for alias in (node.names if isinstance(node, ast.Import) else [None])
     }
     assert imported <= {"__future__", "dataclasses"}, imported
+
+
+# ---------------------------------------------------------------------------
+# Stage 3 of 6 (`v0.067`): the config object in arklight.js
+# ---------------------------------------------------------------------------
+
+import json
+import shutil
+import subprocess
+
+from arklight.backend.js.render import JSBackend, _provider_config_js
+
+_PAGE_SITE = (
+    "from arklight import *\n"
+    "site = Site(name='T'{extra})\n"
+    "@site.page('/')\n"
+    "def home():\n"
+    "    return Page(Heading('Hi'))\n"
+)
+
+
+def _js(tmp_path, provider_src: str | None = None, name: str = "site") -> str:
+    extra = f", provider={provider_src}" if provider_src else ""
+    site_file = tmp_path / f"{name}.py"
+    site_file.write_text(_PAGE_SITE.format(extra=extra))
+    return JSBackend().render(compile_site_file(site_file))["arklight.js"]
+
+
+_DECL = "Provider.declare(name='firebase', capabilities=['auth', 'read'])"
+
+
+def test_no_provider_ships_no_config_object(tmp_path):
+    assert "ARKLIGHT_PROVIDER" not in _js(tmp_path)
+
+
+def test_provider_config_helper_returns_nothing_for_none():
+    assert _provider_config_js(None) == ""
+
+
+def test_a_declared_provider_ships_its_name_and_capabilities_in_order(tmp_path):
+    js = _js(tmp_path, _DECL)
+    assert "window.ARKLIGHT_PROVIDER = Object.freeze({" in js
+    assert 'name: "firebase"' in js
+    assert 'capabilities: Object.freeze(["auth", "read"])' in js
+
+
+def test_the_config_object_ships_even_when_the_devtools_reminder_is_off(tmp_path):
+    (tmp_path / "site.py").write_text(_PAGE_SITE.format(extra=f", provider={_DECL}"))
+    ir = compile_site_file(tmp_path / "site.py")
+    ir.devtools_console_reminder = False
+    js = JSBackend().render(ir)["arklight.js"]
+    assert "ARKLIGHT_PROVIDER" in js
+    assert "provider-integration" not in js  # the reminder really is off
+
+
+def test_the_config_block_contains_nothing_that_touches_the_network_or_loads_code():
+    block = _provider_config_js(_declare())
+    for token in ("fetch", "XMLHttpRequest", "WebSocket", "import", "eval", "Function(", "src"):
+        assert token not in block
+
+
+def test_the_config_object_carries_only_name_and_capabilities():
+    block = _provider_config_js(_declare())
+    assert block.count(":") == 2  # `name:` and `capabilities:` -- no hooks, no state keys
+
+
+def test_pages_and_stylesheet_still_never_mention_the_provider(tmp_path):
+    (tmp_path / "with.py").write_text(_SITE_WITH)
+    build(tmp_path / "with.py", tmp_path / "out")
+    for name, data in _files(tmp_path / "out").items():
+        if name.endswith((".html", ".css")):
+            assert b"ARKLIGHT_PROVIDER" not in data and b"firebase" not in data
+
+
+def _run_in_node(js_path) -> dict:
+    """Run the generated script against a stub DOM and report what it
+    left in `window.ARKLIGHT_PROVIDER`, after attempting to mutate it."""
+    script = """
+    global.window = global;
+    global.document = { addEventListener() {}, body: { addEventListener() {} },
+                        querySelectorAll() { return []; } };
+    require("vm").runInThisContext(require("fs").readFileSync(process.argv[1], "utf8"));
+    var p = window.ARKLIGHT_PROVIDER;
+    var frozen = Object.isFrozen(p) && Object.isFrozen(p.capabilities);
+    try { p.name = "changed"; } catch (e) {}
+    try { p.capabilities.push("write"); } catch (e) {}
+    process.stdout.write("\\n@@" + JSON.stringify({ value: p, frozen: frozen }) + "\\n");
+    """
+    result = subprocess.run(
+        [shutil.which("node"), "-e", script, str(js_path)],
+        capture_output=True, text=True, check=True,
+    )
+    line = next(l for l in result.stdout.split("\n") if l.startswith("@@"))
+    return json.loads(line[2:])
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not available")
+def test_node_can_read_the_config_object_and_it_is_frozen(tmp_path):
+    js = _js(tmp_path, _DECL)
+    path = tmp_path / "arklight.js"
+    path.write_text(js)
+    out = _run_in_node(path)
+    assert out["frozen"] is True
+    # The mutation attempts inside _run_in_node changed nothing.
+    assert out["value"] == {"name": "firebase", "capabilities": ["auth", "read"]}
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not available")
+@pytest.mark.parametrize(
+    "label",
+    ['fire"base', "back\\slash", "</script>", "line\u2028sep", "caf\u00e9 \U0001f525", "it's"],
+)
+def test_node_round_trips_awkward_provider_names_exactly(tmp_path, label):
+    decl = ProviderDeclaration(name=label, capabilities=("auth",))
+    path = tmp_path / "arklight.js"
+    path.write_text("(function () {\n" + _provider_config_js(decl) + "})();\n")
+    assert _run_in_node(path)["value"]["name"] == label
+
+
+def test_config_object_is_set_before_a_script_extension_appended_after_it(tmp_path):
+    js = _js(tmp_path, _DECL)
+    # A ScriptExtension is appended after the whole runtime, so anything
+    # it reads must already exist -- i.e. sit before the closing of the IIFE.
+    assert js.index("window.ARKLIGHT_PROVIDER") < js.rindex("})();")
