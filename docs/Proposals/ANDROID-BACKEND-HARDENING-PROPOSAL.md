@@ -2,6 +2,14 @@
 
 ## Status
 
+**Partially accepted; first slice implemented as of `0.06507`.**
+Accepted and shipped: §2.1 (external-link handling) with the
+`android.allow_navigation` key it needs, §2.2 (a load-error page, as fixed
+behavior), §2.3 (predictive back), §2.4 (WebView state save/restore) and
+§3's `webContentsDebuggingEnabled`-follows-build-type. Still a proposal,
+unscheduled: §2.5 (documentation-only), §2.6 (`WebChromeClient`), §2.7 (the
+WebView-version floor), the `append_user_agent` key and the WebView
+background-colour key. See "Implementation notes" at the end. Originally:
 **Proposal -- not yet accepted, not yet scheduled against a version.**
 Written after a source-level audit of `arklight/backend/android/
 runtime.py` and `arklight/cli/android.py` against `docs/Backends/
@@ -279,3 +287,34 @@ removes nothing from it -- see §0.
   this proposal, or is it small enough to fold in once someone's
   already touching `onReceivedError`?** Left open rather than
   pre-decided.
+
+## 8. Implementation notes (`0.06507`)
+
+What landed, and where it departs from the text above:
+
+- **§2.1 / `allow_navigation`.** As proposed: same-origin and listed hosts
+  stay in the WebView, other `http(s)` links go out via `Intent.ACTION_VIEW`
+  inside a `try/catch (ActivityNotFoundException)`. Additions: `mailto:`,
+  `tel:` and `sms:` go out the same way; only main-frame navigations are
+  intercepted (an iframe is left alone); every other scheme keeps the
+  WebView's default. Entries are bare hostnames, `*.` matches subdomains but
+  not the bare domain, in-WebView loading is `https` only, and a malformed
+  entry hard-fails `arklight android scaffold` -- this settles §7's
+  validation question the same way `package_id` already works.
+- **`INTERNET` permission.** §1 says to keep the app permission-free by
+  default, and it is. §2.1 didn't say that `allow_navigation` can't work
+  without the permission; the manifest now adds it when, and only when, the
+  list is non-empty.
+- **§2.4 correction.** `saveState`/`restoreState` preserve the WebView's
+  back/forward history and scroll position. They do not preserve JavaScript
+  state, so a rotation still resets a `State` that isn't `persist=True`; the
+  proposal's "any client-side State" phrasing overstated the win.
+- **§2.2.** A fixed string page loaded on a main-frame error; no URL or error
+  text is interpolated into it. Error-page *content* stays unconfigurable,
+  as §4 left it.
+- **§3 debugging.** Keyed to `ApplicationInfo.FLAG_DEBUGGABLE`, not
+  `BuildConfig.DEBUG`, because AGP 8 doesn't generate `BuildConfig` by
+  default and the scaffold doesn't turn it on.
+- **Unverified on a device.** The Kotlin was compiled (1.9.24) against stubs
+  and its routing logic exercised, not built with the Android SDK; the
+  scaffolded CI workflow is the first real build.

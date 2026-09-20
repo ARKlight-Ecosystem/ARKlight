@@ -63,6 +63,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06504 **(draft -- version slot unconfirmed)** | Bug fix: `trusted_script_origins` CSP directive injection -- `_render_csp_meta_tag` spliced entries verbatim into `script-src`; `'unsafe-inline'`/`'unsafe-eval'` (quoted or not) and directive-breaking characters (`;`, whitespace) now raise a build-time `ValueError` at `Site.__init__` instead of silently reaching the emitted CSP. `docs/Proposals/CSP-TRUSTED-ORIGIN-INJECTION-BUGFIX.md`. Landed in code (`arklight/api.py`, `tests/test_csp.py`) without a version bump or this row -- added retroactively during a docs-consistency pass; a maintainer should confirm the slot and pyproject bump | DONE (code) / DRAFT (record) |
 | v0.06505 | Capability fix: JS runtime error-handling coverage -- per-element `try`/`catch` guards in `recomputeAll`, `renderBindings`, `renderClassBindings`, `renderModelBindings`, `renderRepeat`, `renderShow` and `wireModelBinding`'s write-back (one bad element reports, the rest of the pass keeps running); a page-level `error`/`unhandledrejection` boundary (`wireErrorBoundary`); and `arkReportError`, the one funnel every runtime error goes through, with the closed `window.ARKLIGHT_ON_ERROR(message, err)` override (returning `false` suppresses the on-page notice). Shipped only where `arkNotify` already ships. `docs/Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md`; `Site(on_error=...)` and a message registry not implemented. `tests/test_runtime_error_handling.py` (31 tests); full suite 1569 passed. `0.06503` -> `0.06505` (skips the unconfirmed `0.06504` draft slot); roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent | DONE |
 | v0.06506 | Capability fix: compiler-native diagnostics for user-defined component calls (issue-register #5/#32) -- a positional call (`Stat("a", "b")`) now raises `ComponentError` (component, keyword-only rule, declared props, by-name example, the call's `file:line`) instead of Python's `takes 0 positional arguments` `TypeError`; a `props=` contract that disagrees with the render function's signature (also for a `mode="registry"` backend override) raises `ComponentError` from an argument-*binding* check instead of a raw `TypeError`. `docs/Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`. `tests/test_component_call_diagnostics.py` (19 tests); full suite 1588 passed. `0.06505` -> `0.06506`; roadmap `v0.065` untouched | DONE |
+| v0.06507 | Capability fix: Android native-shell hardening, first slice of `docs/Proposals/ANDROID-BACKEND-HARDENING-PROPOSAL.md` (now partially accepted) -- the generated `MainActivity.kt` routes external `http(s)`/`mailto:`/`tel:`/`sms:` links to the device instead of loading them inside the app's WebView (`shouldOverrideUrlLoading`, `ActivityNotFoundException` caught); new `android.allow_navigation` config key (bare hosts / `*.` subdomains, build-time `AndroidError` on a malformed entry) keeps chosen external `https` hosts in-app and is the only thing that adds `INTERNET` to the manifest; deprecated `onBackPressed()` replaced by an `OnBackPressedCallback` + `enableOnBackInvokedCallback` (predictive back); WebView `saveState`/`restoreState` across rotation (history + scroll, not JS state); a fixed built-in page on a failed main-frame load; `setWebContentsDebuggingEnabled` tied to `FLAG_DEBUGGABLE`. `append_user_agent`, background colour, `WebChromeClient`, WebView-version floor not done. `tests/test_android_hardening.py` (56 tests); full suite 1644 passed. Kotlin compiled with 1.9.24 against stubs and its routing logic run on a URL matrix; **not** built with the Android SDK or run on a device. `0.06506` -> `0.06507`; roadmap `v0.065` untouched | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -141,6 +142,57 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06507 -- Capability fix: Android native-shell hardening, first slice (DONE)
+
+Out-of-band, same slot-sharing precedent as `v0.0650`-`v0.06506`; numbered
+`0.0650` plus decimals, roadmap `v0.065` untouched. Picked from
+`docs/Proposals/` as the one proposal that was still marked "not yet
+accepted" *and* described a defect in shipped output rather than a design
+question waiting on a maintainer (`USE-PREAMBLE`, `USER-DEFINED-ERROR-HANDLING`
+and `APP-SHELL-CAPABILITY` are all open decisions; `URL-STATE-AS-PRIMITIVE` is
+already implemented in `arklight/backend/js/runtime/query.py` despite its
+header). Its section 2.1 is the reason: once `MainActivity.kt` attached a
+`WebViewClient`, Android stopped opening external links in the browser, so
+every link left the app's own pages *inside* the WebView.
+
+**Reproduced first** by reading the generated file: the only `WebViewClient`
+override was `shouldInterceptRequest`; no `shouldOverrideUrlLoading`, no
+`onReceivedError`, `@Suppress("DEPRECATION") onBackPressed()`, no
+`saveState`/`restoreState`.
+
+**Decisions.** (1) Only main-frame http(s) and `mailto:`/`tel:`/`sms:` are
+intercepted; every other scheme and every subframe keeps the previous
+behavior, so the change can't newly break an in-page load. (2) `allow_navigation`
+is https-only and hard-fails at scaffold time, like `package_id`; its regex
+also guarantees a host can never close the Kotlin string it's spliced into,
+and `runtime.project_files` re-checks it rather than trust its caller.
+(3) `INTERNET` is added *only* when `allow_navigation` is non-empty: the proposal
+wanted the offline default kept, and an in-WebView external page can't load
+without the permission. (4) The proposal's 2.4 says state save/restore keeps
+non-persisted `State`; it doesn't (WebView saves history and scroll, not the JS
+heap), so the changelog and generated README say so. (5) Debugging is keyed to
+`FLAG_DEBUGGABLE` rather than `BuildConfig.DEBUG`, since AGP 8 generates no
+`BuildConfig` unless asked.
+
+**Verified.** 56 new tests (generated Kotlin/manifest content, the
+accept/reject matrix for `allow_navigation`, a structural check of every
+`MainActivity.kt` variant). Full suite 1588 -> 1644 passed. Beyond that, the
+generated `MainActivity.kt` was compiled with Kotlin 1.9.24 (the scaffold's
+pinned version) against hand-written Android stubs, and `routeNavigation` /
+`isInApp` were run on a 24-URL matrix (own origin, exact and wildcard hosts,
+look-alike hosts, `http` vs `https`, `mailto`/`tel`/`sms`, `intent:`, `about:`,
+`javascript:`).
+
+**Not verified:** a real Android SDK build, or any run on a device/emulator.
+Stub signatures are transcribed from the platform API, not checked against
+`android.jar`. The scaffold's own CI job is the first real check.
+
+**Behavior change:** re-scaffolded apps open external links in the browser.
+
+**Not done, on purpose:** `append_user_agent`, WebView background colour,
+`WebChromeClient` (console, file chooser), the WebView-version floor, the
+error-page-content key, and edge-to-edge (documentation-only in the proposal).
 
 ## v0.06506 -- Capability fix: compiler-native diagnostics for user-defined component calls (DONE)
 

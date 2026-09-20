@@ -86,6 +86,7 @@ _DEFAULTS: dict[str, object] = {
     "splash": None,
     "orientation": "portrait",
     "edge_to_edge": False,
+    "allow_navigation": [],
 }
 
 # Config-file `orientation` values -> `android:screenOrientation`
@@ -194,6 +195,41 @@ def _resolve_orientation(value: object) -> str:
         valid = ", ".join(sorted(_ORIENTATIONS))
         raise AndroidError(f"Unknown android.orientation {value!r} -- valid values: {valid}.")
     return _ORIENTATIONS[value]  # type: ignore[index]
+
+
+def _resolve_allow_navigation(value: object) -> list[str]:
+    """
+    Validate `android.allow_navigation`: the external `https` hosts a
+    link may load *inside* the app's WebView rather than being handed
+    to the system browser (an OAuth or payment domain, say). Hard-fails
+    on a malformed entry, like `package_id` does, rather than warning
+    and skipping it -- a silently dropped host would send the user to
+    the browser mid-flow with nothing at build time saying why.
+
+    Each entry is a bare hostname, optionally `*.`-prefixed to mean
+    "any subdomain of" (the bare domain itself is not included). A
+    scheme, port or path is rejected, with a message that says so,
+    since `"https://login.example.com"` is the natural first guess.
+    Entries are lowercased and de-duplicated, order preserved.
+    """
+    if isinstance(value, str) or not isinstance(value, (list, tuple)):
+        raise AndroidError(
+            f"android.allow_navigation must be a list of hostnames, got {value!r}."
+        )
+    hosts: list[str] = []
+    for entry in value:
+        if not isinstance(entry, str) or not runtime.HOST_PATTERN_RE.match(entry):
+            raise AndroidError(
+                f"Invalid android.allow_navigation entry {entry!r} -- each entry must be "
+                f"a bare hostname such as 'login.example.com', or '*.example.com' to "
+                f"allow every subdomain. No scheme (https://), port or path; "
+                f"single-label names like 'localhost' and bare wildcards like '*.com' "
+                f"are not accepted."
+            )
+        host = entry.lower()
+        if host not in hosts:
+            hosts.append(host)
+    return hosts
 
 
 def _resolve_asset(build_dir: Path, rel_path: object, key: str) -> Path:
@@ -326,6 +362,7 @@ def scaffold_project(
     version_code = _validate_version_code(android_cfg["version_code"])
     orientation = _resolve_orientation(android_cfg["orientation"])
     edge_to_edge = bool(android_cfg["edge_to_edge"])
+    allow_navigation = _resolve_allow_navigation(android_cfg["allow_navigation"])
 
     icon_path = (
         _resolve_asset(build_dir, android_cfg["icon"], "icon")
@@ -370,6 +407,7 @@ def scaffold_project(
         has_debug_keystore=debug_keystore_path is not None,
         include_release_job=include_release_job,
         project_subdir=project_subdir,
+        allow_navigation=allow_navigation,
     )
 
     written: list[Path] = []

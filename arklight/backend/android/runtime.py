@@ -64,6 +64,23 @@ _GRADLE_VERSION = "8.9"
 # this needs to exist at all: the file:// problem".
 _ASSET_ORIGIN = "https://appassets.androidplatform.net"
 
+# Hostname-only form of `_ASSET_ORIGIN`, for the Kotlin `Uri.host` comparison
+# `MainActivity.kt` makes when deciding whether a link stays in the WebView.
+_ASSET_HOST = _ASSET_ORIGIN.removeprefix("https://")
+
+# One entry of `android.allow_navigation`: a bare, dotted hostname, optionally
+# with a leading `*.` that matches subdomains (`*.example.com` matches
+# `login.example.com`, not `example.com` itself). No scheme, port, or path.
+# Requiring at least two labels after an optional `*.` keeps `*.com`-style
+# entries out. Public because `arklight.cli.android` validates config against
+# this same pattern, and because `_main_activity_kt` splices entries into a
+# Kotlin string literal -- nothing this pattern accepts can close that string
+# (no quotes, backslashes, or `$`).
+HOST_PATTERN_RE = re.compile(
+    r"^(\*\.)?[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?"
+    r"(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$"
+)
+
 
 def _package_path(package_id: str) -> str:
     return package_id.replace(".", "/")
@@ -91,6 +108,7 @@ def project_files(
     has_debug_keystore: bool = False,
     include_release_job: bool = False,
     project_subdir: str | None = None,
+    allow_navigation: tuple[str, ...] | list[str] = (),
 ) -> dict[str, str]:
     """
     Return `{relative_path: contents}` for every *generated text* file
@@ -123,7 +141,17 @@ def project_files(
 
     `project_subdir` is forwarded as-is to `_github_ci_workflow_yml`
     -- see that function's own docstring.
+
+    `allow_navigation` is the already-validated `android.allow_navigation`
+    host list (see `HOST_PATTERN_RE`): external `https` hosts a link may
+    load *inside* the WebView instead of being handed to the system
+    browser. Empty by default, which is also what keeps the generated
+    manifest free of the `INTERNET` permission -- only a non-empty list
+    adds it, since an in-WebView external page can't load without one.
     """
+    for host in allow_navigation:
+        if not HOST_PATTERN_RE.match(host):
+            raise ValueError(f"Invalid allow_navigation host {host!r}.")
     package_path = _package_path(package_id)
     java_dir = f"app/src/main/java/{package_path}"
 
@@ -135,8 +163,12 @@ def project_files(
         "app/build.gradle.kts": _app_build_gradle_kts(
             package_id, version_name, version_code, has_splash, has_debug_keystore
         ),
-        "app/src/main/AndroidManifest.xml": _android_manifest_xml(orientation, has_splash),
-        f"{java_dir}/MainActivity.kt": _main_activity_kt(package_id, edge_to_edge, has_splash),
+        "app/src/main/AndroidManifest.xml": _android_manifest_xml(
+            orientation, has_splash, needs_internet=bool(allow_navigation)
+        ),
+        f"{java_dir}/MainActivity.kt": _main_activity_kt(
+            package_id, edge_to_edge, has_splash, tuple(allow_navigation)
+        ),
         f"{java_dir}/ArkApplication.kt": _kt_with_package(_ARK_APPLICATION_KT, package_id),
         f"{java_dir}/ArkBundle.kt": _kt_with_package(_ARK_BUNDLE_KT, package_id),
         f"{java_dir}/ArkSeal.kt": _kt_with_package(_ARK_SEAL_KT, package_id),
@@ -656,7 +688,9 @@ jobs:
 # ---------------------------------------------------------------------------
 
 
-def _android_manifest_xml(orientation: str, has_splash: bool) -> str:
+def _android_manifest_xml(
+    orientation: str, has_splash: bool, needs_internet: bool = False
+) -> str:
     # Application mode: exactly one launcher activity, no bundle-open
     # intent filters (see ANDROID-BACKEND-IMPLEMENTATION.md's Stage-0
     # file table -- those stay Viewer-mode-only). `.MainActivity`'s
@@ -664,13 +698,28 @@ def _android_manifest_xml(orientation: str, has_splash: bool) -> str:
     # configured (installSplashScreen() in MainActivity then hands
     # off to Theme.ArkApp itself), otherwise Theme.ArkApp directly.
     activity_theme = "@style/Theme.App.Starting" if has_splash else "@style/Theme.ArkApp"
+    # No INTERNET permission by default -- a baked-in-assets app never
+    # touches the network, and not asking is the strongest offline
+    # guarantee this scaffold can give. It is added only when
+    # `android.allow_navigation` names a host to load in the WebView,
+    # which can't work without it.
+    internet_permission = (
+        '    <uses-permission android:name="android.permission.INTERNET" />\n\n'
+        if needs_internet
+        else ""
+    )
+    # `enableOnBackInvokedCallback` opts into Android 13+'s predictive
+    # back gesture; MainActivity's OnBackPressedCallback is what the
+    # system consults, so a page with history goes back and a page
+    # without gets the system's back-to-home animation.
     return f'''\
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <application
+{internet_permission}    <application
         android:name=".ArkApplication"
         android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
@@ -697,7 +746,12 @@ def _android_manifest_xml(orientation: str, has_splash: bool) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _main_activity_kt(package_id: str, edge_to_edge: bool, has_splash: bool) -> str:
+def _main_activity_kt(
+    package_id: str,
+    edge_to_edge: bool,
+    has_splash: bool,
+    allow_navigation: tuple[str, ...] = (),
+) -> str:
     splash_import = (
         "\nimport androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen"
         if has_splash
@@ -709,14 +763,28 @@ def _main_activity_kt(package_id: str, edge_to_edge: bool, has_splash: bool) -> 
         if edge_to_edge
         else ""
     )
+    # Entries are already validated against HOST_PATTERN_RE (see
+    # `project_files`), which cannot match a quote, backslash or `$`,
+    # so splicing them into a Kotlin string literal is safe.
+    allowed_hosts_kt = (
+        "listOf(" + ", ".join(f'"{host.lower()}"' for host in allow_navigation) + ")"
+        if allow_navigation
+        else "emptyList()"
+    )
     return f'''\
 package {package_id}
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.net.Uri
 import android.os.Bundle
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity{splash_import}
 import androidx.core.view.WindowCompat
 import androidx.webkit.WebViewAssetLoader
@@ -740,6 +808,25 @@ import androidx.webkit.WebViewAssetLoader
  * load can't provide, which is what makes ARKlight's
  * `State(persist=True)` -> `localStorage` reliable here.
  *
+ * Native-shell behavior (docs/Proposals/ANDROID-BACKEND-HARDENING-
+ * PROPOSAL.md; none of it involves a JS-to-native bridge):
+ *
+ * - Links: a main-frame navigation to this app's own origin, or to a
+ *   host listed in `android.allow_navigation`, loads in the WebView.
+ *   Any other http(s) link, and mailto:/tel:/sms: links, are handed to
+ *   whatever app on the device handles them. Nothing else about the
+ *   WebView's link handling is changed.
+ * - Back: the system back gesture (including Android 13+ predictive
+ *   back) goes back through the WebView's history while it has any,
+ *   and is otherwise left to the system.
+ * - Rotation: the WebView's history and scroll position are saved and
+ *   restored across activity recreation. In-page JavaScript state is
+ *   not part of that -- only `State(persist=True)` survives a reload.
+ * - Load errors: a failed main-frame load shows a plain built-in page
+ *   instead of Chromium's own error page.
+ * - WebView remote debugging (chrome://inspect) is on in debuggable
+ *   builds only.
+ *
  * `ArkBundle.kt`/`ArkSeal.kt`/`MemoryGuard.kt` ship alongside this
  * file (vendored unchanged from the Viewer app) but go unused by this
  * default, unpacked-tree code path -- see
@@ -752,6 +839,16 @@ class MainActivity : AppCompatActivity() {{
 
     private lateinit var webView: WebView
 
+    // Enabled only while the WebView has history to go back through.
+    // When disabled the system handles back itself, which is what lets
+    // predictive back show its back-to-home animation instead of the
+    // app swallowing the gesture.
+    private val backCallback = object : OnBackPressedCallback(false) {{
+        override fun handleOnBackPressed() {{
+            if (webView.canGoBack()) webView.goBack()
+        }}
+    }}
+
     override fun onCreate(savedInstanceState: Bundle?) {{
         {splash_install}super.onCreate(savedInstanceState)
         {edge_to_edge_setup}webView = WebView(this)
@@ -759,6 +856,12 @@ class MainActivity : AppCompatActivity() {{
 
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+
+        // Tied to the build type rather than a config key: a debuggable
+        // (debug) build can be inspected, a release build never can.
+        WebView.setWebContentsDebuggingEnabled(
+            (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        )
 
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
@@ -769,18 +872,91 @@ class MainActivity : AppCompatActivity() {{
                 view: WebView,
                 request: WebResourceRequest
             ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+
+            override fun shouldOverrideUrlLoading(
+                view: WebView,
+                request: WebResourceRequest
+            ): Boolean = request.isForMainFrame && routeNavigation(request.url)
+
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceError
+            ) {{
+                if (request.isForMainFrame) {{
+                    view.loadDataWithBaseURL(
+                        null, LOAD_ERROR_HTML, "text/html", "UTF-8", request.url.toString()
+                    )
+                }}
+            }}
+
+            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {{
+                backCallback.isEnabled = view.canGoBack()
+            }}
         }}
 
-        webView.loadUrl(SITE_URL)
+        onBackPressedDispatcher.addCallback(this, backCallback)
+
+        // A saved state that can't be restored (null) falls through to
+        // a normal first load rather than leaving a blank WebView.
+        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {{
+            webView.loadUrl(SITE_URL)
+        }}
+        backCallback.isEnabled = webView.canGoBack()
     }}
 
-    @Suppress("DEPRECATION")
-    override fun onBackPressed() {{
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+    override fun onSaveInstanceState(outState: Bundle) {{
+        super.onSaveInstanceState(outState)
+        webView.saveState(outState)
+    }}
+
+    /**
+     * Decides who loads a main-frame navigation. Returns true when it
+     * was dealt with here (handed to another app), so the WebView must
+     * not also load it; false to let the WebView load it as usual.
+     */
+    private fun routeNavigation(uri: Uri): Boolean {{
+        if (isInApp(uri)) return false
+        val scheme = uri.scheme?.lowercase() ?: return false
+        if (scheme !in EXTERNAL_SCHEMES) return false
+        try {{
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        }} catch (e: ActivityNotFoundException) {{
+            // Nothing on this device handles that link; stay on the page.
+        }}
+        return true
+    }}
+
+    /** This app's own origin, or an https host `allow_navigation` names. */
+    private fun isInApp(uri: Uri): Boolean {{
+        if (uri.scheme?.lowercase() != "https") return false
+        val host = uri.host?.lowercase() ?: return false
+        if (host == ASSET_HOST) return true
+        return ALLOWED_HOSTS.any {{ pattern ->
+            if (pattern.startsWith("*.")) host.endsWith(pattern.substring(1)) else host == pattern
+        }}
     }}
 
     companion object {{
         private const val SITE_URL = "{_ASSET_ORIGIN}/assets/index.html"
+        private const val ASSET_HOST = "{_ASSET_HOST}"
+
+        // From `android.allow_navigation` in arklight.config.py. A
+        // leading "*." matches subdomains only, not the bare domain.
+        private val ALLOWED_HOSTS: List<String> = {allowed_hosts_kt}
+
+        private val EXTERNAL_SCHEMES = setOf("http", "https", "mailto", "tel", "sms")
+
+        // Static on purpose: nothing from the failed URL is interpolated.
+        private const val LOAD_ERROR_HTML =
+            "<!doctype html><html><head><meta charset='utf-8'>" +
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
+            "<meta name='color-scheme' content='light dark'>" +
+            "<title>Page unavailable</title></head>" +
+            "<body style='font-family:sans-serif;margin:2rem;line-height:1.5'>" +
+            "<h1 style='font-size:1.25rem'>This page couldn't be loaded</h1>" +
+            "<p>Check your connection, then go back and try again.</p>" +
+            "</body></html>"
     }}
 }}
 '''
@@ -1591,6 +1767,32 @@ want it back.
   section if this project is nested inside a larger repo. Edit or
   delete it freely; it's a normal, hand-editable workflow file, not
   something ARKlight regenerates in place.
+
+## Links, back and rotation
+
+`MainActivity.kt` keeps the app feeling like an Android app rather than
+a browser tab:
+
+- **External links** open in the device's own browser (or mail/phone
+  app for `mailto:`/`tel:`/`sms:`), not inside your app. Links to the
+  app's own pages stay in the app. To keep a specific external `https`
+  host *inside* the app -- an OAuth or payment domain, say -- list it in
+  `arklight.config.py`:
+
+  ```
+  CONFIG = {{"android": {{"allow_navigation": ["login.example.com", "*.pay.example.org"]}}}}
+  ```
+
+  `*.` matches subdomains only, not the bare domain. Setting this adds
+  the `INTERNET` permission to the manifest, which the app otherwise
+  does not request. Re-run `arklight android scaffold` after changing it.
+- **Back** goes back through the page history first, and only then
+  leaves the app (with Android's predictive back animation on 13+).
+- **Rotation** keeps the page history and scroll position. Page state
+  that isn't `persist=True` is reset, same as a reload.
+- **A page that fails to load** shows a plain built-in message instead
+  of Chromium's error page.
+- **Remote debugging** (`chrome://inspect`) works in debug builds only.
 
 ## Custom launcher icon
 
