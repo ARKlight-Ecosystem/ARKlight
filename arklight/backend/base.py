@@ -1,10 +1,10 @@
 """
 Backend Interface.
 
-A "backend" turns Website IR into output files. v0.001 ships exactly
-one backend (HTML). Future milestones add CSS, JavaScript, Vue, and
-Svelte backends -- all of them implement this same tiny contract, so
-the compiler pipeline never needs to know which backend it's talking to.
+A "backend" turns Website IR into output files. v0.001 shipped exactly
+one backend (HTML); CSS and JavaScript backends followed. Every backend
+implements this same tiny contract, so the compiler pipeline never needs
+to know which backend it's talking to.
 """
 
 from __future__ import annotations

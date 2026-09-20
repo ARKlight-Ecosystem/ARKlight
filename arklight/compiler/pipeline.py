@@ -21,8 +21,8 @@ Ties every stage together, matching the architecture doc exactly:
 
 As of v0.002, `build()` runs *multiple* backends over the same Website
 IR by default (HTML and CSS) and merges their output files -- this is
-exactly the "Backend Interface" fan-out the architecture doc describes
-under "Future: CSS, JavaScript, Vue, Svelte": each backend consumes the
+exactly the fan-out the architecture doc describes under "Backend
+Interface": each backend consumes the
 same IR and contributes its own output files.
 
 `build()` also copies a top-level `assets/` folder (next to the site's

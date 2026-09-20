@@ -178,7 +178,7 @@ Current:
 
 Future:
 - Android (`arklight android` -- packaging backend, not a template/
-  codegen backend like Vue/Svelte: wraps an existing `build-dir` into
+  codegen backend: wraps an existing `build-dir` into
   a native Android project via `androidx.webkit.WebViewAssetLoader`,
   same "reads already-built output, never touches the
   parser/ir/backend internals" shape as `arklight.packer`. Evolves the
