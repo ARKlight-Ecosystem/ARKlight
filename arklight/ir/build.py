@@ -27,7 +27,7 @@ import re
 
 from arklight import experimental
 from arklight.ast.nodes import ActionRef, ARKNode, DerivationRef
-from arklight.ir import js_numeric
+from arklight.ir import js_numeric, js_string
 from arklight.ir.components import COMPONENT_ORIGIN_PROP_KEY, ComponentOrigin
 
 
@@ -459,6 +459,34 @@ _MATH_VARIADIC: dict[str, Callable[[list[float]], float]] = {
     "lcm": js_numeric.js_lcm,
 }
 
+# `v0.065`: the string derivations catalog. Every kind reads its one
+# input through `js_string.js_to_string` (JavaScript's `String(x)`) and
+# reproduces `String.prototype.*` via `arklight/ir/js_string.py`. The
+# first table holds the kinds with no literal argument, the second the
+# ones that take their parameters from `args`.
+_STRING_UNARY: dict[str, Callable[[str], Any]] = {
+    "capitalize": js_string.js_capitalize,
+    "title_case": js_string.js_title_case,
+    "trim_start": js_string.js_trim_start,
+    "trim_end": js_string.js_trim_end,
+    "reverse_string": js_string.js_reverse,
+    "string_length": js_string.js_length,
+    "is_empty": js_string.js_is_empty,
+}
+_STRING_WITH_ARGS: dict[str, Callable[[str, dict[str, Any]], Any]] = {
+    "pad_start": lambda s, a: js_string.js_pad_start(s, a["length"], a["fill"]),
+    "pad_end": lambda s, a: js_string.js_pad_end(s, a["length"], a["fill"]),
+    "repeat": lambda s, a: js_string.js_repeat(s, a["count"]),
+    "slice_string": lambda s, a: js_string.js_slice(s, a["start"], a["end"]),
+    "char_at": lambda s, a: js_string.js_char_at(s, a["index"]),
+    "replace_first": lambda s, a: js_string.js_replace_first(s, a["search"], a["replacement"]),
+    "replace_all": lambda s, a: js_string.js_replace_all(s, a["search"], a["replacement"]),
+    "split_count": lambda s, a: js_string.js_split_count(s, a["sep"]),
+    "includes_substring": lambda s, a: js_string.js_includes(s, a["substring"]),
+    "starts_with": lambda s, a: js_string.js_starts_with(s, a["substring"]),
+    "ends_with": lambda s, a: js_string.js_ends_with(s, a["substring"]),
+}
+
 
 def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> Any:
     """
@@ -563,6 +591,12 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
         return js_numeric.js_to_fixed(_coerce_number(get(names[0])), args["digits"])
     if kind == "to_precision":
         return js_numeric.js_to_precision(_coerce_number(get(names[0])), args["digits"])
+    # `v0.065` (docs/version history/v0.065.md): the string derivations
+    # catalog -- see `_STRING_UNARY`/`_STRING_WITH_ARGS` above.
+    if kind in _STRING_UNARY:
+        return _STRING_UNARY[kind](js_string.js_to_string(get(names[0])))
+    if kind in _STRING_WITH_ARGS:
+        return _STRING_WITH_ARGS[kind](js_string.js_to_string(get(names[0])), args)
     return None  # unreachable once Validation has run
 
 

@@ -509,6 +509,33 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     "percentage_of": DerivationSpec(min_names=2, max_names=2),
     "to_fixed": DerivationSpec(min_names=1, max_names=1, extra_args=("digits",)),
     "to_precision": DerivationSpec(min_names=1, max_names=1, extra_args=("digits",)),
+    # `v0.065` (docs/version history/v0.065.md): JS vocabulary addendum
+    # stage 5/10 -- the string derivations catalog. Every kind reads
+    # exactly one name, coerced the way `String(x)` coerces it; the
+    # literal parameters (`length`, `fill`, `search`, ...) ride in `args`
+    # and are checked by `LITERAL_ARG_RULES` below. `is_empty`,
+    # `includes_substring`, `starts_with` and `ends_with` return a
+    # boolean (the source proposal files them as predicates; they ship
+    # here as derivations, per the addendum's `v0.065` section, so a
+    # `Computed(...)` result can feed `Show(Predicate.truthy(...))`).
+    "capitalize": DerivationSpec(min_names=1, max_names=1),
+    "title_case": DerivationSpec(min_names=1, max_names=1),
+    "trim_start": DerivationSpec(min_names=1, max_names=1),
+    "trim_end": DerivationSpec(min_names=1, max_names=1),
+    "pad_start": DerivationSpec(min_names=1, max_names=1, extra_args=("length", "fill")),
+    "pad_end": DerivationSpec(min_names=1, max_names=1, extra_args=("length", "fill")),
+    "repeat": DerivationSpec(min_names=1, max_names=1, extra_args=("count",)),
+    "slice_string": DerivationSpec(min_names=1, max_names=1, extra_args=("start", "end")),
+    "char_at": DerivationSpec(min_names=1, max_names=1, extra_args=("index",)),
+    "replace_first": DerivationSpec(min_names=1, max_names=1, extra_args=("search", "replacement")),
+    "replace_all": DerivationSpec(min_names=1, max_names=1, extra_args=("search", "replacement")),
+    "split_count": DerivationSpec(min_names=1, max_names=1, extra_args=("sep",)),
+    "reverse_string": DerivationSpec(min_names=1, max_names=1),
+    "string_length": DerivationSpec(min_names=1, max_names=1),
+    "includes_substring": DerivationSpec(min_names=1, max_names=1, extra_args=("substring",)),
+    "starts_with": DerivationSpec(min_names=1, max_names=1, extra_args=("substring",)),
+    "ends_with": DerivationSpec(min_names=1, max_names=1, extra_args=("substring",)),
+    "is_empty": DerivationSpec(min_names=1, max_names=1),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
@@ -526,6 +553,58 @@ COMPARE_OPS = frozenset({"eq", "ne", "gt", "lt", "gte", "lte"})
 DIGITS_RANGES: dict[str, tuple[int, int]] = {
     "to_fixed": (0, 100),
     "to_precision": (1, 100),
+}
+
+
+# `v0.065`: the string catalog's literal parameters. Each is checked once
+# at build time against a rule, so a bad one fails the build instead of
+# throwing on every client recompute (`"x".repeat(-1)` is a `RangeError`)
+# or silently doing something else (`charAt(-1)` is `""`, never a wrap).
+#
+# * `int` rules are exact-integer only (`bool` is rejected) and inclusive
+#   `low`/`high`; `nullable` additionally allows `None` (`slice_string`'s
+#   open-ended `end`).
+# * `str` rules take any string; `non_empty` rejects `""`. `search` must
+#   be non-empty because `"abc".replace("", x)` and `"abc".split("")`
+#   are per-code-unit operations nobody means by "replace this text".
+# * `repeat`/`pad_*` are capped (`STRING_SIZE_LIMIT`) so a typo can't ask
+#   the compiler, or a visitor's browser, for a gigabyte string.
+#
+# `replace_first`/`replace_all` take a *literal* `search`/`replacement`,
+# never a pattern: see `arklight/backend/js/derivations/replace_first.py`.
+STRING_SIZE_LIMIT = 1000
+STRING_INDEX_LIMIT = 2**31 - 1
+
+
+@dataclass(frozen=True)
+class LiteralArgRule:
+    kind: str  # "int" or "str"
+    low: int | None = None
+    high: int | None = None
+    nullable: bool = False
+    non_empty: bool = False
+
+
+_SIZE = LiteralArgRule("int", 0, STRING_SIZE_LIMIT)
+_SIGNED_INDEX = LiteralArgRule("int", -STRING_INDEX_LIMIT, STRING_INDEX_LIMIT)
+_ANY_STR = LiteralArgRule("str")
+_NON_EMPTY_STR = LiteralArgRule("str", non_empty=True)
+
+LITERAL_ARG_RULES: dict[str, dict[str, LiteralArgRule]] = {
+    "pad_start": {"length": _SIZE, "fill": _ANY_STR},
+    "pad_end": {"length": _SIZE, "fill": _ANY_STR},
+    "repeat": {"count": _SIZE},
+    "slice_string": {
+        "start": _SIGNED_INDEX,
+        "end": LiteralArgRule("int", -STRING_INDEX_LIMIT, STRING_INDEX_LIMIT, nullable=True),
+    },
+    "char_at": {"index": LiteralArgRule("int", 0, STRING_INDEX_LIMIT)},
+    "replace_first": {"search": _NON_EMPTY_STR, "replacement": _ANY_STR},
+    "replace_all": {"search": _NON_EMPTY_STR, "replacement": _ANY_STR},
+    "split_count": {"sep": _NON_EMPTY_STR},
+    "includes_substring": {"substring": _ANY_STR},
+    "starts_with": {"substring": _ANY_STR},
+    "ends_with": {"substring": _ANY_STR},
 }
 
 

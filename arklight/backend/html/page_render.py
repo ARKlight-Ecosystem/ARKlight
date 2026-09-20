@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from html import escape
 
 from arklight.ast.nodes import ActionRef, ItemIndexRef, PredicateRef
@@ -51,6 +52,9 @@ from arklight.backend.html.routing import _relative_asset_path
 from arklight.backend.html.tag_map import VOID_TAGS, _tag_for
 from arklight.backend.js.render import SCRIPT_PATH
 from arklight.ir.build import IRNode, IRPage
+
+
+_LONE_SURROGATE = re.compile("[\ud800-\udfff]")
 
 
 def _render_bind(node: IRNode, *, page_state: dict) -> str:
@@ -69,6 +73,18 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
     # spells them `NaN`/`Infinity`, so pre-fill the JavaScript spelling.
     if isinstance(value, float) and not math.isfinite(value):
         value = "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+    # `v0.065`: the string catalog's boolean kinds (`is_empty`,
+    # `starts_with`, ...) make a `Computed(...)` value a `bool`, which
+    # Python spells `True`/`False` and the client's `String()` spells
+    # `true`/`false`.
+    if isinstance(value, bool):
+        value = "true" if value else "false"
+    # `v0.065`: `Derive.char_at`/`slice_string` can cut an emoji in half,
+    # leaving a lone surrogate -- legal in a JavaScript string, but it
+    # can't be written out as UTF-8. The browser draws such a character
+    # as U+FFFD, so pre-fill that.
+    if isinstance(value, str):
+        value = _LONE_SURROGATE.sub("\ufffd", value)
     return f'<span data-ark-bind="{escape(str(name), quote=True)}">{escape(str(value))}</span>'
 
 

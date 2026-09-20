@@ -5,6 +5,74 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06513] -- Capability fix: JS vocabulary stage 5/10, the string derivations catalog (the `v0.065` slot's first piece)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06512]`
+(the roadmap's `v0.065` is never touched: its `Provider` piece is still
+PLANNED). `v0.065` is four independent pieces; Rei (`0.06510`) and Platform
+API IR shipped first, this is the first-listed piece, JS vocabulary addendum
+stage 5/10 (`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`).
+
+- **18 new `Derive.*` kinds**, each one fragment file under
+  `arklight/backend/js/derivations/` plus one `DERIVATION_REGISTRY` line, no
+  new IR node, no parser: `capitalize`, `title_case`, `trim_start`,
+  `trim_end`, `pad_start`, `pad_end`, `repeat`, `slice_string`, `char_at`,
+  `replace_first`, `replace_all`, `split_count`, `reverse_string`,
+  `string_length`, `includes_substring`, `starts_with`, `ends_with`,
+  `is_empty`. Each reads one name, coerced like `String(x)`; literal
+  parameters (`length`, `fill`, `search`, ...) ride in `args`.
+- **Literal-only `replace_first`/`replace_all`, as the addendum requires.**
+  `search` is plain text, never a pattern, and nothing builds a `RegExp`.
+  `replacement` is also plain text: `replace_first` returns it from a
+  function so `$&`/`$1`/`$$` are not expanded, and `replace_all` is
+  `split(search).join(replacement)`. `search` must be non-empty.
+- **Build-time validation of every literal argument** (new
+  `LITERAL_ARG_RULES` in `arklight/ir/schema.py`): integers only (no `bool`),
+  `repeat`/`pad_*` capped at `1000` so a typo can't ask for a gigabyte
+  string (and a negative count is a build error, not a `RangeError` on every
+  client recompute), `char_at`'s index `>= 0`, `slice_string`'s `end` may be
+  `None`. A test fails if a new kind gets an argument with no rule.
+- **Decision: the four predicate-shaped kinds ship as derivations.** The
+  source proposal files `includes_substring`, `starts_with`, `ends_with` and
+  `is_empty` as predicates; the addendum lists them under `v0.065`'s string
+  catalog. They ship as boolean-valued `Derive.*` kinds, so a `Computed(...)`
+  result feeds `Show(Predicate.truthy(...))` today. `v0.066`'s predicates
+  catalog is untouched (it still lists `is_empty`/`is_not_empty` for
+  `Predicate.*`).
+- **New `arklight/ir/js_string.py`** reproduces JavaScript's answers where
+  Python's `str` differs: indices, lengths and padding count **UTF-16 code
+  units** (`"😀"` has length 2, `slice`/`charAt` can cut it in half); `String(x)`
+  spells `true`, `null`, `5` and `1e+21` (Python: `True`, `None`, `5.0`,
+  `1e+21`); `trimStart`/`trimEnd`/`\s` use JavaScript's whitespace set
+  (includes `U+FEFF`, excludes `U+001C`-`U+001F` and `U+0085`, unlike
+  `str.strip()`).
+- **Fixed while building it (`Bind(...)` pre-fill):** a boolean `Computed(...)`
+  value was written `True`/`False` where the client's `String()` writes
+  `true`/`false` (already true of `Derive.compare`); and a lone surrogate
+  (from `char_at`/`slice_string` cutting an emoji) would have crashed the
+  UTF-8 write, so it is pre-filled as `U+FFFD`, which is how a browser draws it.
+- **Behavior limits, documented not hidden.** `title_case` and `capitalize`
+  uppercase only the first code unit and leave the rest as written (there is
+  no `lowercase` in the catalog). `reverse_string` is by code point, not
+  grapheme: combining marks and joined emoji sequences still split. `is_empty`
+  reads the string form (`0`/`False` are not empty; `None` is `"null"`).
+  Case mapping goes through each platform's Unicode tables (Python's vs the
+  browser's ICU), which can differ for characters added in the most recent
+  Unicode versions. Browser floor for the new fragments: `padStart`/`padEnd`
+  (ES2017), `trimStart`/`trimEnd` (ES2019).
+- **Left alone, found on the way:** the existing `uppercase`/`trim` mirrors
+  still use Python's `str()`/`str.strip()` (so `trim` of `"\ufeffx"` differs
+  from the browser's), and integer-valued floats still pre-fill as `8.0`
+  where the client writes `8` (already noted under `[0.06509]`; existing
+  tests pin the `.0`). Neither is changed here.
+
+`tests/test_js_vocabulary_v0065.py` (231 tests, Node sweep of ~16,000
+generated cases through the shipped fragments and the build-time mirror --
+emoji, lone surrogates, exotic whitespace, `$`-patterns, non-string state --
+every result bit-for-bit equal; the sweep was checked to fail when the mirror
+is deliberately broken). Full suite 2047 passed (was 1816). `0.06512` ->
+`0.06513`; roadmap `v0.065` untouched.
+
 ## [0.06512] -- Docs-only incremental patch: Rei language proposal filed, Milestones cleanup, Vue/Svelte dropped, dangling references fixed
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06511]`
