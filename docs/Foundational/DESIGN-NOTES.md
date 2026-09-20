@@ -965,6 +965,7 @@ is application logic either:
             "splash": "assets/splash.png",
             "orientation": "portrait",
             "edge_to_edge": False,
+            "allow_navigation": [],
         },
     }
 
@@ -984,6 +985,11 @@ iconed, app. Concretely, the metadata this section owns:
   both configurable per app rather than hard-coded one way, since the
   right choice genuinely differs between something like a portfolio
   site and a utility app.
+- `allow_navigation` (added `0.06507`): external `https` hosts a link
+  may load *inside* the app. Every other external link opens in the
+  device's browser. A bare hostname or `*.`-prefixed subdomain pattern;
+  a non-empty list is also what adds the `INTERNET` permission, which an
+  app without it never requests.
 
 This also gives the eventual Desktop backend (`v0.100`) a precedent to
 follow rather than a second config surface to invent: a `"desktop"`

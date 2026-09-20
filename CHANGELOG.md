@@ -5,6 +5,74 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06507] -- Capability fix: Android native-shell hardening (external links, back, rotation, load errors)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06506]`
+(the roadmap's `v0.065` is never touched). A **capability fix** taken from
+`docs/Proposals/ANDROID-BACKEND-HARDENING-PROPOSAL.md`, which is now
+**partially accepted**: the items that are correctness fixes with no
+JS-to-native bridge, plus the one config key they need. What is left is
+listed under "Not done".
+
+The generated `MainActivity.kt` attached a custom `WebViewClient`, which
+switches off Android's own link handling: **every tapped link, including
+one to another site, loaded inside the app's WebView** with no way back to
+the browser. Also fixed in the same file, from the proposal's audit:
+
+- **External links** (proposal 2.1). A main-frame navigation to the app's
+  own origin stays in the WebView; any other `http(s)` link, and
+  `mailto:`/`tel:`/`sms:`, is handed to the device via `Intent.ACTION_VIEW`
+  (an `ActivityNotFoundException` is caught, so a device with no handler
+  can't crash the activity). Other schemes and subframe navigations keep
+  the WebView's previous behavior.
+- **`android.allow_navigation`** (new `arklight.config.py` key, default
+  `[]`). External `https` hosts a link may load *inside* the WebView -- an
+  OAuth or payment domain. Bare hostnames, `*.` prefix for subdomains
+  (not the bare domain); a scheme, port, path, single-label name or bare
+  `*.com` is a build-time `AndroidError`, not a warning. Setting it also
+  adds the `INTERNET` permission to the manifest, which the scaffold
+  otherwise still does not request (an in-WebView external page can't
+  load without it).
+- **Back** (2.3). `onBackPressed()` (deprecated) is replaced by an
+  `OnBackPressedCallback`, enabled only while the WebView has history, and
+  `android:enableOnBackInvokedCallback="true"` opts into Android 13+
+  predictive back.
+- **Rotation** (2.4). `saveState`/`restoreState` keep the WebView's history
+  and scroll position across activity recreation. In-page JavaScript state
+  is *not* preserved by this (only `State(persist=True)` survives a
+  reload); the proposal's wording on this point was too generous.
+- **Load errors** (2.2). A failed main-frame load shows a fixed built-in
+  page instead of Chromium's error page; nothing from the URL is put in it.
+- **Remote debugging** (proposal section 3). `setWebContentsDebuggingEnabled`
+  follows `FLAG_DEBUGGABLE`, so debug builds can be inspected and release
+  builds cannot. Not a config key.
+- The generated project `README.md` documents all of the above.
+
+**Behavior change:** a scaffolded app that previously opened an external
+link inside itself now opens it in the browser. Sites that relied on the old
+behavior for a specific host list it in `android.allow_navigation` and
+re-scaffold. Nothing changes for a project that isn't re-scaffolded, and
+non-Android builds are untouched.
+
+**Not done** (still in the proposal, unscheduled): the `append_user_agent`
+and WebView background-colour keys, the `WebChromeClient` work
+(console messages, file chooser), the WebView-version floor, the
+error-page-content key, and the edge-to-edge note (2.5, documentation only).
+
+`tests/test_android_hardening.py` (56 tests): generated-Kotlin content for
+each behavior above, manifest permission/attribute, `allow_navigation`
+accept/reject matrix and error messages, the runtime builder refusing an
+unvalidated host, and a structural check of every `MainActivity.kt` variant.
+Full suite 1588 -> 1644 passed (the two `test_version.py` metadata tests need
+the package installed; the rest of the suite is unchanged).
+
+**Verification limits.** The generated Kotlin was compiled with Kotlin
+1.9.24 (the version the scaffold pins) against hand-written stubs of the
+Android/AndroidX classes it uses, and its link-routing/host-matching
+methods were run against a URL matrix; it was **not** built with the real
+Android SDK or run on a device or emulator. The scaffold's own CI workflow
+(`assembleDebug` + emulator smoke test) is the first place that happens.
+
 ## [0.06506] -- Capability fix: compiler-native diagnostics for user-defined component calls
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06505]`
