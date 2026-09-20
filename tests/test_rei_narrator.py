@@ -401,3 +401,51 @@ def test_duplicate_style_name_is_narrated_the_same_way(tmp_path, capsys):
     assert "[Rei] Compilation halted." in captured.err
     assert "dup-box" in captured.err
     assert "Try: arklight search" not in captured.err
+
+
+# --- stage-table drift guard -----------------------------------------------
+#
+# `narrate_stage` falls back to a raw `[Rei] <message>` passthrough for a
+# message no pattern matches. That keeps a new pipeline stage visible, but
+# it also means a stage added without a pattern would silently narrate as
+# "[ARKlight]-style" text under --narrate. These tests make that a failure.
+
+
+def _is_passthrough(message: str) -> bool:
+    return rei.narrate_stage(message) == f"{rei.REI_PREFIX} {message}"
+
+
+def test_every_stage_message_a_real_build_emits_has_a_narration_pattern(tmp_path):
+    from arklight.compiler.pipeline import build
+
+    site_path = write_site(tmp_path, SIMPLE_SITE)
+    messages: list[str] = []
+    build(site_path, tmp_path / "dist", on_stage=messages.append)
+    assert messages
+    unmatched = [
+        m for m in messages if not rei.is_unconditional_banner(m) and _is_passthrough(m)
+    ]
+    assert unmatched == []
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        # Stages a plain build doesn't reach, in the exact form
+        # `arklight.compiler.pipeline` logs them.
+        "Running raw postprocess function 1/2...",
+        "Reading .arklight snapshot from build/site.arklight...",
+        "Rebuilding Website IR from 3 page(s)...",
+    ],
+)
+def test_conditional_stage_messages_have_a_narration_pattern(message):
+    assert not _is_passthrough(message)
+
+
+def test_assets_stage_does_not_claim_an_assets_folder_exists():
+    # The pipeline logs this stage on every build, with or without an
+    # `assets/` folder next to the site file.
+    assert (
+        rei.narrate_stage("Copying assets...")
+        == "[Rei] Copying your assets/ folder into the output, if there is one."
+    )
