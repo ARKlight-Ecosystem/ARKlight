@@ -481,6 +481,34 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     # `count`.
     "uppercase": DerivationSpec(min_names=1, max_names=1),
     "trim": DerivationSpec(min_names=1, max_names=1),
+    # `v0.064` (docs/version history/v0.064.md): JS vocabulary
+    # addendum stage 4/10 -- the math derivations catalog. Unary
+    # transforms take exactly one name; `power`/`percentage_of` are
+    # ordered pairs and `clamp` an ordered triple (value, low, high);
+    # `hypot`/`average`/`median`/`gcd`/`lcm` are variadic; `to_fixed`/
+    # `to_precision` take one name plus a literal `digits` argument
+    # (range-checked in `arklight.ir.validate`).
+    "absolute": DerivationSpec(min_names=1, max_names=1),
+    "ceiling": DerivationSpec(min_names=1, max_names=1),
+    "floor": DerivationSpec(min_names=1, max_names=1),
+    "truncate_number": DerivationSpec(min_names=1, max_names=1),
+    "sign": DerivationSpec(min_names=1, max_names=1),
+    "sqrt": DerivationSpec(min_names=1, max_names=1),
+    "cbrt": DerivationSpec(min_names=1, max_names=1),
+    "power": DerivationSpec(min_names=2, max_names=2),
+    "exp": DerivationSpec(min_names=1, max_names=1),
+    "log": DerivationSpec(min_names=1, max_names=1),
+    "log2": DerivationSpec(min_names=1, max_names=1),
+    "log10": DerivationSpec(min_names=1, max_names=1),
+    "hypot": DerivationSpec(min_names=1, max_names=None),
+    "clamp": DerivationSpec(min_names=3, max_names=3),
+    "average": DerivationSpec(min_names=1, max_names=None),
+    "median": DerivationSpec(min_names=1, max_names=None),
+    "gcd": DerivationSpec(min_names=1, max_names=None),
+    "lcm": DerivationSpec(min_names=1, max_names=None),
+    "percentage_of": DerivationSpec(min_names=2, max_names=2),
+    "to_fixed": DerivationSpec(min_names=1, max_names=1, extra_args=("digits",)),
+    "to_precision": DerivationSpec(min_names=1, max_names=1, extra_args=("digits",)),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
@@ -489,6 +517,16 @@ KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
 # raw operator string executed as code -- mirrors why `on_click`/
 # `action` are closed vocabularies rather than arbitrary strings.
 COMPARE_OPS = frozenset({"eq", "ne", "gt", "lt", "gte", "lte"})
+
+# `v0.064`: `Derive.to_fixed(...)`/`Derive.to_precision(...)`'s `digits`
+# is a literal, range-checked at build time to exactly the range
+# JavaScript's own `Number.prototype.toFixed`/`toPrecision` accept --
+# outside it the browser would throw a `RangeError` on every recompute
+# instead of the build failing once, loudly.
+DIGITS_RANGES: dict[str, tuple[int, int]] = {
+    "to_fixed": (0, 100),
+    "to_precision": (1, 100),
+}
 
 
 # `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): `Show(...)`'s

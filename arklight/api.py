@@ -945,6 +945,8 @@ class Derive:
                   derive=Derive.compare("count", "limit", "gt"))
         Computed("shout", deps=("name",), derive=Derive.uppercase("name"))
         Computed("clean_input", deps=("raw",), derive=Derive.trim("raw"))
+        Computed("share", deps=("done", "total"), derive=Derive.percentage_of("done", "total"))
+        Computed("price_text", deps=("price",), derive=Derive.to_fixed("price", 2))
     """
 
     @staticmethod
@@ -1032,6 +1034,142 @@ class Derive:
         string with leading/trailing whitespace stripped -- a sibling
         of `Derive.join`/`Derive.format`."""
         return DerivationRef(kind="trim", names=(name,))
+
+    # ------------------------------------------------------------------
+    # `v0.064` (docs/version history/v0.064.md): the math derivations
+    # catalog -- JS vocabulary addendum stage 4/10. Inputs are read the
+    # way `sum` reads them (`Number(x) || 0`); results follow JavaScript's
+    # `Math.*` semantics, so an out-of-domain input (`sqrt` of a negative,
+    # `log` of zero) yields `NaN`/`Infinity`, never a build or runtime
+    # error.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def absolute(name: str) -> DerivationRef:
+        """`v0.064`: `Math.abs` of the named value."""
+        return DerivationRef(kind="absolute", names=(name,))
+
+    @staticmethod
+    def ceiling(name: str) -> DerivationRef:
+        """`v0.064`: `Math.ceil` -- round up to the next whole number."""
+        return DerivationRef(kind="ceiling", names=(name,))
+
+    @staticmethod
+    def floor(name: str) -> DerivationRef:
+        """`v0.064`: `Math.floor` -- round down to the previous whole number."""
+        return DerivationRef(kind="floor", names=(name,))
+
+    @staticmethod
+    def truncate_number(name: str) -> DerivationRef:
+        """`v0.064`: `Math.trunc` -- drop the fractional part (rounds
+        toward zero, so `-2.7` becomes `-2`)."""
+        return DerivationRef(kind="truncate_number", names=(name,))
+
+    @staticmethod
+    def sign(name: str) -> DerivationRef:
+        """`v0.064`: `Math.sign` -- `-1`, `0`, or `1`."""
+        return DerivationRef(kind="sign", names=(name,))
+
+    @staticmethod
+    def sqrt(name: str) -> DerivationRef:
+        """`v0.064`: `Math.sqrt` (`NaN` for a negative input)."""
+        return DerivationRef(kind="sqrt", names=(name,))
+
+    @staticmethod
+    def cbrt(name: str) -> DerivationRef:
+        """`v0.064`: `Math.cbrt`, the cube root (defined for negatives)."""
+        return DerivationRef(kind="cbrt", names=(name,))
+
+    @staticmethod
+    def power(base: str, exponent: str) -> DerivationRef:
+        """`v0.064`: `Math.pow` -- `Derive.power("base", "exponent")`
+        reads as `base ** exponent`."""
+        return DerivationRef(kind="power", names=(base, exponent))
+
+    @staticmethod
+    def exp(name: str) -> DerivationRef:
+        """`v0.064`: `Math.exp`, `e ** x`."""
+        return DerivationRef(kind="exp", names=(name,))
+
+    @staticmethod
+    def log(name: str) -> DerivationRef:
+        """`v0.064`: `Math.log`, the natural logarithm (`-Infinity` for
+        `0`, `NaN` for a negative input)."""
+        return DerivationRef(kind="log", names=(name,))
+
+    @staticmethod
+    def log2(name: str) -> DerivationRef:
+        """`v0.064`: `Math.log2`."""
+        return DerivationRef(kind="log2", names=(name,))
+
+    @staticmethod
+    def log10(name: str) -> DerivationRef:
+        """`v0.064`: `Math.log10`."""
+        return DerivationRef(kind="log10", names=(name,))
+
+    @staticmethod
+    def hypot(*names: str) -> DerivationRef:
+        """`v0.064`: `Math.hypot` -- the Euclidean norm
+        `sqrt(a**2 + b**2 + ...)` over one or more values."""
+        return DerivationRef(kind="hypot", names=tuple(names))
+
+    @staticmethod
+    def clamp(value: str, low: str, high: str) -> DerivationRef:
+        """`v0.064`: `min(max(value, low), high)` -- `value` held within
+        `[low, high]`. If `low` is above `high` the result is `high`."""
+        return DerivationRef(kind="clamp", names=(value, low, high))
+
+    @staticmethod
+    def average(*names: str) -> DerivationRef:
+        """`v0.064`: the arithmetic mean of one or more values --
+        complements `Derive.sum`/`Derive.count`."""
+        return DerivationRef(kind="average", names=tuple(names))
+
+    @staticmethod
+    def mean(*names: str) -> DerivationRef:
+        """`v0.064`: alias for `Derive.average` (same `"average"` kind)."""
+        return DerivationRef(kind="average", names=tuple(names))
+
+    @staticmethod
+    def median(*names: str) -> DerivationRef:
+        """`v0.064`: the middle value of one or more values (the mean of
+        the two middle ones for an even count)."""
+        return DerivationRef(kind="median", names=tuple(names))
+
+    @staticmethod
+    def gcd(*names: str) -> DerivationRef:
+        """`v0.064`: greatest common divisor of one or more values,
+        each truncated to a whole number and made non-negative first."""
+        return DerivationRef(kind="gcd", names=tuple(names))
+
+    @staticmethod
+    def lcm(*names: str) -> DerivationRef:
+        """`v0.064`: least common multiple of one or more values, each
+        truncated to a whole number and made non-negative first (`0` if
+        any is `0`)."""
+        return DerivationRef(kind="lcm", names=tuple(names))
+
+    @staticmethod
+    def percentage_of(part: str, whole: str) -> DerivationRef:
+        """`v0.064`: `(part / whole) * 100` -- `Derive.percentage_of(
+        "done", "total")`. A zero `whole` follows JavaScript's float
+        division (`Infinity`/`NaN`), same as `Derive.divide`."""
+        return DerivationRef(kind="percentage_of", names=(part, whole))
+
+    @staticmethod
+    def to_fixed(name: str, digits: int) -> DerivationRef:
+        """`v0.064`: `Number.prototype.toFixed(digits)` -- the value as a
+        **string** with exactly `digits` decimals (`0`-`100`), e.g.
+        `Derive.to_fixed("price", 2)` -> `"9.50"`. For display; a string
+        isn't further arithmetic input."""
+        return DerivationRef(kind="to_fixed", names=(name,), args={"digits": digits})
+
+    @staticmethod
+    def to_precision(name: str, digits: int) -> DerivationRef:
+        """`v0.064`: `Number.prototype.toPrecision(digits)` -- the value
+        as a **string** with `digits` significant digits (`1`-`100`),
+        switching to exponent notation for very large/small values."""
+        return DerivationRef(kind="to_precision", names=(name,), args={"digits": digits})
 
 
 # ---------------------------------------------------------------------------

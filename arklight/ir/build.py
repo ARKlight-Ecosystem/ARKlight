@@ -27,6 +27,7 @@ import re
 
 from arklight import experimental
 from arklight.ast.nodes import ActionRef, ARKNode, DerivationRef
+from arklight.ir import js_numeric
 from arklight.ir.components import COMPONENT_ORIGIN_PROP_KEY, ComponentOrigin
 
 
@@ -423,12 +424,40 @@ def _coerce_number(value: Any) -> float:
     if isinstance(value, bool):
         return 1.0 if value else 0.0
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return 0.0
+    # `Number(x) || 0`: `||` also turns `NaN` and `-0` into `+0`. Matters
+    # once a derivation can *produce* `NaN` (`v0.064`'s `sqrt(-1)`,
+    # `log(0) - log(0)`) that a later `Computed(...)` then reads.
+    return 0.0 if (number == 0 or math.isnan(number)) else number
 
 
 _FORMAT_PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
+
+# `v0.064`: kind -> build-time mirror, for the math derivations whose
+# evaluation is one call. Unary kinds take one coerced number; variadic
+# kinds take the list of coerced numbers.
+_MATH_UNARY: dict[str, Callable[[float], float]] = {
+    "absolute": abs,
+    "ceiling": js_numeric.js_ceil,
+    "floor": js_numeric.js_floor,
+    "truncate_number": js_numeric.js_trunc,
+    "sign": js_numeric.js_sign,
+    "sqrt": js_numeric.js_sqrt,
+    "cbrt": js_numeric.js_cbrt,
+    "exp": js_numeric.js_exp,
+    "log": js_numeric.js_log,
+    "log2": js_numeric.js_log2,
+    "log10": js_numeric.js_log10,
+}
+_MATH_VARIADIC: dict[str, Callable[[list[float]], float]] = {
+    "hypot": js_numeric.js_hypot,
+    "average": js_numeric.js_average,
+    "median": js_numeric.js_median,
+    "gcd": js_numeric.js_gcd,
+    "lcm": js_numeric.js_lcm,
+}
 
 
 def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> Any:
@@ -447,7 +476,13 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
     args: dict[str, Any] = spec["args"]
 
     if kind == "sum":
-        return sum(_coerce_number(get(name)) for name in names)
+        # Explicit loop, not `sum()`: Python 3.12's float `sum()` is
+        # compensated and can differ from JavaScript's plain `reduce`
+        # in the last digit (`0.1` ten times: `1.0` vs `0.9999999999999999`).
+        total = 0.0
+        for name in names:
+            total += _coerce_number(get(name))
+        return total
     if kind == "multiply":
         total = 1.0
         for name in names:
@@ -495,17 +530,10 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
         values = [_coerce_number(get(name)) for name in names]
         total = values[0]
         for value in values[1:]:
-            # Mirrors JavaScript's own `x / 0` semantics (`Infinity`/
-            # `-Infinity`/`NaN`, never a thrown error) rather than
-            # Python's `ZeroDivisionError` -- see
-            # `arklight/backend/js/derivations/divide.py`'s docstring.
-            if value == 0:
-                if total == 0:
-                    total = math.nan
-                else:
-                    total = math.copysign(math.inf, total) * math.copysign(1.0, value)
-            else:
-                total /= value
+            # JavaScript's `x / 0` semantics (`Infinity`/`-Infinity`/
+            # `NaN`, never a thrown error) rather than Python's
+            # `ZeroDivisionError` -- see `arklight/ir/js_numeric.py`.
+            total = js_numeric.js_divide(total, value)
         return total
     if kind == "min":
         return min(_coerce_number(get(name)) for name in names)
@@ -515,6 +543,26 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
         return str(get(names[0])).upper()
     if kind == "trim":
         return str(get(names[0])).strip()
+    # `v0.064` (docs/version history/v0.064.md): the math derivations
+    # catalog. Every case reads its inputs through `_coerce_number`
+    # (JavaScript's `Number(x) || 0`) and reproduces `Math.*`/
+    # `Number.prototype.*` via `arklight/ir/js_numeric.py`.
+    if kind in _MATH_UNARY:
+        return _MATH_UNARY[kind](_coerce_number(get(names[0])))
+    if kind in _MATH_VARIADIC:
+        return _MATH_VARIADIC[kind]([_coerce_number(get(name)) for name in names])
+    if kind == "power":
+        return js_numeric.js_pow(_coerce_number(get(names[0])), _coerce_number(get(names[1])))
+    if kind == "clamp":
+        value, low, high = (_coerce_number(get(name)) for name in names)
+        return min(max(value, low), high)
+    if kind == "percentage_of":
+        part, whole = (_coerce_number(get(name)) for name in names)
+        return js_numeric.js_divide(part, whole) * 100
+    if kind == "to_fixed":
+        return js_numeric.js_to_fixed(_coerce_number(get(names[0])), args["digits"])
+    if kind == "to_precision":
+        return js_numeric.js_to_precision(_coerce_number(get(names[0])), args["digits"])
     return None  # unreachable once Validation has run
 
 
