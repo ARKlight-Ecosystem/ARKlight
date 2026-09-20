@@ -24,7 +24,7 @@ the command refuses to proceed rather than hanging on a prompt that
 can never be answered.
 
 ```bash
-arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--debug]
+arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--debug] [--narrate]
     [--max-width VALUE] [--bg VALUE] [--font-family VALUE] [--button-text VALUE] [--lang TAG]
     [--emit-arklight[=PATH]]
 ```
@@ -62,6 +62,49 @@ arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--de
   chained Python traceback instead of the short one-line error
   message, so you can trace a compiler error back to the exact file
   and line that raised it.
+- `--narrate` -- like `--verbose`, but the same pipeline progress is
+  told by Rei, ARKlight's compiler narrator, as short natural-language
+  sentences instead of `[ARKlight] ...` lines, e.g.:
+
+  ```
+  [Rei] Reading your site file and turning it into an AST tree.
+  [Rei] Expanding any @component(...)-registered pieces you used.
+  [Rei] Normalizing the tree into a consistent shape.
+  [Rei] Checking everything against the known component schema.
+  [Rei] Building the Website IR from the validated tree.
+  [Rei] Rendering the html backend.
+  ...
+  [Rei] All done -- open ARK/index.html whenever you're ready.
+  ```
+
+  Mutually exclusive with `--verbose` and `--debug`: combining
+  `--narrate` with either one fails the build immediately, naming the
+  conflicting flag, rather than silently picking one. Rei is pure
+  Python and deterministic -- the same build always produces
+  byte-identical narration; no network access, no LLM.
+
+  - **First-build introduction.** The first narrated build into an
+    output directory that doesn't exist yet, or exists and is empty,
+    starts with a two-line `[Rei]` greeting that also says *why*
+    narration is on (the `--narrate` flag, or `arklight.config.py`).
+    It is not repeated on later builds into the same directory, and
+    comes back if you delete/clear the output directory.
+  - **On failure**, the error prints as `[Rei] Compilation halted.`
+    followed by the same error message the plain build prints. When
+    the failure is an unknown component type, or a known component
+    missing a required prop, one extra fixed line is appended --
+    `Try: arklight search <Name>`, pointing at the existing `search`
+    subcommand below. No other kind of failure gets that line.
+  - Experimental-feature banners (see below) print exactly as under
+    `--verbose`; Rei never rewords them.
+  - **Pinning it per project.** Instead of passing the flag on every
+    build, set `CONFIG = {"rei": {"default_mode": "narrate"}}` in the
+    project's `arklight.config.py`. `default_mode` is one of
+    `"plain"` (the default, and what a missing `rei` section means),
+    `"verbose"` or `"narrate"`; any other value fails the build. It
+    only decides what a build with *no* `--verbose`/`--debug`/
+    `--narrate` flag does -- a flag on the command line always wins
+    for that invocation.
 - `--max-width VALUE` -- overrides the page's max content width
   (`--ark-max-width`), e.g. `90rem`, `1400px`, `100%`. Takes
   precedence over `Site(max_width=...)` in the site file, without

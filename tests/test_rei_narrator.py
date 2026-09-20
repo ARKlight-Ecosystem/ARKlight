@@ -3,10 +3,14 @@ see docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md /
 docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md.
 """
 
+import ast
 from pathlib import Path
+
+import pytest
 
 from arklight.cli.main import main
 from arklight.compiler import rei
+from arklight.ir.components import COMPONENT_REGISTRY
 from arklight.ir.validate import ValidationError
 
 SIMPLE_SITE = """
@@ -37,14 +41,14 @@ def home():
 """
 
 DUPLICATE_COMPONENT_SITE = """
-from arklight import *
+# include <stdlib.ARKlight>
 
-@component("Dup")
-def dup_one(props):
+@component()
+def DupReiProbe():
     return Heading("one")
 
-@component("Dup")
-def dup_two(props):
+@component()
+def DupReiProbe():
     return Heading("two")
 
 site = Site()
@@ -53,6 +57,30 @@ site = Site()
 def home():
     return Page(Heading("Hi"))
 """
+
+
+DUPLICATE_STYLE_SITE = """
+# include <stdlib.ARKlight>
+
+site = Site()
+site.style("dup-box", {"color": "red"})
+site.style("dup-box", {"color": "blue"})
+
+@site.page("/")
+def home():
+    return Page(Heading("Hi"))
+"""
+
+
+@pytest.fixture
+def isolated_component_registry():
+    """`@component()` registers into a process-global registry, so a
+    site file that registers `DupReiProbe` would otherwise leak it into
+    every later test. Snapshot and restore around the test."""
+    saved = dict(COMPONENT_REGISTRY)
+    yield
+    COMPONENT_REGISTRY.clear()
+    COMPONENT_REGISTRY.update(saved)
 
 
 def write_site(tmp_path: Path, source: str) -> Path:
@@ -216,7 +244,7 @@ def test_narrate_omits_search_pointer_for_non_schema_validation_error(tmp_path, 
 
 
 def test_plain_mode_never_prints_search_pointer(tmp_path, capsys):
-    site_path = write_site(tmp_path, UNKNOWN_COMPONENT_SITE)
+    site_path = write_site(tmp_path, MISSING_REQUIRED_PROP_SITE)
     exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
     err = capsys.readouterr().err
     assert exit_code == 1
@@ -281,3 +309,95 @@ def test_is_fresh_output_dir_false_once_populated(tmp_path):
     populated.mkdir()
     (populated / "index.html").write_text("hi")
     assert rei.is_fresh_output_dir(str(populated)) is False
+
+
+# --- vendored ELIZA reference is never imported by shipping code -----------
+
+
+def test_no_shipping_module_imports_the_vendored_eliza_reference():
+    """`docs/reference/eliza/eliza.py` is read-only design reference
+    (addendum: "studied during design, not linked against at runtime").
+    Walk every `arklight/**/*.py` module's real import statements
+    (via `ast`, not a text grep, so a comment or docstring merely
+    *mentioning* ELIZA -- as `arklight/compiler/rei/__init__.py`'s does
+    -- doesn't count) and fail if any reaches into it.
+    """
+    package_root = Path(rei.__file__).resolve().parents[2]  # .../arklight
+    offenders = []
+    for py_file in sorted(package_root.rglob("*.py")):
+        tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                imported = [node.module or ""]
+                imported += [f"{node.module}.{alias.name}" for alias in node.names if node.module]
+            else:
+                continue
+            for name in imported:
+                parts = name.lower().split(".")
+                if "eliza" in parts or name.startswith("docs.reference"):
+                    offenders.append(f"{py_file.relative_to(package_root.parent)}: {name}")
+    assert offenders == []
+
+
+# --- import-time registration errors (addendum: "Tests", last bullet) ------
+#
+# `DuplicateComponentError`/`DuplicateStyleNameError` fire while the site
+# file itself runs, which happens *inside* the pipeline's first
+# ("Discovering site...") stage. `load_site` re-raises them as
+# `SiteLoadError` -> `CompileError`, so they are ordinary build errors --
+# not raw tracebacks -- and are narrated like any other build failure.
+# These tests pin that behavior (decided at v0.065; see the addendum).
+
+
+@pytest.mark.parametrize("flags", [[], ["--verbose"], ["--narrate"]])
+def test_duplicate_component_is_a_build_error_not_a_traceback_in_every_mode(
+    tmp_path, capsys, isolated_component_registry, flags
+):
+    site_path = write_site(tmp_path, DUPLICATE_COMPONENT_SITE)
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open", *flags])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Traceback" not in captured.err
+    assert "already registered" in captured.err
+    assert "Try: arklight search" not in captured.err
+
+
+def test_duplicate_component_under_narrate_is_narrated_from_the_discovery_stage(
+    tmp_path, capsys, isolated_component_registry
+):
+    site_path = write_site(tmp_path, DUPLICATE_COMPONENT_SITE)
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open", "--narrate"])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    # The discovery stage had genuinely started, so it is narrated...
+    assert "[Rei] Reading your site file and turning it into an AST tree." in captured.out
+    # ...and the failure is reported in Rei's voice, on stderr.
+    assert "[Rei] Compilation halted." in captured.err
+    # Nothing past the discovery stage ran.
+    assert "Expanding" not in captured.out
+    assert not (tmp_path / "dist" / "index.html").exists()
+
+
+def test_duplicate_component_under_verbose_prints_only_the_discovery_stage(
+    tmp_path, capsys, isolated_component_registry
+):
+    site_path = write_site(tmp_path, DUPLICATE_COMPONENT_SITE)
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open", "--verbose"])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "[ARKlight] Discovering site and compiling AST trees..." in captured.out
+    assert "[ARKlight] Expanding" not in captured.out
+    assert "[Rei]" not in captured.out + captured.err
+
+
+def test_duplicate_style_name_is_narrated_the_same_way(tmp_path, capsys):
+    site_path = write_site(tmp_path, DUPLICATE_STYLE_SITE)
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open", "--narrate"])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Traceback" not in captured.err
+    assert "[Rei] Compilation halted." in captured.err
+    assert "dup-box" in captured.err
+    assert "Try: arklight search" not in captured.err

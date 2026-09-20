@@ -220,15 +220,22 @@ Also out of scope, for a different reason: `DuplicateComponentError`/
 raised by `register_component`/`register_backend_render`/
 `Site.style(...)` on a same-name re-registration without
 `allow_redefine=True`). These aren't `ValidationError`s at all, and
-they aren't raised from `arklight/ir/validate.py` -- they fire at
-site-file *import* time, when a project's own `component(...)`/
-`site.style(...)` calls run, well before `arklight build` ever reaches
-the narrated pipeline stages §1 describes. A build that fails this way
-never gets far enough for `--narrate` to say anything about it at all;
-this is a plain Python traceback today (the same as every other
-import-time error a site file can raise), and stays one under this
-proposal. If import-time errors ever get their own narrated treatment,
-that's its own proposal, not an implicit extension of §5's pointer.
+they aren't raised from `arklight/ir/validate.py` -- they fire while
+the site file's own `component(...)`/`site.style(...)` calls run, which
+is *inside* the pipeline's first ("Discovering site...") stage, not
+before it. `load_site` re-raises any exception from running the site
+file as `SiteLoadError`, which the pipeline turns into a
+`CompileError`, so this is an ordinary build failure, not a raw Python
+traceback. Under `--narrate` it is therefore narrated like any other
+build failure: that stage's line, then `[Rei] Compilation halted.` and
+the error text, with no `arklight search` pointer (there is no
+`component_name` on it). *Correction, made when `v0.065` shipped: this
+paragraph originally claimed such a build "never gets far enough for
+`--narrate` to say anything" and "is a plain Python traceback"; that
+was wrong about where in the pipeline these errors fire.* Giving
+import-time errors their own bespoke narrated treatment, or a pointer,
+is still not part of this proposal -- that would be its own proposal,
+not an implicit extension of §5.
 
 ## 6. Relationship to Raeliana and Miko
 
