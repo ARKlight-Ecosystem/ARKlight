@@ -43,12 +43,14 @@ section for the version-number history).
   note for why. Rei does not import or call
   `arklight.search.engine`/`arklight.cli.search` herself; the pointer
   is a static template with substitution, not an invocation. Also not
-  in scope: `DuplicateComponentError`/`DuplicateStyleNameError`
-  (`arklight.ir.components`/`arklight.api`) from a same-name
-  `register_component`/`register_backend_render`/`Site.style(...)`
-  re-registration -- these are import-time errors, not
-  `ValidationError`s narrated by this renderer at all (see the
-  proposal's §5 scope note).
+  in scope: a bespoke pointer for `DuplicateComponentError`/
+  `DuplicateStyleNameError` (`arklight.ir.components`/`arklight.api`)
+  from a same-name `register_component`/`register_backend_render`/
+  `Site.style(...)` re-registration. These aren't `ValidationError`s,
+  so they carry no `component_name` and get no `Try: arklight search`
+  line. They *are* narrated like any other build failure -- see the
+  "Import-time registration errors" test bullet and the proposal's §5
+  scope note for why.
 - `docs/Foundational/CLI-REFERENCE.md` updated to document `--narrate`
   alongside `--verbose`/`--debug`, once actually shipped -- **not**
   before, per that file's own "implemented and shipped only" scope
@@ -81,17 +83,22 @@ section for the version-number history).
   A regression test should assert the *absence* of the pointer line
   on at least one of those other-registry failures, not just its
   presence on the schema-violation cases.
-- Import-time registration errors are untouched by this addendum:
-  a site file whose own `component(...)`/`site.style(...)` calls
-  raise `DuplicateComponentError`/`DuplicateStyleNameError` (a
-  same-name re-registration without `allow_redefine=True` -- see
-  `arklight.ir.components`/`arklight.api`) still surfaces as a plain
-  Python traceback, identically under `--narrate`, `--verbose`, and no
-  flag at all, since the failure happens before `arklight build`
-  reaches any of the narrated pipeline stages. A regression test
-  should confirm `--narrate` produces no Rei output (banner or
-  otherwise) for this case, not just that no `arklight search` pointer
-  is appended.
+- Import-time registration errors are narrated like any other build
+  failure. A site file whose own `component(...)`/`site.style(...)`
+  calls raise `DuplicateComponentError`/`DuplicateStyleNameError` (a
+  same-name re-registration without `allow_redefine=True`) fails
+  *inside* the pipeline's first ("Discovering site...") stage:
+  `arklight.parser.loader.load_site` wraps any exception raised while
+  the site file runs into `SiteLoadError` -> `CompileError`. So this
+  is an ordinary build error, not a Python traceback, in every log
+  mode. Tests pin, for both errors: exit code 1; no `Traceback` in any
+  mode; under `--narrate`, the discovery-stage line on stdout and
+  `[Rei] Compilation halted.` plus the error text on stderr, nothing
+  from any later stage, and no `arklight search` pointer; under
+  `--verbose`, only the `[ARKlight] Discovering...` stage line and no
+  `[Rei]` output. (An earlier draft of this bullet specified zero Rei
+  output and a raw traceback; that misdescribed where these errors
+  fire, and was corrected when `v0.065` shipped.)
 
 ## Explicitly not part of this addendum
 
@@ -102,8 +109,30 @@ narrator personas.
 
 ## Status
 
-**PLANNED -- not yet started.** Update this addendum and roll its
-outcome into `docs/version history/v0.065.md` (replacing the PLANNED
-marker on this section) once actually implemented, following the
-same convention `v0.061.md`-`v0.064.md` already set for their own
-stages.
+**SHIPPED.** Implemented in `arklight/compiler/rei/` plus wiring in
+`arklight/cli/main.py`, `arklight/config.py` (`rei` section) and
+`arklight/ir/validate.py` (`ValidationError.component_name`);
+`docs/Foundational/CLI-REFERENCE.md` documents `--narrate` and
+`rei.default_mode`. Covered by `tests/test_rei_narrator.py` (31 tests):
+flag parsing, config default and flag override, determinism, first-build
+banner (shown / not repeated / back after clearing the directory), the
+`arklight search` pointer (present on unknown-type and missing-required-
+prop failures, absent on a behavior-validation failure, absent outside
+`--narrate`), the no-import check against the vendored ELIZA reference,
+and import-time registration errors (narrated as ordinary build
+failures, in all three log modes). Outcome rolled into
+[`docs/version history/v0.065.md`](../version%20history/v0.065.md), per
+the convention `v0.061.md`-`v0.064.md` set.
+
+**Decision recorded at ship time -- import-time registration errors.**
+This addendum and the proposal's §5 originally specified that
+`DuplicateComponentError`/`DuplicateStyleNameError` would produce zero Rei
+output and surface as a raw Python traceback. Building it showed the
+premise was wrong: the site file runs inside the "Discovering site..."
+stage, and `load_site` converts any exception it raises into a
+`CompileError`, so these were never tracebacks. Rather than defer the
+stage line or special-case the loader (which would also have changed
+`--verbose` output), the spec was amended to the behavior the pipeline
+actually has: the failure is narrated like any other. If bespoke
+narration or a pointer for import-time errors is ever wanted, that is
+its own proposal.
