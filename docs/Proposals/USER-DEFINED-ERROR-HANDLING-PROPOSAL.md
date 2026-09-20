@@ -1,4 +1,4 @@
-# User Defined Error Handling: `errhanlib.ARKlight` and the Three-Bracket Directive
+# User Defined Error Handling: `errhanlib.ARKlight`'s `Try`
 
 ## Status
 
@@ -7,301 +7,370 @@
 that does not exist yet, may never be built as written, and could be
 rejected outright.
 
-**Requested slot: `v0.079`** (the maintainer's number). That milestone
-is already reserved in `PROGRESS.md` for `arklight assistant` Miko MVP,
-Stage A. This document does not schedule anything; if it is accepted
-at `v0.079` it would be interleaved into that slot, the same "make
-room for one more" precedent `v0.065` used for Rei and Platform API IR.
-That is a maintainer decision (open question 8).
+**Full replace of an earlier draft of this file.** That draft proposed
+a `# [{Catch What?}] [sink] [message]` three-bracket comment syntax
+attached above a function definition. It is superseded by this one
+after further design review surfaced a cleaner fit for ARKlight's
+existing conventions; its own open questions are kept here wherever
+they still apply, and its rationale otherwise lives in git history,
+not repeated. The maintainer's original stated goals all still hold
+and are carried forward unchanged: opt-in, applies to any function
+ARKlight recognises, "doesn't collide with try/catch method of
+python," and follows the `<x>lib.ARKlight` library-naming convention
+(`errhanlib`, alongside the stated future `androidlib`/`linuxlib`/
+`winlib`/`maclib`).
 
-**How to read this file.** Three labels are used throughout:
+**Requested slot: `v0.079`** (unchanged from the prior draft). That
+milestone is already reserved in `PROGRESS.md` for `arklight assistant`
+Miko MVP, Stage A. This document does not schedule anything; open
+question 8 is a maintainer decision.
 
-- **Stated** -- the maintainer said it. Recorded in "The design, as
-  stated" and in the clarification below.
-- **Proposed** -- the author's suggestion, offered so there is
+**How to read this file.** Three labels are used throughout, the same
+convention the prior draft used:
+
+- **Stated** -- came from the maintainer, either directly or carried
+  forward unchanged from the earlier draft.
+- **Proposed** -- this document's own suggestion, offered so there is
   something concrete to accept, change or kill. Nothing marked
   *Proposed* is decided.
-- **Open** -- a question only the maintainer can answer. Each one is
-  numbered in "Open questions". Question 1 blocks the rest.
+- **Open** -- a question only a maintainer can answer. Numbered in
+  "Open questions"; question 1 no longer blocks the rest the way it
+  did in the prior draft (see below), but is kept as an open question.
 
-## The design, as stated
+## Summary
 
-```python
-# include <stdlib.ARKlight>
-# include <errhanlib.ARKlight>
-
-# [{Catch What?}] [ARKlight Log] [{error message}]
-def home():
-    ...
-```
-
-Claims, reduced from the maintainer's words:
-
-1. **Opt-in.** A user chooses to print custom error logs, "in js or
-   arklight compiler."
-2. **Three brackets are the syntax.** "Three [] is a syntax for user
-   defined error handling."
-3. **Any recognised function.** It applies to any function ARKlight
-   recognises, not only site-level ones. The line goes as a special
-   comment **directly above the function it wraps**. The target is
-   implicit: it is the function beneath the comment, so no function
-   name is written. This works because ARKlight sites are a Python
-   DSL, where a comment directly above a `def` already reads as
-   belonging to it. The goal is error logs that are easy to handle.
-4. **No collision with Python.** It "doesn't collide with try catch
-   method of python." ARKlight owns this representation because it is
-   simpler, easier and aligned with ARKlight's philosophy.
-5. **Library naming.** Everything ARKlight can do today is a `stdlib`.
-   Backend-specific features get their own libs: `androidlib` and
-   `linuxlib` now, `winlib` and `maclib` when those targets exist, so a
-   site can reach cross-platform targets. `errhanlib` for error
-   handling follows that spirit.
-
-(The earlier draft of this file read the example's `Site.site(.....)`
-as a site construction and treated slot 1 as a *function name*. Claim 3
-corrects that: the function is not named at all.)
+Java's `try`/`catch`/`finally` is taken as inspiration for its
+**syntax** -- a class, `catch` clauses matched by exception-type
+inheritance, a guaranteed `finally` block -- not its **semantics**.
+Nothing a site author writes in a `catch`/`finally` body ever executes
+as code, at build time or in the browser. Instead, both bodies are
+ordinary ARKlight closed-vocabulary declarations: a plain list of
+`Action.*(...)` refs (already used by `on_click=`/`Watch(..., then=)`)
+and two new `Log.*(...)` refs this proposal adds. The compiler reads
+the class once at build time -- the same way it already reads
+`Action.increment("count")` -- and never calls back into it at error
+time, whether that error happens while compiling or later, live, in
+the browser.
 
 ## What exists today (checked against the source)
 
 - **Include labels:** `arklight/parser/preamble.py` resolves exactly
-  two: `stdlib.ARKlight` and `acc.<dotted.module>`. Any other label is
-  refused at load time with a `PreambleError`, so
-  `# include <errhanlib.ARKlight>` fails loudly today and nobody can be
-  relying on it.
-- **No platform libs yet.** There is no `androidlib`, `linuxlib`,
-  `winlib` or `maclib` anywhere in the source or docs. They are the
-  maintainer's stated direction, not shipped.
-- **Directives are a registry.** One recogniser plus one normalization
-  handler each (`_DIRECTIVE_PARSERS`, `_HANDLERS`). Today only comments
-  *above the first statement* are read (`_leading_comment_lines`).
-  A directive that sits above a function, in the middle of a file, is
-  a new place to look; it does not exist yet.
-- **Loud by construction.** Anything malformed or unresolved is recorded
-  during normalization and raised by validation, never skipped.
-- **`# use <...>` is reserved and refused**, pointing at
-  `USE-PREAMBLE-PROPOSAL.md`, precisely so nobody builds on its shape
-  before it is designed. That proposal's open questions overlap with
-  this one; see open questions 6 and 7.
-- **Functions are registered at definition time.** `@site.page(route)`
-  stores the function object in `Site.routes` the moment the decorator
-  runs, and `@component(...)` registers its render function the same
-  way. This matters for the compiler sink (section D).
+  two: `stdlib.ARKlight` and `acc.<dotted.module>`. Any other label,
+  including `errhanlib.ARKlight`, is refused at load time with a
+  `PreambleError`, so nobody can be relying on it today.
+- **No platform libs yet.** Unchanged from the prior draft: there is
+  no `androidlib`, `linuxlib`, `winlib` or `maclib` anywhere in the
+  source or docs.
+- **A real inheritance hierarchy for errors already exists -- entirely
+  internal to the compiler.** `ComponentError(RuntimeError)` ->
+  `DuplicateComponentError(ComponentError)`
+  (`arklight/ir/components.py:148,158`); `PreambleError(SyntaxError)`
+  -> `PreambleCollisionError(PreambleError)`
+  (`arklight/parser/preamble.py:191,196`). Both are caught by
+  `arklight/compiler/pipeline.py`'s `compile_site_file` and rewrapped
+  into a single `CompileError`, never a raw traceback. This proposal's
+  `catches=` is the site-author-facing version of the exact same
+  pattern -- classification by real Python exception inheritance,
+  resolved at build time -- not a new mechanism.
+- **"Declaration says what happens, compiler resolves it later" is
+  already the DSL's dominant pattern**, not something this proposal
+  invents. `Action.*(...)` (`arklight/api.py:738`) returns a small,
+  frozen `ActionRef` -- "deliberately a small structured object, not a
+  string... never becomes a JS/Python string that gets executed"
+  (`arklight/ast/nodes.py:102`) -- validated against
+  `arklight.ir.schema.ACTION_REGISTRY` at compile time.
+  `Watch(name, then=Action.set(...))` (`arklight/api.py:1189`) is the
+  closest existing precedent for this proposal's shape specifically:
+  "whenever `name` changes, run `then` -- an `Action.*(...)` reference"
+  -- trigger, closed-vocab consequence, nothing else.
+- **Class definitions carry no DSL meaning today.**
+  `parser/preamble.py`'s `_collect_binders` only records a class's
+  bound name for collision bookkeeping, the same shallow treatment
+  given to any other module-level statement. This proposal is the
+  first to give a class body compiler-recognised meaning.
 - **Runtime errors already have one funnel** (`0.06505`):
   `arkReportError(message, err)` logs to the console, calls the
-  optional `window.ARKLIGHT_ON_ERROR(message, err)`, then shows
-  `arkNotify` unless the hook returned `false`. Its messages are fixed,
-  compiler-chosen strings.
-- **Build-time messages** go through the compiler's `[ARKlight] ...` log
-  lines (`--verbose`/`--debug`); Rei's `--narrate` (shipped, `0.06510`)
-  is a second presentation of the same stages.
+  optional `window.ARKLIGHT_ON_ERROR(message, err)` hook, then shows
+  `arkNotify(message)` unless the hook returns exactly `false`.
+  Messages passed to it today are fixed, compiler-chosen strings --
+  "no site-authored text reaches `arkNotify`"
+  (`arklight/backend/js/runtime/notify.py`'s module docstring). This
+  proposal is the first to put author-chosen text on that path (see
+  design principle F below, carried from the prior draft).
+- **"The browser never executes Python" is unchanged and still the
+  wall.** (`arklight/__init__.py`; `docs/Foundational/PITCH.md:7`;
+  `docs/README.md:8`; `docs/Foundational/ARCHITECTURE.md:13`.) A
+  `Try` subclass is read only at build time. Nothing about it runs
+  live in the browser; what reaches the browser is a fixed,
+  compiler-generated lookup table, the same shape `0.06505`'s funnel
+  already uses.
 
-## The syntax
+## The design (Proposed)
 
-A concrete use, with the target implicit:
+### The base class
 
 ```python
 # include <stdlib.ARKlight>
 # include <errhanlib.ARKlight>
 
-# [{Catch What?}] [ARKlight Log] [The home page failed to build]
-@site.page("/")
-def home():
-    ...
+class HomePageFailure(Try):
+    catches = (ValueError, ComponentError)
 
-# [{Catch What?}] [JS Log] [The cart total could not be shown]
-@component()
-def cart_summary():
+    catch = [
+        Log.compiler("The home page failed to build"),
+        Log.js("Something went wrong loading this page"),
+        Action.set("status", "error"),
+    ]
+    finally_ = [
+        Action.set("loading", False),
+    ]
+
+
+@site.page("/")
+@HomePageFailure.wraps
+def home():
     ...
 ```
 
-| Slot | Written as | Reading | Status |
-| --- | --- | --- | --- |
-| 1 | `[{Catch What?}]` | What to catch. **Meaning unresolved** (open question 1). | Open |
-| 2 | `[ARKlight Log]` | A fixed keyword naming the *sink*: the ARKlight compiler's own log. | Stated |
-| 3 | `[{error message}]` | The text to print. | Stated |
+`Try` is the one name `errhanlib.ARKlight` binds -- alongside `Log`.
+(The prior draft's open question 6 asked whether an `include` that
+"binds no names" stretches the word `include`; this design makes the
+question moot, since it now binds names the same shape
+`stdlib.ARKlight` already does.)
 
-The maintainer named only the `ARKlight Log` sink, but said "in js or
-arklight compiler." `JS Log` is the author's **proposed** name for the
-JS side (open question 2). Whether the braces are literal is open
-question 3.
+A site author extends `Try` the way they'd extend any Python base
+class -- ordinary inheritance, ordinary class-body attributes.
+Nothing in the class body is arbitrary code from ARKlight's point of
+view: `catch` and `finally_` are plain list literals of
+`Action.*(...)`/`Log.*(...)` refs, checked against closed registries
+the same way `Action` already is.
 
-## Design sketch (Proposed)
+### `catches`: real exception types, matched by inheritance
 
-**A. The include is the switch.** `# include <errhanlib.ARKlight>`
-turns on the three-bracket recogniser for that file. Without it, a
-line like `# [a] [b] [c]` is an ordinary comment, so the opt-in is
-structural and existing files cannot be affected. It would be the first
-include that binds *no vocabulary names*; it activates a directive
-family instead (relevant to `USE-PREAMBLE-PROPOSAL.md` Q1).
+`catches` is a tuple of real Python exception types -- built-ins
+(`ValueError`, `KeyError`, ...) or ARKlight's own compiler-raised
+types (`ComponentError`, `ValidationError`). Matching uses ordinary
+`issubclass` semantics: a handler with `catches = (ComponentError,)`
+also catches `DuplicateComponentError`, the same behavior Java's own
+catch clauses have, because it's just Python's type system -- nothing
+ARKlight invents. This directly answers the prior draft's **open
+question 1** ("what does slot 1 mean") in favor of its reading (a),
+exception-type filtering, without needing a bracket-comment grammar
+or an escaping rule to express it.
 
-**B. Placement and attachment.** In an activated file, a three-bracket
-comment attaches to the function definition whose **first line is the
-very next line**. No blank line and no other statement may sit between
-them. Consecutive directive comments above one function all attach to
-it. Comments are read with `tokenize`, because `ast` discards them.
-When the function has decorators, the function's first line is its
-topmost decorator, so the directive goes above `@site.page(...)` or
-`@component(...)`, as in the example. (Open question 5: confirm this
-placement.)
+### `finally_`, not `finally`
 
-**C. Attachment errors are loud.** In an activated file, each of the
-following raises and names the line. A typo must not become a handler
-that never fires.
-- A three-bracket comment that is not directly above a function.
-- A line that looks like three brackets but is malformed (two groups,
-  an empty slot, an unknown sink).
-- A directive above a function ARKlight does not recognise (open
-  question 4 decides which functions count).
+Python reserves `finally` as a keyword; a class attribute cannot be
+named `finally`. This draft uses `finally_` (a trailing underscore,
+the same convention the standard library itself uses for keyword
+collisions, e.g. `type_`). Whether a trailing underscore is acceptable
+ARKlight authoring style, or this should be a different word entirely
+(`always`, `ensure`, `cleanup`), is **open question 2**.
 
-**D. Compiler sink.** Because the target is the function directly
-beneath the comment, ARKlight can wrap it *where it is defined*. The
-sketch: the compiler inserts an internal wrapper as the innermost
-decorator of that `def` (directly below any user decorators), which
-calls the original and, if it raises, prints the author's message
-through the compiler's log channel and **re-raises the original
-exception**. Doing it at definition time is not optional. `@site.page`
-and `@component` store the function they are handed at the moment they
-run, so swapping a name in the module after the file has executed would
-leave the registry holding the unwrapped original and the handler would
-never fire. A wrapper rather than a source rewrite means line numbers
-stay true and the author writes no `try`/`except`. Nested functions and
-methods are covered whenever they are recognised (open question 4).
+### Applying it: an explicit decorator, not an implicit comment attachment
 
-**E. JS sink.** This is the hard half. The generated JS is closed
-vocabulary and has no idea which site function produced a node. The
-sketch: when at least one `[JS Log]` line exists, the compiler stamps
-the nodes produced under that function with a compact id attribute and
-bakes a fixed id-to-message table into the output. The `0.06505` guards
-already hold the failing `el`/`container` in hand, so on failure they
-find the nearest stamped ancestor and pass *the author's message* to
-`arkReportError` instead of the generic one. `ARKLIGHT_ON_ERROR` still
-receives it and `false` still suppresses the notice. With no `[JS Log]`
-line, no attribute, table or lookup code is emitted.
+```python
+@site.page("/")
+@HomePageFailure.wraps
+def home():
+    ...
+```
 
-The catch: some runtime failures are not tied to an element. A
-`Computed(...)` recompute or a `Watch(...)` effect is per state name, so
-attributing it means the compiler must also stamp State/Computed/Watch
-declarations with the function that produced them. That is new IR
-provenance and is the real cost of this feature (open question 9).
+`Try.wraps` is a classmethod returning a decorator, applied as the
+innermost decorator (directly above `def`, below `@site.page(...)`/
+`@component(...)`), matching the prior draft's design sketch item D
+for *why* it must sit there: `@site.page`/`@component` store the
+function object the moment their own decorator runs, so wrapping must
+happen before that capture or the registry would hold the unwrapped
+original.
 
-**F. Author text reaches the runtime.** `RUNTIME-ERROR-HANDLING-PROPOSAL.md`
-section 4 deliberately kept site-authored strings out of `arkNotify`.
-This proposal reverses that on purpose, so it should be decided openly.
-The text comes from the site author's own source, not from visitors, and
-`arkNotify` uses `textContent`; the table would be JSON-encoded, with no
-inline script. It still stays a literal: no expressions and no code.
+Unlike the prior draft, the target function is **explicit** --
+ordinary Python decorator application, not a comment inferred to
+belong to "the next line." That removes the prior draft's entire
+placement-and-attachment machinery: no `tokenize`-based comment
+reading, no "no blank line between them" rule, no distinct error case
+for a directive sitting somewhere it can't attach to (prior draft
+section B/C). It also means one `Try` subclass can be applied to
+several functions (`@HomePageFailure.wraps` on more than one page),
+which the comment-per-function design couldn't express without
+repeating the whole class.
 
-**G. Log, don't swallow.** A handler adds a message; it never turns a
-failure into success. A build with a caught error still fails; the JS
-guards still keep the rest of the page running exactly as they do now.
-Anything that recovers or retries is a different feature (out of scope).
+### Two sinks, routed by which ref appears
 
-**H. Nested calls.** If a wrapped function calls another wrapped
-function and the inner one raises, each wrapper that sees the exception
-prints its own message, innermost first, then the original exception
-propagates unchanged. (Open question 10: confirm, or print only the
-innermost.)
+- **`Log.compiler(message)`** -- build-time only. When the wrapped
+  function raises while the compiler is running it (a `ComponentError`
+  during expansion, for instance), the compiler prints `message`
+  through its own `[ARKlight] ...` log channel (or `--narrate`'s
+  prose, open question 7) and **re-raises the original exception** --
+  matching the prior draft's principle G, "log, don't swallow": a
+  build with a caught error still fails the build.
+- **`Log.js(message)`** -- runtime only. `@site.page`/`@component`
+  functions run at build time to produce IR; what can fail *live* in
+  the browser is the compiled JS behind that function's own
+  `State`/`Computed`/`Watch`/`bind_value` declarations, through the
+  existing `0.06505` guards. The compiler sketch, carried over from
+  the prior draft's section E: nodes produced under a `wraps`-covered
+  function get a compact id attribute, and a fixed id-to-message table
+  ships in the output; on failure the existing guards find the nearest
+  stamped ancestor and pass `message` to `arkReportError` instead of
+  its generic string. With no `Log.js(...)` present, no attribute,
+  table or lookup code is emitted -- unchanged "only ship what's used"
+  discipline.
+- **`Action.*(...)` inside `catch`/`finally_`** -- runtime only, for
+  the same reason `Log.js` is: `Action.set(...)` mutates a live
+  browser `State` store that doesn't exist while the compiler is
+  running. An `Action.*(...)` entry compiles into the same JS
+  `catch`/`finally` block `Log.js` stamps in; a `Log.compiler(...)`
+  entry contributes nothing to that block.
+
+Whether a `Log.compiler(...)`-only handler is even allowed to omit
+`Log.js`/`Action.*` entirely (a purely build-time handler, no runtime
+footprint at all) is **Proposed: yes**, and is the expected common
+case for build-only functions.
+
+## Design sketch (Proposed) -- compiler mechanics
+
+Carried forward from the prior draft's section D/E, adapted for the
+new syntax:
+
+- **Build-time wrapping.** `Try.wraps` inserts the same kind of
+  internal wrapper the prior draft sketched -- calls the original
+  function, and on a caught exception type runs the `catch` list's
+  `Log.compiler(...)` entries (if any) through the compiler's log
+  channel before re-raising. Doing it via an explicit decorator (not a
+  source rewrite or a comment-triggered insertion) means line numbers
+  stay true and there's no separate "where does this attach" logic to
+  validate.
+- **JS-sink stamping.** Unchanged in substance from the prior draft's
+  section E: id-stamped nodes, a fixed id-to-message table, the
+  existing `0.06505` guards doing the lookup. The harder case flagged
+  there is unchanged too: a `Computed(...)`/`Watch(...)` failure is
+  per state name, not per element, so attributing it to a `wraps`-ed
+  function means stamping `State`/`Computed`/`Watch` declarations with
+  their owning function -- new IR provenance, and the real cost of
+  this feature (open question 9, carried over).
+- **`finally_` in the generated JS.** Compiles to an actual JS
+  `finally` block wrapping the stamped operation, running each
+  `Action.*(...)` entry unconditionally -- the literal Java-shaped
+  guarantee, expressed as closed-vocab dispatch calls, never arbitrary
+  code.
+- **Nested calls.** Because application is now an explicit decorator
+  rather than implicit attachment, this is no longer a special rule
+  ARKlight must define (the prior draft's open question 10): if a
+  `wraps`-ed function calls another `wraps`-ed function, ordinary
+  Python call-stack behavior already decides who sees what, the same
+  as any two decorated functions calling each other. Confirmation that
+  this reasoning is sufficient is open question 5.
 
 ## Philosophy fit
 
 Checked against `docs/README.md`'s philosophy list and
-`SYSTEM-DESIGN-AGREEMENTS.md` (sections 1, 8, 16):
+`SYSTEM-DESIGN-AGREEMENTS.md`:
 
-- **Fail loudly at build time.** Misplaced or malformed directives
-  raise; handlers do not suppress errors.
-- **Compiler first, runtime last.** The compiler sink is pure compiler.
-  For JS the compiler decides which nodes, which messages and whether
-  anything ships at all; the runtime only looks a string up.
-- **No eval, no `new Function`.** The message is a literal, never
-  evaluated.
-- **Only ship what's used / zero drift when opted out.** No `errhanlib`
-  include means no change to output. No `[JS Log]` line means no
-  attribute, table or lookup code.
-- **Not a second untrusted layer.** No arbitrary developer JS or Python
-  runs in a handler; there is nothing to run, only text to print.
-- **Not a reimplementation of `try`/`except`.** The directive is a
-  comment; Python's exception semantics are untouched, which is what
-  "doesn't collide" means here.
+- **Fail loudly at build time.** A malformed `catches` (not exception
+  types), an unrecognised entry in `catch`/`finally_` (not an
+  `Action.*`/`Log.*` ref), or `wraps` applied to a function ARKlight
+  doesn't recognise all raise at build time, named to the line.
+- **Compiler first, runtime last.** The compiler decides which nodes,
+  which messages, and whether anything ships at all; the browser only
+  ever looks a fixed id up in a fixed table.
+- **No eval, no `new Function`.** `catch`/`finally_` are literal list
+  attributes read once at build time -- never a method the compiler
+  calls back into, never code executed at error time, at build time
+  or in the browser.
+- **Only ship what's used / zero drift when opted out.** No
+  `errhanlib` include means no `Try` name and no change to output. A
+  handler with no `Log.js`/`Action.*` entries emits no JS attribute,
+  table or lookup code at all.
+- **Not a second untrusted layer.** There is nothing to run inside a
+  handler, only a closed list of refs to read -- the same trust
+  boundary `Action`/`Watch` already have, extended to a class body
+  instead of a function call's keyword arguments.
+- **Not a reimplementation of `try`/`except`.** `Try` does not
+  subclass `Exception`; it is never raised or caught by Python's own
+  exception machinery. It is introspected once at build time, the
+  same relationship `Action` already has to `on_click=`. Real Python
+  `try`/`except` written elsewhere in the site file (the loader
+  genuinely executes ARKlight source as Python) is untouched and
+  orthogonal -- this is what "doesn't collide" means here, unchanged
+  from the prior draft's claim 4.
 
 ## Open questions
 
-1. **What is slot 1, `[{Catch What?}]`, now that the function is
-   implicit?** The function is no longer named, so this slot must mean
-   something else. Two readings: (a) **which error to catch**, e.g. an
-   exception type such as `ValueError`, with some keyword for "any";
-   (b) **dropped**, leaving `[sink] [message]`, which contradicts "three
-   brackets." This document currently lists exception-type filtering as
-   out of scope, which only holds under a reading that is not (a). This
-   blocks everything below; nothing should be built before it is
-   answered.
-2. **Which sinks, and what are they called?** `ARKlight Log` is given;
-   `JS Log` is the author's guess, and "ARKlight Log" is ambiguous when
-   ARKlight also emits the JS (`Compiler Log`/`Build Log` would pair
-   more clearly with `JS Log`). Are there levels (warn vs error), or
-   more sinks later?
-3. **Are the braces literal, and can the message interpolate?**
-   `{Catch What?}` reads like a placeholder, but if a message can also
-   carry the error text or function name (`{error}`, `{function}`), the
-   same braces would mean two things. Also unspecified: how a message
-   contains a literal `]`, for example `[Failed on items[0]]`. Pick one
-   notation and an escape rule before anything is built.
-4. **What counts as "a function ARKlight recognises"?** Page functions
-   (`@site.page`) and `@component`s clearly. Plain helpers like `nav()`?
-   Nested functions and methods? A component that is defined but never
-   used never runs; is a handler on it an error? A directive above an
-   unrecognised function raises (section C); the set needs a definition.
-5. **Placement with decorators.** Section B puts the directive above the
-   topmost decorator. Confirm, or specify between-decorator-and-`def`.
-   Either way, the other placement should be an error, not a silent
-   second meaning.
-6. **Is this an `include` or a `use`?** An include that binds no names
-   stretches the word. Related: `errhanlib.ARKlight` follows
-   `stdlib.ARKlight`'s `<x>.ARKlight` shape, but nothing resolves such a
-   label besides the built-in stdlib today. Built into the `arklight`
-   package, or resolved some other way? (And it is spelled `errhanlib`
-   throughout the maintainer's message; kept as written, but if
-   `errhandlib` was meant, the label changes by a letter.)
-7. **Do `androidlib`/`linuxlib`/`winlib`/`maclib` belong here?** This
-   proposal only borrows their naming. A documented `<x>lib.ARKlight`
-   label family, and how backend-specific libs relate to
-   `PlatformAPI` and `check_backend_support`
-   (`docs/Foundational/PLATFORM-APIS.md`), is bigger than error handling
-   and probably wants its own proposal.
-8. **The version slot, and one release or two.** `v0.079` is held by
-   Miko Stage A. Interleave (as Rei was into `v0.065`), or take another
-   slot? The compiler sink is small; the JS sink needs new IR
-   provenance. Should they ship separately, compiler sink first?
-9. **JS attribution granularity.** Elements only, or also State,
-   Computed and Watch? The second is more useful and a much larger IR
-   change.
-10. **Nested and duplicate handlers.** Section H proposes that every
-    wrapper in the call chain prints. Confirm or change. Separately:
-    two directives for the same function and sink: refuse, allow both,
-    or must they agree, as duplicate `# define`s must?
-11. **Does Rei narrate it?** Should `--narrate` mention a handler's
-    message when it fires, and does Project Knowledge's diagnostics
-    integration (`v0.076`) record it?
+1. ~~What is slot 1?~~ Resolved by this redesign: `catches` is a
+   tuple of real exception types, matched by `issubclass`. Kept here,
+   renumbered, only to record that it is no longer blocking.
+2. **`finally_`'s naming collision with the `finally` keyword.**
+   Trailing underscore, or a different word (`always`/`ensure`/
+   `cleanup`)?
+3. **Can a site define its own exception types purely for `catches=`
+   grouping?** A marker subclass with no body/behavior (since nothing
+   about it ever executes) would let a site group several build-time
+   failure kinds under one handler without reaching for unrelated
+   built-ins. If yes, does ARKlight need to recognise "an empty
+   exception subclass" as its own small closed shape, or is any
+   subclass of `Exception` accepted as-is since nothing in it ever
+   runs?
+4. **Can more than one `Try` subclass wrap the same function?**
+   Stacked `@wraps` decorators, first match wins, or refused as
+   ambiguous the same way duplicate `# define`s are refused?
+5. **Nested calls.** Confirm that ordinary Python call-stack behavior
+   (see design sketch above) is sufficient, or does a `wraps`-ed
+   function calling another need an explicit rule after all?
+6. **Where can a `Try` subclass live?** Must it be declared in the
+   same file as the function(s) it wraps, or can one be defined once
+   and imported/reused across files as a shared "standard failure
+   handler"?
+7. **Does Rei narrate a `catch`/`finally_` firing?** Does Project
+   Knowledge's diagnostics integration (`v0.076`) record it? (Carried
+   from the prior draft's open question 11.)
+8. **The version slot, and one release or two.** Unchanged from the
+   prior draft: `v0.079` is held by Miko Stage A. Interleave, or take
+   another slot? Compiler-sink-only support is small; the JS sink
+   needs new IR provenance (question 9) and could ship separately.
+9. **JS attribution granularity.** Elements only, or also `State`,
+   `Computed` and `Watch`? The second is more useful and a much larger
+   IR change. (Carried from the prior draft's open question 9.)
+10. **Do `androidlib`/`linuxlib`/`winlib`/`maclib` belong in this
+    document at all?** This proposal only borrows their naming
+    convention for `errhanlib`. (Carried from the prior draft's open
+    question 7.)
 
 ## Explicitly out of scope
 
-- Recovering from, retrying or swallowing an error.
-- New exception classes, or any `try`/`except`-like syntax.
+- Recovering the *build* from a build-time exception; a caught
+  build-time exception still fails the build.
+- Arbitrary code inside `catch`/`finally_` bodies, or a handler that
+  receives the actual exception object to inspect or format at error
+  time. If that's wanted later, it is a new proposal, not folded in
+  here -- it would reopen "the browser never executes Python" for the
+  JS sink and "no eval" for the compiler sink.
+- A `catch`/`finally_` entry that isn't a recognised `Action.*(...)`/
+  `Log.*(...)` ref -- no expressions, no string formatting beyond what
+  `Log.*(...)`'s own argument accepts as a literal.
 - Remote reporting or analytics; `window.ARKLIGHT_ON_ERROR` (`0.06505`)
-  remains the seam for that.
-- Designing the platform libs themselves.
-
-(Filtering by exception type was listed here in an earlier draft. It is
-removed from this list because open question 1 may make it the meaning
-of slot 1.)
+  remains the seam for that, unchanged.
+- Designing the platform libs themselves (open question 10).
 
 ## Relationship to other work
 
 - **`0.06505` / `RUNTIME-ERROR-HANDLING-PROPOSAL.md`:** the JS sink is
-  a customization of that funnel, not a new mechanism.
-- **`USE-PREAMBLE-PROPOSAL.md`:** shares the label-grammar and
-  include-vs-use questions; whichever settles first constrains the
-  other.
+  a customization of that funnel, not a new mechanism -- unchanged
+  from the prior draft.
+- **`ir/components.py`'s `ComponentError`/`DuplicateComponentError`,
+  `parser/preamble.py`'s `PreambleError`/`PreambleCollisionError`:**
+  the existing, compiler-internal precedent for `catches=`'s
+  inheritance-based matching. New to this redesign.
+- **`arklight/api.py`'s `Action`/`Watch`:** the existing precedent for
+  "closed-vocab declaration, resolved once at build time, never
+  executed as code" that `catch`/`finally_` extend into a class body.
+  New to this redesign.
+- **`USE-PREAMBLE-PROPOSAL.md`:** shared label-grammar and
+  include-vs-use questions from the prior draft no longer apply in the
+  same way, since `errhanlib.ARKlight` now binds names (`Try`, `Log`)
+  the ordinary way `stdlib.ARKlight` does.
 - **`REI-COMPILER-NARRATOR-PROPOSAL.md`, `PROJECT-KNOWELEDGE-PROPOSAL.md`:**
-  possible consumers of a handler's messages (question 11).
-- **`PLATFORM-API-IR-PROPOSAL.md`:** the backend-specific-libs direction
-  overlaps it (question 7).
+  possible consumers of a handler's messages (open question 7).
+- **`PLATFORM-API-IR-PROPOSAL.md`:** the backend-specific-libs
+  direction overlaps `errhanlib`'s naming convention (open question
+  10).
