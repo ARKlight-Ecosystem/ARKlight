@@ -52,6 +52,7 @@ from arklight.backend.html.routing import _relative_asset_path
 from arklight.backend.html.tag_map import VOID_TAGS, _tag_for
 from arklight.backend.js.render import SCRIPT_PATH
 from arklight.ir.build import IRNode, IRPage
+from arklight.ir.js_string import from_units
 
 
 _LONE_SURROGATE = re.compile("[\ud800-\udfff]")
@@ -82,9 +83,12 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
     # `v0.065`: `Derive.char_at`/`slice_string` can cut an emoji in half,
     # leaving a lone surrogate -- legal in a JavaScript string, but it
     # can't be written out as UTF-8. The browser draws such a character
-    # as U+FFFD, so pre-fill that.
+    # as U+FFFD, so pre-fill that. Python never merges adjacent surrogate
+    # characters, but JavaScript does (`Derive.join` of a `char_at(0)` and
+    # a `char_at(1)` of an emoji is the emoji again), so recombine valid
+    # pairs first and only blank what is genuinely lone.
     if isinstance(value, str):
-        value = _LONE_SURROGATE.sub("\ufffd", value)
+        value = _LONE_SURROGATE.sub("\ufffd", from_units(value))
     return f'<span data-ark-bind="{escape(str(name), quote=True)}">{escape(str(value))}</span>'
 
 
