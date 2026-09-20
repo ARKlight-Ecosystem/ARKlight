@@ -51,6 +51,9 @@ stage 5/10 (`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`).
   `true`/`false` (already true of `Derive.compare`); and a lone surrogate
   (from `char_at`/`slice_string` cutting an emoji) would have crashed the
   UTF-8 write, so it is pre-filled as `U+FFFD`, which is how a browser draws it.
+  Adjacent high/low halves are recombined first (`from_units`), since a client
+  `join` of `char_at(0)` and `char_at(1)` is the emoji again and only genuinely
+  lone halves become `U+FFFD`.
 - **Behavior limits, documented not hidden.** `title_case` and `capitalize`
   uppercase only the first code unit and leave the rest as written (there is
   no `lowercase` in the catalog). `reverse_string` is by code point, not
@@ -64,7 +67,15 @@ stage 5/10 (`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`).
   still use Python's `str()`/`str.strip()` (so `trim` of `"\ufeffx"` differs
   from the browser's), and integer-valued floats still pre-fill as `8.0`
   where the client writes `8` (already noted under `[0.06509]`; existing
-  tests pin the `.0`). Neither is changed here.
+  tests pin the `.0`). Neither is changed here. Also unchanged, and found
+  by comparing against the shipped fragments in Node: `join`/`format` still
+  build-time-render with `str()`, so a boolean, `None` or integral float input
+  pre-renders as `True`/`None`/`5.0` where the client writes `true`/nothing
+  (`Array.join` turns `null` into `""`)/`5` -- which the new boolean kinds make
+  easier to hit (`Derive.format("{v}", v=<is_empty result>)`); `count` of a
+  string counts code points where the client counts UTF-16 units; and
+  `Bind(...)` of a plain `None`/list/dict `State(...)` pre-fills `None`/`[1, 2]`/
+  `{}` where the client writes `null`/`1,2`/`[object Object]`.
 
 `tests/test_js_vocabulary_v0065.py` (231 tests, Node sweep of ~16,000
 generated cases through the shipped fragments and the build-time mirror --

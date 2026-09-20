@@ -422,6 +422,24 @@ def test_html_prefill_of_a_lone_surrogate_does_not_crash_the_utf8_write():
     html.encode("utf-8")  # must not raise
 
 
+def test_html_prefill_keeps_surrogate_halves_that_a_join_puts_back_together():
+    # `char_at(0)` + `char_at(1)` of an emoji are two lone halves, but the
+    # client's `join` recombines them into the emoji, so the pre-fill must too.
+    tree = Page(
+        State("s", "😀"),
+        Computed("hi", deps=("s",), derive=Derive.char_at("s", 0)),
+        Computed("lo", deps=("s",), derive=Derive.char_at("s", 1)),
+        Computed("both", deps=("hi", "lo"), derive=Derive.join("hi", "lo", sep="")),
+        Computed("swapped", deps=("hi", "lo"), derive=Derive.join("lo", "hi", sep="")),
+        Text(Bind("both")), Text(Bind("swapped")),
+    )
+    html = HTMLBackend().render(_ir({"/": tree}))["index.html"]
+    assert 'data-ark-bind="both">😀<' in html
+    # Reversed, low half first: still two lone halves in JavaScript too.
+    assert 'data-ark-bind="swapped">\ufffd\ufffd<' in html
+    html.encode("utf-8")  # must not raise
+
+
 def test_html_prefill_of_a_new_derivation_and_a_boolean_show_guard():
     tree = Page(
         State("q", ""),
