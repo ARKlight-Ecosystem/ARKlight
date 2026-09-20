@@ -173,7 +173,25 @@ _LEGAL_QUERY_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
 
 
 class ValidationError(Exception):
-    """Raised when an ARK AST tree fails validation."""
+    """Raised when an ARK AST tree fails validation.
+
+    `component_name`, when set, names the literal `node.type` that a
+    SCHEMA-backed check failed against -- either an unrecognized
+    component type or a known type with a missing required prop. It is
+    set *only* at those SCHEMA-lookup sites (`--narrate`'s Rei renderer
+    uses its presence, not any parsing of `str(self)`, to decide
+    whether to append the `arklight search <name>` pointer -- see
+    `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md` §5). Every other
+    `ValidationError` in this module (Bind/on_click/modifier/behavior
+    checks, etc.) leaves this `None`, which is exactly how Rei knows
+    *not* to print a pointer for those -- structured data reaching the
+    renderer, rather than regex-scraping the formatted message back
+    apart.
+    """
+
+    def __init__(self, message: str, *, component_name: str | None = None) -> None:
+        super().__init__(message)
+        self.component_name = component_name
 
 
 def _validate_bind(node: ARKNode, *, path: str, page_state: frozenset[str]) -> None:
@@ -915,12 +933,14 @@ def _validate_repeat_template(
         known = ", ".join(sorted(SCHEMA))
         raise ValidationError(
             f"Unknown component type {node.type!r} at {path} (inside a "
-            f"Repeat(...) template). Known component types are: {known}."
+            f"Repeat(...) template). Known component types are: {known}.",
+            component_name=node.type,
         )
     for prop_name in spec.required_props:
         if prop_name not in node.props:
             raise ValidationError(
-                f"{node.type!r} at {path} is missing required prop {prop_name!r}."
+                f"{node.type!r} at {path} is missing required prop {prop_name!r}.",
+                component_name=node.type,
             )
     on_click = node.props.get("on_click")
     if isinstance(on_click, ActionRef):
@@ -1039,13 +1059,15 @@ def validate_node(
         known = ", ".join(sorted(SCHEMA))
         raise ValidationError(
             f"Unknown component type {node.type!r} at {path}. "
-            f"Known component types are: {known}."
+            f"Known component types are: {known}.",
+            component_name=node.type,
         )
 
     for prop_name in spec.required_props:
         if prop_name not in node.props:
             raise ValidationError(
-                f"{node.type!r} at {path} is missing required prop {prop_name!r}."
+                f"{node.type!r} at {path} is missing required prop {prop_name!r}.",
+                component_name=node.type,
             )
 
     _validate_behavior_props(node, path=path, mutable_state=mutable_state, page_state=page_state)

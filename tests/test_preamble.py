@@ -400,9 +400,9 @@ def test_star_import_notice_reaches_the_build_log(tmp_path):
 
 def test_star_import_notice_prints_without_verbose(capsys):
     """The CLI shows any message starting with the warning glyph
-    regardless of --verbose; the notice must qualify."""
+    regardless of log mode; the notice must qualify."""
     from arklight.cli.main import _stage_logger
     from arklight.parser.preamble import retired_star_import_notice
 
-    _stage_logger(retired_star_import_notice("site.py", 1), verbose=False)
+    _stage_logger(retired_star_import_notice("site.py", 1), mode="plain")
     assert "retired" in capsys.readouterr().out

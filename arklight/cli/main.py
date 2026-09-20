@@ -40,9 +40,11 @@ from arklight.cli.scaffold import ScaffoldError, new_project
 from arklight.cli.search import record_acceptance, resolve_exact, search_component
 from arklight.cli.templates import TEMPLATES
 from arklight.cli.upgrade import upgrade_to_alpha
+from arklight.compiler import rei
 from arklight.compiler.pipeline import BuildResult, CompileError, build
 from arklight.config import ConfigError, load_config, section
 from arklight.ir import binary as binary_ir
+from arklight.ir.validate import ValidationError
 from arklight.packer.bundle import PackError, pack, unpack
 from arklight.pwa import PWAError, enable_pwa
 from arklight.search.endpoint import serve_stdio
@@ -146,26 +148,35 @@ def open_in_browser(result: BuildResult, output_dir: str | Path) -> bool:
     return True
 
 
-def _stage_logger(message: str, *, verbose: bool) -> None:
+def _stage_logger(message: str, *, mode: str) -> None:
     """`on_stage` callback for `build()` -- prints each pipeline stage
     as it starts, prefixed like the rest of ARKlight's CLI output.
+    `mode` is one of `arklight.compiler.rei.LOG_MODES`
+    (`"plain"`/`"verbose"`/`"narrate"`) -- `arklight.compiler.rei`'s
+    closed vocabulary, since both the CLI and that renderer need to
+    agree on it.
 
     Two different things flow through this one callback:
       - plain pipeline narration ("Running validation...", etc.) --
-        only printed when `verbose` (`--verbose`/`--debug`) is set,
-        same as before.
+        printed as a `[ARKlight] ...` line when `mode == "verbose"`
+        (`--verbose`/`--debug`), or as one of Rei's narrated sentences
+        when `mode == "narrate"`; nothing prints in `"plain"` mode,
+        same as before `--narrate` existed.
       - an inline experimental-API banner (see
         `arklight.experimental.format_inline_banner`; always starts
-        with the warning glyph) -- printed unconditionally, per
-        docs/EXPERIMENTAL-APIS.md's CLI contract ("neither surface is
-        gated behind --verbose/--debug"): an experimental-feature
-        warning isn't narration, it's the entire point of gating the
-        feature, so it always prints regardless of verbosity.
+        with the warning glyph) -- printed unconditionally in every
+        mode, per docs/EXPERIMENTAL-APIS.md's CLI contract ("neither
+        surface is gated behind --verbose/--debug"): an experimental-
+        feature warning isn't narration, it's the entire point of
+        gating the feature, so it always prints regardless of log
+        mode, and Rei never narrates it (`rei.is_unconditional_banner`).
     """
-    if message.startswith("\u26a0"):
+    if rei.is_unconditional_banner(message):
         print(message)
-    elif verbose:
+    elif mode == "verbose":
         print(f"{_STAGE_PREFIX} {message}")
+    elif mode == "narrate":
+        print(rei.narrate_stage(message))
 
 
 # v0.0431 emergency patch: marker prefix `arklight.backend.html.render`
@@ -212,11 +223,39 @@ def _cmd_build(args: argparse.Namespace) -> int:
     # with the stage-by-stage narration already on screen above the
     # traceback, so there's no reason to ask for both separately.
     verbose = args.verbose or args.debug
-    # Always wired up now, not just when verbose -- `_stage_logger`
-    # itself decides what to actually print (see its docstring): plain
-    # stage narration stays gated behind `verbose`, but an experimental-
-    # API inline banner always gets through regardless.
-    on_stage = functools.partial(_stage_logger, verbose=verbose)
+
+    # `--narrate` is mutually exclusive with `--verbose`/`--debug` --
+    # at most one log mode wins per invocation (proposal §1), the same
+    # "last flag wins, no silent stacking" rule `--open`/`--no-open`
+    # already follows. Checked here (rather than an argparse mutually
+    # exclusive group) because `--debug` implying `--verbose` isn't
+    # itself a flag conflict -- only `--narrate` alongside either of
+    # the other two is.
+    if args.narrate and verbose:
+        conflicting = "--debug" if args.debug else "--verbose"
+        print(
+            f"ARKlight build failed: --narrate can't be combined with "
+            f"{conflicting} -- pick one log mode per build.",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Project config's `rei.default_mode` only matters when *no*
+    # `--verbose`/`--debug`/`--narrate` flag was passed at all -- a
+    # flag on this invocation always wins over the project's pinned
+    # default (proposal §2). Resolved after the config load below,
+    # once `project_config` exists; `mode_source` records *why* this
+    # build ended up in the mode it did, purely for Rei's first-compile
+    # introduction banner (§3).
+    if args.narrate:
+        mode = "narrate"
+        mode_source = "--narrate flag"
+    elif verbose:
+        mode = "verbose"
+        mode_source = "--verbose/--debug flag"
+    else:
+        mode = None  # resolved from config below
+        mode_source = "arklight.config.py"
 
     # --max-width/--bg let the *build invocation* set a design token
     # without touching the site file's Site(...) call -- e.g. CI
@@ -267,6 +306,35 @@ def _cmd_build(args: argparse.Namespace) -> int:
         )
         return 1
 
+    # `rei.default_mode` (proposal §2) only resolves `mode` when no
+    # `--verbose`/`--debug`/`--narrate` flag was passed above -- a flag
+    # always wins over the project's pinned default.
+    if mode is None:
+        rei_cfg = section(project_config, "rei", {"default_mode": "plain"})
+        default_mode = rei_cfg["default_mode"]
+        if default_mode not in rei.LOG_MODES:
+            print(
+                f"ARKlight build failed: `CONFIG['rei']['default_mode']` must "
+                f"be one of {rei.LOG_MODES!r}, got {default_mode!r}.",
+                file=sys.stderr,
+            )
+            return 1
+        mode = default_mode
+
+    # Always wired up now, not just when a log mode is active --
+    # `_stage_logger` itself decides what to actually print (see its
+    # docstring): plain stage narration stays gated behind `mode`, but
+    # an experimental-API inline banner always gets through regardless.
+    on_stage = functools.partial(_stage_logger, mode=mode)
+
+    # Rei's one-time-per-fresh-output-directory introduction (proposal
+    # §3): only when narration is actually active for this build, and
+    # only the first time into a missing-or-empty output directory --
+    # checked *before* `build()` runs, since `build()` itself creates
+    # the directory as part of writing output.
+    if mode == "narrate" and rei.is_fresh_output_dir(args.output):
+        print(rei.introduction(mode_source=mode_source, resolved_mode=mode))
+
     try:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -288,6 +356,22 @@ def _cmd_build(args: argparse.Namespace) -> int:
             # which pipeline stage wrapped it.
             print(f"{_STAGE_PREFIX} Build failed -- full trace (--debug):", file=sys.stderr)
             traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+        elif mode == "narrate":
+            # Proposal §5: the `arklight search <name>` pointer only
+            # ever comes from `ValidationError.component_name` --
+            # structured data threaded through `CompileError.__cause__`
+            # -- never from re-parsing `str(exc)`. `__cause__` is only
+            # a `ValidationError` when *that* stage is what failed
+            # (`compile_site_file`'s `except ValidationError as exc:
+            # raise CompileError(...) from exc`); any other failing
+            # stage (site load, component expansion, IR build, a
+            # backend, ...) leaves `component_name` unset, same as any
+            # other `ValidationError` that isn't schema-backed.
+            cause = exc.__cause__
+            component_name = (
+                cause.component_name if isinstance(cause, ValidationError) else None
+            )
+            print(rei.render_failure(str(exc), component_name=component_name), file=sys.stderr)
         else:
             print(f"ARKlight build failed: {exc}", file=sys.stderr)
             print("Re-run with --debug for the full traceback.", file=sys.stderr)
@@ -810,6 +894,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Like --verbose, plus print the full chained traceback (instead of "
         "a short message) if the build fails -- for tracing a compiler "
         "error back to the exact stage and Python frame that raised it.",
+    )
+    build_parser.add_argument(
+        "--narrate",
+        action="store_true",
+        default=False,
+        help="Like --verbose, but narrated in short natural-language sentences "
+        "by Rei, ARKlight's compiler narrator, instead of '[ARKlight] ...' "
+        "stage lines. Mutually exclusive with --verbose/--debug. A "
+        "project can pin this as its default via arklight.config.py's "
+        "CONFIG = {'rei': {'default_mode': 'narrate'}} instead of "
+        "passing the flag every time -- see "
+        "docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md.",
     )
     build_parser.add_argument(
         "--max-width",
