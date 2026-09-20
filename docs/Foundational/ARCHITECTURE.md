@@ -177,8 +177,6 @@ Current:
 - JavaScript (`arklight/backend/js/`)
 
 Future:
-- Vue
-- Svelte
 - Android (`arklight android` -- packaging backend, not a template/
   codegen backend like Vue/Svelte: wraps an existing `build-dir` into
   a native Android project via `androidx.webkit.WebViewAssetLoader`,
@@ -236,65 +234,6 @@ here rather than keeping their own copies. Status: DONE / PLANNED.
 | v0.080   | Android backend -- `arklight android` packages a `build-dir` into a native Android project via `androidx.webkit.WebViewAssetLoader`, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the backend's runtime (staged `scaffold` -> CI build (2) -> CI install/launch smoke test (3) -> CI release build (4) -> local `build` (5) -> `--install` (6) -> `--release` (7) CLI ladder); design complete in `DESIGN-NOTES.md`, staged implementation tracked in `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`, Stages 0-4 (`arklight android scaffold`, including its generated GitHub Actions CI build + emulator smoke-test + release-build workflow) done | IN PROGRESS |
 | v0.100 | Desktop backend -- `arklight desktop` packages a `build-dir` into a native Linux desktop app via a purpose-built GTK3 + WebKit2GTK host (superseding an earlier, now-removed Neutralino.js plan; see `docs/Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`); design complete, staged implementation tracked in `docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`, Stages 1-4 (`arklight desktop scaffold`, including its generated GitHub Actions CI build + headless-Xvfb smoke-test workflow, and `arklight desktop build`) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v1.0 | Stable compiler -- scope, "reliable" defined concretely, and the explicit exclusions (native backends, experimental features, ARKlight Component Collections) all live in [`V1-DEFINITION.md`](V1-DEFINITION.md), kept there as the single canonical copy rather than restated here | PLANNED |
-
-**Renumbered.** v0.048 (CSS `@media` + `<head>` extension) is now
-DONE -- both Stage A (`meta`/`links` on `Page(...)`) and Stage B
-(`responsive_style` + `@media` compilation) have landed; see
-`DESIGN-NOTES.md` for both designs and `PROGRESS.md` for the
-implementation record of each stage. With v0.048 out of the way, the
-milestones behind it were renumbered to close the gap and, at the
-time, make room for a dedicated KaiOS slot: JS backend capability
-expansion moved `v0.044` -> `v0.054`; user-defined components moved
-`v0.100` -> `v0.060`; the Desktop backend moved `v0.060` -> `v0.080`;
-the Android backend moved `v0.080` -> `v0.100`; and the KaiOS
-backend -- previously designed but unnumbered -- was given `v0.120`.
-None of this reordering changed scope or design, only sequencing.
-
-**Re-renumbered again.** The Desktop and Android backend slots have
-since swapped a second time: Android is now `v0.080` and Desktop is
-now `v0.100`. Reason (at the time of the swap): an existing external
-project, `ARKlight-Viewer-for-Android-Devices`, is already most of the
-Android backend's runtime (AndroidX `WebView`, offline `.ark`-bundle
-handling, bundle/seal logic already split into its own files) -- see
-`DESIGN-NOTES.md` ("v0.0438: Android backend")'s "Updated
-direction" note. The Android backend had a head start the Desktop
-backend didn't at that point (Desktop's design was still pending), so
-it moved ahead in sequence. Scope is unchanged for both; only order
-moved. **Since then, Desktop's design has also landed in full** --
-`docs/Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md` settled on a
-purpose-built GTK3 + WebKit2GTK native host, superseding an earlier,
-now-removed Neutralino.js plan -- and both backends now have real implementation
-progress: v0.080 (Android) has Stages 0-4 of its staged CLI ladder
-done, and v0.100 (Desktop) has Stages 1-4 of its own done (see
-`PROGRESS.md`'s Snapshot table for both). v0.054 (JS backend
-expansion) has since shipped in full --
-all 8 vdom-staging stages feeding it are DONE; v0.060
-(user-defined components -- staged ladder now DONE in full, Stages
-0-4; see `docs/Foundational/USER-DEFINED-COMPONENTS.md` for the
-reference), v0.080 (Android), and v0.100
-(Desktop) are all fully designed now; v0.080/
-v0.100 implementation is in progress for both. Alternate backends (Vue, Svelte) remain moved to unscheduled
-future work, pending further development of the IR and state/event
-semantics.
-
-**Un-scheduled (amendment): KaiOS.** `v0.120` above was retired, not
-reassigned -- KaiOS is pulled back out of the numbered roadmap
-entirely and moved to unscheduled future work, the same tier Vue and
-Svelte already sit at. This mirrors, deliberately, how a
-hypothetical dedicated Windows-specific backend would be treated: the
-project has no committed milestone for one, only a written, plausible
-design sitting in `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`
-(a Windows Phone/UWP-era backend, in this case) with no version number
-and no roadmap table entry at all -- an acknowledged possibility, not
-a commitment. KaiOS's own design work isn't discarded by this change;
-`docs/Far Future Concern/KAIOS-BACKEND-IMPLEMENTATION.md` (plus the
-constraint-gathering doc alongside it, `kaios-app-design-doc.md`)
-already lived in that same "Far Future Concern" directory even while
-the milestone table above still scheduled it -- this amendment just
-brings the roadmap's own bookkeeping into agreement with where the
-design docs already sat. See `PROGRESS.md`'s "Planned, not yet
-scheduled to a version" section for the equivalent snapshot-table
-change.
 
 ## Non-goals (v0.001 and for the foreseeable future)
 
