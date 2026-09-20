@@ -18,9 +18,6 @@ with a structured component API, while the output remains ordinary, dependency-f
 </tr>
 </table>
 
-**A Python-first compiler for building static websites where developers work
-with a structured component API, while the output remains ordinary, dependency-free HTML.**
-
 Write your site in Python. ARKlight compiles it to standard HTML with CSS and
 vanilla JavaScript. The browser never executes Python — you get predictable,
 inspectable, portable output that works anywhere static files are hosted.
