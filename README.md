@@ -60,6 +60,12 @@ whether it fits your project.
 [Rei] it motivates him. 
 ```
 
+ARKlight is in active alpha development. Status lives in exactly one
+place per kind of record: [`CHANGELOG.md`](CHANGELOG.md) for version
+history, [`PROGRESS.md`](PROGRESS.md) for the current snapshot and
+what's next, and [`docs/Foundational/ARCHITECTURE.md`](docs/Foundational/ARCHITECTURE.md)
+for the milestone roadmap.
+
 ## Install
 
 ```bash
@@ -69,14 +75,6 @@ pip install -e .
 A runnable example, the Debian/Ubuntu package, upgrading an existing
 checkout, and everything else needed to get running:
 [`docs/Foundational/GETTING-STARTED.md`](docs/Foundational/GETTING-STARTED.md).
-
-## Status
-
-ARKlight is in active alpha development. Status lives in exactly one
-place per kind of record: [`CHANGELOG.md`](CHANGELOG.md) for version
-history, [`PROGRESS.md`](PROGRESS.md) for the current snapshot and
-what's next, and [`docs/Foundational/ARCHITECTURE.md`](docs/Foundational/ARCHITECTURE.md)
-for the milestone roadmap.
 
 ## Documentation
 
