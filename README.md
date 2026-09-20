@@ -2,11 +2,7 @@
 <tr>
 <td width="180" valign="middle" align="center">
 
-<img
-  src="https://raw.githubusercontent.com/ARKlight-Ecosystem/ARKlight/alpha/ARKlight-logo.png"
-  alt="Rei"
-  width="100%"
->
+<img src="https://raw.githubusercontent.com/ARKlight-Ecosystem/ARKlight/alpha/ARKlight-logo.png" alt="Rei" width="100%" >
 
 </td>
 <td valign="middle">
