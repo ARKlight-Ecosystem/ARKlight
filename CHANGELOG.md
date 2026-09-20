@@ -5,6 +5,32 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06508] -- Message/docs fix: the maintainer's speaker tag is now `[Rei]`, not `[Rae ARK]`
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06507]`
+(the roadmap's `v0.065` is never touched).
+
+- The heavy-reliance nudge `arklight.experimental.heavy_reliance_nudge`
+  prints after a build's experimental-API summary now speaks as `[Rei]`
+  instead of `[Rae ARK]`, matching the voice name
+  `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md` already uses
+  (`[Rei] ...`). Wording is unchanged.
+- Same substitution in the places that quote that text:
+  `docs/Foundational/EXPERIMENTAL-APIS.md` (the nudge's example output) and
+  the status block in the root `README.md`.
+- **Behavior change:** anything that matches the literal `[Rae ARK]` in a
+  build's output (a log filter, a script) needs `[Rei]`. Nothing else in the
+  build output changes.
+- Deliberately **not** changed: the `Rae-ARK` GitHub organisation/user name
+  where it is part of a real URL or repository slug
+  (`github.com/Rae-ARK/...`, `rae-ark.github.io`,
+  `Rae-ARK/ARKlight-Component-Collections`), the `LICENSE` copyright line,
+  the `cctv.py` prototype credit, and git history. Those name an account or a
+  legal holder, not the speaker tag.
+
+`tests/test_cli.py` and `tests/test_experimental_apis.py` assert on the new
+tag (5 assertions). Full suite unchanged at 1644 passed.
+
 ## [0.06507] -- Capability fix: Android native-shell hardening (external links, back, rotation, load errors)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06506]`

@@ -173,7 +173,7 @@ def test_cli_build_shows_heavy_reliance_nudge_by_default(tmp_path, capsys):
     site_path = write_nudge_site(tmp_path)
     exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
     assert exit_code == 0
-    assert "[Rae ARK]" in capsys.readouterr().out
+    assert "[Rei]" in capsys.readouterr().out
 
 
 def test_cli_build_hides_heavy_reliance_nudge_via_config(tmp_path, capsys):
@@ -184,7 +184,7 @@ def test_cli_build_hides_heavy_reliance_nudge_via_config(tmp_path, capsys):
     exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
     assert exit_code == 0
     out = capsys.readouterr().out
-    assert "[Rae ARK]" not in out
+    assert "[Rei]" not in out
     # the per-feature warning blocks themselves are untouched by the
     # config setting -- only the nudge is suppressed.
     assert "Legacy API detected: css-import" in out

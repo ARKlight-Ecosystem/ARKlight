@@ -286,10 +286,10 @@ def heavy_reliance_nudge(
     features_used = sorted({usage.feature_id for usage in eligible})
     return "\n".join(
         [
-            "[Rae ARK] Hey, just a heads up -- if you're relying on experimental APIs a lot",
-            f"[Rae ARK] ({len(eligible)} experimental-API uses this build, across: "
+            "[Rei] Hey, just a heads up -- if you're relying on experimental APIs a lot",
+            f"[Rei] ({len(eligible)} experimental-API uses this build, across: "
             f"{', '.join(features_used)})",
-            "[Rae ARK] Might be a good idea to open a pull request for your missing feature",
-            "[Rae ARK] In either the ARKlight or ARKlight-Component-Collections GitHub repo",
+            "[Rei] Might be a good idea to open a pull request for your missing feature",
+            "[Rei] In either the ARKlight or ARKlight-Component-Collections GitHub repo",
         ]
     )
