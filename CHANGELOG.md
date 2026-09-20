@@ -5,6 +5,79 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06515] -- `arklight deploy`: the deployment CLI (Cloudflare Workers via Wrangler)
+
+Implements `docs/Foundational/DEPLOYMENT-CLI.md`, which had been design-only
+since it was written. Numbered next in the `0.0650` + decimals sequence, but
+this is not one of the `v0.065` slot's pieces and the deployment CLI has no
+roadmap row of its own, so the number is the maintainer's to confirm (same
+situation as the `0.06504` draft). Roadmap `v0.065` untouched.
+
+- **`arklight deploy [cloudflare] [entry] [-o OUTPUT_DIR] [--name NAME]
+  [--skip-build] [--dry-run]`**, in the new `arklight/cli/deploy.py` plus
+  `_cmd_deploy` and its parser in `arklight/cli/main.py`. Bare `arklight deploy`
+  is `arklight deploy cloudflare`; `entry` defaults to `site.py`.
+- **A thin hand-off, as specified.** In order: build; find `wrangler` on `PATH`;
+  run one `wrangler deploy`; return Wrangler's exit code unchanged. Wrangler's
+  stdin/stdout/stderr are inherited, never captured, so sign-in prompts, progress
+  and the deployed URL appear as Wrangler wrote them.
+- **The build is `arklight build ... --no-open`**, reached by calling the CLI's
+  own `main([...])`, not a second copy of the build handler. It therefore has
+  the same project config, CSP/experimental handling, warnings and log mode as
+  a manual build, and a new `build` flag can't leave `deploy` behind. A failed
+  build stops the run before Wrangler is looked for.
+- **Never installs Wrangler.** Looked up with `shutil.which("wrangler")` only.
+  No `npx`/`npm` fallback (`npx` downloads what it can't find). A missing
+  Wrangler is a `1` exit with install instructions (`npm install --global
+  wrangler`, `wrangler login`); the check runs after the build, per the spec's
+  step order, so the site is built and the message says nothing was deployed.
+- **The command.** No `wrangler.jsonc`/`.json`/`.toml` in the project directory
+  (the site file's directory): `wrangler deploy --assets <abs output> --name
+  <name> --compatibility-date <today>`, Cloudflare's documented zero-config
+  static-assets form. With a project config: plain `wrangler deploy` from that
+  directory, `--name` forwarded only if given; the config is the user's and is
+  not read, overridden or generated. ARKlight does not check that config's
+  `assets.directory` matches the directory it built, and says so.
+- **Worker name.** `--name` is passed through untouched (Cloudflare's rules are
+  Cloudflare's to enforce). Otherwise it is the project directory's name reduced
+  to lowercase `a-z0-9` and `-`, capped at 63; if nothing is left, `deploy`
+  asks for `--name` instead of inventing a public name.
+- **Provider is a positional, named before the site file**, so
+  `arklight deploy site.py` is an argparse "invalid choice" error rather than a
+  guess, and `--github`-style flags stay free for the later providers the spec
+  anticipates. None exist: `arklight deploy netlify`/`--github` are errors.
+- **Additions beyond the spec:** `--skip-build` (deploy an existing, non-empty
+  output directory; the site file isn't needed) and `--dry-run` (build, check
+  for Wrangler, print the command, stop; it still requires Wrangler so a passing
+  dry run means a real one gets as far as invoking it).
+- **Exit codes.** `0`; a failed build's own code; `1` for anything ARKlight
+  itself found (no Wrangler, missing/empty build directory, missing site file,
+  no derivable name); otherwise Wrangler's code, unchanged. A signal death is
+  `128 + signal`; Ctrl-C is `130` with no traceback.
+- **Not built:** any other provider or provider flag; a `deploy` section in
+  `arklight.config.py`; a Wrangler version check; generating a `wrangler.jsonc`
+  or a `.gitignore` entry for Wrangler's scratch `.wrangler/` directory;
+  Cloudflare Pages. A Cloudflare account was not used, so **no real deploy was
+  run**. Verified against a real Wrangler 4.135.0 only as far as: the exact
+  command form succeeds under Wrangler's own `--dry-run`, and an
+  unauthenticated `arklight deploy --skip-build` gets Wrangler's own
+  "set CLOUDFLARE_API_TOKEN" message with its exit code passed through.
+- **Docs:** `DEPLOYMENT-CLI.md` (status, plus an "As implemented" section
+  recording the open decisions above), `CLI-REFERENCE.md` (new `deploy`
+  section; the two "`arklight deploy` is not implemented" statements removed),
+  the index rows in `docs/README.md` and `docs/Foundational/README.md` (both
+  said "Design only, not implemented"), and `GETTING-STARTED.md`'s layout line
+  for `cli/`. No `docs/version history/` file: the deployment CLI belongs to no
+  milestone yet, and that directory's rule is one file per coherent milestone.
+
+`tests/test_deploy.py` (56 tests; a stand-in `wrangler` on `PATH` records argv
+and working directory, and `PATH` is restricted so a real Wrangler or `npx` can
+never leak in). Nine deliberate breakages each fail a test: dropping the date
+flag, capturing Wrangler's output, an `npx` fallback, carrying on after a failed
+build, `--dry-run` running Wrangler, swallowing the exit code, ignoring a project
+config, "fixing" an explicit name, and letting the build open a browser. Full
+suite 2162 passed (was 2106 on this checkout). `0.06514` -> `0.06515`.
+
 ## [0.06514] -- Capability fix: `Provider`, stage 1/6, the contract itself (the `v0.065` slot's last piece)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06513]`

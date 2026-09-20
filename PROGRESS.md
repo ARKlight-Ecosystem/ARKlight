@@ -71,6 +71,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06512 | Docs-only incremental patch: filed `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` (Rei the *language*, distinct from the narrator; the maintainer has decided Rei is ARKlight's official native source language, so the proposal's playground/Fun-tier framing is superseded and its gating is open question 11) and fixed its false "no channel constant" claim (`arklight.CHANNEL` exists); removed the changelog-style "Renumbered"/"Re-renumbered"/KaiOS paragraphs from `ARCHITECTURE.md`'s Milestones section and fixed the three references they left dangling; recorded that Vue and Svelte backends will not be built and corrected every statement calling them planned (comment-only docstring edits in three modules). No behavior change. `0.06511` -> `0.06512`; roadmap `v0.065` untouched | DONE |
 | v0.06513 | Capability fix: JS vocabulary addendum stage 5/10 (the string derivations catalog, the `v0.065` slot's first-listed piece) -- 18 `Derive.*` kinds (`capitalize`, `title_case`, `trim_start`, `trim_end`, `pad_start`, `pad_end`, `repeat`, `slice_string`, `char_at`, `replace_first`, `replace_all`, `split_count`, `reverse_string`, `string_length`, `includes_substring`, `starts_with`, `ends_with`, `is_empty`), one fragment file + one registry line each; literal arguments range/type-checked at build time (`LITERAL_ARG_RULES`); `replace_first`/`replace_all` are literal-text only (no `RegExp`, `$&`-style patterns not expanded). The four predicate-shaped kinds ship as boolean derivations (recorded decision). New `arklight/ir/js_string.py` reproduces JavaScript's UTF-16 indexing, `String(x)` coercion and whitespace set at build time. Also fixes `Bind(...)` pre-fill for booleans (`true`/`false`) and lone surrogates. `tests/test_js_vocabulary_v0065.py` (231 tests, Node parity sweep); full suite 2047 passed. `0.06512` -> `0.06513`; roadmap `v0.065` untouched (`Provider` stage 1 still PLANNED) | DONE |
 | v0.06514 | Capability fix: `Provider`, stage 1 of 6 (the contract itself; the `v0.065` slot's last piece) -- `Provider.declare(name=..., capabilities=[...])` and `Site(provider=...)`, a frozen self-validating `ProviderDeclaration` (`arklight/provider.py`), a closed, provisional capability vocabulary (`auth`, `read`, `write`, `subscribe`), and the gated `provider-integration` experimental feature (inline banner + end-of-build summary through the existing pipeline; `upstream_candidate=False`). A declared Provider adds no markup, config or script of its own: pages and stylesheet are byte-identical, only `arklight.js`'s console reminder and `sbom.txt` change, as for every gated feature. No config blob, no external-script prop, no concrete provider. `docs/Implementation/PROVIDER-SDK-ADDENDUM.md` is referenced but never committed, so scope follows the per-version previews (`v0.065.md`-`v0.070.md`); pulls stage 2's "recorded on `Site`" bullet forward (the gate needs it to fire), leaving IR threading and `ir/validate.py` enforcement to stage 2. `tests/test_provider.py` (47 tests); full suite 2094 passed. `0.06513` -> `0.06514`; roadmap `v0.065` untouched | DONE |
+| v0.06515 | CLI: `arklight deploy` -- the deployment CLI, design-only until now (`docs/Foundational/DEPLOYMENT-CLI.md`). `arklight deploy [cloudflare] [entry] [-o OUTPUT_DIR] [--name NAME] [--skip-build] [--dry-run]` (`arklight/cli/deploy.py`, `_cmd_deploy` in `arklight/cli/main.py`): builds with `arklight build --no-open`, finds `wrangler` on `PATH`, runs one `wrangler deploy` and returns its exit code unchanged, with Wrangler's output inherited rather than captured. Never installs Wrangler (no `npx`/`npm` fallback), never touches credentials or the network. No project Wrangler config -> `wrangler deploy --assets <output> --name <name> --compatibility-date <today>`; a `wrangler.jsonc`/`.json`/`.toml` in the project directory -> plain `wrangler deploy`, the config is the user's. Cloudflare Workers is the only provider; `--skip-build`/`--dry-run` are additions beyond the spec. **No real deploy run** (no Cloudflare account): the command form was checked under a real Wrangler 4.135.0's `--dry-run`. `tests/test_deploy.py` (56 tests); full suite 2162 passed. `0.06514` -> `0.06515`; slot unconfirmed (no roadmap row of its own), roadmap `v0.065` untouched | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 6-10 of 10 (predicates catalog, list-scalar derivation catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots; stage 1 shipped as `0.06514`, stages 2-6 PLANNED | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -149,6 +150,57 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06515 -- CLI: `arklight deploy`, the deployment CLI (DONE)
+
+`docs/Foundational/DEPLOYMENT-CLI.md` had been marked "design only, not
+implemented" since it was written; this implements it for Cloudflare Workers.
+Numbered next in the `0.0650` + decimals sequence, but it is not one of the
+`v0.065` slot's pieces and has no roadmap row, so the number is the maintainer's
+to confirm. Roadmap `v0.065` untouched.
+
+**What went in.** `arklight/cli/deploy.py` (plan one Wrangler command, find
+Wrangler, run it), `_cmd_deploy` and the `deploy` parser in
+`arklight/cli/main.py`, `tests/test_deploy.py`, and the docs listed in the
+`CHANGELOG.md` entry. Nothing in the compiler, the IR or any backend changed.
+
+**Decisions recorded** (the spec left these open; full reasoning in
+`DEPLOYMENT-CLI.md`'s "As implemented").
+1. The build step re-enters `main(["build", ..., "--no-open"])` instead of
+   duplicating `_cmd_build`'s config handling or hand-building an
+   `argparse.Namespace`. Cost: the license gate and release-note check run a
+   second time; both are idempotent. Benefit: deploy cannot drift from build.
+2. Wrangler is found on `PATH` only. `npx wrangler` would look like a
+   convenience but downloads a package it can't find, which is the silent
+   install the spec forbids.
+3. The Wrangler check runs after the build (the spec's step order). Failing
+   first would be faster to fail but throws away a build the user may want.
+4. A project Wrangler config wins: ARKlight then adds no assets/name/date flags.
+   The alternative, always passing `--assets`, would silently override the
+   user's config with ARKlight's idea of it.
+5. The provider is a positional named before the site file rather than a
+   subcommand. With optional subcommands, a bare file name after `deploy` is
+   parsed as a (nonexistent) provider anyway, and the options would have to be
+   repeated on both parsers, where (checked on Python 3.12) `deploy -o mine
+   cloudflare` silently loses `-o mine` to the subparser's default. A flat
+   parser has neither problem and keeps `--github`-style flags open.
+6. `--name` is the only project-level setting and it isn't in
+   `arklight.config.py`. If retyping it is tedious, a `deploy` config section is
+   the obvious follow-up.
+
+**Not verified.** No real deploy: that needs a Cloudflare account and network
+access this environment doesn't have. What was run against a real Wrangler
+4.135.0: the exact command under Wrangler's own `--dry-run` (succeeds, reads the
+assets directory), and `arklight deploy --skip-build` unauthenticated in a
+non-interactive shell (Wrangler prints its own "set CLOUDFLARE_API_TOKEN" error,
+exit 1, passed through by ARKlight). An interactive `wrangler login` flow and a
+successful upload are untested. Wrangler's flag names are its own and can
+change; if `--assets`/`--name`/`--compatibility-date` do, `plan_cloudflare` is
+the one place to update.
+
+**Verification.** `tests/test_deploy.py` (56 tests) uses a stand-in `wrangler`
+that records argv and cwd. Nine deliberate breakages each fail a test (listed
+in `CHANGELOG.md`). Full suite 2162 passed (2106 before).
 
 ## v0.06514 -- Capability fix: `Provider`, stage 1/6, the contract itself (DONE)
 
