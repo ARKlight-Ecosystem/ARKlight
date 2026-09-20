@@ -75,7 +75,8 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06516 | Capability fix: `Provider`, stage 2 of 6 (the `v0.066` slot's first-shipped piece; JS vocabulary stage 6/10 in the same slot is still PLANNED) -- IR and validation integration. `WebsiteIR.provider: ProviderDeclaration \| None` (`arklight/ir/build.py`), a straight passthrough of `Site(provider=...)` threaded through `build_website_ir(...)`/`arklight/compiler/pipeline.py`, so `ir.provider` now carries the real declaration, not just its recorded experimental usage. New `arklight.ir.validate.validate_provider(provider)` re-checks the closed `PROVIDER_CAPABILITIES` vocabulary at the pipeline's own validation stage, raising the module's shared `ValidationError` instead of `ProviderDeclaration`'s own `ValueError` -- defense in depth, since `Provider.declare(...)` already can't hold an invalid value by construction; called directly from `pipeline.build` since `Site(provider=...)` isn't a node in the ARK AST tree. `arklight/ir/binary.py`'s known-gap comment updated to list `provider` alongside `media_queries`/etc. (still not round-tripped by the `.arklight` binary format). Still nothing is emitted from a declared Provider -- a build with one stays byte-identical to one without, apart from the reports every gated feature already gets. `tests/test_provider.py` (47 -> 55 tests); full suite 2170 passed. `0.06515` -> `0.06516`; out-of-band, no roadmap row, roadmap `v0.066` untouched (its JS vocabulary piece remains) | DONE |
 | v0.06517 | Capability fix: JS vocabulary addendum stage 6/10 (the predicates catalog, the `v0.066` slot's second piece; `Provider` stage 2 already shipped as `0.06516`) -- 8 new `Predicate.*` kinds for `Show(...)`: `and_`/`or_` (2+ names), `not_`, `in_range` (`lo <= x <= hi`, `Derive.clamp`'s name order and `Number(x) \|\| 0` reading), `one_of` (literal `values`, strict equality), `is_empty`/`is_not_empty` (`null`/`""`/`[]`), `is_null`. `PredicateSpec` gained `variadic` and `extra_args` (defaults leave every existing kind unchanged); `arklight/ir/validate.py` checks arity/args and `one_of`'s `values`; new `arklight/ir/js_predicate.py` is the build-time twin reproducing JavaScript truthiness/equality so `Show`'s pre-rendered `hidden` agrees with the client's `arkEvalPredicate`; `data-ark-show` carries `args` only for `one_of` (existing kinds' markup byte-identical). `tests/test_js_vocabulary_v0066.py` (81 tests, incl. a Node parity run over the shipped `arkEvalPredicate`); full suite 2251 passed. `0.06516` -> `0.06517`; out-of-band, no roadmap row, roadmap `v0.066` untouched (stages 7-10 remain PLANNED) | DONE |
 | v0.06518 | Capability fix: `Provider`, stage 3 of 6 (the `v0.067` slot's first-shipped piece; JS vocabulary stage 7/10 in the same slot is still PLANNED) -- JS backend emission. A site that declares `Site(provider=...)` now gets one read-only config object in `arklight.js`: `window.ARKLIGHT_PROVIDER = Object.freeze({name, capabilities: Object.freeze([...])})` (`arklight/backend/js/render.py`'s `_provider_config_js`), for the author's own script to read; same all-caps-window-global convention as `window.ARKLIGHT_ON_ERROR`. Site-wide (one provider per `Site`); zero bytes when none is declared; set unconditionally of the devtools-reminder setting. Pages and stylesheet stay byte-identical -- the changed-files set is still just `arklight.js` + `sbom.txt`. No networking, no vendor code, no CSP change. Deliberately carries no DOM hooks/`State(...)` keys (the proposal mentions them, but no authoring surface exists to wire a capability to one; the object only ever gains fields). Stale "adds no markup, config or script" wording corrected in `arklight/provider.py`, `Provider`'s docstring and the `provider-integration` notice. `tests/test_provider.py` (55 -> 70 tests, incl. Node reading/mutating the object and round-tripping awkward names); full suite 2266 passed. `0.06517` -> `0.06518`; out-of-band, no roadmap row, roadmap `v0.067` untouched | DONE |
-| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 7-10 of 10 remain (stage 6, the predicates catalog, shipped as `0.06517`; the rest: list-scalar derivation catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots; stages 1-3 shipped as `0.06514`/`0.06516`/`0.06518`, stages 4-6 PLANNED | PLANNED |
+| v0.066   | Milestone closed -- both pieces of the `v0.066` slot are DONE, so the package version rolls up from the `0.0650x` increments to `0.066`: JS vocabulary addendum stage 6/10, the predicates catalog (8 new `Predicate.*` kinds, `0.06517`) and `Provider` stage 2/6, IR + validation integration (`0.06516`). The build also already contains `Provider` stage 3/6 (`window.ARKLIGHT_PROVIDER`, `0.06518`), pulled forward from the `v0.067` slot; that slot's other piece, JS vocabulary stage 7/10, is untouched. `docs/version history/v0.066.md`. Full suite 2266 passed | DONE |
+| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 7-10 of 10 remain (stage 6, the predicates catalog, shipped as `0.06517` and closed out `v0.066`; the rest: list-scalar derivation catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots; stages 1-3 shipped as `0.06514`/`0.06516`/`0.06518`, stages 4-6 PLANNED | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
@@ -153,6 +154,37 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.066 -- Milestone rollup (DONE)
+
+Closes the `v0.066` slot and moves the package version from the `0.0650x`
+out-of-band increments to the milestone number, `0.066`, the same way
+`0.061`-`0.063` closed their slots. Nothing new is implemented here; this entry
+is the rollup and the version/doc bookkeeping.
+
+**What `v0.066` is.** Two independent pieces shared the slot
+(`docs/version history/v0.066.md`), both now shipped:
+
+1. `Provider` stage 2/6 -- IR and validation integration (`0.06516`).
+2. JS vocabulary addendum stage 6/10 -- the predicates catalog (`0.06517`):
+   `and_`/`or_`/`not_`, `in_range`, `one_of`, `is_empty`/`is_not_empty`,
+   `is_null`.
+
+**What else is in this build.** `Provider` stage 3/6 (`0.06518`, the
+`window.ARKLIGHT_PROVIDER` config object) landed after `v0.066`'s two pieces
+and belongs to the `v0.067` slot. It is in this `0.066` build because the
+increments are cumulative, not because `v0.067` is finished: that slot's other
+piece, JS vocabulary stage 7/10 (list-scalar derivations), has not started, so
+`v0.067` stays open.
+
+**Docs touched by the rollup.** The `v0.066.md` status note, the version-history
+index row, `ARCHITECTURE.md`'s `v0.065`-`v0.070` roadmap row, this table and
+`CHANGELOG.md`.
+
+**Known, carried forward.** The `.arklight` binary still doesn't round-trip
+`provider`, and decodes a `Show`'s `predicate` as a tagged dict rather than a
+`PredicateRef`. `truthy`/`falsy` still use Python's `bool(...)` at build time.
+None of these is new in `v0.066`.
 
 ## v0.06518 -- Capability fix: `Provider`, stage 3 of 6 (DONE)
 
