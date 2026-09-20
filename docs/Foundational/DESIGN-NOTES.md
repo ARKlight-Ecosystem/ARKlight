@@ -889,8 +889,8 @@ than near `v0.044`, because the real dependency this milestone has is
 on Stage 8's persistence work, not on anything in `v0.044` proper --
 see "Why this sits after Stage 8, not after v0.044" below. Per the
 current roadmap table (`docs/ARCHITECTURE.md`), this milestone is
-`v0.080`; the Desktop backend is `v0.100` -- see that file's
-"Renumbered" note for why the two swapped order.
+`v0.080`; the Desktop backend is `v0.100`. The two swapped order
+because of the head start described under "Updated direction" just below.
 
 ### Updated direction: promote the existing Viewer repo, don't start from zero
 

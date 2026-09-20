@@ -68,6 +68,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06509 | Capability fix: JS vocabulary addendum stage 4/10 (the math derivations catalog, the `v0.064` slot's second piece, paused while capability fixes took priority) -- 21 `Derive.*` kinds (`absolute`, `ceiling`, `floor`, `truncate_number`, `sign`, `sqrt`, `cbrt`, `power`, `exp`, `log`, `log2`, `log10`, `hypot`, `clamp`, `average`/`mean`, `median`, `gcd`, `lcm`, `percentage_of`, `to_fixed`, `to_precision`), one fragment file + one registry line each; `to_fixed`/`to_precision` take a build-time range-checked `digits`. New `arklight/ir/js_numeric.py` reproduces JavaScript's `Math.*`/`toFixed`/`toPrecision` answers where Python's `math` raises or rounds differently. Also fixes three build-time/client parity gaps found along the way (`NaN`/`-0` coercion in `_coerce_number`, `Derive.sum`'s compensated summation on Python 3.12+, `nan`/`inf` spelling in `Bind(...)` pre-fill). `random_int` stays with `v0.070`. `tests/test_js_vocabulary_v0064.py` (137 tests, incl. a Node parity sweep); full suite 1781 passed. `0.06508` -> `0.06509`; roadmap `v0.065` untouched | DONE |
 | v0.06510 | Capability fix: Rei, the compiler narrator -- the `v0.065` slot's third piece, shipped ahead of the two still-PLANNED pieces. `arklight build --narrate` (sibling to `--verbose`/`--debug`, mutually exclusive with both) narrates the same `on_stage=` pipeline calls as deterministic `[Rei] ...` sentences (`arklight/compiler/rei/`); `rei.default_mode` config key; one-time introduction on a fresh output directory; `Try: arklight search <Name>` on unknown-component-type / missing-required-prop failures via a new structured `ValidationError.component_name`; original ELIZA reference implementation for study (`docs/reference/eliza/`, never imported). Building it corrected the spec: import-time `DuplicateComponentError`/`DuplicateStyleNameError` are ordinary build errors narrated from the discovery stage, not raw tracebacks. `tests/test_rei_narrator.py` (31 tests); full suite 1810 passed. `0.06509` -> `0.06510`; roadmap `v0.065` untouched | DONE |
 | v0.06511 | Fix (follow-up to `0.06510`, from auditing everything added since `v0.064`): Rei's assets stage no longer claims an `assets/` folder exists on every build (`... if there is one.`); new drift-guard tests fail if any stage message a real build emits, or the three conditional ones, has no Rei pattern; `CLI-REFERENCE.md` states what `--narrate` failure output really is; the ELIZA reference is described as the original implementation it is, not a vendored copy. `tests/test_rei_narrator.py` (36 tests); full suite 1815 passed. `0.06510` -> `0.06511`; roadmap `v0.065` untouched | DONE |
+| v0.06512 | Docs-only incremental patch: filed `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` (Rei the *language*, distinct from the narrator; the maintainer has decided Rei is ARKlight's official native source language, so the proposal's playground/Fun-tier framing is superseded and its gating is open question 11) and fixed its false "no channel constant" claim (`arklight.CHANNEL` exists); removed the changelog-style "Renumbered"/"Re-renumbered"/KaiOS paragraphs from `ARCHITECTURE.md`'s Milestones section and fixed the three references they left dangling; recorded that Vue and Svelte backends will not be built and corrected every statement calling them planned (comment-only docstring edits in three modules). No behavior change. `0.06511` -> `0.06512`; roadmap `v0.065` untouched | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 5-10 of 10 (string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -98,9 +99,9 @@ go-ahead before implementation starts on any of these:
   constraint-gathering doc in the same directory,
   `kaios-app-design-doc.md`) -- but pulled back out of the numbered
   roadmap (it briefly held `v0.120`, assigned in the same reshuffle
-  that produced `v0.060`/`v0.080`/`v0.100` above -- see
-  `docs/ARCHITECTURE.md`'s "Renumbered" note for that history, and the
-  amendment immediately below it for this reversal). No committed
+  that produced `v0.060`/`v0.080`/`v0.100` above -- the reshuffle is
+  recorded in `CHANGELOG.md`, and this entry is the record of the
+  reversal). No committed
   version number or scheduled slot -- the same "Far Future Concern"
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
@@ -146,6 +147,55 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06512 -- Docs-only incremental patch: Rei language proposal, Milestones cleanup, Vue/Svelte dropped (DONE)
+
+Out-of-band, numbered by the same `0.0650` + decimals rule as
+`v0.06501`-`v0.06511`. Docs-only, plus comment-only docstring edits in three
+modules: no compiler behavior changed.
+
+**The Rei language proposal.** `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` was
+filed. It is about Rei the *language* (`.rei` -> Rei AST -> ARK AST; nothing
+below the ARK AST changes), not Rei the compiler narrator that shipped as
+`0.06510`. The maintainer has since decided Rei is ARKlight's official native
+source language, added beside Python authoring, which stays. That supersedes
+the proposal's own "playground / Fun tier / not accepted" framing, so an update
+note sits at its top and the gating question (retire the Fun tier, or keep an
+alpha guard as a maturity gate) is open question 11. It is still **not
+accepted as written**. Open question 10 records that its `arklight/rei/` and
+`tests/test_rei_*.py` would collide in name with the narrator's
+`arklight/compiler/rei/` and `tests/test_rei_narrator.py`.
+
+**A wrong claim, found and fixed.** The proposal (and the re-verification
+section added when it was filed) said no release-channel constant exists.
+`arklight.CHANNEL = "alpha"` does: static per branch, in `__all__`, locked by
+`tests/test_version.py`, and written into the `.arklight` schema tag. The
+re-check had grepped for `RELEASE_CHANNEL` and `_ALPHA_WARNING_MARKER` but not
+plain `CHANNEL`. The alpha guard can therefore check `arklight.CHANNEL` with no
+new constant; Open question 1 and section 1.5 now say so.
+
+**`ARCHITECTURE.md`'s Milestones section was carrying a changelog.** Three
+paragraphs ("Renumbered", "Re-renumbered again", "Un-scheduled (amendment):
+KaiOS") restated history already recorded elsewhere and had started repeating
+status the table above them owns (which is exactly the drift `docs/README.md`'s
+"Adding a new doc" rule warns about). They were removed. The first renumbering
+is in `CHANGELOG.md` (`[0.048]`), the Android/Desktop swap is explained by
+`DESIGN-NOTES.md`'s "Updated direction" note, and KaiOS being unscheduled by
+this file's "Planned, not yet scheduled" section. Three references to them were
+left dangling and fixed: `DESIGN-NOTES.md` (two) and the KaiOS entry above.
+
+**Vue and Svelte backends will not be built.** Recorded as a dated decision at
+the end of `DESIGN-NOTES.md`'s "authoring layer that compiles to real
+frameworks" section, which stays as the reasoning that led there. Corrected in
+`DESIGN-NOTES.md` (three places), the `v0.054` non-scope bullet in this file,
+`ARCHITECTURE.md`'s Android entry and Backend Interface "Future" list, and
+docstrings in `arklight/backend/base.py`, `arklight/ir/build.py` and
+`arklight/compiler/pipeline.py`. Comparisons (React/Vue/Svelte ergonomics,
+"Vue 3 parity") were deliberately left alone, as was this file's historical
+implementation log, which records what was true when it was written.
+
+**Left as-is, worth knowing.** The `## v0.054 ... (PLANNED)` heading further
+down this file still says PLANNED although `v0.054` shipped.
 
 ## v0.06510 -- Capability fix: Rei, the compiler narrator (DONE)
 

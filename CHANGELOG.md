@@ -5,6 +5,51 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06512] -- Docs-only incremental patch: Rei language proposal filed, Milestones cleanup, Vue/Svelte dropped, dangling references fixed
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06511]`
+(the roadmap's `v0.065` is never touched). Docs-only, plus comment-only
+docstring edits in three modules; no behavior change.
+
+- **Filed** `docs/Proposals/REI-LANGUAGE-PROPOSAL.md`: Rei the *language*
+  (`.rei` -> Rei AST -> ARK AST, nothing below the ARK AST changes),
+  distinct from Rei the compiler narrator. Imported from the Rei-Src
+  workspace and re-verified against `alpha`. The maintainer has decided Rei
+  is ARKlight's official native source language, added beside Python
+  authoring (which stays), so the proposal's own "playground / Fun tier"
+  framing is superseded; the update note at its top says so, and its gating
+  is left as open question 11. **Not accepted as written.** New open
+  question 10 records that its proposed `arklight/rei/` and
+  `tests/test_rei_*.py` now collide in name with the shipped narrator
+  (`arklight/compiler/rei/`, `tests/test_rei_narrator.py`).
+- **Fixed** that proposal's claim that no release-channel constant exists.
+  `arklight.CHANNEL = "alpha"` does (static per branch, in `__all__`, read
+  into the `.arklight` schema tag), so the alpha guard needs no new constant.
+- **Removed** the changelog-style "Renumbered", "Re-renumbered again" and
+  "Un-scheduled (amendment): KaiOS" paragraphs from
+  `docs/Foundational/ARCHITECTURE.md`'s Milestones section. They were
+  changelog content that had drifted into the roadmap doc. The first
+  renumbering is recorded in `[0.048]` below; the Android/Desktop swap is
+  explained by `DESIGN-NOTES.md`'s "Updated direction" note, and KaiOS being
+  unscheduled by `PROGRESS.md`'s "Planned, not yet scheduled" section. The
+  roadmap table above them is the canonical copy. Also dropped the "Vue" and "Svelte"
+  entries from that doc's Backend Interface "Future" list.
+- **Decided: Vue and Svelte backends will not be built.** Recorded as a dated
+  decision at the end of `DESIGN-NOTES.md`'s "authoring layer that compiles
+  to real frameworks" section (kept as the reasoning, not a plan). Corrected
+  every statement that called them planned, blocked or unscheduled:
+  `DESIGN-NOTES.md` (three places), `PROGRESS.md`'s `v0.054` non-scope
+  bullet, `ARCHITECTURE.md`'s Android entry, and docstrings in
+  `arklight/backend/base.py`, `arklight/ir/build.py` and
+  `arklight/compiler/pipeline.py`. Comparisons (React/Vue/Svelte ergonomics,
+  "Vue 3 parity") are unchanged.
+- **Fixed** three references left dangling by that removal, in
+  `DESIGN-NOTES.md` (two) and `PROGRESS.md`'s KaiOS entry.
+- **`README.md`.** Dropped a duplicated tagline and moved the status pointer
+  up under the intro, without its own `## Status` heading.
+
+Full suite 1817 passed. `0.06511` -> `0.06512`; roadmap `v0.065` untouched.
+
 ## [0.06511] -- Fix: Rei's assets sentence, a stage-table drift guard, and doc accuracy (follow-up to `0.06510`)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06510]`

@@ -37,8 +37,13 @@ current code still holds:
 - `find_config` looks only in the entry file's own directory, and
   `_KNOWN_SECTIONS` is now `{"live_streaming", "android", "desktop",
   "experimental", "csp", "rei"}`.
-- No release-channel constant exists; `_ALPHA_WARNING_MARKER` in
-  `arklight/cli/main.py` still only tags warning text (Open question 1).
+- A release-channel constant **does** exist: `arklight.CHANNEL = "alpha"`
+  (`arklight/__init__.py`), a static per-branch string exported in `__all__`,
+  locked by `tests/test_version.py` and written into the `.arklight` schema
+  tag (`arklight/ir/binary.py`). `_ALPHA_WARNING_MARKER` in
+  `arklight/cli/main.py` is a separate thing: it only tags warning text
+  (Open question 1). *Corrected 2026-09-20: the proposal as filed, and the
+  first version of this section, said no channel constant existed.*
 - `discover.py` is static analysis over Python's `ast`, `loader.py` executes
   the module, and `Site.build_ark_ast()` returns `dict[str, ARKNode]`.
 - `ARKNode` still has only `type`, `props` and `children`; nothing in `ast/`
@@ -166,10 +171,11 @@ End of run, once per distinct feature:
 
 ### 1.5 The alpha guard
 
-No existing channel marker was found in the code: `_ALPHA_WARNING_MARKER`
-(`arklight/cli/main.py`) tags warning text and is not a channel flag. The guard
-needs a minimal marker, for example `RELEASE_CHANNEL = "alpha"` in
-`arklight/__init__.py`, checked by `fun.emit()`. See Open question 1.
+The channel marker already exists: `arklight.CHANNEL` (`"alpha"` on this
+branch, hardcoded per branch). `_ALPHA_WARNING_MARKER` (`arklight/cli/main.py`)
+tags warning text and is not a channel flag. The guard can therefore check
+`arklight.CHANNEL` in `fun.emit()` and at the `.rei` dispatch point, with no
+new constant. See Open question 1.
 
 ## 2. The two file types
 
@@ -346,8 +352,9 @@ automatic promotion.
 
 ## 10. Open questions
 
-1. **Alpha-channel marker.** No channel constant exists today. Add one, or gate
-   purely on the code living only on the `alpha` line? (Recommend both.)
+1. **Gating on the channel.** `arklight.CHANNEL` already exists. Gate on it,
+   on the code living only on the `alpha` line, or both? (Recommend both.) Part
+   of the wider gating question, Open question 11.
 2. **Route naming.** `Site.page("/")` is Python-side registration. What names a
    route in `.rei`? Strawman: one file, one route, derived from the filename.
 3. **Build-time evaluator.** Python gave loops, conditionals and helpers for
