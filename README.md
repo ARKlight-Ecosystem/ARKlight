@@ -52,15 +52,15 @@ whether it fits your project.
 
 ```text
 [Rei] Hey just a heads-up from the maintained.
-[Rei] ARKlight is tool I have been working on
-[Rei] for a while for personal reasons. It's
+[Rei] ARKlight is tool He has been working on
+[Rei] for a while, personal reasons. It's
 [Rei] clearly not ready for anything involving
 [Rei] ⚠️ Production and until the compiler
-[Rei] reaches a stable stage. It is only recommended
+[Rei] reaches a stable stage. ARKlight is only recommended
 [Rei] for informal, personal, hobby projects.
 [Rei] So if there's an audience waiting for it?
 [Rei] Showing their support (eg: Stars, Forks, and such?)
-[Rei] it motivates me. 
+[Rei] it motivates him. 
 ```
 
 ## Install
