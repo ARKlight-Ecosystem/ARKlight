@@ -66,6 +66,8 @@ history, [`PROGRESS.md`](PROGRESS.md) for the current snapshot and
 what's next, and [`docs/Foundational/ARCHITECTURE.md`](docs/Foundational/ARCHITECTURE.md)
 for the milestone roadmap.
 
+Refer to [`docs/Foundational/EXPERIMENTAL-APIS.md`](./docs/Foundational/EXPERIMENTAL-APIS.md) if you wished to use escape hatches.
+
 ## Install
 
 ```bash
