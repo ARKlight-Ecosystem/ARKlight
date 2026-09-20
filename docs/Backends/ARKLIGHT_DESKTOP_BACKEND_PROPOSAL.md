@@ -937,7 +937,7 @@ That is a better fit for ARKlight than making Neutralino the center of the archi
 ## 23. Sources
 
 - ARKlight `alpha` repository: <https://github.com/Rae-ARK/ARKlight/tree/alpha>
-- ARKlight current Neutralino integration document, superseded by this proposal: <https://github.com/Rae-ARK/ARKlight/blob/alpha/docs/Backends/NEUTRALINO-INTEGRATION.md>
+- ARKlight's former Neutralino integration document, superseded by this proposal and since removed from the repo (see the `alpha` branch history for its last revision)
 - Neutralino architecture: <https://neutralino.js.org/docs/contributing/architecture/>
 - Neutralino CLI and embedded-resource builds: <https://neutralino.js.org/docs/cli/neu-cli/>
 - Neutralino distribution overview: <https://neutralino.js.org/docs/distribution/overview/>

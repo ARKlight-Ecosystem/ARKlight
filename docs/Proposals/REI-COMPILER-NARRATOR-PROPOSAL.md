@@ -4,8 +4,8 @@
 
 **Accepted -- interleaved into `v0.065`'s milestone slot as a third
 piece of work, alongside JS vocabulary addendum stage 5 and
-`Provider` stage 1 of 6. Staged in
-[`docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`](../Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md).**
+`Provider` stage 1 of 6. Shipped as `0.06510` -- see
+[`docs/version history/v0.065.md`](<../version history/v0.065.md>).**
 
 **A version-number note, kept for history:** at filing time, `v0.065`
 was already the shared slot for two accepted, staged pieces of work
@@ -276,8 +276,7 @@ implicit stage 2 of this one.
 ## 8. Open questions for a maintainer
 
 - Exact wording/tone for each stage's narrated sentence(s) -- left to
-  implementation (`docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`),
-  not fixed by this proposal.
+  implementation, not fixed by this proposal.
 - Whether `--narrate` should also cover `arklight pack`/`unpack`/
   `pwa`/`android`/`desktop`'s own build-adjacent output, or stay
   scoped to `arklight build` only for this first landing. This
