@@ -92,7 +92,7 @@ corrects that: the function is not named at all.)
   `arkNotify` unless the hook returned `false`. Its messages are fixed,
   compiler-chosen strings.
 - **Build-time messages** go through the compiler's `[ARKlight] ...` log
-  lines (`--verbose`/`--debug`); Rei's `--narrate` (accepted, planned)
+  lines (`--verbose`/`--debug`); Rei's `--narrate` (shipped, `0.06510`)
   is a second presentation of the same stages.
 
 ## The syntax

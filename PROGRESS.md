@@ -66,8 +66,9 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06507 | Capability fix: Android native-shell hardening, first slice of `docs/Proposals/ANDROID-BACKEND-HARDENING-PROPOSAL.md` (now partially accepted) -- the generated `MainActivity.kt` routes external `http(s)`/`mailto:`/`tel:`/`sms:` links to the device instead of loading them inside the app's WebView (`shouldOverrideUrlLoading`, `ActivityNotFoundException` caught); new `android.allow_navigation` config key (bare hosts / `*.` subdomains, build-time `AndroidError` on a malformed entry) keeps chosen external `https` hosts in-app and is the only thing that adds `INTERNET` to the manifest; deprecated `onBackPressed()` replaced by an `OnBackPressedCallback` + `enableOnBackInvokedCallback` (predictive back); WebView `saveState`/`restoreState` across rotation (history + scroll, not JS state); a fixed built-in page on a failed main-frame load; `setWebContentsDebuggingEnabled` tied to `FLAG_DEBUGGABLE`. `append_user_agent`, background colour, `WebChromeClient`, WebView-version floor not done. `tests/test_android_hardening.py` (56 tests); full suite 1644 passed. Kotlin compiled with 1.9.24 against stubs and its routing logic run on a URL matrix; **not** built with the Android SDK or run on a device. `0.06506` -> `0.06507`; roadmap `v0.065` untouched | DONE |
 | v0.06508 | Message/docs fix: the speaker tag in the experimental-API heavy-reliance nudge (`arklight/experimental.py`), its quoted example in `docs/Foundational/EXPERIMENTAL-APIS.md`, and the root `README.md` status block changes from `[Rae ARK]` to `[Rei]`, matching the Rei voice in `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`. Wording unchanged; the `Rae-ARK` GitHub org name in URLs/slugs, the `LICENSE` copyright line and the `cctv.py` credit are deliberately left alone. `tests/test_cli.py`/`tests/test_experimental_apis.py` updated; full suite 1644 passed. `0.06507` -> `0.06508`; roadmap `v0.065` untouched | DONE |
 | v0.06509 | Capability fix: JS vocabulary addendum stage 4/10 (the math derivations catalog, the `v0.064` slot's second piece, paused while capability fixes took priority) -- 21 `Derive.*` kinds (`absolute`, `ceiling`, `floor`, `truncate_number`, `sign`, `sqrt`, `cbrt`, `power`, `exp`, `log`, `log2`, `log10`, `hypot`, `clamp`, `average`/`mean`, `median`, `gcd`, `lcm`, `percentage_of`, `to_fixed`, `to_precision`), one fragment file + one registry line each; `to_fixed`/`to_precision` take a build-time range-checked `digits`. New `arklight/ir/js_numeric.py` reproduces JavaScript's `Math.*`/`toFixed`/`toPrecision` answers where Python's `math` raises or rounds differently. Also fixes three build-time/client parity gaps found along the way (`NaN`/`-0` coercion in `_coerce_number`, `Derive.sum`'s compensated summation on Python 3.12+, `nan`/`inf` spelling in `Bind(...)` pre-fill). `random_int` stays with `v0.070`. `tests/test_js_vocabulary_v0064.py` (137 tests, incl. a Node parity sweep); full suite 1781 passed. `0.06508` -> `0.06509`; roadmap `v0.065` untouched | DONE |
+| v0.06510 | Capability fix: Rei, the compiler narrator -- the `v0.065` slot's third piece, shipped ahead of the two still-PLANNED pieces. `arklight build --narrate` (sibling to `--verbose`/`--debug`, mutually exclusive with both) narrates the same `on_stage=` pipeline calls as deterministic `[Rei] ...` sentences (`arklight/compiler/rei/`); `rei.default_mode` config key; one-time introduction on a fresh output directory; `Try: arklight search <Name>` on unknown-component-type / missing-required-prop failures via a new structured `ValidationError.component_name`; vendored read-only ELIZA reference (`docs/reference/eliza/`, never imported). Building it corrected the spec: import-time `DuplicateComponentError`/`DuplicateStyleNameError` are ordinary build errors narrated from the discovery stage, not raw tracebacks. `tests/test_rei_narrator.py` (31 tests); full suite 1810 passed. `0.06509` -> `0.06510`; roadmap `v0.065` untouched | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 5-10 of 10 (string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
-| v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
+| v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
@@ -144,6 +145,69 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06510 -- Capability fix: Rei, the compiler narrator (DONE)
+
+Third of the four pieces sharing the `v0.065` slot; shipped ahead of JS
+vocabulary stage 5 and `Provider` stage 1, both still PLANNED, the same way
+Platform API IR's stage 1 was. Numbered `0.0650` plus decimals, same slot-sharing
+precedent; roadmap `v0.065` untouched. Work was paused mid-way while the
+`v0.0641`-`v0.06509` capability fixes took priority and finished afterwards.
+
+**What went in.** `--narrate` and the `rei` config key are wiring; the actual
+renderer is small on purpose. `arklight/compiler/rei/` is a table of
+`re.fullmatch` patterns, one per stage message `arklight.compiler.pipeline`
+emits, over the exact `on_stage=` callback `--verbose` already uses -- a second
+renderer, not a second instrumentation pass. Deterministic, stdlib-only, no
+network, no LLM. Unrecognized messages fall back to `[Rei] <message>` instead of
+disappearing, which is also the signal that the pattern table needs a new row.
+The vendored ELIZA copy under `docs/reference/eliza/` is design reference only;
+a test walks every `arklight/**/*.py` module's real import statements to make
+sure that stays true.
+
+**The `arklight search` pointer needed structured data.** The addendum was firm
+that Rei must not regex the pointer's name back out of a formatted message. So
+`ValidationError` now carries a keyword-only `component_name` (default `None`,
+every existing call unchanged), set at exactly the SCHEMA-lookup sites -- unknown
+component type and missing required prop, plus their `Repeat(...)`-template
+twins -- and read by the CLI off `CompileError.__cause__`. Its presence alone
+decides whether `Try: arklight search <Name>` is appended, which is also why a
+`Bind`/`on_click`/behavior failure correctly gets none; a test asserts that
+absence, not just the presence case.
+
+**Where the spec was wrong.** The addendum (and the proposal's section 5) said
+`DuplicateComponentError`/`DuplicateStyleNameError` would surface as a raw
+traceback before any narrated stage. Reproduced instead of assumed: the
+pipeline logs "Discovering site..." *before* running the site file, and
+`load_site` catches any exception from running it and re-raises `SiteLoadError`
+-> `CompileError`. So they are ordinary build errors in every mode, and under
+`--narrate` a fresh-directory build prints the introduction, the discovery line,
+`Compilation halted.` and the error. The alternatives -- deferring the stage line
+or special-casing the loader -- would also have altered `--verbose`, so the spec
+was amended instead (proposal section 5 carries an in-place correction note)
+and six tests pin the behavior. A first draft of the regression fixture used
+`@component("Dup")`, which isn't the API (`component` takes no positional
+argument; the name is the function's) and would have failed for the wrong reason;
+the probe that exposed it also showed the real failure path.
+
+**Test hygiene.** `@component()` registers into a process-global registry, so the
+duplicate-component tests snapshot and restore `COMPONENT_REGISTRY` around each
+run rather than leaking `DupReiProbe` into later tests. The ELIZA test was
+mutation-checked (a planted `from docs.reference.eliza import eliza` makes it
+fail).
+
+**Verification.** `tests/test_rei_narrator.py` (31 tests). Full suite: 1810
+passed; the 2 `tests/test_version.py` failures need package metadata and only
+appear on a checkout that isn't `pip install`ed, same as `v0.065`'s Platform API
+IR note.
+
+**Not done / left alone.** Rei narrates the stage messages that exist today; a
+new pipeline stage needs a new pattern row (the passthrough keeps it visible
+meanwhile). No bespoke narration or pointer for import-time errors -- that would
+be its own proposal. Nothing in `arklight.config`'s docs enumerates config
+sections, so there was no per-section reference to extend beyond
+`CLI-REFERENCE.md`; `docs/Foundational/CONFIGURABILITY.md` is about a different
+mechanism (site-author-facing defaults) and was deliberately not touched.
 
 ## v0.06509 -- Capability fix: JS vocabulary stage 4/10, math derivations catalog (DONE)
 

@@ -5,6 +5,62 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06510] -- Capability fix: Rei, the compiler narrator (`--narrate`) -- the `v0.065` slot's third piece
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06509]`
+(the roadmap's `v0.065` is never touched). Ships the third of the four pieces
+sharing the `v0.065` slot (`docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`,
+accepted from `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`), ahead of the
+two still PLANNED (JS vocabulary stage 5, `Provider` stage 1).
+
+- **`arklight build --narrate`.** Same pipeline progress `--verbose` prints,
+  told as short `[Rei] ...` sentences instead of `[ARKlight] ...` lines.
+  Mutually exclusive with `--verbose`/`--debug` (combining them fails the build
+  up front, naming the flag); `--debug` still implies `--verbose`. Output is
+  deterministic -- the same build narrates byte-identically. Inline
+  experimental-API banners still print unconditionally and are never reworded.
+- **`arklight/compiler/rei/` (new).** A closed table of `re.fullmatch` patterns,
+  one per stage message the pipeline emits, over the same `on_stage=` callback
+  `--verbose` already uses -- no new compiler hooks. Anything unrecognized falls
+  back to `[Rei] <message>` rather than being dropped. Stdlib only.
+- **`rei.default_mode` config key** (`"plain"`/`"verbose"`/`"narrate"`; `rei`
+  added to `arklight.config._KNOWN_SECTIONS`). Sets what a build with no
+  log-mode flag does; a flag always wins. Missing section/key means `"plain"`;
+  any other value fails the build.
+- **First-build introduction.** The first narrated build into a missing-or-empty
+  output directory starts with a two-line greeting that also says why narration
+  is on (flag vs `arklight.config.py`). Not repeated into the same directory;
+  back after it is cleared.
+- **`arklight search <Name>` pointer on schema violations.** `ValidationError`
+  gained a keyword-only `component_name` (default `None`, so every existing
+  `ValidationError(msg)` call is unchanged), set only at the SCHEMA-lookup
+  sites -- unknown component type, missing required prop, and their two
+  `Repeat(...)`-template twins. Under `--narrate`, a failure carrying it gets
+  exactly one extra line, `Try: arklight search <Name>`. It is read off
+  `CompileError.__cause__`, never scraped from the message; no other
+  validation category gets a pointer.
+- **Vendored ELIZA reference** at `docs/reference/eliza/eliza.py`, read-only
+  design reference; nothing under `arklight/` imports it (a test walks every
+  module's import statements to keep it that way).
+- **Behavior change:** none for a build without `--narrate` and without
+  `rei.default_mode` -- output and error text are unchanged.
+- **Spec corrected while building it.** The addendum and the proposal's section 5
+  said a `DuplicateComponentError`/`DuplicateStyleNameError` from the site file
+  would be a raw Python traceback with zero Rei output. It isn't: the site file
+  runs inside the "Discovering site..." stage and `load_site` wraps any
+  exception it raises into `SiteLoadError` -> `CompileError`, so these are
+  ordinary build errors in every log mode. Rather than defer the stage line or
+  special-case the loader (either would also change `--verbose`), both documents
+  were amended to describe that, and six tests pin it.
+- **Docs.** `docs/Foundational/CLI-REFERENCE.md` documents `--narrate` and
+  `rei.default_mode`; the addendum's Status is SHIPPED; outcome rolled into
+  `docs/version history/v0.065.md`.
+
+`tests/test_rei_narrator.py` (31 tests). Full suite 1810 passed; the 2
+`tests/test_version.py` failures are unrelated and appear only on a checkout
+that isn't `pip install`ed (no package metadata). `0.06509` -> `0.06510`;
+roadmap `v0.065` untouched.
+
 ## [0.06509] -- Capability fix: JS vocabulary stage 4/10, the math derivations catalog (the `v0.064` remainder)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06508]`
