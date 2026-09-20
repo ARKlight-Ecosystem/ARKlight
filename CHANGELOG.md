@@ -40,8 +40,8 @@ untouched.
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06509]`
 (the roadmap's `v0.065` is never touched). Ships the third of the four pieces
-sharing the `v0.065` slot (`docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`,
-accepted from `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`), ahead of the
+sharing the `v0.065` slot, accepted from
+`docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`, ahead of the
 two still PLANNED (JS vocabulary stage 5, `Provider` stage 1).
 
 - **`arklight build --narrate`.** Same pipeline progress `--verbose` prints,

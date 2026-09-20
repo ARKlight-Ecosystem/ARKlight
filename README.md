@@ -8,7 +8,7 @@
 <td valign="middle">
 <div align="center">
 
-# ARKlight Framework
+# ARKlight Compiler Framework
 
 **A Python-first compiler for building static websites where developers work
 with a structured component API, while the output remains ordinary, dependency-free `Hyper Text Markup Language` `Casscading Style Sheets` `JavaScript`.**

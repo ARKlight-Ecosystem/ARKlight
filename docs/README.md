@@ -64,8 +64,7 @@ and captured in the changelog or a Foundational doc.
 | --- | --- |
 | [`ANDROID-BACKEND-IMPLEMENTATION.md`](Backends/ANDROID-BACKEND-IMPLEMENTATION.md) | Staged implementation plan for the Android packaging backend. |
 | [`DESKTOP-BACKEND-IMPLEMENTATION.md`](Backends/DESKTOP-BACKEND-IMPLEMENTATION.md) | Staged implementation plan for the desktop packaging backend (Linux only so far). |
-| [`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`](Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md) | Proposal for a purpose-built native desktop host/packager (replacing Neutralino.js as the canonical desktop backend) -- now Stage 1 of `DESKTOP-BACKEND-IMPLEMENTATION.md`. |
-| [`NEUTRALINO-INTEGRATION.md`](Backends/NEUTRALINO-INTEGRATION.md) | Neutralino.js desktop-app integration -- superseded plan, kept for reference only. |
+| [`ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md`](Backends/ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md) | Proposal for a purpose-built native desktop host/packager (replacing an earlier, now-removed Neutralino.js plan) -- now Stage 1 of `DESKTOP-BACKEND-IMPLEMENTATION.md`. |
 
 ### [`docs/Proposals/`](Proposals/README.md) — unsettled
 
@@ -105,17 +104,17 @@ README for the full rationale.
 | --- | --- |
 | [`JS-VOCABULARY-ADDENDUM-v0.070.md`](Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md) | Staged, ten-rung (`v0.061`-`v0.070`) implementation ladder for the philosophy-compliant parts of `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`. |
 | [`PROJECT-KNOWLEDGE-ADDENDUM.md`](Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md) | Staged, eight-rung (`v0.071`-`v0.078`) implementation ladder for the accepted `docs/Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md` -- `.arklight/` foundation through future-provider open slot, one version per stage. |
-| [`REI-COMPILER-NARRATOR-ADDENDUM.md`](Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md) | Single-version (`v0.065`) implementation entry for Rei, the compiler narrator -- `--narrate` build flag, `rei` config section, first-compile introduction banner. No ladder; a third piece interleaved into `v0.065`. **SHIPPED** (as `0.06510`). |
 
 ### [`docs/new js backend proposal/`](<new js backend proposal/README.md>) — working reference
 
-Competing proposals under consideration for a redesigned JS backend.
-**Working reference only** — removed once a direction is chosen.
+Proposal for a redesigned JS backend; the virtual-DOM direction was
+chosen over a competing no-vdom alternative. **Working reference
+only** — kept until `arklight search --retrieve-doc --js-backend`'s
+dependency on this folder is resolved, then removed.
 
 | File | Covers |
 | --- | --- |
-| [`ARCHITECTURE-VDOM.md`](<new js backend proposal/ARCHITECTURE-VDOM.md>) | Proposal using a virtual DOM approach. |
-| [`ARCHITECTURE no vdom.md`](<new js backend proposal/ARCHITECTURE no vdom.md>) | Alternative proposal without a virtual DOM. |
+| [`ARCHITECTURE-VDOM.md`](<new js backend proposal/ARCHITECTURE-VDOM.md>) | Proposal using a virtual DOM approach -- the chosen direction. |
 
 ### [`docs/Far Future Concern/`](<Far Future Concern/README.md>) — working reference
 

@@ -1,6 +1,6 @@
 """Tests for the Rei compiler narrator (`--narrate`), `v0.065` --
-see docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md /
-docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md.
+see docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md and
+docs/version history/v0.065.md.
 """
 
 import ast

@@ -1,8 +1,9 @@
 """
 Rei -- the compiler narrator (`arklight build --narrate`).
 
-Implements `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md` /
-`docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md` (`v0.065`).
+Implements `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`
+(`v0.065`, shipped as `0.06510` -- see
+`docs/version history/v0.065.md`).
 
 Rei is a **pure-Python, deterministic pattern renderer**: given the
 same stage-completion message (or the same failure), she always

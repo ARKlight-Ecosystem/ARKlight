@@ -11,10 +11,9 @@ own CI-first-then-local staging shape (Stages 2-4 are CI-only, no
 local toolchain required; Stages 5-7 are their `subprocess`-shelling-
 out local counterparts).
 
-`NEUTRALINO-INTEGRATION.md` describes an earlier, superseded plan
-(Neutralino.js as the canonical desktop backend) -- see the proposal's
-section 11 for why that direction was dropped. Nothing in this table
-depends on it.
+An earlier plan used Neutralino.js as the canonical desktop backend;
+see the proposal's section 11 for why that direction was dropped.
+Nothing in this table depends on it.
 
 ## Platform scope
 

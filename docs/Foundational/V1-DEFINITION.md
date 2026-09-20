@@ -179,8 +179,8 @@ Named individually, not left to be inferred from Section 3's silence:
   "you are stepping outside the philosophy" warning on every use
   cannot simultaneously be part of a "just works, reliably" claim.
 - **`Provider`** (`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`), **Rei**
-  (`docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`),
-  **Project Knowledge** (`docs/Implementation/
+  (`docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`, shipped as
+  `0.06510`), **Project Knowledge** (`docs/Implementation/
   PROJECT-KNOWLEDGE-ADDENDUM.md`), and **`arklight assistant`**
   (Miko/Raeliana, `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`).
   All four are explicitly experimental, staged, or provisional as of
