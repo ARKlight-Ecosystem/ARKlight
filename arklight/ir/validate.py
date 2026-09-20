@@ -110,9 +110,12 @@ Checks performed:
     loop below, since it's the only place an `ItemBind` node
     (`RepeatItem.value()`) is valid. `Show(predicate, ...)` needs a
     `Predicate.*(...)` reference (`arklight.ast.nodes.PredicateRef`)
-    whose `kind` is known (`arklight.ir.schema.PREDICATE_REGISTRY`)
-    and whose `names` resolve to `State(...)`/`Computed(...)` declared
-    on the same page; its children are ordinary content, validated the
+    whose `kind` is known (`arklight.ir.schema.PREDICATE_REGISTRY`),
+    whose `names` count matches its spec (exact, or a minimum for the
+    variadic `and`/`or`), whose `args` are exactly its spec's
+    `extra_args` (`v0.066`: `one_of`'s `values`, a non-empty list of
+    JSON scalars), and whose `names` resolve to `State(...)`/
+    `Computed(...)` declared on the same page; its children are ordinary content, validated the
     same way any other component's children are.
 17. `State(..., query="...")` (`v0.064`, `docs/Proposals/
     URL-STATE-AS-PRIMITIVE-PROPOSAL.md`), if present, must be a legal
@@ -149,6 +152,7 @@ Checks performed:
 
 from __future__ import annotations
 
+import math
 import re
 
 from arklight.ast.nodes import (
@@ -175,6 +179,8 @@ from arklight.ir.schema import (
     LITERAL_ARG_RULES,
     LiteralArgRule,
     MODIFIER_REGISTRY,
+    ONE_OF_MAX_INTEGER,
+    ONE_OF_MAX_VALUES,
     PREDICATE_REGISTRY,
     SCHEMA,
 )
@@ -894,6 +900,36 @@ def _validate_watch_declaration(
     _validate_action(then, path=path, mutable_state=mutable_state, page_state=page_state)
 
 
+def _validate_one_of_values(values: object, *, path: str) -> None:
+    """`v0.066`: `Predicate.one_of(...)`'s literal `values` list -- a
+    non-empty list of JSON scalars, so the build-time membership test and
+    the client's `indexOf` always see the same literals. `nan`/`inf`
+    can't be written in JSON at all; integers past 2**53 aren't exactly
+    representable as a JavaScript number."""
+    if not isinstance(values, list) or not values:
+        raise ValidationError(
+            f"Show(...) at {path} needs Predicate.one_of(...) values to be a "
+            f"non-empty list, got {values!r}."
+        )
+    if len(values) > ONE_OF_MAX_VALUES:
+        raise ValidationError(
+            f"Show(...) at {path} gives Predicate.one_of(...) {len(values)} "
+            f"values; the limit is {ONE_OF_MAX_VALUES}."
+        )
+    for value in values:
+        if value is None or isinstance(value, (bool, str)):
+            continue
+        if isinstance(value, int) and abs(value) <= ONE_OF_MAX_INTEGER:
+            continue
+        if isinstance(value, float) and math.isfinite(value):
+            continue
+        raise ValidationError(
+            f"Show(...) at {path} gives Predicate.one_of(...) the value "
+            f"{value!r}, which isn't a str, bool, None, finite number, or "
+            f"integer within +/-2**53."
+        )
+
+
 def _validate_predicate_ref(
     predicate: PredicateRef | None, *, path: str, page_state: frozenset[str]
 ) -> None:
@@ -905,7 +941,8 @@ def _validate_predicate_ref(
         raise ValidationError(
             f"Show(...) at {path} needs predicate=Predicate.truthy(...)/"
             f"Predicate.falsy(...)/Predicate.equals(...)/Predicate.gt(...)/"
-            f"Predicate.lt(...), got {predicate!r}."
+            f"Predicate.lt(...)/or another Predicate.*(...) kind "
+            f"({', '.join(sorted(PREDICATE_REGISTRY))}), got {predicate!r}."
         )
     spec = PREDICATE_REGISTRY.get(predicate.kind)
     if spec is None:
@@ -914,11 +951,29 @@ def _validate_predicate_ref(
             f"Show(...) at {path} uses unknown predicate {predicate.kind!r}. "
             f"Known predicates are: {known}."
         )
-    if len(predicate.names) != spec.names:
+    count = len(predicate.names)
+    if count < spec.names or (count > spec.names and not spec.variadic):
+        arity = f"at least {spec.names}" if spec.variadic else f"exactly {spec.names}"
         raise ValidationError(
             f"Show(...) at {path} uses Predicate.{predicate.kind}(...) with "
-            f"{len(predicate.names)} name(s); it takes exactly {spec.names}."
+            f"{count} name(s); it takes {arity}."
         )
+    unknown_args = set(predicate.args) - set(spec.extra_args)
+    if unknown_args:
+        raise ValidationError(
+            f"Show(...) at {path} passes unexpected argument(s) "
+            f"{sorted(unknown_args)!r} to Predicate.{predicate.kind}(...). "
+            f"Known arguments for Predicate.{predicate.kind}(...) are: "
+            f"{spec.extra_args!r}."
+        )
+    missing_args = [name for name in spec.extra_args if name not in predicate.args]
+    if missing_args:
+        raise ValidationError(
+            f"Show(...) at {path} is missing required argument(s) "
+            f"{missing_args!r} for Predicate.{predicate.kind}(...)."
+        )
+    if predicate.kind == "one_of":
+        _validate_one_of_values(predicate.args["values"], path=path)
     for name in predicate.names:
         if name not in page_state:
             known = ", ".join(sorted(page_state)) or "(none declared)"

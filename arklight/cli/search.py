@@ -250,7 +250,10 @@ def _format_derivation_spec(name: str, spec: DerivationSpec) -> str:
 
 def _format_predicate_spec(name: str, spec: PredicateSpec) -> str:
     lines = [f"Predicate.{name}"]
-    lines.append(f"  names          : exactly {spec.names} name{'s' if spec.names != 1 else ''}")
+    qualifier = "at least" if spec.variadic else "exactly"
+    lines.append(f"  names          : {qualifier} {spec.names} name{'s' if spec.names != 1 else ''}")
+    if spec.extra_args:
+        lines.append(f"  extra args     : {', '.join(spec.extra_args)}")
     return "\n".join(lines)
 
 
