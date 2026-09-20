@@ -88,7 +88,17 @@ CONFIG_FILENAME = "arklight.config.py"
 # list is inherently per-site content (which external origins *this*
 # site actually trusts), not a project-wide policy, so it stays a
 # `Site(...)`-only kwarg with no config-file equivalent.
-_KNOWN_SECTIONS = {"live_streaming", "android", "desktop", "experimental", "csp"}
+#
+# "rei" is read by `arklight.cli.main` (`arklight build`) -- one key,
+# `default_mode`, one of `"plain"`/`"verbose"`/`"narrate"`. Sets what a
+# bare `arklight build` (no `--verbose`/`--narrate` flag) does for this
+# project. A CLI flag always overrides this for that one invocation --
+# the config only changes the no-flag-passed default, the same
+# override relationship `--max-width`/`--bg`/etc. already have with
+# `Site(...)` kwargs. Missing key or missing section both mean
+# `"plain"` (today's unnamed default) -- this is opt-in end to end.
+# See docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md.
+_KNOWN_SECTIONS = {"live_streaming", "android", "desktop", "experimental", "csp", "rei"}
 
 
 class ConfigError(Exception):
