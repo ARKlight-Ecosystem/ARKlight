@@ -118,7 +118,9 @@ flag parsing, config default and flag override, determinism, first-build
 banner (shown / not repeated / back after clearing the directory), the
 `arklight search` pointer (present on unknown-type and missing-required-
 prop failures, absent on a behavior-validation failure, absent outside
-`--narrate`), the no-import check against the vendored ELIZA reference,
+`--narrate`), the no-import check against the ELIZA reference (landed at
+`docs/reference/eliza/eliza.py` as an original from-scratch implementation
+rather than a copy of a third-party ELIZA, as its own header states),
 and import-time registration errors (narrated as ordinary build
 failures, in all three log modes). Outcome rolled into
 [`docs/version history/v0.065.md`](../version%20history/v0.065.md), per

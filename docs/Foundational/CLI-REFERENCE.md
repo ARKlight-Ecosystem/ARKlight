@@ -90,7 +90,10 @@ arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--de
     It is not repeated on later builds into the same directory, and
     comes back if you delete/clear the output directory.
   - **On failure**, the error prints as `[Rei] Compilation halted.`
-    followed by the same error message the plain build prints. When
+    followed by the same error text the plain build prints -- without
+    its `ARKlight build failed:` prefix and its `Re-run with --debug`
+    hint, since `--debug` can't be combined with `--narrate` (drop
+    `--narrate` and add `--debug` to get the full traceback). When
     the failure is an unknown component type, or a known component
     missing a required prop, one extra fixed line is appended --
     `Try: arklight search <Name>`, pointing at the existing `search`

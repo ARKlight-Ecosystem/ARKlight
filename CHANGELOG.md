@@ -5,6 +5,37 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06511] -- Fix: Rei's assets sentence, a stage-table drift guard, and doc accuracy (follow-up to `0.06510`)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06510]`
+(the roadmap's `v0.065` is never touched). Found while auditing everything
+added since `v0.064`.
+
+- **Rei's assets narration was untrue on most builds.** The pipeline logs
+  its "Copying assets..." stage on every build, with or without an `assets/`
+  folder, but Rei said "Copying your assets/ folder into the output." Now:
+  "Copying your assets/ folder into the output, if there is one."
+  **Behavior change:** only under `--narrate` (or `rei.default_mode =
+  "narrate"`), and only that one line; `--verbose` and plain output are
+  unchanged.
+- **Drift guard.** `narrate_stage` falls back to a raw `[Rei] <message>`
+  passthrough for a message no pattern matches. New tests fail if any stage
+  message a real build emits -- or the three conditional ones (raw
+  postprocess, `.arklight` snapshot read, IR rebuild) -- lacks a pattern, so
+  a future pipeline stage can't silently narrate as raw text.
+- **Docs.** `CLI-REFERENCE.md` now says what `--narrate` failure output
+  actually is: the plain error text without the `ARKlight build failed:`
+  prefix or the `Re-run with --debug` hint (`--debug` can't be combined with
+  `--narrate`). `CHANGELOG.md`, `PROGRESS.md` and `v0.065.md` called
+  `docs/reference/eliza/eliza.py` "vendored"; it is an original from-scratch
+  implementation, and the addendum's Status now records where it landed, as
+  the addendum asked.
+
+`tests/test_rei_narrator.py` (36 tests). Full suite 1815 passed; the 2
+`tests/test_version.py` failures are unrelated and appear only on a checkout
+that isn't `pip install`ed. `0.06510` -> `0.06511`; roadmap `v0.065`
+untouched.
+
 ## [0.06510] -- Capability fix: Rei, the compiler narrator (`--narrate`) -- the `v0.065` slot's third piece
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06509]`
@@ -39,8 +70,9 @@ two still PLANNED (JS vocabulary stage 5, `Provider` stage 1).
   exactly one extra line, `Try: arklight search <Name>`. It is read off
   `CompileError.__cause__`, never scraped from the message; no other
   validation category gets a pointer.
-- **Vendored ELIZA reference** at `docs/reference/eliza/eliza.py`, read-only
-  design reference; nothing under `arklight/` imports it (a test walks every
+- **ELIZA reference** at `docs/reference/eliza/eliza.py` -- an original,
+  from-scratch implementation kept as read-only study material (its header
+  says it is not a copy of anyone's code), not a vendored third-party file; nothing under `arklight/` imports it (a test walks every
   module's import statements to keep it that way).
 - **Behavior change:** none for a build without `--narrate` and without
   `rei.default_mode` -- output and error text are unchanged.

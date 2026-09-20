@@ -114,7 +114,7 @@ _STAGE_PATTERNS: tuple[_StagePattern, ...] = (
     ),
     _pat(
         r"Copying assets\.\.\.",
-        lambda m: _line("Copying your assets/ folder into the output."),
+        lambda m: _line("Copying your assets/ folder into the output, if there is one."),
     ),
     _pat(
         r"Build complete -> (?P<path>.+)",
