@@ -109,7 +109,7 @@ narrator personas.
 
 ## Status
 
-**SHIPPED.** Implemented in `arklight/compiler/rei/` plus wiring in
+**SHIPPED** (as the capability-fix increment `0.06510`). Implemented in `arklight/compiler/rei/` plus wiring in
 `arklight/cli/main.py`, `arklight/config.py` (`rei` section) and
 `arklight/ir/validate.py` (`ValidationError.component_name`);
 `docs/Foundational/CLI-REFERENCE.md` documents `--narrate` and
