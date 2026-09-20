@@ -5,6 +5,23 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.066] -- Milestone rollup: `v0.066` is done
+
+Version moves from the `0.0650x` out-of-band increments to the milestone
+number. No code change beyond `pyproject.toml`'s version.
+
+- **`v0.066`'s two pieces both shipped:** `Provider` stage 2/6, IR and
+  validation integration (`[0.06516]`), and JS vocabulary addendum stage 6/10,
+  the predicates catalog (`[0.06517]`).
+- **Also in this build:** `Provider` stage 3/6, `window.ARKLIGHT_PROVIDER`
+  (`[0.06518]`). That is a `v0.067`-slot piece pulled forward; `v0.067` stays
+  open, since its other piece (JS vocabulary stage 7/10, list-scalar
+  derivations) has not started.
+- **Docs:** `docs/version history/v0.066.md` and its index row now describe
+  `v0.066` as a closed milestone; `ARCHITECTURE.md`'s `v0.065`-`v0.070` row
+  and `PROGRESS.md`'s snapshot table carry the rollup.
+- Full suite 2266 passed. `0.06518` -> `0.066`.
+
 ## [0.06518] -- Capability fix: `Provider`, stage 3/6, JS backend emission (the `v0.067` slot's first-shipped piece)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06517]`.
