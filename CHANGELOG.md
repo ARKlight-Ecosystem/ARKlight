@@ -5,6 +5,36 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06506] -- Capability fix: compiler-native diagnostics for user-defined component calls
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06505]`
+(the roadmap's `v0.065` is never touched). A **capability fix** for
+issue-register #5 and the general point in #32: `@component` promised a
+clear message instead of a raw Python `TypeError`, and two boundaries
+still leaked one. Full design record:
+`docs/Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`.
+
+- A positional call (`Stat("a", "b")`) raises `ComponentError` naming the
+  component, the keyword-only rule, its declared props, a by-name example
+  and the call's `file:line`, instead of `Stat() takes 0 positional
+  arguments but 2 were given`.
+- A `props=` contract that disagrees with the render function's signature
+  (a declared prop it has no parameter for, or a required parameter
+  `props=` doesn't declare) raises `ComponentError` naming both sides.
+  Checked with `inspect.Signature.bind` when the component is *used*
+  (expansion, and `mode="registry"` backend-override dispatch), so it
+  never runs the function and cannot reject a call that would have
+  worked. A component that is defined but never used is unaffected.
+- **Behavior change:** both cases are now `ComponentError` (a
+  `RuntimeError`), not `TypeError`. Valid components and calls, and every
+  build that succeeded before, are unchanged.
+- Not changed: positional children on user-defined components (still
+  unsupported; the message says so), built-in components, and errors
+  raised inside a render function's own body.
+
+`tests/test_component_call_diagnostics.py` (19 tests); full suite 1588
+passed.
+
 ## [0.06505] -- Capability fix: JS runtime error-handling coverage (`ARKLIGHT_ON_ERROR`)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06503]`

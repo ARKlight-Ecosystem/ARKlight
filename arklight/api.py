@@ -15,6 +15,7 @@ except `Site`, which is a small registry object.
 from __future__ import annotations
 
 import re
+import sys
 from typing import Any, Callable
 
 from arklight import experimental
@@ -315,8 +316,10 @@ NoScript = node("NoScript")
 
 from arklight.ir.components import (  # noqa: E402
     ALLOW_REDEFINE_MARKER,
+    ComponentError,
     ComponentState,
     Prop,
+    positional_call_message,
     register_backend_render,
     register_component,
 )
@@ -430,7 +433,25 @@ def component(
             allow_redefine=allow_redefine,
         )
 
-        def marker(**call_props: Any) -> ARKNode:
+        declared_prop_names = list(props) if props else []
+
+        def marker(*args: Any, **call_props: Any) -> ARKNode:
+            # v0.06506: `*args` exists only so a positional call site
+            # reaches *this* check -- with a bare `**call_props`
+            # signature, Python itself refuses the call first, with a
+            # "takes 0 positional arguments" `TypeError` that says
+            # nothing about ARKlight's keyword-only rule or what this
+            # component actually accepts.
+            if args:
+                frame = sys._getframe(1)
+                raise ComponentError(
+                    positional_call_message(
+                        name,
+                        args,
+                        declared_prop_names,
+                        caller=f"{frame.f_code.co_filename}:{frame.f_lineno}",
+                    )
+                )
             return ARKNode(type=name, props=call_props, children=[])
 
         marker.__name__ = name

@@ -86,6 +86,7 @@ preserved.
 
 from __future__ import annotations
 
+import inspect
 import itertools
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
@@ -178,6 +179,105 @@ class DuplicateComponentError(ComponentError):
     a project turns it on exactly where it re-registers on purpose,
     everywhere else keeps the safety net.
     """
+
+
+def positional_call_message(
+    name: str,
+    args: tuple[Any, ...],
+    declared_props: "list[str]",
+    *,
+    caller: str | None = None,
+) -> str:
+    """
+    v0.06506 (issue-register #5/#32): the message a user-defined
+    component's call-site marker raises when it is called with
+    positional arguments.
+
+    A component's call site is keyword-only -- `Stat(label="a")`, never
+    `Stat("a")` -- because props are matched by *name* against the
+    `props=` contract, and built-in components' positional *children*
+    have no equivalent on a user-defined one. Before this message
+    existed, the marker's own `**call_props` signature made Python
+    itself refuse the call with `Stat() takes 0 positional arguments
+    but 2 were given`: accurate about Python, silent about ARKlight's
+    actual rule and about what the component does accept.
+
+    `declared_props` is the component's `props=` keys in declared
+    order (empty when it declares none). `caller` is an optional
+    `"file:line"` for the offending call site.
+    """
+    count = len(args)
+    plural = "" if count == 1 else "s"
+    head = (
+        f"Component {name!r} was called with {count} positional "
+        f"argument{plural}, but user-defined components accept keyword "
+        "props only."
+    )
+    if not declared_props:
+        detail = (
+            f" {name!r} declares no props, so it takes no arguments at "
+            f"all: call it as {name}()."
+        )
+    elif count <= len(declared_props):
+        example = ", ".join(f"{p}=..." for p in declared_props[:count])
+        detail = (
+            f" Declared props: {declared_props!r}. Pass each value by "
+            f"name instead, e.g. {name}({example})."
+        )
+    else:
+        detail = (
+            f" It declares only {len(declared_props)} prop(s): "
+            f"{declared_props!r}."
+        )
+    tail = (
+        " Positional children are not supported on a user-defined "
+        "component; pass content through a declared prop."
+    )
+    where = f" (called at {caller})" if caller else ""
+    return head + detail + tail + where
+
+
+def call_render_fn(
+    name: str,
+    render_fn: Callable[..., Any],
+    resolved_props: dict[str, Any],
+    *,
+    what: str = "render function",
+) -> Any:
+    """
+    v0.06506 (issue-register #32): call `render_fn(**resolved_props)`,
+    but check first that the keyword arguments actually *bind* to its
+    signature, so a `props=` contract that disagrees with the function
+    it belongs to fails as a `ComponentError` naming both sides instead
+    of a raw `TypeError` from two frames down.
+
+    Only argument binding is checked (`inspect.Signature.bind`, which
+    never runs the function), so this cannot reject a call that would
+    have succeeded: every prop the contract declares is passed by
+    keyword, so a declared prop the function has no parameter for -- or
+    a required parameter no prop supplies -- was always going to raise
+    `TypeError`. A function whose signature can't be introspected
+    (`ValueError`/`TypeError` from `inspect.signature`) is called as
+    before, unchecked. Errors raised *inside* the function are never
+    touched.
+    """
+    try:
+        signature = inspect.signature(render_fn)
+    except (TypeError, ValueError):
+        return render_fn(**resolved_props)
+    try:
+        signature.bind(**resolved_props)
+    except TypeError as exc:
+        raise ComponentError(
+            f"Component {name!r}: props= and the {what}'s signature "
+            f"disagree -- {exc}. Declared props: "
+            f"{sorted(resolved_props)!r}; {what} parameters: "
+            f"{list(signature.parameters)!r}. Every declared prop is "
+            "passed by keyword, so each must be a parameter (or the "
+            "function must accept **kwargs), and every required "
+            "parameter must be declared in props=."
+        ) from exc
+    return render_fn(**resolved_props)
 
 
 @dataclass(frozen=True)
@@ -766,7 +866,7 @@ def _render_once(
     if spec.mode == "macro":
         # Option A: plain, immediate call -- the marker is expanded
         # away right here, nothing about it survives past this pass.
-        rendered = spec.render_fn(**resolved_props)
+        rendered = call_render_fn(spec.name, spec.render_fn, resolved_props)
     elif spec.mode == "registry":
         # Option B: still resolves through the component's shared
         # `render_fn` here, same as Option A above -- this call always
@@ -775,7 +875,7 @@ def _render_once(
         # is what gives a backend an actual way to supply a different
         # subtree for the *same* call site; this branch itself is
         # unchanged from Stage 0/1/2.
-        rendered = spec.render_fn(**resolved_props)
+        rendered = call_render_fn(spec.name, spec.render_fn, resolved_props)
     else:  # pragma: no cover -- unreachable, ComponentSpec.__post_init__ already validated this
         raise ComponentError(f"Component {spec.name!r}: unknown mode {spec.mode!r}.")
 
