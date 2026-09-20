@@ -39,6 +39,7 @@ that already imported them from there, same as Stages 1-4.
 from __future__ import annotations
 
 import json
+import math
 from html import escape
 
 from arklight.ast.nodes import ActionRef, ItemIndexRef, PredicateRef
@@ -62,6 +63,12 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
     """
     name = node.props.get("name")
     value = page_state.get(name, "")
+    # `v0.064`: a math derivation can now produce a non-finite result
+    # (`Derive.sqrt` of a negative, `Derive.log` of zero). Python's
+    # `str()` spells those `nan`/`inf`; the client runtime's `String()`
+    # spells them `NaN`/`Infinity`, so pre-fill the JavaScript spelling.
+    if isinstance(value, float) and not math.isfinite(value):
+        value = "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
     return f'<span data-ark-bind="{escape(str(name), quote=True)}">{escape(str(value))}</span>'
 
 

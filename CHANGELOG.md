@@ -5,6 +5,58 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06509] -- Capability fix: JS vocabulary stage 4/10, the math derivations catalog (the `v0.064` remainder)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06508]`
+(the roadmap's `v0.065` is never touched). Finishes the half of the
+`v0.064` milestone slot that the capability fixes paused: `v0.064` shipped
+`arklight search --retrieve-doc` and left JS vocabulary addendum stage 4/10
+(`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`) PLANNED.
+
+- **21 new `Derive.*` kinds**, each one fragment file under
+  `arklight/backend/js/derivations/` plus one `DERIVATION_REGISTRY` line, no
+  new IR node: `absolute`, `ceiling`, `floor`, `truncate_number`, `sign`,
+  `sqrt`, `cbrt`, `power`, `exp`, `log`, `log2`, `log10`, `hypot`, `clamp`,
+  `average` (`Derive.mean` is an alias for the same kind), `median`, `gcd`,
+  `lcm`, `percentage_of`, `to_fixed`, `to_precision`. `random_int` stays
+  deferred to `v0.070`, as the addendum's scope filter says.
+- Arity: unary transforms take one name; `power`/`percentage_of` take an
+  ordered pair; `clamp` an ordered triple (value, low, high); `hypot`/
+  `average`/`median`/`gcd`/`lcm` are variadic. `to_fixed`/`to_precision` take
+  one name plus a literal `digits`, range-checked at build time
+  (`arklight.ir.schema.DIGITS_RANGES`: `0`-`100` and `1`-`100`, exactly what
+  JavaScript accepts) so a bad value is one build error, not a `RangeError`
+  on every browser recompute. Both return a **string**, for display.
+- **`arklight/ir/js_numeric.py` (new)** holds the build-time mirrors. Python's
+  `math` *raises* where JavaScript returns a value (`sqrt(-1)`, `log(0)`,
+  `exp(1000)`, `ceil(inf)`, `pow(0, -1)`), and disagrees on `pow(1, Infinity)`
+  (`NaN` in JavaScript). Each mirror reproduces JavaScript's answer, so
+  out-of-domain input gives `NaN`/`Infinity`, never a build or runtime error.
+  `to_fixed` rounds an exact tie away from zero like JavaScript
+  (`(2.5).toFixed(0) === "3"`; Python's own `format` says `"2"`).
+- **Fixed while verifying parity** (behavior changes, all toward the existing
+  "server-rendered text agrees with the client recompute" invariant):
+  - `_coerce_number` now also maps `NaN` and `-0` to `+0`, as JavaScript's
+    `Number(x) || 0` does. Before, a `Computed(...)` reading a `NaN`-valued
+    `Computed(...)` got `NaN` at build time and `0` in the browser.
+  - `Derive.sum` no longer uses Python's `sum()`, which has been a
+    compensated sum since 3.12 and disagrees with JavaScript's `reduce` in the
+    last digit (ten `0.1`s: `1.0` vs `0.9999999999999999`).
+  - `Bind(...)` pre-fill spells non-finite results `NaN`/`Infinity`/
+    `-Infinity` (what the client's `String()` writes), not Python's
+    `nan`/`inf`.
+- **Known limit, documented rather than hidden:** `exp`, `log*`, `cbrt`,
+  `power` and `hypot` go through each platform's libm at build time and
+  V8's port in the browser, so the pre-rendered value can differ from the
+  recomputed one in the final binary digit (`hypot(2, 3)`: `3.605551275463989`
+  vs `3.6055512754639896`). `cbrt` is settled to the nearest double so
+  perfect cubes are exact. Format with `Derive.to_fixed` for display.
+
+`tests/test_js_vocabulary_v0064.py` (137 tests), including a Node sweep of
+~1,700 inputs that compares every kind's build-time value against the shipped
+fragment (string kinds and correctly-rounded kinds bit-for-bit). Full suite
+1781 passed. `0.06508` -> `0.06509`; roadmap `v0.065` untouched.
+
 ## [0.06508] -- Message/docs fix: the maintainer's speaker tag is now `[Rei]`, not `[Rae ARK]`
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06507]`

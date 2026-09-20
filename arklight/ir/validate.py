@@ -150,6 +150,7 @@ from arklight.ir.schema import (
     ACTION_REGISTRY,
     COMPARE_OPS,
     DERIVATION_REGISTRY,
+    DIGITS_RANGES,
     KNOWN_BEHAVIORS,
     KNOWN_QUERY_HISTORY_MODES,
     KNOWN_REVEAL_BEHAVIORS,
@@ -751,6 +752,15 @@ def _validate_derive_ref(
             raise ValidationError(
                 f"Computed(...) at {path} uses Derive.compare(...) with "
                 f"unknown op {op!r}. Known ops are: {known}."
+            )
+    if derive.kind in DIGITS_RANGES:
+        low, high = DIGITS_RANGES[derive.kind]
+        digits = derive.args.get("digits")
+        if isinstance(digits, bool) or not isinstance(digits, int) or not low <= digits <= high:
+            raise ValidationError(
+                f"Computed(...) at {path} uses Derive.{derive.kind}(...) with "
+                f"digits={digits!r}, but digits must be an integer from {low} "
+                f"to {high}."
             )
 
 

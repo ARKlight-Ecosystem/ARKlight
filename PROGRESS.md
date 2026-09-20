@@ -65,7 +65,8 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06506 | Capability fix: compiler-native diagnostics for user-defined component calls (issue-register #5/#32) -- a positional call (`Stat("a", "b")`) now raises `ComponentError` (component, keyword-only rule, declared props, by-name example, the call's `file:line`) instead of Python's `takes 0 positional arguments` `TypeError`; a `props=` contract that disagrees with the render function's signature (also for a `mode="registry"` backend override) raises `ComponentError` from an argument-*binding* check instead of a raw `TypeError`. `docs/Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`. `tests/test_component_call_diagnostics.py` (19 tests); full suite 1588 passed. `0.06505` -> `0.06506`; roadmap `v0.065` untouched | DONE |
 | v0.06507 | Capability fix: Android native-shell hardening, first slice of `docs/Proposals/ANDROID-BACKEND-HARDENING-PROPOSAL.md` (now partially accepted) -- the generated `MainActivity.kt` routes external `http(s)`/`mailto:`/`tel:`/`sms:` links to the device instead of loading them inside the app's WebView (`shouldOverrideUrlLoading`, `ActivityNotFoundException` caught); new `android.allow_navigation` config key (bare hosts / `*.` subdomains, build-time `AndroidError` on a malformed entry) keeps chosen external `https` hosts in-app and is the only thing that adds `INTERNET` to the manifest; deprecated `onBackPressed()` replaced by an `OnBackPressedCallback` + `enableOnBackInvokedCallback` (predictive back); WebView `saveState`/`restoreState` across rotation (history + scroll, not JS state); a fixed built-in page on a failed main-frame load; `setWebContentsDebuggingEnabled` tied to `FLAG_DEBUGGABLE`. `append_user_agent`, background colour, `WebChromeClient`, WebView-version floor not done. `tests/test_android_hardening.py` (56 tests); full suite 1644 passed. Kotlin compiled with 1.9.24 against stubs and its routing logic run on a URL matrix; **not** built with the Android SDK or run on a device. `0.06506` -> `0.06507`; roadmap `v0.065` untouched | DONE |
 | v0.06508 | Message/docs fix: the speaker tag in the experimental-API heavy-reliance nudge (`arklight/experimental.py`), its quoted example in `docs/Foundational/EXPERIMENTAL-APIS.md`, and the root `README.md` status block changes from `[Rae ARK]` to `[Rei]`, matching the Rei voice in `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`. Wording unchanged; the `Rae-ARK` GitHub org name in URLs/slugs, the `LICENSE` copyright line and the `cctv.py` credit are deliberately left alone. `tests/test_cli.py`/`tests/test_experimental_apis.py` updated; full suite 1644 passed. `0.06507` -> `0.06508`; roadmap `v0.065` untouched | DONE |
-| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
+| v0.06509 | Capability fix: JS vocabulary addendum stage 4/10 (the math derivations catalog, the `v0.064` slot's second piece, paused while capability fixes took priority) -- 21 `Derive.*` kinds (`absolute`, `ceiling`, `floor`, `truncate_number`, `sign`, `sqrt`, `cbrt`, `power`, `exp`, `log`, `log2`, `log10`, `hypot`, `clamp`, `average`/`mean`, `median`, `gcd`, `lcm`, `percentage_of`, `to_fixed`, `to_precision`), one fragment file + one registry line each; `to_fixed`/`to_precision` take a build-time range-checked `digits`. New `arklight/ir/js_numeric.py` reproduces JavaScript's `Math.*`/`toFixed`/`toPrecision` answers where Python's `math` raises or rounds differently. Also fixes three build-time/client parity gaps found along the way (`NaN`/`-0` coercion in `_coerce_number`, `Derive.sum`'s compensated summation on Python 3.12+, `nan`/`inf` spelling in `Bind(...)` pre-fill). `random_int` stays with `v0.070`. `tests/test_js_vocabulary_v0064.py` (137 tests, incl. a Node parity sweep); full suite 1781 passed. `0.06508` -> `0.06509`; roadmap `v0.065` untouched | DONE |
+| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 5-10 of 10 (string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
@@ -143,6 +144,62 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06509 -- Capability fix: JS vocabulary stage 4/10, math derivations catalog (DONE)
+
+Finishes the second piece of the `v0.064` slot. `v0.064` was always two
+independent pieces (`arklight search --retrieve-doc`, and JS vocabulary
+addendum stage 4/10); the first shipped, the second sat PLANNED while the
+`v0.0641`-`v0.06508` capability fixes took priority. Numbered `0.0650` plus
+decimals, same slot-sharing precedent; roadmap `v0.065` untouched.
+
+**What went in.** The 21 kinds from the addendum's `v0.064` section (everything
+in the source proposal's section 6.1 except `random_int`, which the addendum
+defers to `v0.070`): one fragment file each in
+`arklight/backend/js/derivations/`, one `DERIVATION_REGISTRY` line each, `Derive.*`
+constructors in `arklight/api.py`, and a build-time case in
+`_evaluate_derivation`. No new IR node, no parser, nothing near `eval`.
+
+**Where the work actually was: build-time parity.** The fragments are
+one-liners over `Math.*`. The hard part is that `_evaluate_derivation` has to
+produce the same value at build time, and Python's `math` is not JavaScript's:
+
+- It raises where JavaScript returns a value (`sqrt(-1)`, `log(0)`,
+  `exp(1000)`, `ceil(inf)`, `pow(0, -1)`, `pow(10, 400)`). New
+  `arklight/ir/js_numeric.py` reproduces JavaScript's answer for each.
+- `Math.pow(1, Infinity)` is `NaN`; C's `pow` (and `math.pow`) says `1`.
+- `(2.5).toFixed(0)` is `"3"` (a tie rounds away from zero); Python's
+  `format(2.5, ".0f")` is `"2"`. `to_fixed`/`to_precision` are built on
+  `decimal` with `ROUND_HALF_UP` over the double's exact value, which is what
+  the spec says JavaScript does. A first cut of `to_precision` zero-padded
+  past ~28 digits because `Decimal.scaleb` rounds to the ambient context;
+  caught by the 100-digit sweep, fixed with an explicit wide context.
+- `Math.ceil(-0.5)` is `-0`; the sign of zero is preserved.
+
+**Reproduced first, then fixed: three existing parity gaps** the new sweep
+surfaced (none needed the new kinds to exist, but the new kinds make the first
+one reachable): `_coerce_number` let `NaN` through where JavaScript's
+`Number(x) || 0` gives `0` (a first version of the fix used a truthiness test
+and missed `NaN` -- `bool(nan)` is `True`; the dependent-`Computed` test
+caught it); `Derive.sum` used Python 3.12's compensated `sum()`; and
+`Bind(...)` pre-fill printed `nan`/`inf`.
+
+**Verification.** `tests/test_js_vocabulary_v0064.py` (137 tests). Its Node
+sweep runs ~1,700 generated inputs through the shipped fragments and the
+build-time mirror: every string-valued kind and every correctly-rounded numeric
+kind matches bit-for-bit. Five kinds (`exp`, `log*`, `cbrt`, `power`, `hypot`)
+go through libm, differ from V8 in the last binary digit on a small fraction
+of inputs (about 30 of ~1,700), and are asserted equal to within 4.5e-16
+relative. That is documented as a known limit in `CHANGELOG.md` and
+`docs/version history/v0.064.md`, not papered over; `cbrt` is at least made
+exact on perfect cubes. Full suite: 1781 passed (was 1644).
+
+**Not done / left alone.** Server-side pre-fill still prints integer-valued
+floats as `8.0` where the client writes `8`, and `1e-07` where the client
+writes `1e-7` -- pre-existing, affects `sum`/`multiply` too, and out of scope
+here. The package could not be `pip install -e`'d in the working environment
+because the source build asks for a license acceptance; tests were run from
+the source tree (`PYTHONPATH=.`).
 
 ## v0.06507 -- Capability fix: Android native-shell hardening, first slice (DONE)
 

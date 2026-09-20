@@ -1,7 +1,7 @@
 # JS Vocabulary Addendum: Staged Order, v0.061 -> v0.070
 
-**Status:** IN PROGRESS -- stages 1-3/10 (`v0.061`-`v0.063`) have
-shipped; stages 4-10 remain PLANNED. This file turns
+**Status:** IN PROGRESS -- stages 1-4/10 (`v0.061`-`v0.064`) have
+shipped; stages 5-10 remain PLANNED. This file turns
 the accepted, philosophy-compliant part of
 [`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](../Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md)
 into a trackable, ten-rung landing order, the same role
@@ -187,7 +187,7 @@ needing sign-off before they ship as written:
 | v0.061 | Math siblings (`subtract`/`divide`/`min`/`max`) | SHIPPED |
 | v0.062 | String-casing sibling + comparison predicates | SHIPPED |
 | v0.063 | Small new runtime primitives | SHIPPED |
-| v0.064 | Math derivations catalog | PLANNED |
+| v0.064 | Math derivations catalog | SHIPPED (as `0.06509`) |
 | v0.065 | String derivations catalog | PLANNED |
 | v0.066 | Predicates catalog | PLANNED |
 | v0.067 | List-scalar derivations catalog | PLANNED |

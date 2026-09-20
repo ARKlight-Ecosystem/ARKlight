@@ -21,17 +21,38 @@ same "only ship what's used" discipline `ACTION_FRAGMENTS`/
 from __future__ import annotations
 
 from arklight.backend.js.derivations import (
+    absolute,
+    average,
+    cbrt,
+    ceiling,
+    clamp,
     compare,
     count,
     divide,
+    exp,
+    floor,
     format,
+    gcd,
+    hypot,
     join,
+    lcm,
+    log,
+    log10,
+    log2,
     max as max_,
+    median,
     min as min_,
     multiply,
+    percentage_of,
+    power,
+    sign,
+    sqrt,
     subtract,
     sum,
+    to_fixed,
+    to_precision,
     trim,
+    truncate_number,
     uppercase,
 )
 
@@ -50,6 +71,29 @@ DERIVATION_MODULES = {
     # addendum stage 2/10 -- string-casing siblings of `join`/`format`.
     uppercase.NAME: uppercase,
     trim.NAME: trim,
+    # `v0.064` (docs/version history/v0.064.md): JS vocabulary addendum
+    # stage 4/10 -- the math derivations catalog.
+    absolute.NAME: absolute,
+    ceiling.NAME: ceiling,
+    floor.NAME: floor,
+    truncate_number.NAME: truncate_number,
+    sign.NAME: sign,
+    sqrt.NAME: sqrt,
+    cbrt.NAME: cbrt,
+    power.NAME: power,
+    exp.NAME: exp,
+    log.NAME: log,
+    log2.NAME: log2,
+    log10.NAME: log10,
+    hypot.NAME: hypot,
+    clamp.NAME: clamp,
+    average.NAME: average,
+    median.NAME: median,
+    gcd.NAME: gcd,
+    lcm.NAME: lcm,
+    percentage_of.NAME: percentage_of,
+    to_fixed.NAME: to_fixed,
+    to_precision.NAME: to_precision,
 }
 
 DERIVATION_FRAGMENTS: dict[str, str] = {
