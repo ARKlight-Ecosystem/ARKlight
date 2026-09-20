@@ -147,6 +147,44 @@ FEATURES: dict[str, ExperimentalFeature] = {
             "unchecked-arbitrary-code risk."
         ),
     ),
+    "provider-integration": ExperimentalFeature(
+        id="provider-integration",
+        inline_note=(
+            "This site declares a Provider -- ARKlight does not implement, "
+            "audit, or guarantee the external service it points at."
+        ),
+        detail_lines=[
+            "A Provider declares that this site talks to an external service",
+            "(a hosted database, an auth service, your own API) at runtime.",
+            "ARKlight only checks the declaration itself against a closed",
+            "vocabulary of capabilities. It ships no vendor SDK, makes no",
+            "network calls, and does not implement, audit, or guarantee the",
+            "service the declaration points at.",
+            "Networking, authentication, data handling and security are",
+            "entirely the responsibility of whatever concrete implementation",
+            "you supply. ARKlight has no opinion on auth flows, token storage",
+            "or security rules, and takes no responsibility for them.",
+            "",
+            "The contract is still being staged: the capability vocabulary",
+            "is provisional until the last stage of the Provider ladder",
+            "finalizes it, so a declaration that is valid today may need",
+            "updating when you upgrade ARKlight.",
+        ],
+        legacy_note=(
+            "Not a legacy API -- Provider is new, and nothing here is being "
+            "kept for backward compatibility yet. It is flagged because the "
+            "external service a site points at is outside anything ARKlight "
+            "can validate, and because the contract itself (the capability "
+            "vocabulary in particular) is still provisional."
+        ),
+        # A deliberate boundary, not a missing-feature gap: the concrete
+        # implementation being the site author's own code is the whole
+        # design (PROVIDER-SDK-PROPOSAL.md, sections 2 and 6). The
+        # heavy-reliance nudge ("open a pull request for your missing
+        # feature") would be the wrong advice to give someone who simply
+        # uses a Provider, the same reasoning `css-media-queries` uses.
+        upstream_candidate=False,
+    ),
 }
 
 

@@ -70,7 +70,8 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06511 | Fix (follow-up to `0.06510`, from auditing everything added since `v0.064`): Rei's assets stage no longer claims an `assets/` folder exists on every build (`... if there is one.`); new drift-guard tests fail if any stage message a real build emits, or the three conditional ones, has no Rei pattern; `CLI-REFERENCE.md` states what `--narrate` failure output really is; the ELIZA reference is described as the original implementation it is, not a vendored copy. `tests/test_rei_narrator.py` (36 tests); full suite 1815 passed. `0.06510` -> `0.06511`; roadmap `v0.065` untouched | DONE |
 | v0.06512 | Docs-only incremental patch: filed `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` (Rei the *language*, distinct from the narrator; the maintainer has decided Rei is ARKlight's official native source language, so the proposal's playground/Fun-tier framing is superseded and its gating is open question 11) and fixed its false "no channel constant" claim (`arklight.CHANNEL` exists); removed the changelog-style "Renumbered"/"Re-renumbered"/KaiOS paragraphs from `ARCHITECTURE.md`'s Milestones section and fixed the three references they left dangling; recorded that Vue and Svelte backends will not be built and corrected every statement calling them planned (comment-only docstring edits in three modules). No behavior change. `0.06511` -> `0.06512`; roadmap `v0.065` untouched | DONE |
 | v0.06513 | Capability fix: JS vocabulary addendum stage 5/10 (the string derivations catalog, the `v0.065` slot's first-listed piece) -- 18 `Derive.*` kinds (`capitalize`, `title_case`, `trim_start`, `trim_end`, `pad_start`, `pad_end`, `repeat`, `slice_string`, `char_at`, `replace_first`, `replace_all`, `split_count`, `reverse_string`, `string_length`, `includes_substring`, `starts_with`, `ends_with`, `is_empty`), one fragment file + one registry line each; literal arguments range/type-checked at build time (`LITERAL_ARG_RULES`); `replace_first`/`replace_all` are literal-text only (no `RegExp`, `$&`-style patterns not expanded). The four predicate-shaped kinds ship as boolean derivations (recorded decision). New `arklight/ir/js_string.py` reproduces JavaScript's UTF-16 indexing, `String(x)` coercion and whitespace set at build time. Also fixes `Bind(...)` pre-fill for booleans (`true`/`false`) and lone surrogates. `tests/test_js_vocabulary_v0065.py` (231 tests, Node parity sweep); full suite 2047 passed. `0.06512` -> `0.06513`; roadmap `v0.065` untouched (`Provider` stage 1 still PLANNED) | DONE |
-| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 6-10 of 10 (predicates catalog, list-scalar derivation catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
+| v0.06514 | Capability fix: `Provider`, stage 1 of 6 (the contract itself; the `v0.065` slot's last piece) -- `Provider.declare(name=..., capabilities=[...])` and `Site(provider=...)`, a frozen self-validating `ProviderDeclaration` (`arklight/provider.py`), a closed, provisional capability vocabulary (`auth`, `read`, `write`, `subscribe`), and the gated `provider-integration` experimental feature (inline banner + end-of-build summary through the existing pipeline; `upstream_candidate=False`). A declared Provider adds no markup, config or script of its own: pages and stylesheet are byte-identical, only `arklight.js`'s console reminder and `sbom.txt` change, as for every gated feature. No config blob, no external-script prop, no concrete provider. `docs/Implementation/PROVIDER-SDK-ADDENDUM.md` is referenced but never committed, so scope follows the per-version previews (`v0.065.md`-`v0.070.md`); pulls stage 2's "recorded on `Site`" bullet forward (the gate needs it to fire), leaving IR threading and `ir/validate.py` enforcement to stage 2. `tests/test_provider.py` (47 tests); full suite 2094 passed. `0.06513` -> `0.06514`; roadmap `v0.065` untouched | DONE |
+| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 6-10 of 10 (predicates catalog, list-scalar derivation catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots; stage 1 shipped as `0.06514`, stages 2-6 PLANNED | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
@@ -148,6 +149,52 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06514 -- Capability fix: `Provider`, stage 1/6, the contract itself (DONE)
+
+The last of the four pieces sharing the `v0.065` slot (after Rei `0.06510`,
+Platform API IR and JS vocabulary stage 5 `0.06513`). Numbered `0.0650` plus
+decimals, same slot-sharing precedent; roadmap `v0.065` untouched (all four
+pieces have now shipped; closing that row is the maintainer's call).
+
+**What went in.** `arklight/provider.py` (the contract: a closed vocabulary and
+a frozen `ProviderDeclaration` that validates itself), `Provider.declare(...)`
+beside `PlatformAPI` in `arklight/api.py`, `Site(provider=...)`, and a
+`provider-integration` entry in `arklight/experimental.py`. The pipeline needed
+no change: `Site.__init__` records the `ExperimentalUsage`, and the existing
+loop in `compile_site_file` prints the banner and the CLI prints the summary.
+
+**Decisions recorded.**
+1. The vocabulary is the four names the proposal lists, marked provisional
+   until the ladder's last stage. Empty and repeated capabilities are errors.
+2. `upstream_candidate=False`. The nudge tells people to "open a pull request
+   for your missing feature"; someone using a Provider has a deliberate
+   boundary, not a missing feature.
+3. One provider per `Site`, as in the proposal's sketch. `ProviderDeclaration`
+   is not exported from `arklight` (only `Provider`).
+4. Nothing is emitted from the declaration. Verified by building the same site
+   with and without: pages and stylesheet are byte-identical; `arklight.js`
+   (the existing devtools console reminder) and `sbom.txt` differ, as they do
+   for every gated feature.
+5. **Overlap with stage 2, on purpose.** `v0.066.md` lists "a declared `Provider`
+   recorded on `Site`" under stage 2. It is done here because the gate cannot
+   fire on a real build without it. The vocabulary is checked when `declare(...)`
+   runs; enforcement in `arklight/ir/validate.py` and threading through
+   `WebsiteIR` remain stage 2.
+
+**Spec gap, found while doing it.** The proposal and twelve other docs point at
+`docs/Implementation/PROVIDER-SDK-ADDENDUM.md` for the six-stage ladder. That file
+was never committed to any branch. The stages are recoverable from the
+per-version previews (`v0.065.md`-`v0.070.md`), which is what scope followed;
+anything the addendum said beyond them is unknown.
+
+**Known cost.** `Provider` is a common word added to `arklight.__all__`, so a
+site using `# include <stdlib.ARKlight>` that defines its own `Provider` now
+fails to build (the preamble's rebind check, working as designed).
+
+**Verification.** `tests/test_provider.py` (47 tests); six deliberate breakages
+each fail at least one. Full suite 2094 passed; the 2 `test_version.py`
+failures are environmental.
 
 ## v0.06513 -- Capability fix: JS vocabulary stage 5/10, string derivations catalog (DONE)
 
