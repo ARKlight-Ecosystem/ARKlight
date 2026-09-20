@@ -62,6 +62,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06503 | Capability fix: live-input -> action-value -- `Bind("name")` accepted as `Action.set`/`Action.append`'s `value` (`{"__state__": name}` marker, opt-in per argument via `ActionSpec.state_args`, build-time validated, resolved by `resolveActionArgs` at dispatch time), so `[type a task] [Add]` is expressible with `bind_value=Bind.model(...)` + `Watch(..., then=Action.reset(...))`. Issue-register #7; `docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`. Also fixes a raw `TypeError` on `Action.append(name, Bind(...))`. `tests/test_action_value_from_state.py` (31 tests); full suite 1538 passed. `0.06502` -> `0.06503`; roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent | DONE |
 | v0.06504 **(draft -- version slot unconfirmed)** | Bug fix: `trusted_script_origins` CSP directive injection -- `_render_csp_meta_tag` spliced entries verbatim into `script-src`; `'unsafe-inline'`/`'unsafe-eval'` (quoted or not) and directive-breaking characters (`;`, whitespace) now raise a build-time `ValueError` at `Site.__init__` instead of silently reaching the emitted CSP. `docs/Proposals/CSP-TRUSTED-ORIGIN-INJECTION-BUGFIX.md`. Landed in code (`arklight/api.py`, `tests/test_csp.py`) without a version bump or this row -- added retroactively during a docs-consistency pass; a maintainer should confirm the slot and pyproject bump | DONE (code) / DRAFT (record) |
 | v0.06505 | Capability fix: JS runtime error-handling coverage -- per-element `try`/`catch` guards in `recomputeAll`, `renderBindings`, `renderClassBindings`, `renderModelBindings`, `renderRepeat`, `renderShow` and `wireModelBinding`'s write-back (one bad element reports, the rest of the pass keeps running); a page-level `error`/`unhandledrejection` boundary (`wireErrorBoundary`); and `arkReportError`, the one funnel every runtime error goes through, with the closed `window.ARKLIGHT_ON_ERROR(message, err)` override (returning `false` suppresses the on-page notice). Shipped only where `arkNotify` already ships. `docs/Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md`; `Site(on_error=...)` and a message registry not implemented. `tests/test_runtime_error_handling.py` (31 tests); full suite 1569 passed. `0.06503` -> `0.06505` (skips the unconfirmed `0.06504` draft slot); roadmap `v0.065` untouched. Out-of-band, same slot-sharing precedent | DONE |
+| v0.06506 | Capability fix: compiler-native diagnostics for user-defined component calls (issue-register #5/#32) -- a positional call (`Stat("a", "b")`) now raises `ComponentError` (component, keyword-only rule, declared props, by-name example, the call's `file:line`) instead of Python's `takes 0 positional arguments` `TypeError`; a `props=` contract that disagrees with the render function's signature (also for a `mode="registry"` backend override) raises `ComponentError` from an argument-*binding* check instead of a raw `TypeError`. `docs/Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`. `tests/test_component_call_diagnostics.py` (19 tests); full suite 1588 passed. `0.06505` -> `0.06506`; roadmap `v0.065` untouched | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 4-10 of 10 (math/string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- `docs/Implementation/REI-COMPILER-NARRATOR-ADDENDUM.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | PLANNED |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -140,6 +141,43 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06506 -- Capability fix: compiler-native diagnostics for user-defined component calls (DONE)
+
+Out-of-band, same slot-sharing precedent as `v0.0650`-`v0.06505`; numbered
+`0.0650` plus decimals, roadmap `v0.065` untouched. Picked from the issue
+register (#5, with the general point in #32) as a self-contained diagnostic
+gap: `@component`'s own docstring already promised a clear message instead
+of a raw `TypeError`, and two boundaries didn't keep it.
+
+**Reproduced first:** `Stat("a", "b")` on a keyword-only component raised
+`Stat() takes 0 positional arguments but 2 were given`, which
+`compile_site_file` surfaced as `Error while building page(s): ...` with no
+file or line.
+
+**Decisions.** (1) The call-site marker takes `*args` only so a positional
+call reaches ARKlight's check; it raises `ComponentError`, the type every
+other component misuse already raises, with the caller's `file:line` from
+the frame. (2) A `props=`/signature disagreement is caught by
+`inspect.Signature.bind` in `call_render_fn`, at *use* rather than at
+registration: bind never runs the function and the declared props are
+exactly what gets passed, so it can only reject calls that were already
+going to raise `TypeError`, and a broken-but-unused component stays as
+harmless as before. (3) Positional *children* are not made to work; that
+needs a designed spelling and is a feature, not a diagnostic.
+
+**Verified.** 19 new tests (message contents, singular/plural, no-props,
+too many args, unchanged keyword calls, the location through
+`compile_site_file`, mismatch both ways, `**kwargs`/defaulted extras
+accepted, a `TypeError` inside the render function left alone, registry
+mode, a mismatched backend override). Full suite 1569 -> 1588 passed, none
+of the existing 1569 changed; the bundled example still builds.
+
+**Behavior change:** the two failures above are now `ComponentError`
+(a `RuntimeError`), not `TypeError`.
+
+**Not done, on purpose:** built-in components' own misuse; errors raised
+inside a render function's body; a registration-time signature audit.
 
 ## v0.06503 -- Capability fix: live-input -> action-value (DONE)
 

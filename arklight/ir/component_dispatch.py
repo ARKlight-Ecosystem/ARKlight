@@ -50,6 +50,7 @@ from arklight.ir.components import (
     MAX_COMPONENT_EXPANSION_DEPTH,
     ComponentError,
     apply_default_style_class,
+    call_render_fn,
     expand_node,
 )
 from arklight.ir.normalize import normalize_node
@@ -82,7 +83,12 @@ def _render_backend_override(
     pass, in case the override's subtree contains further
     `mode="registry"` calls with overrides of their own.
     """
-    rendered = render_fn(**resolved_props)
+    rendered = call_render_fn(
+        component_name,
+        render_fn,
+        resolved_props,
+        what=f"{backend_name!r} backend override",
+    )
 
     if isinstance(rendered, list):
         # Same top-level-single-root requirement `expand_ark_ast` (via

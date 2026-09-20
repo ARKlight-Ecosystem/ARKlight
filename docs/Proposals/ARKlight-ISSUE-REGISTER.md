@@ -122,7 +122,11 @@ compiler-quality ARKlight diagnostic identifying the actual component API
 violation. Validation quality is uneven depending on which boundary catches
 the error first.
 
-**Status:** confirmed diagnostic-quality bug.
+**Status:** addressed in `0.06506` -- a positional call now raises a
+`ComponentError` naming the component, the keyword-only rule and the
+declared props, with the call's `file:line`; see
+[`COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`](COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md).
+(Originally: confirmed diagnostic-quality bug.)
 
 ### 6. `--near` behavior doesn't match its documented expectation
 
@@ -449,7 +453,13 @@ into a compiler that otherwise wants semantic ARKlight diagnostics. The
 compiler should ideally catch component misuse before Python's own runtime
 does, wherever practical.
 
-**Status:** validation-boundary weakness.
+**Status:** partly addressed in `0.06506` -- the positional-call boundary
+(#5) and the `props=`-vs-render-function-signature boundary now raise
+`ComponentError` before Python's own `TypeError` can surface; see
+[`COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`](COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md).
+Other boundaries (built-in components, errors raised inside a render
+function's own body) are unchanged. (Originally: validation-boundary
+weakness.)
 
 ### 33. Component state semantics and documentation have drifted
 

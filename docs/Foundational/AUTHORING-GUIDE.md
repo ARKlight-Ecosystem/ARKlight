@@ -381,6 +381,30 @@ put `debounce=` on the `Bind.model(...)` a submit button reads from: a
 click inside the delay would read the previous value. Design record:
 [`../Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`](../Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md).
 
+## Calling a user-defined component
+
+A component registered with `@component(props={...})` is called with
+**keyword props only**, unlike the built-ins, whose positional arguments
+are children:
+
+```python
+@component(props={"label": Prop(), "value": Prop(default=0)})
+def Stat(label, value=0):
+    return Text(f"{label}: {value}")
+
+Stat(label="Signups", value=42)   # ok
+Stat("Signups", 42)               # build error, not a TypeError
+```
+
+The positional form fails the build with a message naming the component,
+the rule, its declared props, a by-name example and the `file:line` of
+the call. The same goes for a `props=` contract that disagrees with the
+render function's parameters (a declared prop the function has no
+parameter for, or a required parameter `props=` doesn't declare): one
+`ComponentError` naming both sides. To put content inside a component,
+pass it through a declared prop. Design record:
+[`../Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`](../Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md).
+
 ## Runtime errors (`ARKLIGHT_ON_ERROR`)
 
 On a page that ships ARKlight's runtime (any `State(...)` or click
