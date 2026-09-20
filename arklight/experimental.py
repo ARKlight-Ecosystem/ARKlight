@@ -111,40 +111,71 @@ FEATURES: dict[str, ExperimentalFeature] = {
         id="raw-postprocess",
         inline_note="Runs your own code directly over the final output files, completely unchecked by ARKlight.",
         detail_lines=[
-            "This is an advanced experimental feature. It hands your",
-            "function the *entire* dict of generated output files --",
-            "every path, every byte -- after every backend has already",
-            "rendered and postprocessed them, and whatever your function",
-            "returns is written to disk exactly as-is.",
-            "Nothing about it is validated, normalized, or checked against",
-            "ARKlight's layout model, HTML/CSS/JS correctness, or anything",
-            "else the rest of the pipeline guarantees -- it is the single",
-            "widest surface exposed to user code in the whole project.",
-            "Used carelessly, it can give you a million different ways to",
-            "shoot yourself in the foot: a typo can silently corrupt every",
-            "page, strip a <script> tag, or ship broken CSS with no error",
-            "at build time. Use it wisely, and proceed with caution.",
+            "OFFICIALLY DEPRECATED -- Site.raw_postprocess(fn) no longer",
+            "registers or runs anything; calling it only prints a log",
+            "pointing at its replacement. This entry stays registered for",
+            "historical/documentation purposes only (old builds, old docs,",
+            "and anything that still calls experimental.emit(\"raw-postprocess\")",
+            "directly), not because the escape hatch itself still exists.",
             "",
-            "Interacts with ARKlight's default Content-Security-Policy",
-            "(arklight/backend/html/csp.py, Site(strict_csp=True) by",
-            "default): script-src 'self' blocks any inline <script> this",
-            "hook injects, silently, in the browser. A nonce doesn't fix",
-            "this -- ARKlight ships static files, so a nonce baked into a",
-            "static build is public and permanent, not a real per-request",
-            "secret. If your postprocess step injects inline scripts, pass",
-            "Site(strict_csp=False) to opt out of the policy entirely, or",
-            "Site(trusted_script_origins=[...]) if it instead loads an",
-            "external <script src=\"...\"> from a trusted origin.",
+            "This used to be an advanced experimental feature that handed",
+            "your function the *entire* dict of generated output files --",
+            "every path, every byte -- after every backend had already",
+            "rendered and postprocessed them, with whatever it returned",
+            "written to disk exactly as-is. Nothing about it was validated,",
+            "normalized, or checked against ARKlight's layout model,",
+            "HTML/CSS/JS correctness, or anything else the rest of the",
+            "pipeline guarantees -- it was the single widest surface",
+            "exposed to user code in the whole project, hence the removal.",
+            "",
+            "What most callers actually used it for -- adding hand-written",
+            "JS alongside the generated arklight.js runtime -- is now",
+            "site.register_script_extension(...)",
+            "(arklight.backend.script_extension.ScriptExtension): narrower,",
+            "class-based, and it only ever touches arklight.js.",
         ],
         legacy_note=(
-            "Not a legacy API in the historical sense -- a raw, unchecked "
-            "escape hatch for the rare transformation that genuinely can't "
-            "be expressed any other way (e.g. a one-off script-based build "
-            "step). If the transformation is reusable or depends on what "
-            "another backend produced, prefer a real Backend subclass "
-            "overriding postprocess() (see arklight.backend.base.Backend) "
-            "instead -- it gets the same second pass with none of the "
-            "unchecked-arbitrary-code risk."
+            "Officially deprecated and removed as of the script-extension "
+            "capability. Site.raw_postprocess(fn) is now a no-op that only "
+            "logs. Prefer site.register_script_extension(...) "
+            "(arklight.backend.script_extension.ScriptExtension) for JS "
+            "injection, or a real Backend subclass overriding postprocess() "
+            "(see arklight.backend.base.Backend) for anything reusable or "
+            "dependent on another backend's output."
+        ),
+    ),
+    "script-extension": ExperimentalFeature(
+        id="script-extension",
+        inline_note=(
+            "Hand-written JS, lowered from a Svelte-script-only subclass, "
+            "appended to arklight.js -- unchecked the way every other "
+            "escape hatch here is."
+        ),
+        detail_lines=[
+            "ScriptExtension (arklight.backend.script_extension) is the",
+            "class-based successor to site.raw_postprocess(fn) for the one",
+            "job most raw_postprocess uses were actually for: adding",
+            "hand-written JS alongside the arklight.js runtime every page",
+            "already loads.",
+            "Its surface is narrower than raw_postprocess's -- only the",
+            "<script> portion of Svelte single-file-component syntax is",
+            "accepted, and only arklight.js is ever touched, never an",
+            "arbitrary output file -- but the JS itself is still unchecked:",
+            "no eval, no new Function, but also no guarantee it's even",
+            "syntactically valid, the same as every other hand-written JS",
+            "surface ARKlight ships.",
+            "Usage is expected to carry a '#include <expapilib.ARKlight>'",
+            "marker comment in the subclass's own source file. Missing it",
+            "doesn't block the build -- it just adds one more warning on",
+            "top of this one.",
+        ],
+        legacy_note=(
+            "Not a legacy API -- ScriptExtension is new, offered as the "
+            "narrower, class-based successor to site.raw_postprocess(fn) "
+            "for JS-injection specifically. Flagged for the same reason "
+            "every hand-written-JS escape hatch here is: ARKlight cannot "
+            "validate the script's contents the way it validates its own "
+            "generated runtime."
         ),
     ),
     "provider-integration": ExperimentalFeature(

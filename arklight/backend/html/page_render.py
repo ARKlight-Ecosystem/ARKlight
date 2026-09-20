@@ -466,9 +466,9 @@ def _render_page(
     # anything else), so CSP is the very next one -- applied as early as
     # possible, before the stylesheet link or any other tag. Empty
     # string when `strict_csp=False` (Site(strict_csp=False), the
-    # raw_postprocess escape valve -- see csp.py's module docstring),
-    # so a site that opts out gets exactly today's tag set back, byte
-    # for byte.
+    # general escape valve -- see csp.py's module docstring), so a
+    # site that opts out gets exactly today's tag set back, byte for
+    # byte.
     csp_meta = _render_csp_meta_tag(trusted_script_origins) if strict_csp else ""
     return (
         "<!DOCTYPE html>\n"

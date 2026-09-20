@@ -2702,48 +2702,59 @@ class Site:
         self, fn: Callable[[dict[str, str]], dict[str, str]]
     ) -> Callable[[dict[str, str]], dict[str, str]]:
         """
-        \u26a0\ufe0f EXPERIMENTAL -- ADVANCED, UNCHECKED ESCAPE HATCH (see
-        `docs/EXPERIMENTAL-APIS.md`). Register a raw postprocessing
-        function that runs directly over the site's *final* output
-        files -- the same combined `{relative_path: contents}` dict
-        every `Backend.postprocess()` gets (see
-        `arklight.backend.base.Backend.postprocess`), except this one
-        is authored by you, not a backend, and runs last: after every
-        backend's own render() + postprocess() pass, in the order
-        `site.raw_postprocess(...)` was called. Whatever `fn` returns
-        replaces the output dict entirely and is written to disk
-        as-is -- add, remove, or rewrite any file, in any way.
+        \u26a0\ufe0f DEPRECATED -- officially removed. `site.raw_postprocess(fn)`
+        no longer registers or runs `fn` at all; it only prints a log
+        pointing at its replacement. See `docs/EXPERIMENTAL-APIS.md`,
+        `script-extension`.
 
-        This is an advanced experimental feature. It is recommended to
-        use it wisely: because nothing about `fn`'s output is
-        validated, normalized, or checked against ARKlight's layout
-        model the way every other generated file is, it hands you a
-        million different ways to shoot yourself in the foot -- a
-        stray string replace can silently corrupt every page in the
-        site with no error at build time. Proceed with caution. Every
-        call is flagged: an `[EXPERIMENTAL FEATURE ACTIVE]` banner
-        prints the moment the build detects it, and a summary block
-        prints again at the end of the build.
+        The full-output-dict escape hatch this used to be (`fn` handed
+        the entire combined `{relative_path: contents}` output,
+        whatever it returned written to disk verbatim) is gone. What
+        most callers actually reached for it to do -- add hand-written
+        JS alongside the generated `arklight.js` runtime -- is now
+        `site.register_script_extension(...)`
+        (`arklight.backend.script_extension.ScriptExtension`): a
+        narrower, class-based surface that only ever touches
+        `arklight.js`, never an arbitrary file.
 
-        Can be used directly (`site.raw_postprocess(my_fn)`) or as a
-        bare decorator (`@site.raw_postprocess`) -- either way `fn` is
-        returned unchanged, so decorating doesn't shadow the name.
-
-        Prefer a real `Backend` subclass overriding `postprocess()`
-        instead whenever the transformation is reusable across
-        projects or depends on what another backend already produced
-        -- it gets the exact same second pass with none of the
-        unchecked-arbitrary-code risk. Reach for this only for a
-        genuine one-off that can't be expressed that way.
+        Still validates `fn` is callable and still returns it unchanged
+        (so `@site.raw_postprocess` continues to parse and doesn't
+        shadow the decorated name), but nothing further happens: `fn`
+        is never added to `site.raw_postprocessors`, never runs at
+        build time, and no `ExperimentalUsage` is recorded for it.
         """
         if not callable(fn):
             raise TypeError(
                 f"site.raw_postprocess(fn) needs a callable taking and "
                 f"returning a dict[str, str], got {fn!r}."
             )
-        self.raw_postprocessors.append(fn)
-        self.experimental_usages.append(experimental.emit("raw-postprocess"))
+        print(
+            "[ARKlight] site.raw_postprocess(...) is deprecated and no "
+            "longer registers or runs your function. Use "
+            "site.register_script_extension(...) "
+            "(arklight.backend.script_extension.ScriptExtension) instead -- "
+            "see docs/Foundational/EXPERIMENTAL-APIS.md."
+        )
         return fn
+
+    def register_script_extension(
+        self, extension: "ScriptExtension | type[ScriptExtension]"
+    ) -> "ScriptExtension":
+        """
+        \u26a0\ufe0f EXPERIMENTAL -- see `docs/EXPERIMENTAL-APIS.md`,
+        `script-extension`. Class-based successor to
+        `site.raw_postprocess(fn)` for adding hand-written JS alongside
+        the generated `arklight.js` runtime -- see
+        `arklight.backend.script_extension` for the full contract
+        (Svelte-script-only source, OOP subclassing on purpose, the
+        `#include <expapilib.ARKlight>` marker convention). Accepts
+        either a `ScriptExtension` instance or a bare subclass
+        (instantiated with no args), and returns the registered
+        instance.
+        """
+        from arklight.backend.script_extension import register as _register_script_extension
+
+        return _register_script_extension(self, extension)
 
     def page(self, route: str) -> Callable[[Callable[[], ARKNode]], Callable[[], ARKNode]]:
         if not route.startswith("/"):

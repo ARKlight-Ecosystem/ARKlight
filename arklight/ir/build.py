@@ -225,8 +225,8 @@ class WebsiteIR:
     # decide whether/what CSP meta tag to emit per page -- see
     # `Site.__init__`'s own comment (arklight/api.py) for the full
     # reasoning, including why style-src is deliberately never touched
-    # and why `strict_csp=False` (not a nonce) is the escape valve for
-    # raw_postprocess-injected inline scripts. Defaults preserve today's
+    # and why `strict_csp=False` (not a nonce) is the general escape
+    # valve for any hand-injected inline script. Defaults preserve today's
     # (pre-feature) output only when explicitly disabled; the *default*
     # for a new build is `strict_csp=True`, which is a deliberate,
     # unconditional new-default addition -- see PROGRESS.md's entry for
@@ -257,11 +257,15 @@ class WebsiteIR:
     devtools_console_reminder: bool = True
     # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): `(output_files: dict[str,
     # str]) -> dict[str, str]` callables registered via
-    # `site.raw_postprocess(...)`, in call order -- straight passthrough,
-    # same shape as `style_imports` etc. above. `arklight.compiler.
-    # pipeline.build` runs these last, after every backend's own
-    # render()+postprocess() pass, over the combined output dict. Empty
-    # for sites that never call `site.raw_postprocess(...)`.
+    # `site.register_script_extension(...)`
+    # (arklight.backend.script_extension.register), in call order --
+    # straight passthrough, same shape as `style_imports` etc. above.
+    # `arklight.compiler.pipeline.build` runs these last, after every
+    # backend's own render()+postprocess() pass, over the combined
+    # output dict. No longer populated by `Site.raw_postprocess(...)`,
+    # which is deprecated and no-op as of the script-extension
+    # capability (see `arklight/experimental.py`'s `raw-postprocess`
+    # entry). Empty for sites that never register a ScriptExtension.
     raw_postprocessors: list = field(default_factory=list)
 
 
@@ -762,8 +766,9 @@ def build_website_ir(
     `Site(app_shell=...)`'s straight passthrough, same shape as
     `lang`. Defaults to `False`, unchanged output for existing callers.
 
-    `raw_postprocessors` is `Site.raw_postprocess(...)`'s straight
-    passthrough (docs/EXPERIMENTAL-APIS.md) -- a list of
+    `raw_postprocessors` is `site.register_script_extension(...)`'s
+    straight passthrough (docs/EXPERIMENTAL-APIS.md; no longer fed by
+    the deprecated `Site.raw_postprocess(...)`) -- a list of
     `(output_files) -> output_files` callables `arklight.compiler.
     pipeline.build` runs, in order, after every backend's own
     render()+postprocess() pass. Defaults to `None` (empty list), so

@@ -9,7 +9,7 @@ import pytest
 
 from arklight import Site, Page, Heading
 from arklight.backend.css.custom_styles import render_media_queries
-from arklight.compiler.pipeline import compile_site_file, build, CompileError
+from arklight.compiler.pipeline import compile_site_file, build
 from arklight import experimental
 
 
@@ -334,21 +334,26 @@ def test_enable_pwa_install_button_removed_when_flag_dropped(tmp_path):
     assert "ark-pwa-install" not in html
 
 
-# --- raw-postprocess (Site.raw_postprocess) ------------------------------
+# --- raw-postprocess (Site.raw_postprocess) -- deprecated, no-op ---------
 
 
-def test_raw_postprocess_registers_and_records_experimental_usage():
+def test_raw_postprocess_is_deprecated_and_registers_nothing(capsys):
     site = Site(name="Test")
 
     def add_banner(files):
         files["banner.txt"] = "hi"
         return files
 
-    site.raw_postprocess(add_banner)
+    result = site.raw_postprocess(add_banner)
 
-    assert site.raw_postprocessors == [add_banner]
-    assert len(site.experimental_usages) == 1
-    assert site.experimental_usages[0].feature_id == "raw-postprocess"
+    # Returned unchanged (decorator use doesn't break), but never
+    # wired up: no postprocessor, no experimental usage.
+    assert result is add_banner
+    assert site.raw_postprocessors == []
+    assert site.experimental_usages == []
+    out = capsys.readouterr().out
+    assert "deprecated" in out
+    assert "register_script_extension" in out
 
 
 def test_raw_postprocess_rejects_non_callable():
@@ -359,19 +364,20 @@ def test_raw_postprocess_rejects_non_callable():
     assert site.experimental_usages == []
 
 
-def test_raw_postprocess_works_as_bare_decorator():
+def test_raw_postprocess_works_as_bare_decorator_but_does_nothing():
     site = Site(name="Test")
 
     @site.raw_postprocess
     def strip_comments(files):
         return {k: v for k, v in files.items() if not k.endswith(".tmp")}
 
-    # decorating doesn't shadow the name
+    # decorating still doesn't shadow the name...
     assert callable(strip_comments)
-    assert site.raw_postprocessors == [strip_comments]
+    # ...but it's never registered to actually run.
+    assert site.raw_postprocessors == []
 
 
-def test_compile_site_file_threads_raw_postprocessors_into_ir(tmp_path):
+def test_compile_site_file_raw_postprocess_no_longer_threads_into_ir(tmp_path):
     site_file = tmp_path / "site.py"
     site_file.write_text(
         "from arklight import Site, Page, Heading\n"
@@ -384,9 +390,8 @@ def test_compile_site_file_threads_raw_postprocessors_into_ir(tmp_path):
         "    return Page(Heading('Hi'))\n"
     )
     ir = compile_site_file(site_file)
-    assert len(ir.raw_postprocessors) == 1
-    assert len(ir.experimental_usages) == 1
-    assert ir.experimental_usages[0].feature_id == "raw-postprocess"
+    assert ir.raw_postprocessors == []
+    assert ir.experimental_usages == []
 
 
 def test_compile_site_file_no_raw_postprocess_is_empty(tmp_path):
@@ -402,26 +407,7 @@ def test_compile_site_file_no_raw_postprocess_is_empty(tmp_path):
     assert ir.raw_postprocessors == []
 
 
-def test_build_emits_inline_banner_for_raw_postprocess(tmp_path):
-    site_file = tmp_path / "site.py"
-    site_file.write_text(
-        "from arklight import Site, Page, Heading\n"
-        "site = Site(name='Test')\n"
-        "@site.raw_postprocess\n"
-        "def noop(files):\n"
-        "    return files\n"
-        "@site.page('/')\n"
-        "def home():\n"
-        "    return Page(Heading('Hi'))\n"
-    )
-    messages: list[str] = []
-    build(site_file, tmp_path / "ARK", on_stage=messages.append)
-    banners = [m for m in messages if m.startswith("\u26a0")]
-    assert len(banners) == 1
-    assert "raw-postprocess" in banners[0]
-
-
-def test_build_runs_raw_postprocess_over_combined_output(tmp_path):
+def test_build_no_inline_banner_or_output_change_from_deprecated_raw_postprocess(tmp_path):
     site_file = tmp_path / "site.py"
     site_file.write_text(
         "from arklight import Site, Page, Heading\n"
@@ -435,70 +421,23 @@ def test_build_runs_raw_postprocess_over_combined_output(tmp_path):
         "    return Page(Heading('Hi'))\n"
     )
     out_dir = tmp_path / "ARK"
-    result = build(site_file, out_dir)
-    assert "robots.txt" in result.output_files
-    assert (out_dir / "robots.txt").read_text(encoding="utf-8") == "User-agent: *\nDisallow:"
-
-
-def test_build_runs_multiple_raw_postprocessors_in_order(tmp_path):
-    site_file = tmp_path / "site.py"
-    site_file.write_text(
-        "from arklight import Site, Page, Heading\n"
-        "site = Site(name='Test')\n"
-        "@site.raw_postprocess\n"
-        "def first(files):\n"
-        "    files['order.txt'] = 'first'\n"
-        "    return files\n"
-        "@site.raw_postprocess\n"
-        "def second(files):\n"
-        "    files['order.txt'] += ',second'\n"
-        "    return files\n"
-        "@site.page('/')\n"
-        "def home():\n"
-        "    return Page(Heading('Hi'))\n"
-    )
-    out_dir = tmp_path / "ARK"
-    build(site_file, out_dir)
-    assert (out_dir / "order.txt").read_text(encoding="utf-8") == "first,second"
-
-
-def test_build_raw_postprocess_error_raises_compile_error(tmp_path):
-    site_file = tmp_path / "site.py"
-    site_file.write_text(
-        "from arklight import Site, Page, Heading\n"
-        "site = Site(name='Test')\n"
-        "@site.raw_postprocess\n"
-        "def boom(files):\n"
-        "    raise RuntimeError('kaboom')\n"
-        "@site.page('/')\n"
-        "def home():\n"
-        "    return Page(Heading('Hi'))\n"
-    )
-    with pytest.raises(CompileError, match="kaboom"):
-        build(site_file, tmp_path / "ARK")
-
-
-def test_build_raw_postprocess_bad_return_type_raises_compile_error(tmp_path):
-    site_file = tmp_path / "site.py"
-    site_file.write_text(
-        "from arklight import Site, Page, Heading\n"
-        "site = Site(name='Test')\n"
-        "@site.raw_postprocess\n"
-        "def bad(files):\n"
-        "    return 'not a dict'\n"
-        "@site.page('/')\n"
-        "def home():\n"
-        "    return Page(Heading('Hi'))\n"
-    )
-    with pytest.raises(CompileError, match="must return a dict"):
-        build(site_file, tmp_path / "ARK")
+    messages: list[str] = []
+    result = build(site_file, out_dir, on_stage=messages.append)
+    banners = [m for m in messages if m.startswith("\u26a0")]
+    assert banners == []
+    # Never runs -- robots.txt is never added.
+    assert "robots.txt" not in result.output_files
 
 
 def test_raw_postprocess_summary_mentions_shoot_yourself_in_the_foot(capsys):
+    # The FEATURES registry entry itself stays registered for
+    # historical/documentation purposes -- see
+    # arklight/experimental.py's raw-postprocess entry -- even though
+    # nothing in Site emits it anymore.
     usage = experimental.emit("raw-postprocess")
     experimental.print_summary([usage])
     out = capsys.readouterr().out
-    assert "shoot yourself in the foot" in out
+    assert "OFFICIALLY DEPRECATED" in out
     assert "Feature : raw-postprocess" in out
 
 
