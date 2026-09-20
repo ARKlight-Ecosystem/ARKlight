@@ -11,11 +11,15 @@ hosted database, an auth service, a hand-rolled API). It is named
 **An interface only.** This module holds the closed vocabulary a
 declaration may draw from and the value a site attaches to
 `Site(provider=...)`. It contains no vendor code, no networking code,
-and no opinion about auth or schemas. At this stage a declared
-Provider adds no markup, config or script of its own to the generated
-site (the pages are byte-identical; the only differences are the
-reports every gated experimental feature already gets, the devtools
-console reminder in `arklight.js` and an entry in `sbom.txt`). The
+and no opinion about auth or schemas. A declared Provider adds
+nothing to the generated pages or stylesheet (byte-identical with and
+without one). Two things in the output differ: the reports every gated
+experimental feature already gets (the devtools console reminder in
+`arklight.js` and an entry in `sbom.txt`), and, from stage 3 (`v0.067`),
+one read-only config object in `arklight.js`, `window.ARKLIGHT_PROVIDER`
+(`{name, capabilities}`), which the site author's own code reads to learn
+what the site declared. It carries no DOM hooks or `State(...)` keys yet --
+there is no authoring surface to wire a capability to one. The
 concrete implementation (the real Firebase SDK, your own fetch calls)
 is the site author's own code, never generated or checked by ARKlight. What
 ARKlight *does* own is the part the compiler can decide ahead of time:

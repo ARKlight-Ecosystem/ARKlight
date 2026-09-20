@@ -5,6 +5,43 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06518] -- Capability fix: `Provider`, stage 3/6, JS backend emission (the `v0.067` slot's first-shipped piece)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06517]`.
+`v0.067`'s slot has two independent pieces (`docs/version history/v0.067.md`);
+this ships only `Provider` stage 3 of 6. JS vocabulary addendum stage 7/10 (the
+list-scalar derivations catalog) is still PLANNED. Roadmap `v0.067` untouched.
+
+- **`window.ARKLIGHT_PROVIDER`** (`arklight/backend/js/render.py`,
+  `_provider_config_js`) -- a site that declares `Site(provider=...)` gets one
+  read-only object in `arklight.js`:
+  `Object.freeze({name, capabilities: Object.freeze([...])})`, for the author's
+  own script to read. Same all-caps-window-global convention as
+  `window.ARKLIGHT_ON_ERROR`. It is site-wide (one provider per `Site`), zero
+  bytes when no provider is declared, and set whether or not the devtools console
+  reminder is enabled. Name and capabilities are written via `json.dumps`, so
+  quotes, `</script>`, U+2028 and non-ASCII names round-trip exactly (checked in
+  Node).
+- **Pages and stylesheet are unchanged.** A build with a Provider still differs
+  from one without in exactly `arklight.js` and `sbom.txt`. No networking, no
+  vendor SDK, no CSP change, no generated glue that talks to anything.
+- **Not in the object:** DOM hooks and `State(...)` keys. The proposal mentions
+  them, but there is no authoring surface to wire a capability to one yet, so
+  the object holds only what a declaration actually contains.
+- **Stale wording corrected:** `arklight/provider.py`, `Provider`'s docstring
+  and the `provider-integration` notice said a declared Provider "adds no
+  markup, config or script"; they now describe the config object.
+- **Not done**, per the later previews: the external `<script src>` prop
+  (stage 4), `arklight search` integration (stage 5), the final capability enum
+  (stage 6). The `.arklight` binary still doesn't round-trip `provider`.
+
+`tests/test_provider.py` gained 15 tests (55 -> 70): absent without a provider,
+name/capabilities in order, independence from the reminder flag, no network
+tokens in the block, only two fields, pages/CSS never mention it, a Node run
+reading the frozen object and failing to mutate it, six awkward-name round
+trips, and placement before anything appended after the runtime. Full suite
+2266 passed (was 2251 on `0.06517`). `0.06517` -> `0.06518`.
+
 ## [0.06517] -- Capability fix: JS vocabulary addendum stage 6/10, the predicates catalog (the `v0.066` slot's second piece)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06516]`.

@@ -659,6 +659,51 @@ def _experimental_console_reminder_js(experimental_usages: list) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _provider_config_js(provider) -> str:
+    """
+    `Provider` stage 3 of 6 (`v0.067` -- see `docs/version history/
+    v0.067.md` and `arklight/provider.py`): the fixed config blob a
+    declared `Site(provider=...)` needs at runtime, exposed to the site
+    author's own code as `window.ARKLIGHT_PROVIDER` -- the same
+    all-caps-window-global convention `window.ARKLIGHT_ON_ERROR` already
+    sets for the other direction (author hook -> runtime).
+
+    The blob is exactly what a validated declaration holds, and nothing
+    else: `{"name": ..., "capabilities": [...]}`, both deep-frozen so
+    the author's script can read it but not rewrite what the compiler
+    decided. It is site-wide (one provider per `Site`), not per page.
+    Nothing here calls the network, loads a vendor SDK, or reads
+    `State(...)`; the concrete implementation stays the author's own
+    code, reading this global to learn what the site declared.
+
+    Returns `""` (nothing to ship) when the site declares no provider,
+    same "only ship what's used" discipline as every function here.
+
+    `json.dumps(...)` (default `ensure_ascii=True`) produces safely
+    escaped JS string literals -- quotes, backslashes, control
+    characters and non-ASCII (so no raw U+2028/U+2029) -- and is never
+    used to build or run code; nothing is passed through `eval`/
+    `new Function`.
+
+    Deliberately *not* included, because nothing at this stage can
+    author them: DOM hooks or `State(...)` keys a capability is wired
+    to (the proposal's section 3 mentions both). No authoring surface
+    for wiring a capability exists yet, so inventing blob fields ahead
+    of it would be guessing at a contract; the object only ever gains
+    fields.
+    """
+    if provider is None:
+        return ""
+    name = json.dumps(provider.name)
+    capabilities = ", ".join(json.dumps(cap) for cap in provider.capabilities)
+    return (
+        "  window.ARKLIGHT_PROVIDER = Object.freeze({\n"
+        f"    name: {name},\n"
+        f"    capabilities: Object.freeze([{capabilities}])\n"
+        "  });\n"
+    )
+
+
 def _build_runtime_js(ir: WebsiteIR) -> str:
     (
         used_behaviors,
@@ -803,6 +848,17 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         console_reminder = _experimental_console_reminder_js(ir.experimental_usages)
         if console_reminder:
             parts.append(console_reminder)
+
+    # `Provider` stage 3 of 6 (`v0.067`): the declared provider's config
+    # blob, unconditionally of htmx/state/behaviors -- like the console
+    # reminder above it needs nothing from the rest of this runtime, and
+    # it's set before any author code appended after the IIFE (a
+    # `ScriptExtension`) can read it. Its own gate is `ir.provider`, not
+    # `devtools_console_reminder`: turning the reminder off must not
+    # silently hide the config a site's own code depends on.
+    provider_config = _provider_config_js(ir.provider)
+    if provider_config:
+        parts.append(provider_config)
 
     needs_notify = needs_click_interceptor or has_state
     if needs_notify:
