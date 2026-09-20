@@ -302,8 +302,19 @@ The canonical list -- `README.md` links here rather than keeping its
 own copy:
 
 - Browser-side Python
-- Virtual DOM
 - Runtime Python execution in the browser
+- **A user-facing/authored Virtual DOM.** ARKlight never asks a site
+  author to write against a vdom concept, and a page with no
+  `State(...)` ships zero vdom code. Internally, since `v0.054`
+  (`vdom-staging`, all 8 stages DONE), the `State`/`Bind`/`Action.*`
+  runtime is powered by a vendored bare [snabbdom](https://github.com/snabbdom/snabbdom)
+  core (`init`/`h`/`vnode`/`htmlDomApi` only) as an implementation
+  detail of the diff/patch mechanism -- see `DESIGN-NOTES.md`'s
+  "Reactive-core vdom staging". No page-facing API changed when it
+  landed. The vendored htmx runtime (`hx-boost`/`hx-preserve` for
+  app-shell navigation) is the same kind of thing: an internal
+  mechanism the compiler emits when needed, not an authoring surface
+  a site author writes `hx-` attributes against directly.
 - Feature creep beyond the milestone roadmap above
 
 ---
