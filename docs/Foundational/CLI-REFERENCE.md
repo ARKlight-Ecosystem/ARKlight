@@ -7,11 +7,8 @@ keeps no CLI content of its own and points here for all of it.
 
 `build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`,
 `--version`, and `--upgrade-alpha` below are implemented and shipped.
-`arklight deploy` is **not** one of them -- it's a design-only,
-not-yet-implemented subcommand; see
-[`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) for its spec and status.
-`android` and `desktop` (below) are implemented, but alpha-only so
-far -- see the note in their own section.
+`android`, `desktop` and `deploy` (below) are implemented, but
+alpha-only so far -- see the note in their own sections.
 
 **One-time license gate.** The first time any `arklight <command>`
 runs on a machine, it prints the ARKlight Additional Terms and asks
@@ -401,7 +398,7 @@ arklight desktop build <project-dir> [--run]
 ```
 
 **Alpha-only so far -- not yet on `main`.** `android` and `desktop`
-are real, implemented subcommands (unlike `arklight deploy`), but
+are real, implemented subcommands, but
 they're part of the in-progress Android/Desktop backend work (see
 `PROGRESS.md`'s Snapshot table -- `v0.080`/`v0.100`, both IN
 PROGRESS) and haven't landed on the stable `main` branch yet. Full
@@ -445,6 +442,75 @@ and
 arklight android scaffold ARK -o android-project --release
 arklight desktop scaffold ARK -o desktop-project
 arklight desktop build desktop-project --run
+```
+
+```bash
+arklight deploy [cloudflare] [entry] [-o OUTPUT_DIR] [--name NAME] [--skip-build] [--dry-run]
+```
+
+**Alpha-only so far -- not yet on `main`.** Builds the site, then hands
+the build directory to the hosting provider's own CLI. Cloudflare
+Workers (static assets), deployed by [Wrangler](https://developers.cloudflare.com/workers/wrangler/),
+is the only provider so far, and bare `arklight deploy` means
+`arklight deploy cloudflare`. Spec and the reasoning behind the
+boundary: [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md).
+
+- `provider` -- where to deploy. Only `cloudflare` exists. Name it
+  *before* the site file: `arklight deploy cloudflare my_site.py`
+  (`arklight deploy my_site.py` is refused rather than guessed at).
+- `entry` -- the site file to build (default: `site.py`, what
+  `arklight new` scaffolds). Its directory is the *project directory*:
+  where a `wrangler.jsonc` is looked for and where Wrangler runs.
+- `-o, --output` -- the build directory to deploy (default: `ARK`).
+- `--name NAME` -- Cloudflare Worker name, passed to Wrangler as-is
+  (Wrangler validates it). Without it, and with no Wrangler config in
+  the project, the name is the project directory's name, lowercased
+  with anything outside `a-z0-9` turned into `-`; if nothing usable is
+  left, `deploy` asks for `--name` instead of inventing one.
+- `--skip-build` -- deploy the existing `--output` directory as-is,
+  without running `arklight build`. The directory must exist and not
+  be empty; the site file is not needed.
+- `--dry-run` -- build (unless `--skip-build`) and check for Wrangler,
+  then print the command that would run instead of running it.
+  Nothing is deployed.
+
+What a run does, in order:
+
+1. Runs `arklight build <entry> -o <output> --no-open` -- the same
+   build, with the same output and warnings, as running it yourself.
+   If it fails, `deploy` stops there and Wrangler is never started.
+2. Looks for `wrangler` on your `PATH`. If it's missing, `deploy`
+   stops with install instructions. **ARKlight never installs
+   Wrangler** (and never runs `npm`/`npx`, which could) -- run
+   `npm install --global wrangler` and `wrangler login` yourself.
+3. Prints the exact command, then runs it, from the project directory:
+   - **No Wrangler config** (`wrangler.jsonc`, `wrangler.json` or
+     `wrangler.toml`) in the project directory:
+     `wrangler deploy --assets <output> --name <name> --compatibility-date <today>`
+     -- Cloudflare's documented zero-config form for a static site.
+   - **A Wrangler config is there:** plain `wrangler deploy` (plus
+     `--name` only if you passed one). Your config decides what is
+     deployed; ARKlight does not read it, and does not check that its
+     `assets.directory` is the directory it just built.
+4. Wrangler owns the rest: sign-in prompts, upload, the deployed URL
+   and any error message are shown exactly as Wrangler prints them
+   (its output is not captured or filtered).
+
+Exit code: `0` on success; a failed build's own code; `1` for a
+problem ARKlight itself found (Wrangler missing, missing build
+directory, missing site file); otherwise **Wrangler's own exit code,
+unchanged** (`130` on Ctrl-C). In CI, Wrangler reads its credentials
+from `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` -- ARKlight never
+touches them.
+
+Wrangler keeps a scratch `.wrangler/` directory in the directory it runs
+in; add it to your `.gitignore`.
+
+```bash
+arklight deploy
+arklight deploy cloudflare my_site.py -o public --name my-portfolio
+arklight deploy --dry-run
+arklight deploy --skip-build
 ```
 
 ```bash

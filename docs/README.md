@@ -46,7 +46,7 @@ record for the project, updated in place rather than removed.
 | [`CLI-REFERENCE.md`](Foundational/CLI-REFERENCE.md) | The implemented, shipped `arklight` CLI: every subcommand, its flags, and worked examples. |
 | [`GETTING-STARTED.md`](Foundational/GETTING-STARTED.md) | Install (pip and the Debian/Ubuntu package), the annotated repository layout, and the `pytest` workflow (moved out of the root `README.md`, which keeps only a two-line pointer). |
 | [`AUTHORING-GUIDE.md`](Foundational/AUTHORING-GUIDE.md) | The full public component/behavior/state API reference (moved out of the root `README.md`, which keeps only the quickstart). |
-| [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | **Design only, not implemented.** The planned `arklight deploy` subcommand and its spec. |
+| [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | `arklight deploy`: the spec and the provider boundary (ARKlight builds, the provider's own CLI deploys), and what shipped -- Cloudflare Workers via Wrangler, alpha-only so far. |
 | [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`SYSTEM-DESIGN-AGREEMENTS.md`](Foundational/SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |

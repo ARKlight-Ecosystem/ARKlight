@@ -104,7 +104,8 @@ arklight-framework/
                         docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md
                         (alpha-only so far, not yet on `main`)
     compiler/          Pipeline orchestration
-    cli/               `arklight` command-line entry point
+    cli/               `arklight` command-line entry point (incl.
+                        `deploy.py`, the `arklight deploy` -> Wrangler hand-off)
       templates/       `simple`/`production` scaffolds for
                         `arklight new` (v0.004a; see docs/Foundational/DESIGN-NOTES.md)
     packer/            `arklight pack`/`unpack` -- ARK Bundle (.ark)

@@ -8,6 +8,7 @@ ARKlight CLI.
     arklight pwa ARK --name "My Site" --icon assets/icon-192.png:192x192
     arklight android scaffold ARK -o android-project
     arklight desktop scaffold ARK -o desktop-project
+    arklight deploy cloudflare
     arklight search Picture
 
 Beginner-friendly by design: a handful of subcommands, sensible
@@ -30,8 +31,9 @@ import webbrowser
 from pathlib import Path
 
 from arklight import __version__, experimental
-from arklight.cli import android, desktop, live_streaming
+from arklight.cli import android, deploy, desktop, live_streaming
 from arklight.cli.android import AndroidError
+from arklight.cli.deploy import DeployError
 from arklight.cli.desktop import DesktopError
 from arklight.cli.doc_retrieval import DOC_FOLDERS, DocRetrievalError, ignored_flag_notices, run_retrieve_doc
 from arklight.cli.license_gate import ensure_license_accepted
@@ -720,6 +722,113 @@ def _cmd_desktop_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_deploy(args: argparse.Namespace) -> int:
+    """
+    `arklight deploy [cloudflare]` -- build, check that Wrangler is
+    there, then hand the build directory to it. See
+    docs/Foundational/DEPLOYMENT-CLI.md, and `arklight.cli.deploy` for
+    what this deliberately does *not* do (install Wrangler, authenticate,
+    upload, capture Wrangler's output).
+
+    Exit code: 0 on success; a failed build's own code; 1 for a problem
+    ARKlight itself found (missing Wrangler, missing build directory);
+    otherwise Wrangler's exit code, unchanged.
+    """
+    entry = Path(args.entry)
+    output = Path(args.output)
+    # Same rule `arklight build` uses to find `arklight.config.py`: the
+    # project is the directory the site file lives in. It is also where
+    # a project-owned `wrangler.jsonc` is looked for and where Wrangler
+    # runs.
+    project_dir = entry.resolve().parent
+
+    if not project_dir.is_dir():
+        print(f"ARKlight deploy failed: directory not found: {project_dir}", file=sys.stderr)
+        return 1
+
+    if args.skip_build:
+        try:
+            deploy.check_build_dir(output)
+        except DeployError as exc:
+            print(f"ARKlight deploy failed: {exc}", file=sys.stderr)
+            return 1
+    else:
+        if not entry.is_file():
+            print(
+                f"ARKlight deploy failed: site file not found: {entry}. Pass "
+                f"its path (`arklight deploy cloudflare path/to/site.py`), or "
+                f"use --skip-build to deploy an existing build directory.",
+                file=sys.stderr,
+            )
+            return 1
+        # Deliberately re-enters the CLI rather than calling
+        # `compiler.pipeline.build` directly: `arklight build` already
+        # owns project config, CSP/experimental handling, alpha-warning
+        # and experimental-API output, and Rei's log mode, and deploy
+        # should build *exactly* like `arklight build` does -- not a
+        # second copy of that logic that drifts. `--no-open` because
+        # nobody wants a browser window in the middle of a deploy.
+        build_code = main(["build", str(entry), "-o", str(output), "--no-open"])
+        if build_code != 0:
+            print(
+                "ARKlight deploy: the build failed, so nothing was deployed.",
+                file=sys.stderr,
+            )
+            return build_code
+
+    try:
+        wrangler = deploy.find_wrangler()
+        plan = deploy.plan_cloudflare(
+            wrangler=wrangler,
+            output_dir=output,
+            project_dir=project_dir,
+            name=args.name,
+        )
+    except DeployError as exc:
+        print(f"ARKlight deploy failed: {exc}", file=sys.stderr)
+        if not args.skip_build:
+            print(
+                f"(The site was built -> {output}/, but nothing was deployed.)",
+                file=sys.stderr,
+            )
+        return 1
+
+    print(f"ARKlight v{__version__} deploying {output}/ to Cloudflare Workers with Wrangler.")
+    if plan.uses_project_config:
+        print(
+            f"Using the Wrangler config in {project_dir}/ -- it decides what "
+            f"gets deployed. (ARKlight does not check that its assets "
+            f"directory is {output}/.)"
+        )
+    else:
+        print(
+            f"No Wrangler config in {project_dir}/, so deploying {output}/ as "
+            f"Worker {plan.worker_name!r} (compatibility date "
+            f"{plan.compatibility_date}). Add a wrangler.jsonc there to "
+            f"control this yourself."
+        )
+    print(f"$ {plan.display}")
+
+    if args.dry_run:
+        print("--dry-run: Wrangler was not run.")
+        return 0
+
+    print()
+    try:
+        code = deploy.run_wrangler(plan)
+    except DeployError as exc:
+        print(f"ARKlight deploy failed: {exc}", file=sys.stderr)
+        return 1
+
+    if code != 0:
+        print(
+            f"ARKlight deploy: Wrangler exited with code {code} -- see its "
+            f"output above for the reason.",
+            file=sys.stderr,
+        )
+    return code
+
+
 def _cmd_new(args: argparse.Namespace) -> int:
     # `--explain-architecture` is informational and doesn't require a
     # project name -- `arklight new --explain-architecture` alone just
@@ -1179,6 +1288,59 @@ def main(argv: list[str] | None = None) -> int:
         help="Launch the built binary once `make` succeeds.",
     )
     desktop_build_parser.set_defaults(func=_cmd_desktop_build)
+
+    deploy_parser = subparsers.add_parser(
+        "deploy",
+        help="Build the site, then deploy it with the hosting provider's own CLI "
+        "(Cloudflare Workers via Wrangler). See docs/Foundational/DEPLOYMENT-CLI.md.",
+        description="Build the site, then hand the build directory to the hosting "
+        "provider's own CLI. ARKlight does not install that CLI, authenticate, or "
+        "upload anything itself: it runs `wrangler deploy` and Wrangler does the rest, "
+        "with its output shown as-is. Bare `arklight deploy` is `arklight deploy "
+        "cloudflare`. Name the provider before the site file: `arklight deploy "
+        "cloudflare my_site.py`.",
+    )
+    deploy_parser.add_argument(
+        "provider",
+        nargs="?",
+        choices=deploy.PROVIDERS,
+        default=deploy.DEFAULT_PROVIDER,
+        help="Where to deploy (default: %(default)s, the only provider so far).",
+    )
+    deploy_parser.add_argument(
+        "entry",
+        nargs="?",
+        default="site.py",
+        help="Path to the Python site file to build (default: site.py). Its directory "
+        "is the project directory: where a wrangler.jsonc is looked for and where "
+        "Wrangler runs.",
+    )
+    deploy_parser.add_argument(
+        "-o", "--output", default="ARK", help="Build output directory to deploy (default: ARK)"
+    )
+    deploy_parser.add_argument(
+        "--name",
+        default=None,
+        help="Cloudflare Worker name, passed to Wrangler as-is (Wrangler/Cloudflare "
+        "validate it). Default: the project directory's name, lowercased, when the "
+        "project has no wrangler config; with one, the config's own name is used "
+        "unless you pass this.",
+    )
+    deploy_parser.add_argument(
+        "--skip-build",
+        action="store_true",
+        default=False,
+        help="Deploy the existing --output directory as it is, without running "
+        "`arklight build` first.",
+    )
+    deploy_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Build (unless --skip-build) and check for Wrangler, then print the "
+        "Wrangler command that would run instead of running it. Nothing is deployed.",
+    )
+    deploy_parser.set_defaults(func=_cmd_deploy)
 
     new_parser = subparsers.add_parser(
         "new", help="Scaffold a new ARKlight project from a built-in template."
