@@ -5,13 +5,72 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06517] -- Capability fix: JS vocabulary addendum stage 6/10, the predicates catalog (the `v0.066` slot's second piece)
+
+Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06516]`.
+`v0.066`'s slot had two independent pieces (`docs/version history/v0.066.md`);
+`Provider` stage 2 shipped as `0.06516`, and this ships the other, so both
+are now done. Roadmap `v0.066` (the `v0.065`-`v0.070` range row) still
+untouched -- stages 7-10 remain PLANNED.
+
+- **Eight new `Predicate.*` kinds for `Show(...)`**, no new IR node:
+  `and`/`or` (2+ names, JavaScript truthiness), `not` (1 name), `in_range`
+  (`lo <= x <= hi`, both ends inclusive; three names in `Derive.clamp`'s
+  order, read as `Number(x) || 0` exactly as `clamp` reads them),
+  `one_of` (membership in a literal `values` list, strict `===`-style
+  equality), `is_empty`/`is_not_empty` (`null`, `""` or `[]`; numbers,
+  booleans and objects are never empty) and `is_null`.
+- **Python spellings.** `and`/`or`/`not` are keywords, so the API methods are
+  `Predicate.and_(...)`/`.or_(...)`/`.not_(...)`; the registry kinds stay
+  `"and"`/`"or"`/`"not"` (so `arklight search Predicate.and` works). `not` is
+  the same verdict as the existing `falsy`; it ships because the proposal
+  lists it and `and_`/`or_`/`not_` read better together.
+- **`PredicateSpec` grew two fields** (`arklight/ir/schema.py`), defaults
+  keep every existing kind unchanged: `variadic: bool` (`names` becomes a
+  minimum -- `and`/`or`) and `extra_args: tuple[str, ...]` (same role as
+  `DerivationSpec.extra_args` -- `one_of`'s `values`).
+- **Validation** (`arklight/ir/validate.py`): arity honours `variadic`;
+  `args` must be exactly the spec's `extra_args`; `one_of`'s `values` must be
+  a non-empty list of at most 1000 `str`/`bool`/`None`/finite-number
+  scalars, integers within +/-2**53 (the range a JavaScript number holds
+  exactly). `Predicate.one_of(name, "abc")` raises `TypeError` in the API
+  rather than quietly becoming three one-letter values.
+- **Build-time twin** (new `arklight/ir/js_predicate.py`, used by
+  `page_render._evaluate_predicate`): reproduces JavaScript's rules where
+  Python's differ -- `NaN` is falsy, `[]`/`{}` are truthy, `1 !== true`.
+  `Show`'s server-rendered `hidden` therefore agrees with the client.
+- **Runtime** (`arkEvalPredicate` in `arklight/backend/js/runtime/show.py`)
+  gained the eight cases. `data-ark-show` now carries an `"args"` key **only
+  when a kind has args** (`one_of`), so markup for every existing kind is
+  byte-identical to before.
+- **`arklight search`** reports variadic arity (`at least 2 names`) and
+  extra args for predicates.
+- **`Predicate.is_empty` is not `Derive.is_empty`.** The derivation (v0.065)
+  reads `String(x).length === 0`, so `None` is the text `"null"` and *not*
+  empty. The predicate treats `None` as empty, since "no value yet" is what
+  a `Show` guard means. Documented on both.
+- **Not done:** the `.arklight` binary decoder still hands a `Show`'s
+  `predicate` back as a tagged dict rather than a live `PredicateRef` -- true
+  of `truthy` too, so this stage neither caused nor fixed it; `one_of`'s
+  `values` do survive the trip. Pre-existing `truthy`/`falsy` are left on
+  Python's `bool(...)`, so `Predicate.truthy("items")` on an empty list
+  still pre-renders hidden while the browser (`!![]`) shows it; the new
+  kinds don't share that mismatch.
+
+`tests/test_js_vocabulary_v0066.py` (81 tests): API, registry, validation,
+the build-time evaluators, `hidden` per kind against initial state, JS
+render, search, binary round trip, and a Node parity test that runs the
+*shipped* `arkEvalPredicate` (extracted from `RENDER_SHOW_JS`) against the
+build-time evaluator over 1000+ cases of awkward values. Full suite 2251
+passed (was 2170 on `0.06516`). `0.06516` -> `0.06517`.
+
 ## [0.06516] -- Capability fix: `Provider`, stage 2/6, IR and validation integration (the `v0.066` slot's first piece)
 
 Numbered by the same `0.0650` + decimals rule as `[0.06501]`-`[0.06515]`.
 `v0.066`'s slot has two independent pieces (`docs/version history/v0.066.md`);
 this ships only `Provider` stage 2 of 6. JS vocabulary addendum stage 6/10
-(the predicates catalog), sharing the same slot, is still PLANNED. Roadmap
-`v0.066` untouched.
+(the predicates catalog), sharing the same slot, shipped afterwards as
+`0.06517`. Roadmap `v0.066` untouched.
 
 - **`WebsiteIR.provider: ProviderDeclaration | None`** (`arklight/ir/build.py`)
   -- straight passthrough of `Site(provider=...)`, same shape as

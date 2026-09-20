@@ -610,13 +610,19 @@ LITERAL_ARG_RULES: dict[str, dict[str, LiteralArgRule]] = {
 
 # `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): `Show(...)`'s
 # closed-vocabulary predicate, the same shape discipline as
-# `DERIVATION_REGISTRY` above but scaled down -- both current kinds
-# take exactly one state/computed name, so a plain `names: int` arity
-# is enough (no need for `DerivationSpec`'s min/max split, since
-# nothing here is variadic yet).
+# `DERIVATION_REGISTRY` above but scaled down.
+#
+# `names` is the exact number of state/computed names a kind takes --
+# or, when `variadic` is true (`v0.066`: `and`/`or`), the *minimum*,
+# with no upper bound. `extra_args` documents the closed set of extra
+# literal data (beyond `names`) a kind's `PredicateRef.args` dict must
+# carry, the same role `DerivationSpec.extra_args` plays (`v0.066`:
+# `one_of`'s `values`).
 @dataclass
 class PredicateSpec:
     names: int = 1
+    variadic: bool = False
+    extra_args: tuple[str, ...] = field(default_factory=tuple)
 
 
 PREDICATE_REGISTRY: dict[str, PredicateSpec] = {
@@ -627,11 +633,31 @@ PREDICATE_REGISTRY: dict[str, PredicateSpec] = {
     # alongside `Derive.compare`'s `eq/ne/gt/lt/gte/lte` op set, just
     # never wired into this registry. Each is its own fixed-arity
     # `kind` (mirrors `truthy`/`falsy`'s shape) rather than one
-    # `compare`-style kind plus an `op` extra arg, since
-    # `PredicateSpec` has no `extra_args` slot to carry one.
+    # `compare`-style kind plus an `op` extra arg.
     "equals": PredicateSpec(names=2),
     "gt": PredicateSpec(names=2),
     "lt": PredicateSpec(names=2),
+    # `v0.066` (docs/version history/v0.066.md): JS vocabulary
+    # addendum stage 6/10 -- the predicates catalog. `and`/`or` are the
+    # only variadic kinds (2+ names); `in_range` reads three names in
+    # `Derive.clamp`'s order (value, low, high); `one_of` is the only
+    # kind with an extra arg, a literal `values` list.
+    "and": PredicateSpec(names=2, variadic=True),
+    "or": PredicateSpec(names=2, variadic=True),
+    "not": PredicateSpec(names=1),
+    "in_range": PredicateSpec(names=3),
+    "one_of": PredicateSpec(names=1, extra_args=("values",)),
+    "is_empty": PredicateSpec(names=1),
+    "is_not_empty": PredicateSpec(names=1),
+    "is_null": PredicateSpec(names=1),
 }
 
 KNOWN_PREDICATES = frozenset(PREDICATE_REGISTRY)
+
+# `v0.066`: `Predicate.one_of(...)`'s `values` is a literal list, range-
+# checked once at build time (see `arklight.ir.validate`): at most this
+# many entries, each a JSON scalar. Integers are held to +/-2**53 so the
+# build-time membership test and the browser's `indexOf` (which sees a
+# double) can never disagree about which number a literal is.
+ONE_OF_MAX_VALUES = 1000
+ONE_OF_MAX_INTEGER = 2**53

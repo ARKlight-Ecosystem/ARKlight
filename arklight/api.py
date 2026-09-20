@@ -1494,6 +1494,10 @@ class Predicate:
         Show(Predicate.falsy("is_open"), Text("Click to expand"))
         Show(Predicate.equals("role", "admin_role"), Text("Welcome, admin"))
         Show(Predicate.gt("score", "threshold"), Text("You passed!"))
+        Show(Predicate.and_("logged_in", "has_items"), Text("Ready to check out"))
+        Show(Predicate.in_range("age", "min_age", "max_age"), Text("Eligible"))
+        Show(Predicate.one_of("tag", ["news", "sale"]), Text("Featured"))
+        Show(Predicate.is_empty("query"), Text("Type to search"))
     """
 
     @staticmethod
@@ -1522,6 +1526,69 @@ class Predicate:
         """`v0.062`: true when `a`'s value is less than `b`'s,
         mirroring `Derive.compare(a, b, "lt")`."""
         return PredicateRef(kind="lt", names=(a, b))
+
+    # `v0.066`: the predicates catalog. Python keywords can't be method
+    # names, so `and`/`or`/`not` are spelled `and_`/`or_`/`not_` here;
+    # the registry kind is still plain `"and"`/`"or"`/`"not"`.
+
+    @staticmethod
+    def and_(*names: str) -> PredicateRef:
+        """`v0.066`: true when *every* named state/computed value is
+        truthy (JavaScript truthiness). Takes two or more names."""
+        return PredicateRef(kind="and", names=tuple(names))
+
+    @staticmethod
+    def or_(*names: str) -> PredicateRef:
+        """`v0.066`: true when *any* named state/computed value is
+        truthy. Takes two or more names."""
+        return PredicateRef(kind="or", names=tuple(names))
+
+    @staticmethod
+    def not_(name: str) -> PredicateRef:
+        """`v0.066`: logical negation of one named value (the same
+        verdict as `Predicate.falsy(name)`; kept because guards built
+        from `and_`/`or_`/`not_` read more naturally together)."""
+        return PredicateRef(kind="not", names=(name,))
+
+    @staticmethod
+    def in_range(name: str, low: str, high: str) -> PredicateRef:
+        """`v0.066`: true when `low <= name <= high`, all three named
+        state/computed values, both ends inclusive. Read as numbers the
+        way `Derive.clamp(name, low, high)` reads them. Argument order
+        matches `Derive.clamp`."""
+        return PredicateRef(kind="in_range", names=(name, low, high))
+
+    @staticmethod
+    def one_of(name: str, values: list | tuple) -> PredicateRef:
+        """`v0.066`: true when the named value is strictly equal (`===`,
+        so `1` is not `True` and `"1"` is not `1`) to one of `values`, a
+        fixed list of literals (`str`/`int`/`float`/`bool`/`None`)."""
+        if isinstance(values, (str, bytes)) or not isinstance(values, (list, tuple)):
+            # `list("abc")` would silently become three one-letter values.
+            raise TypeError(
+                f"Predicate.one_of({name!r}, values) needs values to be a list or "
+                f"tuple of literals, got {type(values).__name__}."
+            )
+        return PredicateRef(kind="one_of", names=(name,), args={"values": list(values)})
+
+    @staticmethod
+    def is_empty(name: str) -> PredicateRef:
+        """`v0.066`: true when the named value is `None`, an empty
+        string, or an empty list. Numbers, booleans and everything else
+        are never empty. Unlike `Derive.is_empty`, `None` counts as
+        empty."""
+        return PredicateRef(kind="is_empty", names=(name,))
+
+    @staticmethod
+    def is_not_empty(name: str) -> PredicateRef:
+        """`v0.066`: the negation of `Predicate.is_empty(name)`."""
+        return PredicateRef(kind="is_not_empty", names=(name,))
+
+    @staticmethod
+    def is_null(name: str) -> PredicateRef:
+        """`v0.066`: true when the named value is `None` (`null`).
+        An empty string is *not* null -- see `is_empty`."""
+        return PredicateRef(kind="is_null", names=(name,))
 
 
 def Show(predicate: PredicateRef, *children: Any) -> ARKNode:

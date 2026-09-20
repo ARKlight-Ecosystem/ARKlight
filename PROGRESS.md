@@ -73,6 +73,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06514 | Capability fix: `Provider`, stage 1 of 6 (the contract itself; the `v0.065` slot's last piece) -- `Provider.declare(name=..., capabilities=[...])` and `Site(provider=...)`, a frozen self-validating `ProviderDeclaration` (`arklight/provider.py`), a closed, provisional capability vocabulary (`auth`, `read`, `write`, `subscribe`), and the gated `provider-integration` experimental feature (inline banner + end-of-build summary through the existing pipeline; `upstream_candidate=False`). A declared Provider adds no markup, config or script of its own: pages and stylesheet are byte-identical, only `arklight.js`'s console reminder and `sbom.txt` change, as for every gated feature. No config blob, no external-script prop, no concrete provider. `docs/Implementation/PROVIDER-SDK-ADDENDUM.md` is referenced but never committed, so scope follows the per-version previews (`v0.065.md`-`v0.070.md`); pulls stage 2's "recorded on `Site`" bullet forward (the gate needs it to fire), leaving IR threading and `ir/validate.py` enforcement to stage 2. `tests/test_provider.py` (47 tests); full suite 2094 passed. `0.06513` -> `0.06514`; roadmap `v0.065` untouched | DONE |
 | v0.06515 | CLI: `arklight deploy` -- the deployment CLI, design-only until now (`docs/Foundational/DEPLOYMENT-CLI.md`). `arklight deploy [cloudflare] [entry] [-o OUTPUT_DIR] [--name NAME] [--skip-build] [--dry-run]` (`arklight/cli/deploy.py`, `_cmd_deploy` in `arklight/cli/main.py`): builds with `arklight build --no-open`, finds `wrangler` on `PATH`, runs one `wrangler deploy` and returns its exit code unchanged, with Wrangler's output inherited rather than captured. Never installs Wrangler (no `npx`/`npm` fallback), never touches credentials or the network. No project Wrangler config -> `wrangler deploy --assets <output> --name <name> --compatibility-date <today>`; a `wrangler.jsonc`/`.json`/`.toml` in the project directory -> plain `wrangler deploy`, the config is the user's. Cloudflare Workers is the only provider; `--skip-build`/`--dry-run` are additions beyond the spec. **No real deploy run** (no Cloudflare account): the command form was checked under a real Wrangler 4.135.0's `--dry-run`. `tests/test_deploy.py` (56 tests); full suite 2162 passed. `0.06514` -> `0.06515`; out-of-band, no roadmap row, roadmap `v0.065` untouched | DONE |
 | v0.06516 | Capability fix: `Provider`, stage 2 of 6 (the `v0.066` slot's first-shipped piece; JS vocabulary stage 6/10 in the same slot is still PLANNED) -- IR and validation integration. `WebsiteIR.provider: ProviderDeclaration \| None` (`arklight/ir/build.py`), a straight passthrough of `Site(provider=...)` threaded through `build_website_ir(...)`/`arklight/compiler/pipeline.py`, so `ir.provider` now carries the real declaration, not just its recorded experimental usage. New `arklight.ir.validate.validate_provider(provider)` re-checks the closed `PROVIDER_CAPABILITIES` vocabulary at the pipeline's own validation stage, raising the module's shared `ValidationError` instead of `ProviderDeclaration`'s own `ValueError` -- defense in depth, since `Provider.declare(...)` already can't hold an invalid value by construction; called directly from `pipeline.build` since `Site(provider=...)` isn't a node in the ARK AST tree. `arklight/ir/binary.py`'s known-gap comment updated to list `provider` alongside `media_queries`/etc. (still not round-tripped by the `.arklight` binary format). Still nothing is emitted from a declared Provider -- a build with one stays byte-identical to one without, apart from the reports every gated feature already gets. `tests/test_provider.py` (47 -> 55 tests); full suite 2170 passed. `0.06515` -> `0.06516`; out-of-band, no roadmap row, roadmap `v0.066` untouched (its JS vocabulary piece remains) | DONE |
+| v0.06517 | Capability fix: JS vocabulary addendum stage 6/10 (the predicates catalog, the `v0.066` slot's second piece; `Provider` stage 2 already shipped as `0.06516`) -- 8 new `Predicate.*` kinds for `Show(...)`: `and_`/`or_` (2+ names), `not_`, `in_range` (`lo <= x <= hi`, `Derive.clamp`'s name order and `Number(x) \|\| 0` reading), `one_of` (literal `values`, strict equality), `is_empty`/`is_not_empty` (`null`/`""`/`[]`), `is_null`. `PredicateSpec` gained `variadic` and `extra_args` (defaults leave every existing kind unchanged); `arklight/ir/validate.py` checks arity/args and `one_of`'s `values`; new `arklight/ir/js_predicate.py` is the build-time twin reproducing JavaScript truthiness/equality so `Show`'s pre-rendered `hidden` agrees with the client's `arkEvalPredicate`; `data-ark-show` carries `args` only for `one_of` (existing kinds' markup byte-identical). `tests/test_js_vocabulary_v0066.py` (81 tests, incl. a Node parity run over the shipped `arkEvalPredicate`); full suite 2251 passed. `0.06516` -> `0.06517`; out-of-band, no roadmap row, roadmap `v0.066` untouched (stages 7-10 remain PLANNED) | DONE |
 | v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 6-10 of 10 (predicates catalog, list-scalar derivation catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots; stage 1 shipped as `0.06514`, stages 2-6 PLANNED | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
@@ -151,6 +152,55 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06517 -- Capability fix: JS vocabulary addendum stage 6/10, the predicates catalog (DONE)
+
+The second and last piece of the `v0.066` slot (`Provider` stage 2 shipped
+as `0.06516`). Eight `Predicate.*` kinds for `Show(...)`, all pure registry
+additions -- no new IR node, no parser, nothing `eval`-shaped.
+
+**What went in.**
+
+1. `arklight/ir/schema.py`: `PredicateSpec` gained `variadic: bool = False`
+   (`names` becomes a minimum -- `and`/`or`) and `extra_args: tuple = ()`
+   (`one_of`'s `values`); eight `PREDICATE_REGISTRY` entries; `ONE_OF_MAX_VALUES`
+   (1000) and `ONE_OF_MAX_INTEGER` (2**53).
+2. `arklight/api.py`: `Predicate.and_`/`or_`/`not_`/`in_range`/`one_of`/
+   `is_empty`/`is_not_empty`/`is_null`. Trailing underscores because
+   `and`/`or`/`not` are Python keywords; the registry kinds are unsuffixed.
+3. `arklight/ir/validate.py`: `_validate_predicate_ref` honours `variadic`,
+   rejects unexpected/missing `args`, and `_validate_one_of_values` checks the
+   literal list.
+4. `arklight/ir/js_predicate.py` (new): `PREDICATE_EVALUATORS`, the build-time
+   twin of the client. Needed because Python and JavaScript disagree exactly
+   where a `Show` guard lives: `bool(float("nan"))` is `True` (JS: false),
+   `bool([])` is `False` (JS: `![]` is false, i.e. truthy), `1 == True` (JS:
+   `1 !== true`).
+5. `arklight/backend/html/page_render.py` delegates the new kinds to it and
+   emits `"args"` in `data-ark-show` only when present.
+6. `arklight/backend/js/runtime/show.py`: `arkEvalPredicate` gained the eight
+   cases. `arklight/cli/search.py`: variadic arity and extra args shown.
+
+**Decisions worth a second look.**
+
+- `in_range` reads `Number(x) || 0` (the `clamp` coercion) rather than
+  `gt`/`lt`'s raw comparison, so `in_range(x, lo, hi)` and `clamp(x, lo, hi)`
+  agree, and so Python can mirror it. An inverted range (`lo > hi`) matches
+  nothing, whereas `clamp` returns its upper bound.
+- `is_empty` treats `None` as empty; `Derive.is_empty` (v0.065) does not
+  (`String(null)` is `"null"`). Objects are never empty.
+- `not` duplicates `falsy`. Shipped as specified in the addendum.
+- The proposal's section 4.2 (cited for emptiness) doesn't exist in the
+  proposal; the semantics above are this stage's own.
+
+**Not done / known.** The `.arklight` decoder returns a `Show`'s `predicate` as
+a tagged dict, not a `PredicateRef` (pre-existing, `truthy` too). `truthy`/
+`falsy` keep Python's `bool(...)`, so an empty-list `State` pre-renders hidden
+under `truthy` but visible in the browser (pre-existing; the new kinds don't
+have it). Left alone deliberately: changing shipped behaviour is a separate
+call.
+
+Full suite 2251 passed (was 2170). `0.06516` -> `0.06517`.
 
 ## v0.06516 -- Capability fix: `Provider`, stage 2 of 6 (DONE)
 

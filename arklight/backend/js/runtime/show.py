@@ -55,10 +55,27 @@ it's present to a visitor -- so nothing here touches `arkPatch`.
 from __future__ import annotations
 
 RENDER_SHOW_JS = """  function arkEvalPredicate(store, spec) {
-    if (spec.kind === "equals") return store.get(spec.names[0]) === store.get(spec.names[1]);
-    if (spec.kind === "gt") return store.get(spec.names[0]) > store.get(spec.names[1]);
-    if (spec.kind === "lt") return store.get(spec.names[0]) < store.get(spec.names[1]);
-    var value = store.get(spec.names[0]);
+    var names = spec.names;
+    if (spec.kind === "equals") return store.get(names[0]) === store.get(names[1]);
+    if (spec.kind === "gt") return store.get(names[0]) > store.get(names[1]);
+    if (spec.kind === "lt") return store.get(names[0]) < store.get(names[1]);
+    // 0.06517 (v0.066): the predicates catalog. Twins of
+    // arklight/ir/js_predicate.py -- keep the two in step.
+    if (spec.kind === "and") return names.every(function (n) { return !!store.get(n); });
+    if (spec.kind === "or") return names.some(function (n) { return !!store.get(n); });
+    if (spec.kind === "not") return !store.get(names[0]);
+    if (spec.kind === "in_range") {
+      var x = Number(store.get(names[0])) || 0;
+      return (Number(store.get(names[1])) || 0) <= x && x <= (Number(store.get(names[2])) || 0);
+    }
+    if (spec.kind === "one_of") return spec.args.values.indexOf(store.get(names[0])) !== -1;
+    if (spec.kind === "is_null") return store.get(names[0]) == null;
+    if (spec.kind === "is_empty" || spec.kind === "is_not_empty") {
+      var v = store.get(names[0]);
+      var empty = v == null || ((typeof v === "string" || Array.isArray(v)) && v.length === 0);
+      return spec.kind === "is_empty" ? empty : !empty;
+    }
+    var value = store.get(names[0]);
     return spec.kind === "falsy" ? !value : !!value;
   }
 

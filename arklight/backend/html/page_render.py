@@ -52,6 +52,7 @@ from arklight.backend.html.routing import _relative_asset_path
 from arklight.backend.html.tag_map import VOID_TAGS, _tag_for
 from arklight.backend.js.render import SCRIPT_PATH
 from arklight.ir.build import IRNode, IRPage
+from arklight.ir.js_predicate import PREDICATE_EVALUATORS
 from arklight.ir.js_string import from_units
 
 
@@ -93,11 +94,16 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
 
 
 def _evaluate_predicate(predicate: PredicateRef, *, page_state: dict) -> bool:
-    """`vdom-7`/`v0.062`: the same truthy/falsy/equals/gt/lt check
-    `Predicate.*(...)` describes, evaluated at build time against the
-    page's initial state -- see `arkEvalPredicate` in
-    `arklight/backend/js/runtime/show.py` for the client-side twin
-    that re-runs this on every state change."""
+    """`vdom-7`/`v0.062`/`v0.066`: the same check `Predicate.*(...)`
+    describes, evaluated at build time against the page's initial state
+    -- see `arkEvalPredicate` in `arklight/backend/js/runtime/show.py`
+    for the client-side twin that re-runs this on every state change.
+    The `v0.066` catalog kinds live in `arklight.ir.js_predicate`, which
+    reproduces JavaScript's truthiness/equality rules rather than
+    Python's."""
+    catalog_evaluator = PREDICATE_EVALUATORS.get(predicate.kind)
+    if catalog_evaluator is not None:
+        return catalog_evaluator(predicate.names, predicate.args, page_state.get)
     if predicate.kind == "equals":
         return page_state.get(predicate.names[0]) == page_state.get(predicate.names[1])
     if predicate.kind == "gt":
@@ -126,9 +132,12 @@ def _render_show(
     with `predicate` after that.
     """
     predicate = node.props["predicate"]
-    predicate_json = escape(
-        json.dumps({"kind": predicate.kind, "names": list(predicate.names)}), quote=True
-    )
+    spec = {"kind": predicate.kind, "names": list(predicate.names)}
+    if predicate.args:
+        # `v0.066`: `one_of`'s literal `values`. Only emitted when
+        # present, so every pre-existing kind's markup is unchanged.
+        spec["args"] = predicate.args
+    predicate_json = escape(json.dumps(spec), quote=True)
     visible = _evaluate_predicate(predicate, page_state=page_state)
     hidden_attr = "" if visible else " hidden"
     inner = _render_children(
