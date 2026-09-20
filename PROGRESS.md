@@ -69,7 +69,8 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06510 | Capability fix: Rei, the compiler narrator -- the `v0.065` slot's third piece, shipped ahead of the two still-PLANNED pieces. `arklight build --narrate` (sibling to `--verbose`/`--debug`, mutually exclusive with both) narrates the same `on_stage=` pipeline calls as deterministic `[Rei] ...` sentences (`arklight/compiler/rei/`); `rei.default_mode` config key; one-time introduction on a fresh output directory; `Try: arklight search <Name>` on unknown-component-type / missing-required-prop failures via a new structured `ValidationError.component_name`; original ELIZA reference implementation for study (`docs/reference/eliza/`, never imported). Building it corrected the spec: import-time `DuplicateComponentError`/`DuplicateStyleNameError` are ordinary build errors narrated from the discovery stage, not raw tracebacks. `tests/test_rei_narrator.py` (31 tests); full suite 1810 passed. `0.06509` -> `0.06510`; roadmap `v0.065` untouched | DONE |
 | v0.06511 | Fix (follow-up to `0.06510`, from auditing everything added since `v0.064`): Rei's assets stage no longer claims an `assets/` folder exists on every build (`... if there is one.`); new drift-guard tests fail if any stage message a real build emits, or the three conditional ones, has no Rei pattern; `CLI-REFERENCE.md` states what `--narrate` failure output really is; the ELIZA reference is described as the original implementation it is, not a vendored copy. `tests/test_rei_narrator.py` (36 tests); full suite 1815 passed. `0.06510` -> `0.06511`; roadmap `v0.065` untouched | DONE |
 | v0.06512 | Docs-only incremental patch: filed `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` (Rei the *language*, distinct from the narrator; the maintainer has decided Rei is ARKlight's official native source language, so the proposal's playground/Fun-tier framing is superseded and its gating is open question 11) and fixed its false "no channel constant" claim (`arklight.CHANNEL` exists); removed the changelog-style "Renumbered"/"Re-renumbered"/KaiOS paragraphs from `ARCHITECTURE.md`'s Milestones section and fixed the three references they left dangling; recorded that Vue and Svelte backends will not be built and corrected every statement calling them planned (comment-only docstring edits in three modules). No behavior change. `0.06511` -> `0.06512`; roadmap `v0.065` untouched | DONE |
-| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 5-10 of 10 (string/list-scalar derivation catalogs, predicates catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
+| v0.06513 | Capability fix: JS vocabulary addendum stage 5/10 (the string derivations catalog, the `v0.065` slot's first-listed piece) -- 18 `Derive.*` kinds (`capitalize`, `title_case`, `trim_start`, `trim_end`, `pad_start`, `pad_end`, `repeat`, `slice_string`, `char_at`, `replace_first`, `replace_all`, `split_count`, `reverse_string`, `string_length`, `includes_substring`, `starts_with`, `ends_with`, `is_empty`), one fragment file + one registry line each; literal arguments range/type-checked at build time (`LITERAL_ARG_RULES`); `replace_first`/`replace_all` are literal-text only (no `RegExp`, `$&`-style patterns not expanded). The four predicate-shaped kinds ship as boolean derivations (recorded decision). New `arklight/ir/js_string.py` reproduces JavaScript's UTF-16 indexing, `String(x)` coercion and whitespace set at build time. Also fixes `Bind(...)` pre-fill for booleans (`true`/`false`) and lone surrogates. `tests/test_js_vocabulary_v0065.py` (231 tests, Node parity sweep); full suite 2047 passed. `0.06512` -> `0.06513`; roadmap `v0.065` untouched (`Provider` stage 1 still PLANNED) | DONE |
+| v0.064-v0.070 (remainder) | JS vocabulary addendum, stages 6-10 of 10 (predicates catalog, list-scalar derivation catalog, cross-language "batteries included" numeric/formatting idioms, capstone `pluralize`/`random_int`) -- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`; per-stage `docs/version history/` previews marked PLANNED until each lands. `v0.065`-`v0.070` additionally carry `Provider`'s six-stage ladder (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`), one stage per version -- accepted, independent piece of work sharing this range's milestone slots | PLANNED |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
@@ -147,6 +148,64 @@ the experiment. See the base proposal's Maintainer Decision section
 for the exact wording.
 
 Design complete; implementation not started.
+
+## v0.06513 -- Capability fix: JS vocabulary stage 5/10, string derivations catalog (DONE)
+
+The first-listed piece of the `v0.065` slot, shipped after Rei (`0.06510`) and
+Platform API IR. Numbered `0.0650` plus decimals, same slot-sharing precedent;
+roadmap `v0.065` untouched (`Provider` stage 1 is still PLANNED).
+
+**What went in.** The 18 kinds from the addendum's `v0.065` section: one
+fragment file each, one `DERIVATION_REGISTRY` line each, `Derive.*`
+constructors in `arklight/api.py`, and build-time cases in
+`_evaluate_derivation`. No new IR node, no parser, no `eval`, no `RegExp`.
+
+**Where the work actually was: build-time parity again, but for strings.**
+The fragments are one-liners over `String.prototype`. The pre-render has to
+match them, and Python's `str` is not JavaScript's:
+
+- JavaScript indexes UTF-16 code units, Python code points. `"😀".length` is
+  `2`; `charAt(0)` of it is a lone surrogate. New `arklight/ir/js_string.py`
+  runs every operation on a "unit string" (one Python character per code
+  unit), which makes `len`, slicing, `replace` and `count` exact.
+- `String(x)` vs `str(x)`: `true`/`false`, `null`, `5` not `5.0`, `1e-7`,
+  `1,,ab` for `[1, None, "ab"]`.
+- `trimStart`/`\s` whitespace is not `str.strip()`'s (`U+FEFF` in, `U+001C`-
+  `U+001F` and `U+0085` out).
+- `String.prototype.replace(a, b)` expands `$&`/`$1`/`$$` in `b`. The addendum
+  requires literal replacement, so `replace_first` returns it from a function
+  and `replace_all` is `split(a).join(b)`; a test pins that `"a.b" -> "."`
+  matches a dot and not "any character".
+
+**Decisions recorded.**
+1. `includes_substring`/`starts_with`/`ends_with`/`is_empty` are filed as
+   *predicates* in the source proposal but listed under `v0.065`'s string
+   catalog in the addendum. Shipped as boolean-valued derivations (usable in
+   `Show(Predicate.truthy(...))` immediately); `v0.066` is unaffected.
+2. `search` (and `split_count`'s `sep`) must be non-empty: `replace("", x)` and
+   `split("")` act per code unit, which nobody means.
+3. `repeat`/`pad_*` are capped at `1000` (`STRING_SIZE_LIMIT`), one constant.
+4. `string_length`/`slice`/`char_at`/`pad` count UTF-16 units, matching the
+   JavaScript method each is named for. Documented in the docstrings.
+
+**Also fixed in `Bind(...)` pre-fill:** booleans were written `True`/`False`
+(client: `true`/`false`); a lone surrogate would have crashed the UTF-8 write
+(now `U+FFFD`).
+
+**Verification.** `tests/test_js_vocabulary_v0065.py` (231 tests). The Node
+sweep runs ~16,000 generated cases (emoji, lone surrogates, exotic
+whitespace, `$`-patterns, non-string state values) through the shipped
+fragments and the build-time mirror; every result is equal. Three deliberate
+breakages of the mirror (code-point length, `str.lstrip()`, `str()` for
+booleans) each made the sweep fail, so it is not vacuous. Full suite 2047
+passed (was 1816). Not run in a real browser; Node is the reference engine.
+
+**Not done / left alone.** `uppercase`/`trim` still mirror with Python's
+`str()`/`str.strip()` (`trim("\ufeffx")` differs from the browser's); integer-
+valued floats still pre-fill as `8.0` where the client writes `8` (pinned by
+existing tests). There is no `lowercase`, so `title_case`/`capitalize` leave the
+rest of each word as written. Needle/search arguments are literals; taking one
+from a state name (search-as-you-type) would be a separate, small extension.
 
 ## v0.06512 -- Docs-only incremental patch: Rei language proposal, Milestones cleanup, Vue/Svelte dropped (DONE)
 

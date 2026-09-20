@@ -154,6 +154,8 @@ from arklight.ir.schema import (
     KNOWN_BEHAVIORS,
     KNOWN_QUERY_HISTORY_MODES,
     KNOWN_REVEAL_BEHAVIORS,
+    LITERAL_ARG_RULES,
+    LiteralArgRule,
     MODIFIER_REGISTRY,
     PREDICATE_REGISTRY,
     SCHEMA,
@@ -780,6 +782,34 @@ def _validate_derive_ref(
                 f"digits={digits!r}, but digits must be an integer from {low} "
                 f"to {high}."
             )
+    for arg_name, rule in LITERAL_ARG_RULES.get(derive.kind, {}).items():
+        _validate_literal_arg(
+            derive.args[arg_name], rule, kind=derive.kind, arg_name=arg_name, path=path
+        )
+
+
+def _validate_literal_arg(
+    value: object, rule: LiteralArgRule, *, kind: str, arg_name: str, path: str
+) -> None:
+    """`v0.065`: one literal `Derive.*(...)` argument against its
+    `LITERAL_ARG_RULES` entry (see `arklight.ir.schema`). Named
+    `Derive.<kind>(..., <arg>=...)` in the message so the author can go
+    straight to the offending call."""
+    where = f"Computed(...) at {path} uses Derive.{kind}(...) with {arg_name}={value!r}"
+    if value is None and rule.nullable:
+        return
+    if rule.kind == "int":
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValidationError(f"{where}, but {arg_name} must be an integer.")
+        if not rule.low <= value <= rule.high:
+            raise ValidationError(
+                f"{where}, but {arg_name} must be an integer from {rule.low} to {rule.high}."
+            )
+        return
+    if not isinstance(value, str):
+        raise ValidationError(f"{where}, but {arg_name} must be a string.")
+    if rule.non_empty and value == "":
+        raise ValidationError(f"{where}, but {arg_name} must be a non-empty string.")
 
 
 def _validate_computed_declaration(node: ARKNode, *, path: str, parent_is_page: bool) -> None:

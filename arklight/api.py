@@ -947,6 +947,8 @@ class Derive:
         Computed("clean_input", deps=("raw",), derive=Derive.trim("raw"))
         Computed("share", deps=("done", "total"), derive=Derive.percentage_of("done", "total"))
         Computed("price_text", deps=("price",), derive=Derive.to_fixed("price", 2))
+        Computed("slug", deps=("title",), derive=Derive.replace_all("title", " ", "-"))
+        Computed("is_blank", deps=("query",), derive=Derive.is_empty("query"))
     """
 
     @staticmethod
@@ -1170,6 +1172,152 @@ class Derive:
         as a **string** with `digits` significant digits (`1`-`100`),
         switching to exponent notation for very large/small values."""
         return DerivationRef(kind="to_precision", names=(name,), args={"digits": digits})
+
+    # ------------------------------------------------------------------
+    # `v0.065` (docs/version history/v0.065.md): the string derivations
+    # catalog -- JS vocabulary addendum stage 5/10. The input is read the
+    # way `uppercase` reads it (`String(x)`), and results follow
+    # JavaScript's `String.prototype.*`: **indices and lengths count
+    # UTF-16 code units** (`"😀"` is length 2), not characters. Literal
+    # arguments (`length`, `fill`, `search`, ...) are checked at build
+    # time; `replace_*`/`split_count` take a literal substring, never a
+    # regular expression.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def capitalize(name: str) -> DerivationRef:
+        """`v0.065`: uppercase the first letter, leave the rest as it is
+        (`"hello world"` -> `"Hello world"`)."""
+        return DerivationRef(kind="capitalize", names=(name,))
+
+    @staticmethod
+    def title_case(name: str) -> DerivationRef:
+        """`v0.065`: uppercase the first letter of every
+        whitespace-separated word, leave the rest of each word as it is
+        (`"hello wORLD"` -> `"Hello WORLD"`)."""
+        return DerivationRef(kind="title_case", names=(name,))
+
+    @staticmethod
+    def trim_start(name: str) -> DerivationRef:
+        """`v0.065`: `String.prototype.trimStart` -- strip leading
+        whitespace only."""
+        return DerivationRef(kind="trim_start", names=(name,))
+
+    @staticmethod
+    def trim_end(name: str) -> DerivationRef:
+        """`v0.065`: `String.prototype.trimEnd` -- strip trailing
+        whitespace only."""
+        return DerivationRef(kind="trim_end", names=(name,))
+
+    @staticmethod
+    def pad_start(name: str, length: int, fill: str = " ") -> DerivationRef:
+        """`v0.065`: `padStart` -- left-pad to `length` code units
+        (`0`-`1000`) with `fill`, e.g. `Derive.pad_start("n", 3, "0")`
+        turns `"7"` into `"007"`. A longer string, or an empty `fill`,
+        is returned unchanged."""
+        return DerivationRef(
+            kind="pad_start", names=(name,), args={"length": length, "fill": fill}
+        )
+
+    @staticmethod
+    def pad_end(name: str, length: int, fill: str = " ") -> DerivationRef:
+        """`v0.065`: `padEnd` -- right-pad to `length` code units
+        (`0`-`1000`) with `fill`."""
+        return DerivationRef(
+            kind="pad_end", names=(name,), args={"length": length, "fill": fill}
+        )
+
+    @staticmethod
+    def repeat(name: str, count: int) -> DerivationRef:
+        """`v0.065`: `String.prototype.repeat` -- the value `count`
+        times (`0`-`1000`)."""
+        return DerivationRef(kind="repeat", names=(name,), args={"count": count})
+
+    @staticmethod
+    def slice_string(name: str, start: int = 0, end: int | None = None) -> DerivationRef:
+        """`v0.065`: `String.prototype.slice(start, end)` -- negative
+        indices count from the end, `end=None` means "to the end"."""
+        return DerivationRef(
+            kind="slice_string", names=(name,), args={"start": start, "end": end}
+        )
+
+    @staticmethod
+    def char_at(name: str, index: int) -> DerivationRef:
+        """`v0.065`: `String.prototype.charAt(index)` -- one code unit,
+        or `""` past the end. `index` is `>= 0` (`charAt` never wraps
+        around from the end; use `slice_string` for that)."""
+        return DerivationRef(kind="char_at", names=(name,), args={"index": index})
+
+    @staticmethod
+    def replace_first(name: str, search: str, replacement: str) -> DerivationRef:
+        """`v0.065`: replace the first occurrence of the **literal text**
+        `search` with the literal text `replacement`. Not a pattern:
+        `"."` matches a dot, and `$&`/`$1` in `replacement` are plain
+        characters. `search` must be non-empty."""
+        return DerivationRef(
+            kind="replace_first",
+            names=(name,),
+            args={"search": search, "replacement": replacement},
+        )
+
+    @staticmethod
+    def replace_all(name: str, search: str, replacement: str) -> DerivationRef:
+        """`v0.065`: replace every occurrence of the **literal text**
+        `search` -- see `replace_first`. `Derive.replace_all("title",
+        " ", "-")` turns `"a b c"` into `"a-b-c"`."""
+        return DerivationRef(
+            kind="replace_all",
+            names=(name,),
+            args={"search": search, "replacement": replacement},
+        )
+
+    @staticmethod
+    def split_count(name: str, sep: str) -> DerivationRef:
+        """`v0.065`: `split(sep).length` -- how many pieces the literal,
+        non-empty `sep` cuts the value into. `Derive.split_count("t", ",")`
+        over `"a,b,c"` is `3`."""
+        return DerivationRef(kind="split_count", names=(name,), args={"sep": sep})
+
+    @staticmethod
+    def reverse_string(name: str) -> DerivationRef:
+        """`v0.065`: the value reversed by code point (an emoji stays
+        intact; combining marks and joined emoji sequences do not)."""
+        return DerivationRef(kind="reverse_string", names=(name,))
+
+    @staticmethod
+    def string_length(name: str) -> DerivationRef:
+        """`v0.065`: `String.prototype.length` -- UTF-16 code units, so
+        `"😀"` is `2`. (`Derive.count` counts a list's items instead.)"""
+        return DerivationRef(kind="string_length", names=(name,))
+
+    @staticmethod
+    def includes_substring(name: str, substring: str) -> DerivationRef:
+        """`v0.065`: `includes` -- `True` when the value contains the
+        literal `substring`. Yields a boolean, so it can feed
+        `Show(Predicate.truthy(...))`."""
+        return DerivationRef(
+            kind="includes_substring", names=(name,), args={"substring": substring}
+        )
+
+    @staticmethod
+    def starts_with(name: str, substring: str) -> DerivationRef:
+        """`v0.065`: `startsWith` -- `True` when the value begins with
+        the literal `substring`."""
+        return DerivationRef(kind="starts_with", names=(name,), args={"substring": substring})
+
+    @staticmethod
+    def ends_with(name: str, substring: str) -> DerivationRef:
+        """`v0.065`: `endsWith` -- `True` when the value ends with the
+        literal `substring`."""
+        return DerivationRef(kind="ends_with", names=(name,), args={"substring": substring})
+
+    @staticmethod
+    def is_empty(name: str) -> DerivationRef:
+        """`v0.065`: `True` when the value's string form has length 0.
+        Reads the *string* form, so `0` and `False` are not empty; meant
+        for text input (show an empty-state message while a box is
+        blank)."""
+        return DerivationRef(kind="is_empty", names=(name,))
 
 
 # ---------------------------------------------------------------------------
