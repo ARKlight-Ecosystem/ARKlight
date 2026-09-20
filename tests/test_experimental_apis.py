@@ -152,7 +152,7 @@ def test_heavy_reliance_nudge_fires_at_threshold():
     usages = [experimental.emit("css-import") for _ in range(experimental.HEAVY_RELIANCE_THRESHOLD)]
     nudge = experimental.heavy_reliance_nudge(usages)
     assert nudge is not None
-    assert "[Rae ARK]" in nudge
+    assert "[Rei]" in nudge
     assert "pull request" in nudge
     assert "ARKlight" in nudge and "ARKlight-Component-Collections" in nudge
 
@@ -190,14 +190,14 @@ def test_print_summary_includes_nudge_when_threshold_met(capsys):
     usages = [experimental.emit("css-import") for _ in range(experimental.HEAVY_RELIANCE_THRESHOLD)]
     experimental.print_summary(usages)
     out = capsys.readouterr().out
-    assert "[Rae ARK]" in out
+    assert "[Rei]" in out
 
 
 def test_print_summary_omits_nudge_below_threshold(capsys):
     usages = [experimental.emit("css-import")]
     experimental.print_summary(usages)
     out = capsys.readouterr().out
-    assert "[Rae ARK]" not in out
+    assert "[Rei]" not in out
 
 
 # --- css-import (Site.import_style) -------------------------------------

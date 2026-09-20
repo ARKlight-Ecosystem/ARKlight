@@ -117,10 +117,10 @@ once" and more like "this project actually needs a feature ARKlight
 doesn't have yet":
 
 ```
-[Rae ARK] Hey, just a heads up -- if you're relying on experimental APIs a lot
-[Rae ARK] (3 experimental-API uses this build, across: css-import, raw-postprocess)
-[Rae ARK] Might be a good idea to open a pull request for your missing feature
-[Rae ARK] In either the ARKlight or ARKlight-Component-Collections GitHub repo
+[Rei] Hey, just a heads up -- if you're relying on experimental APIs a lot
+[Rei] (3 experimental-API uses this build, across: css-import, raw-postprocess)
+[Rei] Might be a good idea to open a pull request for your missing feature
+[Rei] In either the ARKlight or ARKlight-Component-Collections GitHub repo
 ```
 
 `arklight.experimental.heavy_reliance_nudge` fires once per build when

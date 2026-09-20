@@ -51,16 +51,16 @@ whether it fits your project.
 ## Status
 
 ```text
-[Rae ARK] Hey just a heads-up from the maintained.
-[Rae ARK] ARKlight is tool I have been working on
-[Rae ARK] for a while for personal reasons. It's
-[Rae ARK] clearly not ready for anything involving
-[Rae ARK] ⚠️ Production and until the compiler
-[Rae ARK] reaches a stable stage. It is only recommended
-[Rae ARK] for informal, personal, hobby projects.
-[Rae ARK] So if there's an audience waiting for it?
-[Rae ARK] Showing their support (eg: Stars, Forks, and such?)
-[Rae ARK] it motivates me. 
+[Rei] Hey just a heads-up from the maintained.
+[Rei] ARKlight is tool I have been working on
+[Rei] for a while for personal reasons. It's
+[Rei] clearly not ready for anything involving
+[Rei] ⚠️ Production and until the compiler
+[Rei] reaches a stable stage. It is only recommended
+[Rei] for informal, personal, hobby projects.
+[Rei] So if there's an audience waiting for it?
+[Rei] Showing their support (eg: Stars, Forks, and such?)
+[Rei] it motivates me. 
 ```
 
 ## Install
