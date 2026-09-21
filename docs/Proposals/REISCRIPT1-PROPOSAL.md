@@ -1,436 +1,534 @@
-# Rei Language (RS1): A Java-Syntax Source Language for ARKlight
+# Rei: A Playground Language Frontend for ARKlight (`.rei`)
 
 ## Status
 
-**Not accepted. Filed for maintainer review.** Belongs in `docs/Proposals/`.
-If accepted it would be a **second authoring frontend** for ARKlight. Python
-stays the reference frontend; nothing here replaces it.
+**Proposed. Not accepted as written. Alpha only.** Originally filed against
+`alpha` @ `8cafffe` (`v0.06501`) in the Rei-Src workspace, and imported into
+this repo on 2026-09-20. Its claims about ARKlight were re-checked against
+`alpha` @ `5a15ebb` (`0.06511`); see "Re-verification" below. Nothing here is
+committed to. Deleting the whole feature is a supported outcome (see "Removal
+and graduation").
 
-**Version-number note.** No slot is requested. `v0.079` is held by Miko Stage A
-and `v0.080` by the Android backend. The ladder in section 11 uses `R0`-`R6` and
-receives real versions only if a maintainer accepts it. "RS1" means **Rei Script,
-language level 1**: the first frozen surface of the language, not a compiler
-version.
+This is a play area. It is deliberately low-ceremony: small stages, no
+stability promise, and a clean exit.
 
-**Origin:** an `index.rei` mock plus direction from the author. The direction
-that shaped this document, in the author's words as closely as they can be
-paraphrased: Rei is its own language, not Python and not HTML in a different
-shape; it uses basic Java syntax (classes and OOP, no annotations); input and
-output follow the Java way, with `index.out` a printer that has many methods
-(`println` is one, `heading` is another, and so on); HTML is abstracted away;
-JavaScript is "just a function"; UI, CSS and scripts are Kotlin-inspired; and
-source flows `.rei` files -> Rei AST -> ARK AST -> the existing ARKlight
-pipeline.
+> **Update 2026-09-20: Rei's standing has changed since this was filed.** The
+> maintainer has decided that Rei is the **official native source language of
+> ARKlight**, added *beside* Python authoring, which stays. So the
+> "playground", "Fun tier" and "not accepted" framing in this file no longer
+> describes Rei as a whole. What survives as useful input is the C99 mapping,
+> the two file types and the stage ladder. Whether an alpha-only guard
+> survives as a *maturity* gate, or the Fun tier is retired, is
+> **[open]** (Open question 11). The Rei language still stops at the ARK AST:
+> `.rei` -> Rei AST -> ARK AST, and nothing below that changes. The companion
+> document `WHAT-REI-IS.md` (in the ARKVM repository, `docs/Foundational/`)
+> records the decision, its context and the wider open questions. The body of
+> this proposal is otherwise unchanged from the version filed.
 
-Read against `PITCH.md`, `WHAT-ARKLIGHT-IS.md`, `ARCHITECTURE.md`,
-`SYSTEM-DESIGN-AGREEMENTS.md`, `AUTHORING-GUIDE.md`, `arklight/ast/nodes.py`,
-`arklight/parser/loader.py`, `arklight/compiler/pipeline.py` and
-`arklight/ir/schema.py` on `alpha` (commit `409af0c`).
+> **Update 2026-09-21: Accepted, staged as a four-rung ladder.** The
+> maintainer has now accepted Rei the language as written, superseding
+> the "Not accepted as written" status above. Staged in
+> [`docs/Implementation/REI-LANGUAGE-ADDENDUM.md`](../Implementation/REI-LANGUAGE-ADDENDUM.md)
+> as `v0.081`-`v0.084` (Stage 3 unscheduled, still blocked on Open
+> question 3). This update also resolves five of the eleven open
+> questions below and settles the language-surface decisions the
+> maintainer specified directly:
+>
+> - **Open question 11 (gating) is resolved: the Fun tier is retired.**
+>   Section 1 (Fun tier, `arklight/fun.py`, the `🎲` banner, I3/I4) is
+>   superseded in full -- Rei is no longer a playground. What replaces
+>   it: the alpha-channel guard survives, but only as an ordinary
+>   *maturity* gate (`arklight.CHANNEL == "alpha"`, same mechanism,
+>   different meaning -- "not yet stable," not "may vanish without
+>   notice"), and a *new*, narrower gated surface, **RNI**, takes over
+>   the one thing Fun never actually gated: an escape hatch to
+>   arbitrary output the compiler doesn't own. See "RNI" below.
+> - **Open question 10 (naming collision) is resolved:** the language
+>   lives in `arklight/rei_lang/`, tests in `tests/test_rei_lang_*.py`
+>   -- the proposal's own suggested fix, now confirmed rather than
+>   merely recommended. The narrator keeps `arklight/compiler/rei/` and
+>   `tests/test_rei_narrator.py` unchanged.
+> - **Open question 6 (config key collision) is resolved:** language
+>   settings live under `CONFIG["rei_lang"]` in both `.py` and `.rei`
+>   config, matching the package name above; `CONFIG["rei"]` stays the
+>   narrator's alone.
+> - **Open question 2 (route naming) is resolved:** the strawman
+>   stands -- one `.rei` file, one route, derived from the filename,
+>   the same convention `arklight build site.py`'s single entry file
+>   already implies for the site's own root.
+> - **Open question 7 (two Reis)** is unaffected by acceptance and
+>   remains standing guidance: always say "the Rei language" where the
+>   two could be confused.
+>
+> Four language-surface decisions, specified by the maintainer rather
+> than left to a future stage:
+>
+> 1. **The preamble is shared with Python, real syntax, not comments.**
+>    `.rei` uses the exact same two directives `AUTHORING-GUIDE.md`
+>    documents for `.py` -- `#include <stdlib.ARKlight>` and `#define
+>    <name> -> <text>` -- resolved by the same preamble model
+>    (`PreambleCollisionError`, no silent winner, same recognized
+>    labels). The only difference is spelling: Rei already promotes
+>    these from comment-shaped directives to real C-style preprocessor
+>    syntax, per Section 3.1's phase-4 mapping (`#include`, `#define`
+>    with no leading `#` + space). A `.rei` file that never writes
+>    `#include <stdlib.ARKlight>` has no `Page`, `Container`, `Button`,
+>    etc. in scope -- identical to a `.py` site file today.
+> 2. **The entry point is a class; each route is a `site` method on
+>    it.** A valid `.rei` site file declares one class, and every route
+>    that file defines is a method on that class with the fixed
+>    signature:
+>
+>    ```java
+>    public static void site(Page Home) {
+>        // code
+>    }
+>    ```
+>
+>    `public static void` is fixed -- Java-adjacent shape, not a choice
+>    per file. `site` is the fixed method name (never renamed -- it is
+>    the dispatch point the `.rei` frontend looks for, the same role
+>    `def home():` under `@site.page("/")` plays in Python, minus the
+>    decorator). `Page` is the fixed parameter type; the parameter name
+>    (`Home` above) is the file-local name for the page tree the method
+>    body builds -- Open question 2's per-file route naming applies to
+>    the *file*, this parameter names the *tree inside it*. Multiple
+>    `site` overloads (Java-style overload-by-parameter, if a file ever
+>    needs more than one) are deliberately **not** resolved here -- left
+>    to Stage 1 alongside the lexer/parser work, since it interacts with
+>    Open question 8 (source spans) and needs real parsing to specify
+>    precisely.
+> 3. **Java-adjacent for markup and logic, Kotlin-adjacent for style,
+>    on purpose.** Section 5's Dart-like tree surface (constructor
+>    calls, named props) is unchanged for HTML/JS-equivalent authoring.
+>    What's new: Rei's style-block syntax (the CSS-equivalent surface)
+>    deliberately reads Kotlin-adjacent rather than Java-adjacent or
+>    CSS-literal -- e.g. property assignment inside a typed block rather
+>    than a bare `key: value;` list -- specifically so Rei's stylesheet
+>    authoring doesn't read as "CSS with a different file extension."
+>    Exact grammar is Stage 1 work; this fixes only the *influence*,
+>    matching Section 4's "keep the language small, but not derivative"
+>    reading.
+> 4. **RNI -- Rei Native Interface.** The Fun tier's retirement (above)
+>    leaves a real gap: Section 1 never actually gated raw escape-hatch
+>    output, only the playground framing. RNI fills that gap and takes
+>    over the role `arklight/experimental.py` plays for Python authoring
+>    -- Rei's own gated tier for "steps outside the intrinsic model,"
+>    registered in `arklight/rei_lang/rni.py` (mirroring
+>    `experimental.py`'s `ExperimentalFeature`/`emit()`/
+>    `HEAVY_RELIANCE_THRESHOLD` shape, not `fun.py`'s -- RNI is
+>    Experimental's sibling, not Fun's replacement-in-name). An RNI
+>    block is how a `.rei` site reaches arbitrary JS the closed
+>    vocabulary doesn't cover, the same authoring-side-only,
+>    zero-cost-when-unused contract `EXPERIMENTAL-APIS.md` already
+>    describes -- gated, inline-warned, counted toward
+>    `HEAVY_RELIANCE_THRESHOLD`, and never silently unused-but-shipped.
+>    Grammar (an `rni { ... }` block, a `@RNI` annotation on a method,
+>    or something else) is unresolved -- new Open question 12, below.
+> 5. **Java-based exception handling, and Platform APIs as an
+>    interface.** Two more fixed decisions:
+>    - **Exceptions.** `.rei` gets real `try`/`catch`/`finally` keyword
+>      syntax, matched by inheritance against typed exception classes --
+>      Java's `catch` shape. This is deliberately the *same* shape
+>      `docs/Proposals/USER-DEFINED-ERROR-HANDLING-PROPOSAL.md` already
+>      proposed for Python (`catches=` matched by inheritance, `catch`/
+>      `finally_` restricted to closed-vocab `Action.*`/`Log.*` refs,
+>      never arbitrary executed code) -- Rei gets it as native keyword
+>      syntax instead of a decorator wrapping Python's own `try`, since
+>      Rei owns its own grammar. That Python-side proposal remains **not
+>      accepted** on its own terms (still holding no version slot); its
+>      *shape* is what's reused here, not its acceptance.
+>    - **Platform APIs.** `PLATFORM-APIS.md`'s "the interface belongs to
+>      ARKlight" model gets a literal Rei-syntax expression: an
+>      `interface` (Java-adjacent) or `abstract class` declares the
+>      capability surface (`notify`, `clipboard_write`, ...), matching
+>      `arklight.ir.platform_api.PLATFORM_API_REGISTRY` one-for-one
+>      rather than introducing a second registry -- a `.rei` file calls
+>      through it exactly as `PlatformAPI.notify(...)` already works
+>      from Python, just type-checked against the interface at Rei's own
+>      parse/lower stage instead of at Python call time. No new IR node,
+>      no new backend contract -- this is authoring-surface sugar over
+>      the existing `PlatformAPIRef` lowering, consistent with Section 6
+>      ("no new IR node types, no backend changes").
+>
+> New Open question 12: **RNI's grammar.** Block, annotation, or some
+> third shape -- decide alongside Stage 1's lexer/parser work, the same
+> way Open question 8 (source spans) is deferred there.
+
+## Re-verification against `alpha` @ `5a15ebb` (`0.06511`)
+
+Checked in source on 2026-09-20. Everything this proposal says about the
+current code still holds:
+
+- `arklight/experimental.py` has `ExperimentalFeature`, `emit()`,
+  `HEAVY_RELIANCE_THRESHOLD = 3` and `upstream_candidate`; the inline banner
+  is `⚠️  [EXPERIMENTAL FEATURE ACTIVE]` with `-> Feature:` and `-> Note:`
+  lines, and the summary block ends with a "Legacy API detected" note.
+- `find_config` looks only in the entry file's own directory, and
+  `_KNOWN_SECTIONS` is now `{"live_streaming", "android", "desktop",
+  "experimental", "csp", "rei"}`.
+- A release-channel constant **does** exist: `arklight.CHANNEL = "alpha"`
+  (`arklight/__init__.py`), a static per-branch string exported in `__all__`,
+  locked by `tests/test_version.py` and written into the `.arklight` schema
+  tag (`arklight/ir/binary.py`). `_ALPHA_WARNING_MARKER` in
+  `arklight/cli/main.py` is a separate thing: it only tags warning text
+  (Open question 1). *Corrected 2026-09-20: the proposal as filed, and the
+  first version of this section, said no channel constant existed.*
+- `discover.py` is static analysis over Python's `ast`, `loader.py` executes
+  the module, and `Site.build_ark_ast()` returns `dict[str, ARKNode]`.
+- `ARKNode` still has only `type`, `props` and `children`; nothing in `ast/`
+  or `ir/` stores a source position (Open question 8).
+- `PreambleCollisionError` exists in `arklight/parser/preamble.py`.
+
+What changed since filing, and is reflected below: the compiler narrator this
+proposal calls "accepted" **shipped as `0.06510`**, so two names in this
+proposal now collide with real code (Open question 10).
 
 ## TL;DR
 
-ARKlight already has a small, closed, checkable vocabulary and a compiler that
-owns everything after the ARK AST. What it lacks is a way to author it that is
-not Python. RS1 is a Java-family language whose semantics are ARKlight's, not
-the DOM's:
+- Two new file types: **`.rei`** (site source) and **`arklight.config.rei`**
+  (project config, a sibling of `arklight.config.py`).
+- Rei slots in ahead of the existing pipeline and changes nothing below it:
 
-- **Fields are state, methods are actions, getters are derivations.** A field
-  on a page class lowers to `State(...)`; a method that changes fields lowers to
-  the closed `Action.*` vocabulary; an expression over fields lowers to
-  `Derive.*` / `Predicate.*`.
-- **Output is a stream.** A page writes itself through `out`, the way a Java
-  program writes to `System.out`. There is no node tree in the author's hands.
-- **"JS is just a function" is a compiler contract.** A method that runs in the
-  browser must fit the closed vocabulary. If it does, it lowers; if it does not,
-  the build fails with a message that says which rule it broke.
-- **The compiler never executes author code.** The Python frontend runs the
-  author's module with `exec` (`arklight/parser/loader.py`). A `.rei` file is
-  only ever parsed, checked and lowered.
+  ```
+  Rei source -> Rei AST -> ARK AST -> (existing pipeline, unchanged)
+  ```
 
-```text
- index.rei ─▶ lexer ─▶ parser ─▶ Rei AST ─▶ check ─▶ lower ─▶ ARK AST (+ Site registrations)
-   (source)                        │           │                    │
-                                   │           │                    └▶ normalize ─▶ validate ─▶ IR ─▶ backends
-                                   │           └ names, types, phase, "is it in the vocabulary?"
-                                   └ what the author wrote, with spans
-```
+- It ships as a new API tier, **Fun**, modeled on the Experimental API tier
+  (`arklight/experimental.py`, `docs/Foundational/EXPERIMENTAL-APIS.md`) but
+  with different meaning: *playground, no stability promise, alpha channel
+  only, may vanish without notice.*
+- The Rei spec **tracks ISO C99** (its structure, vocabulary, translation model
+  and philosophy). It does **not** track the C language: no pointers, no manual
+  memory, no `printf`.
+- The surface is Dart-like: trees of constructor calls with named props and
+  positional children.
 
-Everything to the right of "ARK AST" is the existing pipeline, unchanged.
+## Origin and scope note
 
-## 1. What is decided and what is proposed
+The goal behind Rei is a real language: Dart's face on C's spine. Java's
+grammar and AST were studied as a reference point and are not expected to
+survive as-is. **No code from javac or `java.base` is used.** Those files are
+GPL-2.0-only with the Classpath Exception, which cannot be combined with this
+repository's GPL-3.0-or-later. Rei's lexer, parser and spec are written from
+scratch.
 
-| Item | Source |
-|---|---|
-| Separate language; not Python; not HTML reshaped | Author |
-| Basic Java syntax, classes and OOP, **no annotations** | Author |
-| Java-way I/O; `out` is a printer with many methods (`println`, `heading`, ...) | Author |
-| HTML abstracted away; JS is "just a function" | Author |
-| UI, CSS and scripts are Kotlin-inspired | Author (exact meaning: see Q3) |
-| Pipeline `.rei` -> Rei AST -> ARK AST -> existing pipeline | Author |
-| Route comes from the filename (`index.rei` is `/`); `import stdlib.ARKlight;` | Author's mock |
-| Everything else: phase model, lowering table, type system, package layout, ladder | **This proposal** |
+This proposal is intentionally narrower than "design a language". It covers:
+the Fun tier, the two file types, how they enter the pipeline, what tracking
+C99 means, and a short ladder of stages. Larger language decisions are listed
+under "Open questions" and are **not** settled here.
 
-The proposal tries to be strict about that line. Sections 4-9 are design
-suggestions, not settled facts.
+## Motivation
 
-## 2. Why "HTML in a different shape" is the risk
+1. **Exploration.** The author wants a place to experiment with a
+   purpose-built authoring language for ARKlight's `ARKNode(type, props,
+   children)` model without any pressure to make it production-grade.
+2. **A small, concrete benefit.** `arklight.config.py` is loaded by
+   `exec`-ing Python (`arklight/config.py`, `load_config`). A data-only
+   `arklight.config.rei` parsed by Rei's own parser executes nothing, so a
+   config file would carry no code-execution surface at all.
+3. **Fit with ARKlight's doctrine.** "Compiler first, runtime last" and "fail
+   loudly at build time" are easier to enforce for a language ARKlight owns
+   than for Python, where the loader has to run the module to learn what it
+   contains (`arklight/parser/loader.py`).
 
-The pasted mock is Java-flavored, but several of its constructs are HTML
-concepts wearing Java syntax:
+## 1. The Fun tier
 
-| In the mock | What it really is | RS1 replacement |
+### 1.1 How it differs from Experimental
+
+| | Experimental | Fun |
 |---|---|---|
-| `new Container(new Link(...), new Link(...))` returned as a `Node` | A DOM tree built with constructors | `out` calls in order; no tree value the author holds |
-| `.target("#more-details")` | A CSS selector string aimed at another element | A method reference on the same class: `this::toggleDetails` |
-| `.toggleClass("hidden")` | Behavior expressed as a CSS class flip | A boolean field and an `if` that shows or hides content |
-| `.className("nav")` | A CSS class name as a string | A named style resolved by the compiler |
-| `Map.of("padding", "16px", ":hover:background", ...)` | CSS property strings in a map | Typed style assignments (section 8) |
+| Meaning | steps outside the intrinsic model; a real cost to end users | playground; no stability promise |
+| Registry | `arklight/experimental.py` | `arklight/fun.py` (new) |
+| Availability | every channel | **alpha channel only** |
+| Inline warning | multi-line `⚠️ [EXPERIMENTAL FEATURE ACTIVE]` banner | one line: `🎲 [FUN API ACTIVE]` |
+| End-of-run summary | full block per distinct feature, plus a "Legacy API detected" note | short block per distinct feature |
+| Heavy-reliance nudge | yes (`upstream_candidate`) | **never**. A playground is not a missing-feature signal |
+| Silencing | only the nudge, via `CONFIG["experimental"]` | end-of-run block via `CONFIG["fun"]["quiet"]`; the inline line always prints |
+| Reaches shipped JS | yes (`devtools_console_reminder`) | **no**. Authoring side only |
+| Removal | back-compat "legacy" story | may vanish or change on any alpha, no deprecation cycle |
 
-None of these is wrong for the Python frontend, where the vocabulary is exactly
-this. They are wrong for a language whose point is to have its own model. The
-test applied throughout this proposal: **if a construct only makes sense
-because HTML has it, it does not belong in RS1.**
+### 1.2 Registry
 
-## 3. Pipeline and integration
+`arklight/fun.py` mirrors `experimental.py`:
 
-### 3.1 Where it plugs in
+```python
+@dataclass(frozen=True)
+class FunFeature:
+    id: str                  # e.g. "rei-source", "rei-config"
+    inline_note: str         # one line for the inline banner
+    detail_lines: list[str]  # short paragraph for the end-of-run block
+    since: str               # ARKlight version that introduced it
 
-Today `arklight/compiler/pipeline.py` calls `load_site(entry_path)` and receives
-`(Site, DiscoveredSite)`. `load_site` reads the file, discovers pages
-statically, then executes the module to build `ARKNode(type, props, children)`
-trees. A Rei frontend must produce the same result for `.rei` input: a populated
-`Site` whose pages hold ARK AST trees, plus styles and state registrations.
-Everything downstream (`normalize`, `validate`, IR, backends, `.arklight`
-binary, SBOM) is untouched.
+FEATURES: dict[str, FunFeature] = {...}
 
-Proposed layout (a new package, deliberately **not** `arklight/compiler/rei/`,
-which is already the compiler narrator from
-`REI-COMPILER-NARRATOR-PROPOSAL.md`):
-
-```text
-arklight/frontend/rei/
-    lexer.py     tokens with spans
-    parser.py    hand-written recursive descent -> Rei AST
-    ast.py       Rei AST node definitions
-    check.py     names, types, phase analysis, vocabulary check
-    lower.py     Rei AST -> ARK AST + Site registrations
-    stdlib.py    what `import stdlib.ARKlight;` resolves to
+def emit(feature_id: str, on_warning=...) -> None: ...
 ```
 
-`pyproject.toml` declares no runtime dependencies today, and a hand-written
-parser keeps it that way (no parser-generator dependency).
+Callers own *when* to `emit()`, exactly as with `experimental.emit()`. The
+module owns the wording.
 
-### 3.2 Discovery and routing
+### 1.3 What the user sees
 
-The file is the page. `index.rei` is `/`, `about.rei` is `/about`, nested
-folders become nested routes. This mirrors what `@site.page("/")` declares in
-Python. Site-wide settings (title, styles shared across pages) need a home; see
-Q5.
+Inline, at detection:
 
-### 3.3 The narrator
-
-The compile-time voice already exists: `arklight/compiler/rei/` renders
-diagnostics as `[Rei]` sentences under `--narrate`. RS1 diagnostics should flow
-through the same renderer, so a `.rei` error reads like the rest of the
-toolchain. That the language and the narrator share a name is a feature to keep
-deliberately (Q7), not an accident to tidy away.
-
-## 4. Language surface (RS1)
-
-**In:** classes, fields, methods, constructors, `static`, `this`, `new`,
-`import`, single inheritance from library base classes (`Page`), `boolean`,
-`int`, `double`, `String`, built-in `List` and `Map`, `if`/`else`, `for`,
-`while`, `return`, method references (`this::name`), Java-style comments.
-
-**Out (RS1):** annotations (an author decision), user-defined generics,
-interfaces, exceptions, threads, reflection, static initializer blocks, operator
-overloading, inner classes, and any way to call arbitrary Java, JavaScript or
-Python.
-
-A small, closed subset is the point. Each thing left out is a thing the compiler
-does not have to prove safe.
-
-## 5. Input and output the Java way
-
-### 5.1 `out`, the printer
-
-A page is written by calling methods on `index.out` (or `out` inside a `Page`
-subclass). `println` is one method among many; the printer is a typed surface,
-not a tree builder. Draft mapping (names are illustrative):
-
-| `out` method | Lowers to |
-|---|---|
-| `println(String)` | `Text(...)` |
-| `heading(String)` / `heading(String, int level)` | `Heading(...)` |
-| `text(String)` | `Text(...)` |
-| `link(String label, String href)` | `Link(label, href=...)` |
-| `button(String label, Runnable action)` | `Button(label, on_click=<ActionRef>)` |
-| `card { ... }` / `section { ... }` | `Container(...)` / `Section(...)` with children |
-
-Nesting is a **block**, not a constructor argument, so structure comes from
-control flow the author already reads top to bottom.
-
-### 5.2 `in`, the input side (proposed)
-
-The counterpart to `out` is `index.in`: the source of values a visitor supplies.
-A text field is declared through `in` and read like a value:
-
-```java
-Field draft = in.textField("draft");   // lowers to State + bound input
-...
-tasks.add(draft.value);                 // lowers to Action.append("tasks", <state ref>)
+```
+🎲 [FUN API ACTIVE]: 'site.rei' is compiled by the Rei playground frontend.
+   -> Feature: rei-source
+   -> Note: alpha only. Syntax and behavior may change or vanish without notice.
 ```
 
-This is the least settled part of the proposal (Q2). It follows the Java habit
-of pairing an output stream with an input stream, but ARKlight's input is
-event-driven, not blocking, so `in` returns handles rather than reading.
+End of run, once per distinct feature:
 
-## 6. State, methods, and "JS is just a function"
-
-This is the core of the language, and the part most likely to need revision.
-
-### 6.1 Two phases, decided by data dependence
-
-The compiler distinguishes code that runs **once, at build time** from code that
-runs **in the browser**, and it does so from what the code touches, not from
-keywords or annotations:
-
-- **Build phase.** Code that depends only on constants and other build-phase
-  values is **evaluated by the compiler**: loops that unroll, `if`s over
-  constants that fold, helper methods like `nav(out)` that emit fixed content.
-  This is what Python does today by executing the author's module. RS1 gets the
-  same power from a small, deterministic, sandboxed evaluator (no I/O, no clock,
-  no network, step and recursion limits), so nothing the author wrote ever runs
-  as real code.
-- **Runtime phase.** Code that depends on **state** (a field the visitor can
-  change) must exist in the browser, so it is **lowered**, not evaluated:
-  - an `if` whose condition reads a state field becomes `Show(<Predicate>, ...)`;
-  - a `for` over a state list becomes `Repeat(...)`;
-  - a handler method (one passed as `this::name`) becomes a closed action.
-
-Because the phase follows the data, the author never writes "this is runtime
-code." The cost is that an error message must be excellent when the inference
-surprises them (Q4).
-
-### 6.2 What lowers, exactly
-
-RS1 runtime code is limited to what the existing registries already accept.
-Current vocabulary (from `arklight/ir/schema.py`):
-
-- Actions: `append`, `decrement`, `geolocate`, `increment`, `remove`, `reset`,
-  `set`, `toggle_bool`
-- Predicates: `and`, `equals`, `falsy`, `gt`, `in_range`, `is_empty`,
-  `is_not_empty`, `is_null`, `lt`, `not`, `one_of`, `or`, `truthy`
-- Derivations: about fifty, covering arithmetic (`sum`, `subtract`, `multiply`,
-  `divide`, `min`, `max`, ...), rounding, and string operations (`uppercase`,
-  `trim`, `title_case`, `starts_with`, `replace_all`, ...)
-- Modifiers: `debounce`, `once`, `prevent`, `stop`, `throttle`
-
-| RS1 source | Lowers to |
-|---|---|
-| `int count = 0;` (field) | `State("count", initial=0)` |
-| `count++;` | `Action.increment("count")` |
-| `count--;` | `Action.decrement("count")` |
-| `open = !open;` | `Action.toggle_bool("open")` |
-| `name = "x";` / `count = 0;` | `Action.set(...)` / `Action.reset(...)` |
-| `tasks.add(draft.value);` | `Action.append("tasks", <state ref>)` |
-| `tasks.remove(item);` | `Action.remove(...)` |
-| `if (open) { ... }` | `Show(Predicate.truthy("open"), ...)` |
-| `String label() { return name.toUpperCase(); }` | `Computed(...)` via `Derive.uppercase` |
-| `for (Task t : tasks) { ... }` | `Repeat(...)` |
-
-A handler body is a **straight-line sequence of these**. A conditional or a loop
-inside a handler has no closed-action equivalent today, so the compiler rejects
-it and says so. That is a real limit of the current vocabulary, not a choice
-this proposal makes lightly; widening it is the job of the existing JS
-vocabulary addenda, not of the language.
-
-### 6.3 Third-party code
-
-RS1 has no foreign-function interface. Third-party logic arrives through
-ARKlight's own extension routes: ACC capabilities today, and, if it is ever
-accepted, the AVM catalog from `AVM-WASM-SANDBOX-PROPOSAL.md`. That proposal's
-three-state async value would need a matching Rei type (`Async<T>`), which is
-out of scope for RS1.
-
-## 7. A worked example
-
-The mock's home page, rewritten to follow sections 2-6. It differs from the
-mock on purpose: `page(Page index)` becomes a class that owns its state, the
-shared piece prints instead of returning a node, and the toggle is a field
-instead of a selector.
-
-```java
-// index.rei -- route "/" comes from the filename.
-import stdlib.ARKlight;
-
-public class Index extends Page {
-
-    boolean detailsOpen = false;                 // State("detailsOpen", initial=False)
-
-    void toggleDetails() {                       // -> Action.toggle_bool("detailsOpen")
-        detailsOpen = !detailsOpen;
-    }
-
-    static void nav(Out out) {                   // build phase: emits fixed content
-        out.link("Home", "/");
-        out.link("About", "/about");
-    }
-
-    public void build() {
-        style("card") {
-            padding = 16.px;
-            border = "1px solid var(--ark-border)";
-            hover { background = "#f5f5ff"; }
-        }
-
-        nav(out);
-        out.heading("Rei");
-        out.text("Build websites with Rei.").style("muted");
-
-        out.card {
-            out.text("No JavaScript ships except a tiny, fixed runtime.");
-            out.button("Show details", this::toggleDetails);
-            if (detailsOpen) {                   // reads state -> Show(...)
-                out.text("This text starts hidden.");
-            }
-        }
-    }
-}
+```
+🎲 Fun API in use
+    Feature : rei-source
+    Alpha only. Nothing here is covered by any stability promise.
 ```
 
-Lowered to the ARK AST (shape only):
+### 1.4 Invariants (each one is a test)
 
-```text
-State("detailsOpen", initial=False)
-Page(route="/")
- ├ Container(Link("Home", href="/"), Link("About", href="/about"))      # from nav(out)
- ├ Heading("Rei")
- ├ Text("Build websites with Rei.", class_name="muted")
- └ Container(class_name="card")
-     ├ Text("No JavaScript ships except a tiny, fixed runtime.")
-     ├ Button("Show details", on_click=Action.toggle_bool("detailsOpen"))
-     └ Show(Predicate.truthy("detailsOpen"), Text("This text starts hidden."))
+- **I1. No residue for non-Rei sites.** A build that never touches a `.rei`
+  file is byte-identical with the Fun code present. Golden-output test over
+  `examples/`.
+- **I2. Authoring side only.** A Rei site lowers to ARK AST, so its output is
+  ordinary ARKlight output. Nothing "Fun" is emitted into HTML, CSS or JS.
+- **I3. Refuse, never ignore.** On a non-alpha channel a `.rei` file or an
+  `arklight.config.rei` is a loud build error. It is never silently skipped.
+- **I4. Not a nudge input.** Fun uses never count toward
+  `HEAVY_RELIANCE_THRESHOLD`.
+- **I5. Clean removal.** See "Removal and graduation".
+
+### 1.5 The alpha guard
+
+The channel marker already exists: `arklight.CHANNEL` (`"alpha"` on this
+branch, hardcoded per branch). `_ALPHA_WARNING_MARKER` (`arklight/cli/main.py`)
+tags warning text and is not a channel flag. The guard can therefore check
+`arklight.CHANNEL` in `fun.emit()` and at the `.rei` dispatch point, with no
+new constant. See Open question 1.
+
+## 2. The two file types
+
+### 2.1 `.rei`
+
+- Entry point: `arklight build site.rei`. `build` already takes a path
+  (`GETTING-STARTED.md`: `arklight build site.py`).
+- Dispatch by suffix happens **before** `arklight.parser.discover`, because
+  `discover` performs static analysis over Python's `ast` and cannot read Rei.
+- Output of the frontend: the same `dict[str, ARKNode]` (one tree per route)
+  that `Site.build_ark_ast()` returns today. Component expansion and
+  everything after it are untouched.
+
+### 2.2 `arklight.config.rei`
+
+- Lives next to the entry file, with **no parent-directory search**, the same
+  rule as `arklight.config.py` (`find_config`).
+- If both `arklight.config.py` and `arklight.config.rei` exist, that is a
+  `ConfigError` naming both files. This is the same fail-loudly doctrine as
+  `PreambleCollisionError`; no silent winner.
+- **Data-only** in its first stage: one top-level initializer, no functions, no
+  calls. That is what lets it load without an evaluator (see Open question 3).
+- New known section `"fun"` in `_KNOWN_SECTIONS`. The Rei
+  *narrator* (shipped as `0.06510`) already owns a top-level `"rei"` section
+  (`default_mode`), so language settings must not use that name (Open
+  question 6).
+
+### 2.3 Illustrative sketch (non-normative)
+
+Shown only to make the shape reviewable. Spelling is **not** decided.
+
+```
+// arklight.config.rei
+config = {
+    experimental: { heavy_reliance_nudge: false },
+    fun:          { quiet: true },
+};
 ```
 
-The `.arklight` output, the HTML, the Android and Desktop builds all follow from
-the existing pipeline. The author wrote no HTML, no CSS selector, no class
-flip, and no JavaScript.
+```
+// a tree expression: constructor calls, named props, positional children
+Container(
+    Link("Home",  href: "/"),
+    Link("About", href: "/about"),
+    class_name: "nav",
+)
+// lowers to:
+// ARKNode("Container",
+//         {"class_name": "nav"},
+//         [ARKNode("Link", {"href": "/"},      ["Home"]),
+//          ARKNode("Link", {"href": "/about"}, ["About"])])
+```
 
-## 8. Styling and scripts, Kotlin-inspired (proposed reading)
+## 3. The spec tracks C99, not C
 
-RS1 stays Java except in three places, all chosen to keep UI code readable:
+**Tracks:** the *shape* of ISO/IEC 9899:1999 as a specification, plus its
+philosophy. **Does not track:** the C language's feature set.
 
-1. **Trailing blocks** for nesting and styling: `out.card { ... }`,
-   `style("card") { ... }`, `hover { ... }`.
-2. **Named arguments** where a call has several optional parts:
-   `out.button(label = "Save", action = this::save)`.
-3. **Typed units and property assignment** in style blocks: `padding = 16.px`,
-   not a string key in a map.
+### 3.1 What "tracks" means
 
-Style blocks lower to the existing style API (`Site.style(name, rules)` and its
-pseudo-class key form, e.g. `":hover:background"`). "Scripts" in this reading
-are the handler methods of section 6, not a separate embedded language. This is
-my interpretation of "Kotlin-inspired" and should be confirmed (Q3).
+1. **Spec structure.** Rei's spec is organized the way C99 is: conformance,
+   terms, environment, language (lexical elements, expressions, declarations,
+   statements, preprocessing), library. Rei's "library" is the ARKlight
+   vocabulary (`stdlib.ARKlight`).
+2. **A translation-phase model.** C99 5.1.1.2 defines eight ordered phases.
+   Rei defines its own, mapped onto the pipeline (mapping to be refined):
 
-## 9. Costs and consequences
+   | C99 phase | Rei |
+   |---|---|
+   | 1-2: source mapping, line splicing | decode UTF-8 (no trigraphs) |
+   | 3: tokenize | tokenize |
+   | 4: run preprocessing directives | `#include`, `#define` (promoting today's `# include` / `# define` comment directives to real syntax) |
+   | 5-6: charset mapping, adjacent string concatenation | keep adjacent-string concatenation |
+   | 7: translate (syntax + semantic analysis) | parse, check, evaluate `const`, lower to ARK AST |
+   | 8: link | hand-off to ARKlight's pipeline |
 
-- **Identity text must change.** `WHAT-ARKLIGHT-IS.md` says ARKlight is
-  "Python-authored -- not templated, not a DSL with its own syntax" and describes
-  the site as a Python module the compiler executes. Rei is a DSL with its own
-  syntax and is never executed. The bullet needs to become "Python-first, with a
-  second, non-executing frontend," and `pyproject.toml`'s description ("A
-  Python-first compiler...") is already compatible.
-- **A real compiler is a real commitment.** Parser, type checker, phase
-  analysis, evaluator, diagnostics and (eventually) editor support are a large,
-  permanent surface. Python authoring gets much of this for free from Python.
-- **Two frontends must agree.** The conformance rule in section 10 exists so
-  they cannot drift.
-- **A smaller build-time attack surface.** Because the compiler never executes a
-  `.rei` file, a malicious or careless site cannot run code during `arklight
-  build`. The Python frontend cannot claim this. It is a genuine advantage and
-  should be stated plainly, without overselling: it says nothing about the
-  runtime, which is already closed.
+3. **The behavior taxonomy.** C99 sorts non-fully-specified behavior into
+   undefined, unspecified, implementation-defined and locale-specific. Rei
+   adopts the vocabulary so every corner of the spec is *classified*, not left
+   silent. Whether Rei permits any *undefined* behavior is Open question 4.
+4. **The as-if rule (5.1.2.3).** The compiler may transform freely as long as
+   the observable result is unchanged. For Rei the observable result is the ARK
+   AST and its emitted output. This is ARKlight's "the compiler may specialize
+   for the target" agreement, stated in C99's terms.
+5. **C99 precedents that fit trees.**
+   - *Designated initializers* (`.name = value`) are C's native answer to
+     named props. The Dart-style `name: value` spelling is the leading
+     candidate; the C99 spelling is the alternative (Open question 5).
+   - `//` comments, declarations mixed with statements, `_Bool`, and
+     `<stdint.h>`-style fixed-width integer names (a ready answer to "how wide
+     is an int").
+   - The preprocessor as a compiler-owned name-binding layer.
 
-## 10. Conformance: Python as the oracle
+### 3.2 What it does not track
 
-For every RS1 feature, the repository keeps a **Python twin**: an equivalent
-`site.py` producing the same page. The acceptance test is that both compile to an
-identical IR (and therefore identical output). This makes the existing, shipped
-compiler the specification for lowering, and turns "does RS1 mean what we said"
-into an automated check rather than a review opinion.
+Pointers, address-of, pointer arithmetic, `void *`, `malloc`/`free`, `union`,
+`goto`/`setjmp`, `volatile`/`restrict`, variable-length arrays, `stdio`,
+`signal`, K&R and function-pointer declarator syntax, trigraphs, textual macro
+hygiene problems, and implicit narrowing conversions.
 
-## 11. Staged ladder
+### 3.3 Sourcing
 
-Same rung discipline as `PROVIDER-SDK-ADDENDUM.md`: each rung is independently
-shippable and the language stays experimental until RS1 is frozen.
+Cite C99 by section number and consult the public working draft (N1256,
+C99 with technical corrigenda). Write Rei's spec as **original prose**. The
+standard's text is not reproduced.
 
-| Rung | What ships | Done when |
+## 4. Philosophy
+
+Read from the "Spirit of C" tenets in the C99 Rationale (this proposal's
+reading, to be confirmed by the author). Tenets are paraphrased.
+
+| Tenet | Rei reading | Tension |
 |---|---|---|
-| **R0** | Grammar spec, file/route model, `.rei` discovery in the pipeline; no compiler | Spec reviewed; pipeline recognizes `.rei` and reports "not implemented" |
-| **R1** | Lexer, parser, Rei AST; syntax errors through the narrator | Every RS1 example parses; malformed input gives spanned, narrated errors |
-| **R2** | Static pages: `out.heading/text/link`, blocks, `nav(out)` (build-phase evaluator), shared routes | Static `hello_site` home compiles to the same IR as its Python twin |
-| **R3** | Fields -> `State`; handler methods -> actions; `if` over state -> `Show`; method references | The section 7 example matches its Python twin |
-| **R4** | Getters and expressions -> `Computed`/`Predicate`; `for` over state -> `Repeat`; `in` fields | A todo-list example matches its Python twin |
-| **R5** | Styling blocks, typed units, stdlib surface | Style output matches `Site.style` twin |
-| **R6** | Multi-file projects and imports; Android and Desktop parity; docs graduation | Backend matrix verified, `WHAT-ARKLIGHT-IS.md` updated |
+| Trust the programmer | No ceremony: no forced classes, no boilerplate, no nannying syntax | Validation at the ARK AST boundary still happens. That is the closed-vocabulary contract, not distrust |
+| Don't prevent what needs doing | An escape hatch exists, but it is **visible** | Exactly what the Experimental and Fun gates enforce |
+| Keep the language small | Adding a construct requires removing or justifying one; the spec stays readable in one sitting | "Small" is a budget rule here, not a number |
+| One way to do an operation | No duplicate spellings for loops, conditionals or construction | Dart offers several; Rei picks one |
+| Fast, even if not portable | Inverts. ARKlight's portability comes from *standard output* (design agreement 15), so Rei reads this as **predictable output over clever output** | The one tenet translated instead of adopted |
+| No hidden costs | **No hidden output.** Every emitted node traces to a Rei construct; no implicit wrapper elements | Needs the source-span work in Open question 8 |
 
-## 12. Non-goals
+## 5. Surface
 
-Full Java; annotations; a JVM or any Java toolchain; running `.rei` in the
-browser; replacing the Python frontend; arbitrary JavaScript, Python or Java
-interop; IDE and language-server support (each needs its own proposal, as the
-narrator's scope note requires).
+Dart-like, non-normative, listed only to scope Stage 1:
 
-## 13. Open questions
+- constructor calls with named props and positional children; no `new`
+- trailing commas
+- collection-level `if` / `for` / spread inside child lists
+- string interpolation
+- a `const` form for subtrees resolvable at compile time
+- reusable pieces as plain functions
 
-1. **Shared pieces.** `static void nav(Out out)` (Java-way, no node values) or a
-   `Node`-returning method as in the mock? The first is more consistent with
-   section 2; the second composes more easily.
-2. **What `in` is.** Handles that bind fields (section 5.2), or something closer
-   to the Java `Scanner` model? How do forms and validation fit?
-3. **"Kotlin-inspired," precisely.** Are trailing blocks, named arguments and typed
-   units the intended surface, or is something else meant (extension functions,
-   lambdas with receivers, string templates)?
-4. **Phase inference.** Should the compiler infer build versus runtime from data
-   dependence (proposed), or should authors mark it? What is the error message
-   when a method is ambiguous?
-5. **Site-level settings.** Where do title, shared styles, theme and `Provider`
-   configuration live? A `site.rei`, or class-level declarations?
-6. **Type system depth.** How far do `List`, `Map` and user classes go, given
-   that only what the registries can express reaches the browser?
-7. **Naming.** "Rei" is already the compiler narrator. Keep the shared name and
-   package them clearly (`arklight/compiler/rei/` versus
-   `arklight/frontend/rei/`), or rename one?
-8. **Async and extensions.** How does an AVM-style async value or a `Provider`
-   surface as a type in a Java-syntax language?
-9. **Registry growth.** Handler bodies are straight-line only because the action
-   registry has no conditional action. Should the language wait for the
-   vocabulary, or should the vocabulary follow the language?
+## 6. Non-goals
 
-## 14. Relationship to other proposals
+- **Not a Python replacement.** Python authoring remains the default and the
+  supported path.
+- **No new IR node types, no backend changes, no runtime.** Consistent with
+  ARKlight's non-goals (`ARCHITECTURE.md`): no browser-side Python, no virtual
+  DOM, no runtime execution of source in the browser. Rei is never shipped to
+  the browser.
+- **No Java compatibility.** No JVM, no `java.*`, no bytecode.
+- **No stability, package ecosystem, LSP or formatter in alpha.**
+- **No stability promise for the Rei syntax itself.**
 
-- `REI-COMPILER-NARRATOR-PROPOSAL.md`: shipped; supplies the diagnostic voice
-  and shares the name (Q7).
-- `AVM-WASM-SANDBOX-PROPOSAL.md`: a possible source of third-party logic; needs a
-  matching type (Q8).
-- `PROVIDER-SDK-PROPOSAL.md` and `PLATFORM-API-IR-PROPOSAL.md`: external
-  services and device APIs need a Rei-level declaration story; not designed here.
-- `USER-DEFINED-ERROR-HANDLING-PROPOSAL.md`: no exceptions in RS1, so error
-  handling would use its closed vocabulary, not `try`/`catch`.
-- JS vocabulary addenda: they set the ceiling on what "JS is just a function" can
-  mean (section 6.2).
+## 7. Stages
 
-## 15. Filing checklist (per `docs/README.md`'s one-pass rule)
+| Stage | Adds | Acceptance |
+|---|---|---|
+| **0: The tier** | `arklight/fun.py`, the alpha guard, `"fun"` config section, docs | Registry with one inert entry; I1 and I3 tests pass; warnings render as in 1.3 |
+| **1: Tree subset** | lexer, parser, Rei AST and lowering for constructor-call trees, literals, named props, comments, `#include` | `hello_site`'s page trees compile from `.rei` to the same ARK AST as the Python version (tree-equality test) |
+| **2: Config** | `arklight.config.rei`, data-only | same `CONFIG` dict as the `.py` equivalent; both-files error works |
+| **3: Compute** | `const`, functions, minimal evaluator | **Blocked** on Open question 3. Do not start until decided |
 
-1. This file, `docs/Proposals/REI-LANGUAGE-RS1-PROPOSAL.md`, with its Status line.
-2. Its row in `docs/Proposals/README.md`'s Index.
-3. Its row in `docs/README.md`'s Folder Guide for `docs/Proposals/`.
-4. If accepted: `docs/Implementation/REI-LANGUAGE-ADDENDUM.md`, its rows in
-   `docs/Implementation/README.md` and the Folder Guide, the `ARCHITECTURE.md`
-   Milestones row, the `PROGRESS.md` Snapshot row, and the `WHAT-ARKLIGHT-IS.md`
-   identity amendment from section 9.
+Each stage is independently shippable and independently deletable.
 
-Suggested Index row text:
+## 8. Tests
 
-> | [`REI-LANGUAGE-RS1-PROPOSAL.md`](REI-LANGUAGE-RS1-PROPOSAL.md) | Proposal for Rei Script (RS1), a Java-syntax source language and second ARKlight frontend: `.rei` -> Rei AST -> ARK AST -> the existing pipeline. Fields lower to `State`, methods to closed `Action.*`, expressions to `Derive.*`/`Predicate.*`; output is a Java-style `out` printer, not a node tree; the compiler parses and never executes author code. Two-phase model (build-time evaluation versus lowered runtime code), Python twins as the conformance oracle, ladder `R0`-`R6`. **Not accepted.** |
+New `tests/test_fun.py` and `tests/test_rei_*.py`, following the existing
+`tests/` layout.
+
+- I1 to I4 above.
+- Round-trip: `.rei` tree to `ARKNode` equals the Python-authored `ARKNode`.
+- Malformed `.rei` reports `file:line:col` from Rei's own tokens.
+- `.py` and `.rei` config coexisting raises `ConfigError` naming both.
+
+## 9. Removal and graduation
+
+**Removal (supported, zero residue).** Delete `arklight/fun.py` and
+`arklight/rei/`, and revert the two hook points (suffix dispatch in the build
+entry, config-file lookup). I1 guarantees nothing else changed.
+
+**Graduation.** A Fun feature that proves itself moves up only through a normal
+new proposal, to Experimental first and stable after that. There is no
+automatic promotion.
+
+## 10. Open questions
+
+1. **Gating on the channel.** `arklight.CHANNEL` already exists. Gate on it,
+   on the code living only on the `alpha` line, or both? (Recommend both.) Part
+   of the wider gating question, Open question 11.
+2. **Route naming.** `Site.page("/")` is Python-side registration. What names a
+   route in `.rei`? Strawman: one file, one route, derived from the filename.
+3. **Build-time evaluator.** Python gave loops, conditionals and helpers for
+   free by `exec`-ing the module. Rei needs its own interpreter, a static-only
+   subset, or a Python escape hatch. This decides Stage 3.
+4. **Undefined behavior.** C99 permits it. ARKlight's doctrine is "fail loudly
+   at build time". Options: diagnose every would-be UB site, or keep the
+   taxonomy fully and let *unspecified* (e.g. argument evaluation order) exist
+   where it costs nothing.
+5. **Named-argument spelling.** Dart's `name: value` or C99's `.name = value`.
+6. **Config key collision.** The narrator (shipped as `0.06510`) owns
+   `CONFIG["rei"]` (`default_mode`, in `_KNOWN_SECTIONS`). Language settings go
+   under `"fun"`, or wherever Open question 11 lands.
+7. **Two Reis.** Rei is the compiler narrator persona and now also the
+   language. Always say "the Rei language" where the two could be confused.
+8. **Source spans.** `ARKNode` holds only `type`, `props`, `children` (checked
+   in `arklight/ast/nodes.py`); nothing in `ast/` or `ir/` carries source
+   positions. Validation errors raised after lowering cannot point at a Rei
+   line unless a side table (node identity to span) is added. Decide in
+   Stage 1. Precedent: `0.06506` already captures `file:line` at a component
+   call site with `sys._getframe(1)` (`arklight/api.py`), but only to build an
+   error message; it is not stored on the node.
+9. **Integer semantics.** Fixed-width names (`int32`-style) with defined
+   overflow, or checked arithmetic. Java's wraparound, division rounding and
+   UTF-16 string length differ from CPython and JS, so any inherited default
+   needs an explicit decision.
+10. **Names that now collide with shipped code.** This proposal puts the
+    language in `arklight/rei/` and its tests in `tests/test_rei_*.py`. The
+    narrator already lives in `arklight/compiler/rei/` and its tests in
+    `tests/test_rei_narrator.py`, and prints `[Rei]` lines. The paths do not
+    clash, but two packages named `rei` and a `test_rei_*` glob that already
+    matches narrator tests will confuse readers. Pick distinct names before
+    Stage 1 (for example `arklight/rei_lang/` and `tests/test_rei_lang_*.py`).
+    This is Open question 7 applied to the file tree.
+11. **Gating, now that Rei is the official language.** Retire the Fun tier
+    (Stage 0 and invariants I3 and I4 go with it), or keep an alpha guard as a
+    *maturity* gate until Stage 1 ships? Every "Fun", "playground" and "alpha
+    only" statement above depends on the answer.
+
+## Correction carried over from `WHAT-REI-IS.md`
+
+Section 4's "No hidden costs" row is **not** one of the C99 Rationale's "Spirit
+of C" tenets, as best recalled (the five are: trust the programmer; do not
+prevent the programmer from doing what needs to be done; keep the language
+small and simple; provide only one way to do an operation; make it fast, even
+if not guaranteed portable). Label it as Rei's own addition, and verify against
+the Rationale before citing it as C99's.
