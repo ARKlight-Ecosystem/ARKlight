@@ -2,15 +2,23 @@
 
 ## Status
 
-**Proposed. Not accepted as written. Alpha only.** Originally filed against
-`alpha` @ `8cafffe` (`v0.06501`) in the Rei-Src workspace, and imported into
-this repo on 2026-09-20. Its claims about ARKlight were re-checked against
-`alpha` @ `5a15ebb` (`0.06511`); see "Re-verification" below. Nothing here is
-committed to. Deleting the whole feature is a supported outcome (see "Removal
-and graduation").
+**Accepted as written -- staged as a four-rung ladder (`v0.081`-`v0.084`)
+in [`docs/Implementation/REI-LANGUAGE-ADDENDUM.md`](../Implementation/REI-LANGUAGE-ADDENDUM.md).**
+The two update blocks immediately below are kept as filed, in
+chronological order, since they are the actual decision trail this
+proposal was accepted on -- from "proposed, not accepted, alpha-only
+playground" through "the maintainer has decided Rei is the official
+native source language" to "accepted as written." The body of the
+proposal past those two blocks is otherwise unchanged from the
+original filing and is **not** rewritten to read as if it always
+described an accepted feature -- see the addendum linked above for
+current landing order, per-stage status, and how it resolves this
+document's open questions.
 
-This is a play area. It is deliberately low-ceremony: small stages, no
-stability promise, and a clean exit.
+Originally filed against `alpha` @ `8cafffe` (`v0.06501`) in the
+Rei-Src workspace, and imported into this repo on 2026-09-20. Its
+claims about ARKlight were re-checked against `alpha` @ `5a15ebb`
+(`0.06511`); see "Re-verification" below.
 
 > **Update 2026-09-20: Rei's standing has changed since this was filed.** The
 > maintainer has decided that Rei is the **official native source language of
@@ -24,6 +32,137 @@ stability promise, and a clean exit.
 > document `WHAT-REI-IS.md` (in the ARKVM repository, `docs/Foundational/`)
 > records the decision, its context and the wider open questions. The body of
 > this proposal is otherwise unchanged from the version filed.
+
+> **Update 2026-09-21: Accepted, staged as a four-rung ladder.** The
+> maintainer has now accepted Rei the language as written, superseding
+> the "Not accepted as written" status above. Staged in
+> [`docs/Implementation/REI-LANGUAGE-ADDENDUM.md`](../Implementation/REI-LANGUAGE-ADDENDUM.md)
+> as `v0.081`-`v0.084` (the Compute stage, formerly Stage 3, is
+> unscheduled and holds no version slot -- still blocked on Open
+> question 3). This update also resolves five of the eleven open
+> questions below and settles the language-surface decisions the
+> maintainer specified directly:
+>
+> - **Open question 11 (gating) is resolved: the Fun tier is retired.**
+>   Section 1 (Fun tier, `arklight/fun.py`, the `🎲` banner, I3/I4) is
+>   superseded in full -- Rei is no longer a playground. What replaces
+>   it: the alpha-channel guard survives, but only as an ordinary
+>   *maturity* gate (`arklight.CHANNEL == "alpha"`, same mechanism,
+>   different meaning -- "not yet stable," not "may vanish without
+>   notice"), and a *new*, narrower gated surface, **RNI**, takes over
+>   the one thing Fun never actually gated: an escape hatch to
+>   arbitrary output the compiler doesn't own. See "RNI" below.
+> - **Open question 10 (naming collision) is resolved:** the language
+>   lives in `arklight/rei_lang/`, tests in `tests/test_rei_lang_*.py`
+>   -- the proposal's own suggested fix, now confirmed rather than
+>   merely recommended. The narrator keeps `arklight/compiler/rei/` and
+>   `tests/test_rei_narrator.py` unchanged.
+> - **Open question 6 (config key collision) is resolved:** language
+>   settings live under `CONFIG["rei_lang"]` in both `.py` and `.rei`
+>   config, matching the package name above; `CONFIG["rei"]` stays the
+>   narrator's alone.
+> - **Open question 2 (route naming) is resolved:** the strawman
+>   stands -- one `.rei` file, one route, derived from the filename,
+>   the same convention `arklight build site.py`'s single entry file
+>   already implies for the site's own root.
+> - **Open question 7 (two Reis)** is unaffected by acceptance and
+>   remains standing guidance: always say "the Rei language" where the
+>   two could be confused.
+>
+> Four language-surface decisions, specified by the maintainer rather
+> than left to a future stage:
+>
+> 1. **The preamble is shared with Python, real syntax, not comments.**
+>    `.rei` uses the exact same two directives `AUTHORING-GUIDE.md`
+>    documents for `.py` -- `#include <stdlib.ARKlight>` and `#define
+>    <name> -> <text>` -- resolved by the same preamble model
+>    (`PreambleCollisionError`, no silent winner, same recognized
+>    labels). The only difference is spelling: Rei already promotes
+>    these from comment-shaped directives to real C-style preprocessor
+>    syntax, per Section 3.1's phase-4 mapping (`#include`, `#define`
+>    with no leading `#` + space). A `.rei` file that never writes
+>    `#include <stdlib.ARKlight>` has no `Page`, `Container`, `Button`,
+>    etc. in scope -- identical to a `.py` site file today.
+> 2. **The entry point is a class; each route is a `site` method on
+>    it.** A valid `.rei` site file declares one class, and every route
+>    that file defines is a method on that class with the fixed
+>    signature:
+>
+>    ```java
+>    public static void site(Page Home) {
+>        // code
+>    }
+>    ```
+>
+>    `public static void` is fixed -- Java-adjacent shape, not a choice
+>    per file. `site` is the fixed method name (never renamed -- it is
+>    the dispatch point the `.rei` frontend looks for, the same role
+>    `def home():` under `@site.page("/")` plays in Python, minus the
+>    decorator). `Page` is the fixed parameter type; the parameter name
+>    (`Home` above) is the file-local name for the page tree the method
+>    body builds -- Open question 2's per-file route naming applies to
+>    the *file*, this parameter names the *tree inside it*. Multiple
+>    `site` overloads (Java-style overload-by-parameter, if a file ever
+>    needs more than one) are deliberately **not** resolved here -- left
+>    to Stage 1 alongside the lexer/parser work, since it interacts with
+>    Open question 8 (source spans) and needs real parsing to specify
+>    precisely.
+> 3. **Java-adjacent for markup and logic, Kotlin-adjacent for style,
+>    on purpose.** Section 5's Dart-like tree surface (constructor
+>    calls, named props) is unchanged for HTML/JS-equivalent authoring.
+>    What's new: Rei's style-block syntax (the CSS-equivalent surface)
+>    deliberately reads Kotlin-adjacent rather than Java-adjacent or
+>    CSS-literal -- e.g. property assignment inside a typed block rather
+>    than a bare `key: value;` list -- specifically so Rei's stylesheet
+>    authoring doesn't read as "CSS with a different file extension."
+>    Exact grammar is Stage 1 work; this fixes only the *influence*,
+>    matching Section 4's "keep the language small, but not derivative"
+>    reading.
+> 4. **RNI -- Rei Native Interface.** The Fun tier's retirement (above)
+>    leaves a real gap: Section 1 never actually gated raw escape-hatch
+>    output, only the playground framing. RNI fills that gap and takes
+>    over the role `arklight/experimental.py` plays for Python authoring
+>    -- Rei's own gated tier for "steps outside the intrinsic model,"
+>    registered in `arklight/rei_lang/rni.py` (mirroring
+>    `experimental.py`'s `ExperimentalFeature`/`emit()`/
+>    `HEAVY_RELIANCE_THRESHOLD` shape, not `fun.py`'s -- RNI is
+>    Experimental's sibling, not Fun's replacement-in-name). An RNI
+>    block is how a `.rei` site reaches arbitrary JS the closed
+>    vocabulary doesn't cover, the same authoring-side-only,
+>    zero-cost-when-unused contract `EXPERIMENTAL-APIS.md` already
+>    describes -- gated, inline-warned, counted toward
+>    `HEAVY_RELIANCE_THRESHOLD`, and never silently unused-but-shipped.
+>    Grammar (an `rni { ... }` block, a `@RNI` annotation on a method,
+>    or something else) is unresolved -- new Open question 12, below.
+> 5. **Java-based exception handling, and Platform APIs as an
+>    interface.** Two more fixed decisions:
+>    - **Exceptions.** `.rei` gets real `try`/`catch`/`finally` keyword
+>      syntax, matched by inheritance against typed exception classes --
+>      Java's `catch` shape. This is deliberately the *same* shape
+>      `docs/Proposals/USER-DEFINED-ERROR-HANDLING-PROPOSAL.md` already
+>      proposed for Python (`catches=` matched by inheritance, `catch`/
+>      `finally_` restricted to closed-vocab `Action.*`/`Log.*` refs,
+>      never arbitrary executed code) -- Rei gets it as native keyword
+>      syntax instead of a decorator wrapping Python's own `try`, since
+>      Rei owns its own grammar. That Python-side proposal remains **not
+>      accepted** on its own terms (still holding no version slot); its
+>      *shape* is what's reused here, not its acceptance.
+>    - **Platform APIs.** `PLATFORM-APIS.md`'s "the interface belongs to
+>      ARKlight" model gets a literal Rei-syntax expression: an
+>      `interface` (Java-adjacent) or `abstract class` declares the
+>      capability surface (`notify`, `clipboard_write`, ...), matching
+>      `arklight.ir.platform_api.PLATFORM_API_REGISTRY` one-for-one
+>      rather than introducing a second registry -- a `.rei` file calls
+>      through it exactly as `PlatformAPI.notify(...)` already works
+>      from Python, just type-checked against the interface at Rei's own
+>      parse/lower stage instead of at Python call time. No new IR node,
+>      no new backend contract -- this is authoring-surface sugar over
+>      the existing `PlatformAPIRef` lowering, consistent with Section 6
+>      ("no new IR node types, no backend changes").
+>
+> New Open question 12: **RNI's grammar.** Block, annotation, or some
+> third shape -- decide alongside Stage 1's lexer/parser work, the same
+> way Open question 8 (source spans) is deferred there.
 
 ## Re-verification against `alpha` @ `5a15ebb` (`0.06511`)
 

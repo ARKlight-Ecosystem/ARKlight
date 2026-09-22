@@ -91,7 +91,10 @@ folder's own README for the full rationale. Removed or graduated
 | [`APP-SHELL-CAPABILITY-PROPOSAL.md`](<Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md>) | Proposal to scope how far the shipped `Site(app_shell=True)` navigation (`hx-boost`/`hx-preserve`) can extend toward SPA-shaped UX without a client-side router or general expression evaluation -- a philosophy-fit checklist plus in-scope/out-of-scope candidate lists. |
 | [`ANDROID-BACKEND-HARDENING-PROPOSAL.md`](<Proposals/ANDROID-BACKEND-HARDENING-PROPOSAL.md>) | Proposal for native-shell quality work on the Android backend with no JS-to-native bridge: a source-level audit of `arklight/backend/android/runtime.py` and `arklight/cli/android.py` (external-link handling, offline/load-error handling, predictive back, WebView state restore, edge-to-edge, `WebChromeClient`, a WebView-version floor), which config kwargs earn a place, and what is explicitly rejected from the Capacitor comparison. **Partially accepted -- implemented as of `0.06507`:** external-link handling with `android.allow_navigation`, a load-error page, predictive back, WebView state save/restore, debugging tied to build type. `WebChromeClient`, the WebView-version floor, `append_user_agent` and background colour remain unscheduled. |
 | [`USER-DEFINED-ERROR-HANDLING-PROPOSAL.md`](<Proposals/USER-DEFINED-ERROR-HANDLING-PROPOSAL.md>) | Proposal for opt-in user-defined error handling: `# include <errhanlib.ARKlight>` binds a `Try` base class a site author extends -- `catches=` names real exception types (matched by inheritance, Java-shaped `catch`), and `catch`/`finally_` are closed-vocab `Action.*`/`Log.*` lists, never executed code -- applied via an explicit `@SomeFailure.wraps` decorator. **Not accepted**; requested slot `v0.079` is held by Miko Stage A. |
-| [`REI-LANGUAGE-PROPOSAL.md`](<Proposals/REI-LANGUAGE-PROPOSAL.md>) | Proposal for the Rei *language* (`.rei`), a native source frontend that lowers to the ARK AST and changes nothing below it -- distinct from Rei the compiler narrator. `.rei` site files, a data-only `arklight.config.rei`, a spec tracking ISO C99's shape, a four-stage ladder. **Not accepted as written; the maintainer has since decided Rei is ARKlight's official native source language (Python authoring stays), so its playground/Fun-tier framing is superseded and its gating is open.** |
+| [`REI-LANGUAGE-PROPOSAL.md`](<Proposals/REI-LANGUAGE-PROPOSAL.md>) | Proposal for the Rei *language* (`.rei`), a native source frontend that lowers to the ARK AST and changes nothing below it -- distinct from Rei the compiler narrator. `.rei` site files, a data-only `arklight.config.rei`, a spec tracking ISO C99's shape, and a shared preamble/entry-point/exceptions/Platform-APIs surface. **Accepted as written -- staged as a four-rung ladder (`v0.081`-`v0.084`) in [`docs/Implementation/REI-LANGUAGE-ADDENDUM.md`](<Implementation/REI-LANGUAGE-ADDENDUM.md>); the Compute stage stays unscheduled, blocked on an open evaluator-design question.** |
+| [`ARKlight-ISSUE-REGISTER.md`](<Proposals/ARKlight-ISSUE-REGISTER.md>) | A consolidated register of ARKlight's own known bugs, expressiveness gaps, and maturity limitations, sorted into confirmed defects vs. the price of the chosen architecture -- read this before filing a new proposal that might already be tracked here. |
+| [`KAIOS-NATIVE-TARGET-PROPOSAL.md`](<Proposals/KAIOS-NATIVE-TARGET-PROPOSAL.md>) | Proposal for KaiOS as a target-specialized backend rather than a packager -- Gecko *is* the app runtime on KaiOS, so this argues the existing Web build cannot simply be zipped and shipped (input model, engine floor, layout CSS). If accepted, supersedes the packaging-only framing in `docs/Far Future Concern/KAIOS-BACKEND-IMPLEMENTATION.md`'s §§1-3/§7 without touching its manifest design, ZIP-reuse prerequisite, staged CLI ladder, or out-of-scope list. |
+| [`PLATFORM-API-IR-PROPOSAL.md`](<Proposals/PLATFORM-API-IR-PROPOSAL.md>) | Proposal for a platform API interface layer in the compiler IR -- platform-facing capabilities (notifications, clipboard, ...) as backend-independent, versioned interfaces the compiler owns, Web as the default implementation. **Accepted -- staged in [`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`](<Implementation/PLATFORM-API-IR-ADDENDUM.md>); Stage 1 (Web reference implementation) shipped as `v0.065`.** |
 
 ### [`docs/Implementation/`](Implementation/README.md) — accepted, staged
 
@@ -104,7 +107,11 @@ README for the full rationale.
 | File | Covers |
 | --- | --- |
 | [`JS-VOCABULARY-ADDENDUM-v0.070.md`](Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md) | Staged, ten-rung (`v0.061`-`v0.070`) implementation ladder for the philosophy-compliant parts of `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`. |
+| [`SEARCH-RETRIEVE-DOC-ADDENDUM.md`](Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md) | Single-version (`v0.064`) implementation entry for the accepted `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md` -- `arklight search --retrieve-doc`, filed retrospectively after shipping ahead of its own writeup. |
+| [`PROVIDER-SDK-ADDENDUM.md`](Implementation/PROVIDER-SDK-ADDENDUM.md) | Staged, six-rung (`v0.065`-`v0.070`) implementation ladder for the accepted `docs/Proposals/PROVIDER-SDK-PROPOSAL.md` -- contract + experimental gating first, capability-enum finalization last. |
+| [`PLATFORM-API-IR-ADDENDUM.md`](Implementation/PLATFORM-API-IR-ADDENDUM.md) | Two-stage implementation ladder for the accepted `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` -- Stage 1 (Web reference implementation) SHIPPED as `v0.065`; Stage 2 (Android/Desktop native implementations) PLANNED, unscheduled pending each backend's own maturity. |
 | [`PROJECT-KNOWLEDGE-ADDENDUM.md`](Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md) | Staged, eight-rung (`v0.071`-`v0.078`) implementation ladder for the accepted `docs/Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md` -- `.arklight/` foundation through future-provider open slot, one version per stage. |
+| [`REI-LANGUAGE-ADDENDUM.md`](Implementation/REI-LANGUAGE-ADDENDUM.md) | Staged, four-rung (`v0.081`-`v0.084`) implementation ladder for the accepted `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` -- maturity gate/package skeleton/RNI first, exceptions and Platform-APIs-as-interface last; the Compute stage stays unscheduled, blocked on an open evaluator-design question. |
 
 ### [`docs/new js backend proposal/`](<new js backend proposal/README.md>) — working reference
 
@@ -128,6 +135,7 @@ dropped, or graduated elsewhere if it's picked up.
 | [`kaios-app-design-doc.md`](<Far Future Concern/kaios-app-design-doc.md>) | Design doc for a potential KaiOS app. |
 | [`KAIOS-BACKEND-IMPLEMENTATION.md`](<Far Future Concern/KAIOS-BACKEND-IMPLEMENTATION.md>) | Implementation notes for a KaiOS backend. |
 | [`WINDOWS-PHONE-BACKEND.md`](<Far Future Concern/WINDOWS-PHONE-BACKEND.md>) | Notes on a (very) speculative Windows Phone backend. |
+| [`AVM-WASM-SANDBOX-PROPOSAL..md`](<Far Future Concern/AVM-WASM-SANDBOX-PROPOSAL..md>) | Not accepted, filed for maintainer review: a curated-package WebAssembly sandbox ("AVM") letting ARKlight consume a maintainer-curated catalog of existing JS libraries via isolated, discardable WASM sandboxes, without ever exposing JavaScript or npm to the site author. Requests no version slot. |
 
 ### [`docs/version history/`](<version history/README.md>) — permanent
 
@@ -206,20 +214,22 @@ updated.", "Docs update, fix stale cli references part 1 of 2" /
 repo readme aged like fine milk. had to fix that." That pattern is
 one feature landing, then two to four separate later commits chasing
 down what the first commit should have updated already. Concrete
-examples of the kind of drift that caused those follow-ups, found
-still sitting in this tree:
+examples of the kind of drift that caused those follow-ups, since
+fixed in the same pass as this note (kept here as the worked example,
+not as a live warning about this tree's current state):
 
-- `docs/Implementation/README.md`'s own index lists
-  `SEARCH-RETRIEVE-DOC-ADDENDUM.md` and `PROVIDER-SDK-ADDENDUM.md` --
-  neither file exists on disk. (The first is a known, documented gap
-  -- `docs/Foundational/ARCHITECTURE.md`'s `v0.064` row notes it was
-  "never actually filed." The second has no such note; it's simply
-  missing.)
-- This file's own Folder Guide table for `docs/Implementation/` lists
-  2 files; `docs/Implementation/README.md`'s own index lists 4. Same
-  folder, two indexes, two different counts -- exactly the "a reader
-  may land on either README first" problem the paragraph above this
-  one exists to prevent.
+- `docs/Implementation/README.md`'s index once listed
+  `SEARCH-RETRIEVE-DOC-ADDENDUM.md` and `PROVIDER-SDK-ADDENDUM.md`
+  with neither file existing on disk. (The first was a known,
+  documented gap -- `docs/Foundational/ARCHITECTURE.md`'s `v0.064` row
+  notes it was "never actually filed." The second had no such note; it
+  was simply missing.) Both files now exist, filed retrospectively.
+- This file's own Folder Guide table for `docs/Implementation/` once
+  listed 2 files while `docs/Implementation/README.md`'s own index
+  listed 4 -- the same folder, two indexes, two different counts,
+  exactly the "a reader may land on either README first" problem the
+  paragraph above this one exists to prevent. Both tables now list the
+  same 6.
 - A version slot getting silently double-booked (two or three pieces
   of work assigned the same `v0.0xx` without a note explaining it) is
   the same failure in a different table -- see
@@ -228,8 +238,8 @@ still sitting in this tree:
   "version-number note, kept for history" sections for how to handle
   it *with* a note instead of silently.
 
-None of these are hypothetical failure modes -- they're what's
-actually in this tree today, left by past passes that stopped before
+None of these were hypothetical failure modes -- they were what was
+actually in this tree, left by past passes that stopped before
 touching every file a change like this one touches. **A single
 accepted-proposal addition (the size of this section's own change)
 touches all of the following, in the same pass, not spread across
@@ -259,9 +269,11 @@ follow-up commits:**
    have one).
 
 Skipping any of 2/3/5/6 is exactly how one README's index and the
-other's index end up disagreeing, the way `docs/Implementation/`'s
-two indexes do right now. Skipping 4 while still writing 5/6 is
-exactly how `PROVIDER-SDK-ADDENDUM.md`/`SEARCH-RETRIEVE-DOC-ADDENDUM.md`
-ended up referenced without existing. The fix in both cases is not a
-follow-up commit later -- it's checking this numbered list before
-calling a documentation change finished.
+other's index ended up disagreeing, the way `docs/Implementation/`'s
+two indexes once did. Skipping 4 while still writing 5/6 is exactly
+how `PROVIDER-SDK-ADDENDUM.md`/`SEARCH-RETRIEVE-DOC-ADDENDUM.md` ended
+up referenced without existing for several versions' worth of
+`docs/version history/` entries before either file was actually
+written. The fix in both cases is not a follow-up commit later --
+it's checking this numbered list before calling a documentation
+change finished.
