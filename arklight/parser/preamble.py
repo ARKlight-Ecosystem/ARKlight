@@ -665,6 +665,49 @@ def _target_names(target: ast.expr) -> list[str]:
     return []
 
 
+def _bind(
+    binders: dict[str, list[tuple[int, str]]],
+    targets: list[ast.expr],
+    lineno: int,
+    kind: str,
+) -> None:
+    """Record `lineno`/`kind` against every name bound by `targets`."""
+    for target in targets:
+        for name in _target_names(target):
+            binders[name].append((lineno, kind))
+
+
+def _collect_import_from(
+    stmt: ast.ImportFrom,
+    binders: dict[str, list[tuple[int, str]]],
+    stars: list[tuple[int, str]],
+) -> None:
+    for alias in stmt.names:
+        if alias.name == "*":
+            stars.append((stmt.lineno, stmt.module or "."))
+            continue
+        binders[alias.asname or alias.name].append((stmt.lineno, "import"))
+
+
+def _collect_compound(
+    stmt: ast.stmt,
+    binders: dict[str, list[tuple[int, str]]],
+    stars: list[tuple[int, str]],
+) -> None:
+    """Descend into a compound statement's own bodies (`if`/`try`/`for`/
+    `while`/`with`), first recording any name *it* binds directly: a
+    loop variable, or a `with ... as name` target."""
+    if isinstance(stmt, (ast.For, ast.AsyncFor)):
+        _bind(binders, [stmt.target], stmt.lineno, "loop variable")
+    if isinstance(stmt, (ast.With, ast.AsyncWith)):
+        targets = [item.optional_vars for item in stmt.items if item.optional_vars]
+        _bind(binders, targets, stmt.lineno, "with target")
+    for attr in ("body", "orelse", "finalbody"):
+        _collect_binders(getattr(stmt, attr, []) or [], binders, stars)
+    for handler in getattr(stmt, "handlers", []) or []:
+        _collect_binders(handler.body, binders, stars)
+
+
 def _collect_binders(
     body: list[ast.stmt],
     binders: dict[str, list[tuple[int, str]]],
@@ -679,30 +722,17 @@ def _collect_binders(
         elif isinstance(stmt, ast.ClassDef):
             binders[stmt.name].append((stmt.lineno, "class definition"))
         elif isinstance(stmt, ast.Assign):
-            for target in stmt.targets:
-                for name in _target_names(target):
-                    binders[name].append((stmt.lineno, "assignment"))
+            _bind(binders, stmt.targets, stmt.lineno, "assignment")
         elif isinstance(stmt, (ast.AnnAssign, ast.AugAssign)):
-            for name in _target_names(stmt.target):
-                binders[name].append((stmt.lineno, "assignment"))
+            _bind(binders, [stmt.target], stmt.lineno, "assignment")
         elif isinstance(stmt, ast.Import):
             for alias in stmt.names:
                 bound = alias.asname or alias.name.split(".")[0]
                 binders[bound].append((stmt.lineno, "import"))
         elif isinstance(stmt, ast.ImportFrom):
-            for alias in stmt.names:
-                if alias.name == "*":
-                    stars.append((stmt.lineno, stmt.module or "."))
-                else:
-                    binders[alias.asname or alias.name].append((stmt.lineno, "import"))
+            _collect_import_from(stmt, binders, stars)
         else:
-            if isinstance(stmt, (ast.For, ast.AsyncFor)):
-                for name in _target_names(stmt.target):
-                    binders[name].append((stmt.lineno, "loop variable"))
-            for attr in ("body", "orelse", "finalbody"):
-                _collect_binders(getattr(stmt, attr, []) or [], binders, stars)
-            for handler in getattr(stmt, "handlers", []) or []:
-                _collect_binders(handler.body, binders, stars)
+            _collect_compound(stmt, binders, stars)
 
 
 def check_namespace_shadowing(
