@@ -62,6 +62,7 @@ out which.
 | [`SEARCH-RETRIEVE-DOC-ADDENDUM.md`](SEARCH-RETRIEVE-DOC-ADDENDUM.md) | Single-version (`v0.064`) implementation entry for the accepted `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md` -- `arklight search --retrieve-doc`, a doc-tree retrieval mode on the existing `search` subcommand, sharing `v0.064` with JS vocabulary addendum stage 4. |
 | [`PROVIDER-SDK-ADDENDUM.md`](PROVIDER-SDK-ADDENDUM.md) | Staged, six-rung (`v0.065`-`v0.070`) implementation ladder for the accepted `docs/Proposals/PROVIDER-SDK-PROPOSAL.md` -- contract + experimental gating first, capability-enum finalization last -- interleaved one stage per version alongside JS vocabulary addendum stages 5-10. |
 | [`PLATFORM-API-IR-ADDENDUM.md`](PLATFORM-API-IR-ADDENDUM.md) | Two-stage implementation ladder for the accepted `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` -- Stage 1 (`v0.065`, Web reference implementation: architecture plus `notify`/`clipboard_write`) SHIPPED; Stage 2 (Android/Desktop native implementations) PLANNED, unscheduled pending each backend's own maturity. Interleaved as a fourth piece into `v0.065`. |
+| [`REI-LANGUAGE-ADDENDUM.md`](REI-LANGUAGE-ADDENDUM.md) | Staged, four-rung (`v0.081`-`v0.084`) implementation ladder for the accepted `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` -- maturity gate/package skeleton/RNI first, exceptions and Platform-APIs-as-interface last; the Compute stage stays unscheduled, blocked on Open question 3. |
 
 ## Contributing
 

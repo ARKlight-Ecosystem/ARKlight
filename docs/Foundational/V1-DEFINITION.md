@@ -179,13 +179,19 @@ Named individually, not left to be inferred from Section 3's silence:
   "you are stepping outside the philosophy" warning on every use
   cannot simultaneously be part of a "just works, reliably" claim.
 - **`Provider`** (`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`), **Rei**
-  (`docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`, shipped as
-  `0.06510`), **Project Knowledge** (`docs/Implementation/
+  the compiler narrator (`docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`,
+  shipped as `0.06510`), **the Rei language** -- a `.rei` native
+  source frontend added *beside* Python authoring, not a replacement
+  for it (`docs/Proposals/REI-LANGUAGE-PROPOSAL.md`, staged as
+  `docs/Implementation/REI-LANGUAGE-ADDENDUM.md`, `v0.081`-`v0.084`) --
+  **Project Knowledge** (`docs/Implementation/
   PROJECT-KNOWLEDGE-ADDENDUM.md`), and **`arklight assistant`**
   (Miko/Raeliana, `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`).
-  All four are explicitly experimental, staged, or provisional as of
+  All five are explicitly experimental, staged, or provisional as of
   this writing -- useful, in-flight work, but not "the compiler" in
-  the sense Section 1 uses the word.
+  the sense Section 1 uses the word. (Rei the narrator and the Rei
+  language are two different things sharing one name -- always say
+  "the Rei language" where the two could be confused.)
 - **ARKlight Component Collections.** Named on its own in Section 5,
   not folded into the list above, because it is the one item this
   boundary has to be *most* explicit about excluding.
