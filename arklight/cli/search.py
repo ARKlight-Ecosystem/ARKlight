@@ -53,6 +53,24 @@ names), so recording acceptance of e.g. `increment` there would be
 silently inert. The new JS-vocabulary lookup (`_resolve_js_vocab`) is
 therefore a separate, additive path that `search_component` also
 tries, not a change to what `--accept` can record.
+
+One more closed, compiler-validated vocabulary lived outside
+`arklight.ir.schema` entirely and was missed by the sweep above:
+`PLATFORM_API_REGISTRY` (`arklight.ir.platform_api`), the
+`PlatformAPI.notify(...)` / `PlatformAPI.clipboard_write(...)`
+interface table `arklight.ir.validate._validate_platform_api` checks
+capability names and arguments against -- written the same
+`Namespace.name(...)` way as `Action.*`/`Derive.*`/`Predicate.*`, but
+never wired into `_JS_VOCAB_SOURCES`, so `arklight search notify`
+fell all the way through to "no component named" even though `notify`
+is real, closed vocabulary the compiler knows about. It is now the
+seventh (and last) source `_resolve_js_vocab` tries, with its own
+`platformapi.` dotted-prefix and its own formatter
+(`_format_platform_api_spec`) reporting args, required permissions,
+and which backend(s), if any, currently implement the capability --
+`PLATFORM_API_REGISTRY` alone can't answer that last part
+(`BACKEND_PLATFORM_API_SUPPORT` is a separate table; see
+`arklight/ir/platform_api.py`).
 """
 
 from __future__ import annotations
@@ -60,6 +78,11 @@ from __future__ import annotations
 from typing import Any
 
 from arklight.ir.components import COMPONENT_REGISTRY, ComponentSpec
+from arklight.ir.platform_api import (
+    BACKEND_PLATFORM_API_SUPPORT,
+    PLATFORM_API_REGISTRY,
+    PlatformAPISpec,
+)
 from arklight.ir.schema import (
     ACTION_REGISTRY,
     BEHAVIOR_REGISTRY,
@@ -85,6 +108,12 @@ from arklight.search.engine import default_engine
 # registries in practice (components are `PascalCase`, everything
 # here is `snake_case`), but a fixed order keeps a lookup
 # deterministic if that ever changes.
+#
+# `PLATFORM_API_REGISTRY` lives in `arklight.ir.platform_api`, not
+# `arklight.ir.schema` like the other six -- a different module, but
+# the same kind of closed, compiler-validated vocabulary, and the same
+# `Namespace.name(...)` authoring shape as `Action`/`Derive`/
+# `Predicate`, so it belongs in this list on identical terms.
 _JS_VOCAB_SOURCES: tuple[tuple[str, dict[str, Any], str | None], ...] = (
     ("on_click behavior", BEHAVIOR_REGISTRY, None),
     ("on_reveal behavior", REVEAL_REGISTRY, None),
@@ -92,6 +121,7 @@ _JS_VOCAB_SOURCES: tuple[tuple[str, dict[str, Any], str | None], ...] = (
     ("event modifier", MODIFIER_REGISTRY, None),
     ("Derive", DERIVATION_REGISTRY, "derive."),
     ("Predicate", PREDICATE_REGISTRY, "predicate."),
+    ("Platform API", PLATFORM_API_REGISTRY, "platformapi."),
 )
 
 
@@ -257,6 +287,30 @@ def _format_predicate_spec(name: str, spec: PredicateSpec) -> str:
     return "\n".join(lines)
 
 
+def _format_platform_api_spec(name: str, spec: PlatformAPISpec) -> str:
+    lines = [f"PlatformAPI.{name}"]
+    if spec.args:
+        lines.append(f"  args           : {', '.join(spec.args)}")
+    else:
+        lines.append("  args           : (none)")
+    if spec.permissions:
+        lines.append(f"  permissions    : {', '.join(spec.permissions)}")
+    else:
+        lines.append("  permissions    : (none)")
+    implemented_by = sorted(
+        backend
+        for backend, capabilities in BACKEND_PLATFORM_API_SUPPORT.items()
+        if name in capabilities
+    )
+    if implemented_by:
+        lines.append(f"  implemented by : {', '.join(implemented_by)}")
+    else:
+        lines.append("  implemented by : (no backend yet)")
+    if spec.description:
+        lines.append(f"  description    : {spec.description}")
+    return "\n".join(lines)
+
+
 _JS_VOCAB_FORMATTERS: dict[int, Any] = {
     id(BEHAVIOR_REGISTRY): lambda name, label, spec: _format_behavior_spec(name, label, spec),
     id(REVEAL_REGISTRY): lambda name, label, spec: _format_behavior_spec(name, label, spec),
@@ -264,6 +318,7 @@ _JS_VOCAB_FORMATTERS: dict[int, Any] = {
     id(MODIFIER_REGISTRY): lambda name, label, spec: _format_modifier_spec(name, spec),
     id(DERIVATION_REGISTRY): lambda name, label, spec: _format_derivation_spec(name, spec),
     id(PREDICATE_REGISTRY): lambda name, label, spec: _format_predicate_spec(name, spec),
+    id(PLATFORM_API_REGISTRY): lambda name, label, spec: _format_platform_api_spec(name, spec),
 }
 
 
@@ -271,15 +326,16 @@ def _resolve_js_vocab(query: str) -> str | None:
     """Exact-match (case-insensitive) lookup across every non-component
     closed registry -- `BEHAVIOR_REGISTRY`, `REVEAL_REGISTRY`,
     `ACTION_REGISTRY`, `MODIFIER_REGISTRY`, `DERIVATION_REGISTRY`,
-    `PREDICATE_REGISTRY` -- in that fixed order. Strips a leading
-    `action.`/`derive.`/`predicate.` prefix (case-insensitively) first,
-    since that's how these names are actually written in a site file.
-    Returns a formatted result string, or `None` if nothing matched in
-    any of them -- deliberately not a bare name like `resolve_exact`,
-    since the caller needs to know which registry (and therefore which
-    formatter) matched, and there's no CLI `--accept` use case for this
-    vocabulary the way there is for components (see this module's
-    docstring)."""
+    `PREDICATE_REGISTRY`, `PLATFORM_API_REGISTRY` -- in that fixed
+    order. Strips a leading `action.`/`derive.`/`predicate.`/
+    `platformapi.` prefix (case-insensitively) first, since that's how
+    these names are actually written in a site file (`PlatformAPI.
+    notify(...)` included). Returns a formatted result string, or
+    `None` if nothing matched in any of them -- deliberately not a
+    bare name like `resolve_exact`, since the caller needs to know
+    which registry (and therefore which formatter) matched, and
+    there's no CLI `--accept` use case for this vocabulary the way
+    there is for components (see this module's docstring)."""
     lowered = query.lower()
 
     for label, registry, prefix in _JS_VOCAB_SOURCES:
@@ -304,11 +360,12 @@ def search_component(query: str, *, limit: int = 5, near: str | None = None) -> 
 
     Checks, in order: the built-in `SCHEMA`; a project's own
     `COMPONENT_REGISTRY` (registered `@component(...)` functions);
-    then every other closed JS-vocabulary registry --
+    then every other closed vocabulary registry --
     `BEHAVIOR_REGISTRY`/`REVEAL_REGISTRY` (`on_click=`/`on_reveal=`
     behavior names), `ACTION_REGISTRY` (`Action.*`), `MODIFIER_REGISTRY`
-    (event-modifier tokens), `DERIVATION_REGISTRY` (`Derive.*`), and
-    `PREDICATE_REGISTRY` (`Predicate.*`). Exact match (case-insensitive)
+    (event-modifier tokens), `DERIVATION_REGISTRY` (`Derive.*`),
+    `PREDICATE_REGISTRY` (`Predicate.*`), and `PLATFORM_API_REGISTRY`
+    (`PlatformAPI.*`). Exact match (case-insensitive)
     in any of them wins outright, built-ins taking priority on a
     component-name collision. Otherwise, returns a "not found" message
     with up to `limit` ranked suggestions drawn from the component

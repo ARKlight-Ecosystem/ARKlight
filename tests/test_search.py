@@ -200,3 +200,31 @@ def test_search_component_vocabulary_still_wins_over_js_vocab_on_exact_match():
 def test_search_unknown_query_does_not_match_js_vocab_by_accident():
     result = search_component("incrementt")
     assert "No component named 'incrementt' found" in result
+
+
+def test_search_finds_platform_api_by_bare_name():
+    result = search_component("notify")
+    assert result.startswith("PlatformAPI.notify")
+    assert "title, body" in result
+    assert "notifications" in result
+    assert "No component named" not in result
+
+
+def test_search_finds_platform_api_by_dotted_name_case_insensitively():
+    result = search_component("PLATFORMAPI.Clipboard_Write")
+    assert result.startswith("PlatformAPI.clipboard_write")
+    assert "text" in result
+
+
+def test_search_platform_api_reports_implementing_backend():
+    result = search_component("notify")
+    assert "implemented by : web" in result
+
+
+def test_search_every_platform_api_registry_entry_is_reachable():
+    from arklight.ir.platform_api import PLATFORM_API_REGISTRY
+
+    for name in PLATFORM_API_REGISTRY:
+        result = search_component(name)
+        assert result.startswith(f"PlatformAPI.{name}")
+        assert "No component named" not in result
