@@ -595,6 +595,18 @@ def _cmd_android_scaffold(args: argparse.Namespace) -> int:
         f"{result.app_name!r} ({result.package_id}) -> {result.project_dir}/ "
         f"({len(result.written_paths)} file(s))"
     )
+    print(f"  name:        {result.app_name!r} ({result.app_name_source})")
+    print(f"  package id:  {result.package_id} ({result.package_id_source})")
+    if result.system_bar_color is not None:
+        print(f"  system bars: {result.system_bar_color} ({result.system_bar_source})")
+    else:
+        print(f"  system bars: {result.system_bar_source}")
+    if result.system_bar_note:
+        print(f"               note: {result.system_bar_note}")
+    if not result.package_id_configured:
+        print("  Set android.app_name / android.package_id in arklight.config.py to choose")
+        print("  your own. The com.arklight.* id is fine for testing on your own device; use")
+        print("  a package id you control before publishing anywhere.")
     print()
     print("Includes a GitHub Actions workflow (.github/workflows/android-build.yml)")
     print("that builds a debug APK and smoke-tests it (install + launch on an")
