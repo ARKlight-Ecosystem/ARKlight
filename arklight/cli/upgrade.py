@@ -16,6 +16,14 @@ Scope, deliberately narrow:
     equivalent of re-running `pip install -e .` after the branch
     change, so console-script entry points and `__version__` land in
     sync with the new branch).
+  - Works with or without a virtualenv. On a system Python with no
+    venv, modern pip (23.0+) refuses to install into an
+    "externally managed" environment (PEP 668, e.g. Debian/Ubuntu's
+    system Python); the reinstall step then retries once with
+    `--break-system-packages`. A venv, or a Python that isn't
+    externally managed, never needs the retry, so the flag is only
+    added after pip itself has asked for it -- never up front, which
+    would also break on a pip old enough not to know the option.
 """
 
 from __future__ import annotations
@@ -28,6 +36,11 @@ from arklight.cli.whats_new import read_version, show_release_notes_if_new
 
 _ALPHA_BRANCH = "alpha"
 _REMOTE = "origin"
+
+# pip's own marker for a PEP 668 refusal ("error: externally-managed-
+# environment"), printed to stderr and carried into UpgradeError's text
+# by `_run`.
+_EXTERNALLY_MANAGED = "externally-managed-environment"
 
 
 class UpgradeError(Exception):
@@ -57,6 +70,28 @@ def _run(args: list[str], *, cwd: Path) -> str:
             f"`{' '.join(args)}` failed" + (f":\n  {detail}" if detail else "")
         ) from exc
     return result.stdout.strip()
+
+
+def _pip_install_editable(repo_root: Path) -> None:
+    """`pip install -e <repo_root>` into the running interpreter's
+    environment.
+
+    On a system Python with no virtualenv, pip 23.0+ refuses with
+    `externally-managed-environment` (PEP 668) and this whole flow
+    would otherwise dead-end. Only in that case, retry once with
+    `--break-system-packages` (and say so). Any other failure -- or a
+    second failure -- propagates unchanged."""
+    command = [sys.executable, "-m", "pip", "install", "-e", str(repo_root), "--quiet"]
+    try:
+        _run(command, cwd=repo_root)
+    except UpgradeError as exc:
+        if _EXTERNALLY_MANAGED not in str(exc):
+            raise
+        print(
+            "[ARKlight] this Python is externally managed and no virtualenv is active; "
+            "retrying with --break-system-packages..."
+        )
+        _run([*command, "--break-system-packages"], cwd=repo_root)
 
 
 def _find_repo_root(start: Path) -> Path | None:
@@ -90,6 +125,7 @@ def upgrade_to_alpha() -> int:
             "editable/source install, e.g.:\n"
             "  git clone https://github.com/Rae-ARK/ARKlight.git\n"
             "  cd ARKlight && pip install -e .\n"
+            "(on a system Python with no virtualenv, add --break-system-packages)\n"
             "then `arklight --upgrade-alpha` from within that checkout.",
             file=sys.stderr,
         )
@@ -120,7 +156,7 @@ def upgrade_to_alpha() -> int:
         _run(["git", "pull", _REMOTE, _ALPHA_BRANCH], cwd=repo_root)
 
         print("[ARKlight] reinstalling (pip install -e .) so the CLI reflects the new branch...")
-        _run([sys.executable, "-m", "pip", "install", "-e", str(repo_root), "--quiet"], cwd=repo_root)
+        _pip_install_editable(repo_root)
 
     except UpgradeError as exc:
         print(f"arklight --upgrade-alpha: {exc}", file=sys.stderr)
