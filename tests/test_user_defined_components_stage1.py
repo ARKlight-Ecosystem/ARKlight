@@ -73,10 +73,13 @@ def test_component_symbol_fact_with_no_required_props():
 
 def test_build_knowledge_base_without_components_is_unchanged():
     # No `components=` argument at all -- every existing caller (there
-    # were several before Stage 1) still gets exactly the built-in
-    # `SCHEMA` facts, nothing more.
+    # were several before Stage 1) still gets every built-in `SCHEMA`
+    # fact, nothing missing. (Since the search-knowledge-state-and-
+    # keywords capability fix, `facts` is a strict superset of
+    # `SCHEMA` -- it also always carries `STATE_KEYWORDS` and the
+    # closed registries -- so this checks containment, not equality.)
     facts = build_knowledge_base()
-    assert set(facts) == set(SCHEMA)
+    assert set(SCHEMA) <= set(facts)
 
 
 def test_build_knowledge_base_merges_in_registered_components():
