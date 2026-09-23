@@ -190,7 +190,7 @@ needing sign-off before they ship as written:
 | v0.064 | Math derivations catalog | SHIPPED (as `0.06509`) |
 | v0.065 | String derivations catalog | SHIPPED (as `0.06513`) |
 | v0.066 | Predicates catalog | SHIPPED (as `0.06517`) |
-| v0.067 | List-scalar derivations catalog | PLANNED |
+| v0.067 | List-scalar derivations catalog | SHIPPED (as `0.06612`) |
 | v0.068 | Cross-language numeric batteries | PLANNED |
 | v0.069 | Cross-language formatting/case batteries | PLANNED |
 | v0.070 | Capstone: `pluralize` + `random_int` | PLANNED |
