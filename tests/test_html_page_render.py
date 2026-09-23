@@ -55,6 +55,37 @@ def test_render_bind_escapes_value():
     assert "&lt;b&gt;x&lt;/b&gt;" in result
 
 
+def test_render_bind_formats_integral_float_without_trailing_zero():
+    # Regression (ARKlight-ISSUE-REGISTER.md #4): a computed value that
+    # happens to be a Python float with an integral value (e.g. `0.0`)
+    # used to render server-side as "0.0" via plain `str()`, while the
+    # client runtime's `String()` coercion (JS has only one number
+    # type) spells the identical value "0" -- a brief, visible
+    # server/runtime mismatch on load. Both must now agree.
+    node = IRNode(type="Bind", props={"name": "total"})
+    result = _render_bind(node, page_state={"total": 0.0})
+    assert result == '<span data-ark-bind="total">0</span>'
+
+
+def test_render_bind_formats_non_integral_float_normally():
+    node = IRNode(type="Bind", props={"name": "avg"})
+    result = _render_bind(node, page_state={"avg": 2.5})
+    assert result == '<span data-ark-bind="avg">2.5</span>'
+
+
+def test_render_bind_still_spells_non_finite_floats_the_js_way():
+    node = IRNode(type="Bind", props={"name": "x"})
+    assert _render_bind(node, page_state={"x": float("nan")}) == (
+        '<span data-ark-bind="x">NaN</span>'
+    )
+    assert _render_bind(node, page_state={"x": float("inf")}) == (
+        '<span data-ark-bind="x">Infinity</span>'
+    )
+    assert _render_bind(node, page_state={"x": float("-inf")}) == (
+        '<span data-ark-bind="x">-Infinity</span>'
+    )
+
+
 # ---------------------------------------------------------------------------
 # _render_node / _render_children
 # ---------------------------------------------------------------------------

@@ -374,11 +374,24 @@ def search_component(query: str, *, limit: int = 5, near: str | None = None) -> 
     symbols structurally close to `near` (personalized PageRank seed);
     default behavior (`near=None`) is unchanged from before Stage 7.
 
+    `near`, when given, is validated unconditionally -- before the
+    exact-match check below -- so an unknown `--near` always raises
+    `SearchEngineError`, whether or not `query` itself turns out to be
+    a hit. An exact match returns immediately without ever reaching
+    `_suggest()`/`SearchEngine.search()` (there's nothing to rank), so
+    without this upfront check `--near` would silently do nothing on
+    a hit instead of the documented "NAME must be a component the
+    usage graph has actually seen used" error -- validating first
+    closes that gap.
+
     The suggestion fallback below is still component-only -- the
     ranking pipeline's knowledge base doesn't include the JS-vocabulary
     registries (see this module's docstring), so a typo of e.g.
     `increment` doesn't yet get a "did you mean" of its own.
     """
+    if near is not None:
+        default_engine().validate_near(near)
+
     canonical = resolve_exact(query)
     if canonical is not None:
         if canonical in SCHEMA:

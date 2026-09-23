@@ -3,6 +3,7 @@ import pytest
 from arklight.cli.search import resolve_exact, search_component
 from arklight.ir.components import COMPONENT_REGISTRY, Prop, register_component
 from arklight.ir.schema import SCHEMA
+from arklight.search.engine import SearchEngineError
 
 
 @pytest.fixture(autouse=True)
@@ -58,6 +59,24 @@ def test_search_unknown_name_returns_suggestions():
 def test_search_completely_unrelated_query_has_no_suggestions():
     result = search_component("qzxjklw_totally_unrelated")
     assert "nothing close enough to suggest" in result
+
+
+def test_search_unknown_near_raises_even_on_exact_match():
+    # Regression: an exact match used to return immediately without
+    # ever validating `near`, so `--near BogusName` silently did
+    # nothing instead of the documented error whenever the query
+    # itself happened to be a hit. `near` must now be validated
+    # unconditionally, before the exact-match short circuit.
+    with pytest.raises(SearchEngineError):
+        search_component("Image", near="TotallyUnknownSymbol")
+
+
+def test_search_unknown_near_raises_on_a_miss_too():
+    # Same error, same message, on the miss path -- unchanged from
+    # before this fix, kept here so both branches are covered
+    # side-by-side.
+    with pytest.raises(SearchEngineError):
+        search_component("Butto", near="TotallyUnknownSymbol")
 
 
 def test_search_finds_exact_match_for_registered_user_component():

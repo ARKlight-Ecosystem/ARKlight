@@ -144,7 +144,13 @@ def test_html_render_prefills_bind_text_with_subtract_initial_value():
         Text(Bind("net")),
     )
     html = HTMLBackend().render(_ir({"/": tree}))["index.html"]
-    assert 'data-ark-bind="net">85.0<' in html
+    # Bugfix (ARKlight-ISSUE-REGISTER.md #4): 100.0 - 15.0 is the
+    # Python float 85.0, but the client runtime's `String()` coercion
+    # spells that same value "85" (JS has only one number type, no
+    # trailing ".0" for an integral value) -- the server-rendered
+    # initial value must match what the runtime recomputes, not
+    # Python's own `str()` spelling.
+    assert 'data-ark-bind="net">85<' in html
 
 
 # ---------------------------------------------------------------------------
