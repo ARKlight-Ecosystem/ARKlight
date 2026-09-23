@@ -230,7 +230,12 @@ def test_html_render_prefills_bind_text_with_computed_initial_value():
         Text(Bind("total")),
     )
     html = HTMLBackend().render(_ir({"/": tree}))["index.html"]
-    assert 'data-ark-bind="total">30.0<' in html
+    # Bugfix (ARKlight-ISSUE-REGISTER.md #4): 10.0 * 3 is the Python
+    # float 30.0, but the client runtime's `String()` coercion spells
+    # that same value "30" -- the server-rendered initial value must
+    # match what the runtime recomputes, not Python's own `str()`
+    # spelling.
+    assert 'data-ark-bind="total">30<' in html
 
 
 def test_html_render_emits_data_ark_computed_attribute():

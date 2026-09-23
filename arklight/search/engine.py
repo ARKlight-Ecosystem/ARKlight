@@ -191,6 +191,25 @@ class SearchEngine:
         results = rank(query, candidates, self.knowledge, importance, self.stats, now=now)
         return tuple(results[:limit])
 
+    def validate_near(self, near: str) -> None:
+        """Validate that `near` names a symbol the usage graph has
+        actually seen, without computing/returning a full ranked
+        result set. Raises `SearchEngineError` on an unknown name,
+        exactly like `.search(..., near=near)` itself would.
+
+        Exists for callers that need `--near` validated up front, in
+        particular `arklight.cli.search.search_component()`'s exact-
+        match path: an exact hit returns immediately without ever
+        calling `.search()` (there are no suggestions to rank), which
+        previously meant an unknown `--near` passed through completely
+        unchecked whenever the query itself happened to be a hit --
+        `--near` silently doing nothing instead of the documented
+        \"NAME must be a component the usage graph has actually seen
+        used\" error. Calling this first makes that validation
+        unconditional, independent of whether `query` turns out to be
+        an exact match."""
+        self._importance(near)
+
     def accept(self, name: str) -> None:
         """Record that `name` was accepted for some prior query, and
         invalidate the result cache -- future `.search()` calls should

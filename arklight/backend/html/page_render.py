@@ -54,6 +54,7 @@ from arklight.backend.js.render import SCRIPT_PATH
 from arklight.ir.build import IRNode, IRPage
 from arklight.ir.js_predicate import PREDICATE_EVALUATORS
 from arklight.ir.js_string import from_units
+from arklight.ir.js_string import js_number_to_string as _js_number_to_string
 
 
 _LONE_SURROGATE = re.compile("[\ud800-\udfff]")
@@ -73,8 +74,22 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
     # (`Derive.sqrt` of a negative, `Derive.log` of zero). Python's
     # `str()` spells those `nan`/`inf`; the client runtime's `String()`
     # spells them `NaN`/`Infinity`, so pre-fill the JavaScript spelling.
-    if isinstance(value, float) and not math.isfinite(value):
-        value = "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+    #
+    # Bugfix: the same mismatch exists for ordinary *finite* floats --
+    # an integral result like `0.0` printed fine with Python's `str()`
+    # as `"0.0"`, but the client runtime's `String()` coercion (JS has
+    # only one number type) spells the identical value `"0"`, so the
+    # page briefly showed `0.0` on load before the reactive core's own
+    # next render corrected it to `0`. Route every float (finite or
+    # not) through the same JS-`String()`-accurate formatter the string
+    # derivation catalog already uses for this exact purpose (see
+    # `js_to_string` in `arklight/ir/js_string.py`), so the server-
+    # rendered initial value and the client-recomputed one always agree.
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            value = "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+        else:
+            value = _js_number_to_string(value)
     # `v0.065`: the string catalog's boolean kinds (`is_empty`,
     # `starts_with`, ...) make a `Computed(...)` value a `bool`, which
     # Python spells `True`/`False` and the client's `String()` spells
