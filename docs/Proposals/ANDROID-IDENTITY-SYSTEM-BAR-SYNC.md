@@ -2,17 +2,22 @@
 
 ## Status
 
-**Proposal. First slice (§2) implemented in the accompanying patch;
-everything from §3 on is not built.** Unversioned: the patch carries no
-version bump and no `PROGRESS.md` row, so the maintainer picks the slot,
-the same way the `0.06504` draft row was left for confirmation.
+**Proposal. Not accepted, no version slot.** §2 was written together with
+an implementation patch for its first slice, but **that patch is not in
+this tree**: `arklight/cli/android.py` still defaults `app_name` to
+`"ARKlight App"` and `package_id` to `"com.arklight.app"`, and has no
+`android.status_bar_color` key. Everything from §3 on is not built either.
+The patch carried no version bump and no `PROGRESS.md` row, so the
+maintainer picks the slot if and when it is applied, the same way the
+`0.06504` draft row was left for confirmation.
 
 Written after reading `arklight/backend/android/runtime.py`,
 `arklight/cli/android.py`, `docs/Proposals/ANDROID-BACKEND-HARDENING-PROPOSAL.md`
 and `docs/Foundational/DESIGN-NOTES.md`'s "App identity metadata" section,
 then building `examples/hello_site` and scaffolding it.
 
-**What was and wasn't verified.** The patch is covered by 136 new tests
+**What was and wasn't verified** (as reported when the patch was written;
+it is not in this tree, so none of this has been re-run here). The patch is covered by 136 new tests
 (the full suite passes: 2,738). The generated project *text* is checked --
 Kotlin package lines, Gradle `applicationId`, `themes.xml`/`colors.xml`
 content, and that every generated resource file is well-formed XML. The
@@ -28,7 +33,7 @@ Bucket A (Kotlin/Gradle/manifest/WebView configuration, no JS-to-native
 bridge) and Bucket B (anything where the page and native code talk at
 runtime). It filed per-page status-bar sync under Bucket B.
 
-- **§2 (implemented) is Bucket A.** Every value is decided at scaffold time
+- **§2 (patch written, not applied) is Bucket A.** Every value is decided at scaffold time
   from files `arklight build` already wrote, and lands in ordinary manifest,
   string, colour and theme resources. No new Kotlin.
 - **§3.1 (runtime, per-page sync) is the borderline case.** It needs no
@@ -58,7 +63,7 @@ For a site built with `Site("Recipe Box")`:
   light status-bar icons drawn over white. Read off the templates, not
   observed on a device.
 
-## 2. Implemented in the patch
+## 2. First slice, as written in the patch
 
 All of it lives in the scaffold step and reads the *build directory*, so it
 works for a site built by any means and needs no compiler changes.
