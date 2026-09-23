@@ -5,8 +5,8 @@ _Current as of **v0.063** (latest shipped milestone) — see
 capability's status might have moved since this was last updated._
 
 **Not to be confused with `arklight.config.py`** -- the optional
-project-level settings file (`live-streaming` host/port today, more
-sections planned), documented in
+project-level settings file (six sections today: `live_streaming`,
+`android`, `desktop`, `experimental`, `csp`, `rei`), documented in
 [`AUTHORING-GUIDE.md`](AUTHORING-GUIDE.md#configuration-arklightconfigpy) and
 implemented in `arklight/config.py`. This doc is about a different
 kind of configurability: which fixed values inside the compiler

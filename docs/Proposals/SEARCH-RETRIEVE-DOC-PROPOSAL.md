@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted -- staged in [`docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md`](../Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md), targeting `v0.064`.**
+**Accepted -- shipped as `v0.064`; see `docs/version history/v0.064.md`.**
 Follows the format and conventions of
 [`docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md).
 The content below is left as filed -- it's the design record this
