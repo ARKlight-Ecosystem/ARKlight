@@ -990,6 +990,9 @@ class Derive:
         Computed("price_text", deps=("price",), derive=Derive.to_fixed("price", 2))
         Computed("slug", deps=("title",), derive=Derive.replace_all("title", " ", "-"))
         Computed("is_blank", deps=("query",), derive=Derive.is_empty("query"))
+        Computed("todo_count", deps=("todos",), derive=Derive.list_length("todos"))
+        Computed("best", deps=("scores",), derive=Derive.list_max("scores"))
+        Computed("all_done", deps=("marks",), derive=Derive.list_all("marks", "eq", True))
     """
 
     @staticmethod
@@ -1359,6 +1362,85 @@ class Derive:
         for text input (show an empty-state message while a box is
         blank)."""
         return DerivationRef(kind="is_empty", names=(name,))
+
+    # ------------------------------------------------------------------
+    # `v0.067` (docs/version history/v0.067.md): the list-scalar
+    # derivations catalog -- JS vocabulary addendum stage 7/10. Each one
+    # reduces a list-valued `State(...)`/`Computed(...)` (such as one
+    # `Action.append(...)` grows) to a single scalar. A value that isn't
+    # a list reads as an empty list. Numeric kinds read each element as
+    # `Number(x) || 0`, and only numbers, strings and booleans are read
+    # (`null`, a nested list or an object count as `0`). Every literal
+    # argument is checked at build time, and `list_any`/`list_all` take
+    # one of the six `compare` operators, never a callback.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def list_length(name: str) -> DerivationRef:
+        """`v0.067`: how many items the list has (`0` for a value that
+        isn't a list). `Derive.count` is the sibling that also measures
+        a string or an object."""
+        return DerivationRef(kind="list_length", names=(name,))
+
+    @staticmethod
+    def list_min(name: str) -> DerivationRef:
+        """`v0.067`: the smallest item, read as a number. An empty list
+        gives `Infinity`, exactly like `Math.min()`."""
+        return DerivationRef(kind="list_min", names=(name,))
+
+    @staticmethod
+    def list_max(name: str) -> DerivationRef:
+        """`v0.067`: the largest item, read as a number. An empty list
+        gives `-Infinity`, exactly like `Math.max()`."""
+        return DerivationRef(kind="list_max", names=(name,))
+
+    @staticmethod
+    def list_average(name: str) -> DerivationRef:
+        """`v0.067`: the arithmetic mean of the items, read as numbers.
+        An empty list is `0 / 0`, so `NaN`. (`Derive.average` is the
+        sibling over several *named* states.)"""
+        return DerivationRef(kind="list_average", names=(name,))
+
+    @staticmethod
+    def list_first(name: str) -> DerivationRef:
+        """`v0.067`: the first item, as it is -- `None` (`null`) for an
+        empty list."""
+        return DerivationRef(kind="list_first", names=(name,))
+
+    @staticmethod
+    def list_last(name: str) -> DerivationRef:
+        """`v0.067`: the last item, as it is -- `None` (`null`) for an
+        empty list."""
+        return DerivationRef(kind="list_last", names=(name,))
+
+    @staticmethod
+    def list_includes(name: str, value: Any) -> DerivationRef:
+        """`v0.067`: `True` when the list holds `value` -- a literal str,
+        bool, `None` or finite number. Strict (`===`), so `1` matches
+        neither `"1"` nor `True`. Yields a boolean, so it can feed
+        `Show(Predicate.truthy(...))`."""
+        return DerivationRef(kind="list_includes", names=(name,), args={"value": value})
+
+    @staticmethod
+    def list_any(name: str, op: str, value: Any) -> DerivationRef:
+        """`v0.067`: `True` when at least one item satisfies the
+        comparison `item <op> value` (`Array.prototype.some`); `False`
+        for an empty list. `op` is one of `arklight.ir.schema.
+        COMPARE_OPS` (`"eq"`/`"ne"`/`"gt"`/`"lt"`/`"gte"`/`"lte"`).
+        `"eq"`/`"ne"` compare the item itself strictly against any
+        literal; the four relational ops compare the item read as a
+        number against a numeric `value`, e.g.
+        `Derive.list_any("scores", "gt", 90)`."""
+        return DerivationRef(kind="list_any", names=(name,), args={"op": op, "value": value})
+
+    @staticmethod
+    def list_all(name: str, op: str, value: Any) -> DerivationRef:
+        """`v0.067`: `True` when every item satisfies `item <op> value`
+        (`Array.prototype.every`) -- see `list_any` for `op`/`value`.
+        An empty list is vacuously `True`, so pair it with
+        `Derive.list_length` if "no items yet" must not count as "all
+        done"."""
+        return DerivationRef(kind="list_all", names=(name,), args={"op": op, "value": value})
 
 
 # ---------------------------------------------------------------------------

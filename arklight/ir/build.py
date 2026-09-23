@@ -27,7 +27,7 @@ import re
 
 from arklight import experimental
 from arklight.ast.nodes import ActionRef, ARKNode, DerivationRef
-from arklight.ir import js_numeric, js_string
+from arklight.ir import js_list, js_numeric, js_string
 from arklight.ir.components import COMPONENT_ORIGIN_PROP_KEY, ComponentOrigin
 from arklight.provider import ProviderDeclaration
 
@@ -505,6 +505,25 @@ _STRING_WITH_ARGS: dict[str, Callable[[str, dict[str, Any]], Any]] = {
     "ends_with": lambda s, a: js_string.js_ends_with(s, a["substring"]),
 }
 
+# `v0.067`: the list-scalar derivations catalog. Each kind reads its one
+# input -- the raw state value, since what counts as a list is decided by
+# `arklight/ir/js_list.py` exactly as the client's `Array.isArray` does --
+# and reduces it to a scalar. The first table holds the kinds with no
+# literal argument, the second the ones that take theirs from `args`.
+_LIST_UNARY: dict[str, Callable[[Any], Any]] = {
+    "list_length": js_list.js_list_length,
+    "list_min": js_list.js_list_min,
+    "list_max": js_list.js_list_max,
+    "list_average": js_list.js_list_average,
+    "list_first": js_list.js_list_first,
+    "list_last": js_list.js_list_last,
+}
+_LIST_WITH_ARGS: dict[str, Callable[[Any, dict[str, Any]], Any]] = {
+    "list_includes": lambda v, a: js_list.js_list_includes(v, a["value"]),
+    "list_any": lambda v, a: js_list.js_list_any(v, a["op"], a["value"]),
+    "list_all": lambda v, a: js_list.js_list_all(v, a["op"], a["value"]),
+}
+
 
 def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> Any:
     """
@@ -615,6 +634,12 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
         return _STRING_UNARY[kind](js_string.js_to_string(get(names[0])))
     if kind in _STRING_WITH_ARGS:
         return _STRING_WITH_ARGS[kind](js_string.js_to_string(get(names[0])), args)
+    # `v0.067` (docs/version history/v0.067.md): the list-scalar
+    # derivations catalog -- see `_LIST_UNARY`/`_LIST_WITH_ARGS` above.
+    if kind in _LIST_UNARY:
+        return _LIST_UNARY[kind](get(names[0]))
+    if kind in _LIST_WITH_ARGS:
+        return _LIST_WITH_ARGS[kind](get(names[0]), args)
     return None  # unreachable once Validation has run
 
 

@@ -41,6 +41,15 @@ from arklight.backend.js.derivations import (
     is_empty,
     join,
     lcm,
+    list_all,
+    list_any,
+    list_average,
+    list_first,
+    list_includes,
+    list_last,
+    list_length,
+    list_max,
+    list_min,
     log,
     log10,
     log2,
@@ -132,6 +141,18 @@ DERIVATION_MODULES = {
     starts_with.NAME: starts_with,
     ends_with.NAME: ends_with,
     is_empty.NAME: is_empty,
+    # `v0.067` (docs/version history/v0.067.md): JS vocabulary addendum
+    # stage 7/10 -- the list-scalar derivations catalog (a list-valued
+    # `State(...)` reduced to one scalar).
+    list_length.NAME: list_length,
+    list_min.NAME: list_min,
+    list_max.NAME: list_max,
+    list_average.NAME: list_average,
+    list_first.NAME: list_first,
+    list_last.NAME: list_last,
+    list_includes.NAME: list_includes,
+    list_any.NAME: list_any,
+    list_all.NAME: list_all,
 }
 
 DERIVATION_FRAGMENTS: dict[str, str] = {
