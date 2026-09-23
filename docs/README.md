@@ -114,17 +114,6 @@ README for the full rationale.
 | [`PROJECT-KNOWLEDGE-ADDENDUM.md`](Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md) | Staged, eight-rung (`v0.071`-`v0.078`) implementation ladder for the accepted `docs/Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md` -- `.arklight/` foundation through future-provider open slot, one version per stage. |
 | [`REI-LANGUAGE-ADDENDUM.md`](Implementation/REI-LANGUAGE-ADDENDUM.md) | Staged, four-rung (`v0.081`-`v0.084`) implementation ladder for the accepted `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` -- maturity gate/package skeleton/RNI first, exceptions and Platform-APIs-as-interface last; the Compute stage stays unscheduled, blocked on an open evaluator-design question. |
 
-### [`docs/new js backend proposal/`](<new js backend proposal/README.md>) — working reference
-
-Proposal for a redesigned JS backend; the virtual-DOM direction was
-chosen over a competing no-vdom alternative. **Working reference
-only** — kept until `arklight search --retrieve-doc --js-backend`'s
-dependency on this folder is resolved, then removed.
-
-| File | Covers |
-| --- | --- |
-| [`ARCHITECTURE-VDOM.md`](<new js backend proposal/ARCHITECTURE-VDOM.md>) | Proposal using a virtual DOM approach -- the chosen direction. |
-
 ### [`docs/Far Future Concern/`](<Far Future Concern/README.md>) — working reference
 
 Speculative/backlog material for backends that aren't a near-term

@@ -94,12 +94,6 @@ DOC_FOLDERS: tuple[DocFolder, ...] = (
         "staged implementation ladders for accepted proposals",
     ),
     DocFolder(
-        "--js-backend",
-        "js_backend",
-        "new js backend proposal",
-        "competing new-JS-backend architecture proposals",
-    ),
-    DocFolder(
         "--far-future",
         "far_future",
         "Far Future Concern",

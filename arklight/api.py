@@ -1491,7 +1491,7 @@ def Watch(name: str, *, then: "ActionRef") -> ARKNode:
 # `Watch(...)`, which are page-scoped declarations extracted out of the
 # tree entirely) -- `Repeat(...)`/`Show(...)` appear exactly where their
 # rendered output should go, the same as `Container(...)`/`List(...)`.
-# See `docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.2-6.3 for
+# See `ARCHITECTURE-VDOM.md` [retired -- see CHANGELOG.md] SS6.2-6.3 for
 # the design this follows, and `arklight/backend/js/runtime/repeat.py`/
 # `show.py` for the client-side half.
 # ---------------------------------------------------------------------------
@@ -1693,7 +1693,7 @@ def Show(predicate: PredicateRef, *children: Any) -> ARKNode:
     semantic, not a style declaration -- see
     `arklight/backend/js/runtime/show.py`'s module docstring for why
     this is `Show`'s actual mechanism rather than the vnode-swap
-    `docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.3 proposes.
+    `ARCHITECTURE-VDOM.md` SS6.3 proposes.
     """
     return ARKNode(type="Show", props={"predicate": predicate}, children=list(children))
 

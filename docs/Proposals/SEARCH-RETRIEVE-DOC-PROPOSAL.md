@@ -120,7 +120,7 @@ arklight search --retrieve-doc --proposals --file url-state-as-primitive
   | `--backends` | `docs/Backends/` |
   | `--proposals` | `docs/Proposals/` |
   | `--implementation` | `docs/Implementation/` |
-  | `--js-backend` | `docs/new js backend proposal/` |
+  | `--js-backend` | `docs/new js backend proposal/` (removed later, along with its folder) |
   | `--far-future` | `docs/Far Future Concern/` |
   | `--version-history` | `docs/version history/` |
 

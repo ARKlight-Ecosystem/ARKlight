@@ -37,15 +37,14 @@ proposals in their own folder means:
   it's a permanent design decision) or into `Backends/`/wherever the
   in-progress staging doc for that work lives -- the same "graduate
   out once decided" pattern `docs/README.md` already uses for
-  `docs/new js backend proposal/` and `docs/Far Future Concern/`.
-  `Proposals/` is one level earlier than either of those: those two
-  folders hold work that's already been picked up as a direction;
+  `docs/Far Future Concern/`.
+  `Proposals/` is one level earlier than that: `Far Future Concern/`
+  holds work that's already been picked up as a direction;
   this folder holds ideas that haven't been picked up as anything
   yet.
 
-In short: **`Foundational/` = what ARKlight is. `Backends/`/`new js
-backend proposal/` = work already underway or an active fork in the
-road. `Proposals/` = ideas waiting for either of those to happen to
+In short: **`Foundational/` = what ARKlight is. `Backends/` = work already
+underway. `Proposals/` = ideas waiting for either of those to happen to
 them, or for rejection.**
 
 ## What belongs here
