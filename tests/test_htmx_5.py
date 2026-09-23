@@ -88,6 +88,21 @@ def _stateful_ir():
     return _ir(pages)
 
 
+def _stateful_ir_with_trigger_modifier():
+    # htmx-6 bugfix: unlike `_stateful_ir()` above, this page's
+    # on_click carries a modifier (`once`) that actually compiles to
+    # an `hx-trigger` attribute (see `_modifiers_to_hx_trigger` in
+    # `arklight/backend/html/attrs.py`) -- the real condition under
+    # which a stateful page needs vendored HTMX.
+    pages = {
+        "/": Page(
+            State("count", 0),
+            Button("+1", on_click=Action.increment("count").with_modifiers("once")),
+        )
+    }
+    return _ir(pages)
+
+
 def _combined_ir():
     pages = {
         "/": Page(
@@ -192,8 +207,22 @@ def test_behavior_only_page_ships_no_htmx():
     assert "htmx:afterSettle" not in js
 
 
-def test_stateful_page_still_ships_htmx():
+def test_stateful_page_without_trigger_modifiers_ships_no_htmx():
+    # htmx-6 bugfix: a bare `on_click=Action.increment("count")` with
+    # no modifiers compiles to no `hx-trigger` attribute at all (see
+    # `_modifiers_to_hx_trigger`), so this page has nothing HTMX-shaped
+    # for the vendored bundle to do. `State(...)` alone must not be
+    # enough to ship it -- see `_build_runtime_js`'s `needs_htmx`.
     js = JSBackend().render(_stateful_ir())[SCRIPT_PATH]
+    assert HTMX_JS not in js
+    assert "createState" in js  # state itself still ships, just not HTMX
+
+
+def test_stateful_page_with_trigger_modifier_still_ships_htmx():
+    # The actual condition: an on_click modifier that compiles to a
+    # real hx-trigger token (once/debounce/throttle/stop) does need
+    # HTMX loaded.
+    js = JSBackend().render(_stateful_ir_with_trigger_modifier())[SCRIPT_PATH]
     assert HTMX_JS in js
 
 
@@ -208,7 +237,11 @@ def test_app_shell_alone_still_ships_htmx_with_no_behaviors_or_state():
 
 
 def test_allow_eval_disabled_whenever_htmx_ships():
-    js = JSBackend().render(_stateful_ir())[SCRIPT_PATH]
+    # htmx-6 bugfix: `_stateful_ir()` no longer ships HTMX at all (its
+    # on_click has no trigger-changing modifier -- see
+    # `test_stateful_page_without_trigger_modifiers_ships_no_htmx`
+    # above), so this needs a page that actually does.
+    js = JSBackend().render(_stateful_ir_with_trigger_modifier())[SCRIPT_PATH]
     assert "htmx.config.allowEval = false;" in js
     # Set right after HTMX loads, before ARKlight's own IIFE opens.
     htmx_index = js.index(HTMX_JS)
