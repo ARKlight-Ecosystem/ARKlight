@@ -2,7 +2,7 @@
 
 **Status:** PLANNED -- stages 1-8 (`v0.071`-`v0.078`) not yet started.
 This file turns the accepted
-[`PROJECT-KNOWLEDGE-PROPOSAL.md`](PROJECT-KNOWLEDGE-PROPOSAL.md) into a
+[`PROJECT-KNOWELEDGE-PROPOSAL.md`](../Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md) into a
 trackable, eight-rung landing order, the same role
 `JS-VOCABULARY-ADDENDUM-v0.070.md` plays for the JS vocabulary
 addendum and `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md` plays

@@ -604,9 +604,9 @@ packing algorithm, cipher construction, and known caveats.
 
 Optional, project-level settings that don't belong on the `Site(...)`
 call because they're about how you work with a project locally, not
-part of the compiled site itself -- currently just the
-`live-streaming` dev server's bind address, with more sections planned
-(see `docs/Foundational/DESIGN-NOTES.md`).
+part of the compiled site itself -- six sections today
+(`live_streaming`, `android`, `desktop`, `experimental`, `csp`, `rei`;
+see `arklight/config.py`).
 
 Create a file named `arklight.config.py` next to your site's entry
 file (same directory as `site.py`), containing a single top-level
@@ -637,15 +637,13 @@ CONFIG = {
   load time rather than silently falling back to defaults -- a typo'd
   setting should never look like it's taking effect when it isn't.
 - **Forward-compatible by section.** Each top-level key in `CONFIG`
-  (`"live_streaming"` today) is owned by whichever part of ARKlight
+  (`live_streaming`, `android`, `desktop`, `experimental`, `csp`, `rei`
+  today) is owned by whichever part of ARKlight
   reads it; a section this version of ARKlight doesn't know about yet
   is preserved as-is rather than rejected, so a config file written
   against a newer ARKlight still loads on an older one.
 
-See `arklight/config.py` for the loader itself, and
-`docs/Foundational/DESIGN-NOTES.md` for how this same mechanism is
-planned to grow (an `"android"` section for the Android backend's
-app-identity metadata -- icon, splash, package ID, orientation -- and
-a `"desktop"` section for the Desktop backend, each read the same way
-`"live_streaming"` is today).
+See `arklight/config.py` for the loader itself and each section's
+own reading code (`arklight.cli.android`, `arklight.cli.desktop`,
+`arklight.cli.main`) for how it's used.
 

@@ -206,8 +206,10 @@ never leaves either one.
 
 ## Why this section exists: do it in one pass, not several
 
-`git log` on this branch currently shows 56 of 204 commits (~27%) are
-docs-only follow-ups to something that had already landed -- commit
+As of 2026-09-17 (hand-counted, not recomputed since -- `git log` on
+this branch has since grown to 322 commits), 56 of 204 commits (~27%)
+were docs-only follow-ups to something that had already landed --
+commit
 messages like "Docs update", "New proposal added. index need to be
 updated.", "Docs update, fix stale cli references part 1 of 2" /
 "part 2 of 2", and "Docs update, finished the remaining clean up.

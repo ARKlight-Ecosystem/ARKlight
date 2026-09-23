@@ -4,7 +4,8 @@
 exhaustive scalar catalog, including §6.5) have been accepted and
 staged as a ten-rung implementation ladder --
 [`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md)
-(`v0.061`-`v0.070`), all currently PLANNED. Tier 3 and Tier 4 (§7/§8
+(`v0.061`-`v0.070`), of which stages 1-7 (`v0.061`-`v0.067`) have
+shipped and stages 8-10 remain PLANNED. Tier 3 and Tier 4 (§7/§8
 below) remain unsettled proposals -- nothing in this file's
 acceptance covers either. The rest of this document is kept in full,
 unedited, as the source catalog that ladder was staged from.

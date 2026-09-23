@@ -1,8 +1,8 @@
 # ARKlight Desktop Backend: Native Host Proposal
 
-**Status:** Proposed replacement for the Neutralino.js integration plan  
-**Target branch:** `alpha`  
-**Target milestone:** `v0.080`  
+**Status:** Accepted -- superseded the Neutralino.js integration plan; staged implementation tracked in `docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`, Stages 1-4 done, Stages 5-7 not started
+**Target branch:** `alpha`
+**Target milestone:** `v0.100`
 **Date:** 2026-08-31
 
 ## 1. Decision
