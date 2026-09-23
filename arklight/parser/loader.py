@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 
 from arklight.api import Site
+from arklight.ir.components import unregister_components_under
 from arklight.parser.discover import DiscoveredSite, discover
 from arklight.parser.indentation import BracketIndentationError
 from arklight.parser.preamble import (
@@ -167,6 +168,27 @@ def _project_imports(
     the load adds to sys.modules from inside the project is evicted
     again afterward, keeping each load_site() call isolated regardless
     of naming collisions between projects.
+
+    That eviction makes the *next* `load_site()` call (a dev-server
+    rebuild after the author edits a file, most commonly) re-import
+    the project's modules from scratch -- including a `components/`
+    module whose top-level `@component(...)` decorators run again.
+    `arklight.ir.components.COMPONENT_REGISTRY` isn't a project-scoped
+    cache the way `sys.modules` is, though: it's a plain module-level
+    dict that isn't touched by the eviction above, so the fresh
+    registration used to collide with the *previous* build's still-
+    registered entry and raise `DuplicateComponentError` -- as if the
+    author had two unrelated components fighting over one name, when
+    really it was the same component surviving its own rebuild.
+    `unregister_components_under`, called *before* `yield` (i.e.
+    before the project's own modules run and re-register anything),
+    clears out whatever an earlier load of this same site_dir left
+    behind, so this load's own registrations land in a clean registry
+    instead of needing `allow_redefine=True` as a workaround. It can't
+    run in the `finally` block alongside the `sys.modules` eviction
+    above: that would drop the registrations this very load just made,
+    out from under the site object it's about to hand back to a caller
+    (`compile_site_file`) that still needs to expand them.
     """
     added_to_path = site_dir not in sys.path
     if added_to_path:
@@ -174,6 +196,7 @@ def _project_imports(
     finder = _ProjectFinder(Path(site_dir), on_notice)
     sys.meta_path.insert(0, finder)
     modules_before = set(sys.modules)
+    unregister_components_under(site_dir)
     try:
         yield
     finally:

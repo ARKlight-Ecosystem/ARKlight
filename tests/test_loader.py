@@ -3,9 +3,23 @@ from pathlib import Path
 
 import pytest
 
+from arklight.ir.components import COMPONENT_REGISTRY
 from arklight.parser.loader import SiteLoadError, load_site
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def _clean_registry():
+    """See the identical fixture in test_user_defined_components_stage0.py:
+    real projects register components once at import time, but a test
+    that loads a project with its own `components/` module would
+    otherwise leak those registrations into every other test."""
+    saved = dict(COMPONENT_REGISTRY)
+    COMPONENT_REGISTRY.clear()
+    yield
+    COMPONENT_REGISTRY.clear()
+    COMPONENT_REGISTRY.update(saved)
 
 
 def write_site(tmp_path: Path, source: str) -> Path:
@@ -166,3 +180,47 @@ def home_page():
     page_b = site_b.routes["/"]()
     assert page_a.children[0].children[0] == "A"
     assert page_b.children[0].children[0] == "B"
+
+
+def test_load_site_rebuild_does_not_collide_on_imported_component(tmp_path):
+    """Regression test: a dev-server rebuild calls `load_site()` again
+    on the same project after the author edits a file. Before this
+    fix, a `components/` module's top-level `@component(...)` was rerun
+    on the fresh import `_project_imports` forces (it evicts the
+    project's modules from `sys.modules` so the rebuild sees the
+    edited source) and collided with the *previous* build's entry,
+    still sitting in the never-evicted, global `COMPONENT_REGISTRY` --
+    raising `DuplicateComponentError` on every rebuild of any project
+    whose components live in an imported module, with no actual name
+    collision anywhere."""
+    (tmp_path / "components").mkdir()
+    (tmp_path / "components" / "__init__.py").write_text("")
+    (tmp_path / "components" / "nav.py").write_text(
+        """
+from arklight import *
+
+@component()
+def NavBar():
+    return Container(Link("Home", href="/"))
+"""
+    )
+    site_source = """
+from arklight import *
+from components.nav import NavBar
+
+site = Site()
+
+@site.page("/")
+def home():
+    return Page(NavBar())
+"""
+    path = write_site(tmp_path, site_source)
+
+    site, _ = load_site(path)
+    assert "/" in site.routes
+
+    # Simulate the dev server rebuilding after a file change: nothing
+    # about NavBar changed, so this must succeed exactly like the
+    # first load did, not raise DuplicateComponentError.
+    site_again, _ = load_site(path)
+    assert "/" in site_again.routes

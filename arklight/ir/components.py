@@ -88,7 +88,9 @@ from __future__ import annotations
 
 import inspect
 import itertools
+import os
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any, Callable
 
 from arklight.ast.nodes import STATE_REF_KEY, ActionRef, ARKNode, ClassBindSpec, ModelBindSpec, is_state_ref
@@ -576,6 +578,52 @@ def register_backend_render(
     new_spec = replace(spec, backend_render_fns=new_backend_render_fns)
     COMPONENT_REGISTRY[component_name] = new_spec
     return new_spec
+
+
+def _component_source_file(render_fn: RenderFn) -> str | None:
+    """Best-effort absolute path to the file `render_fn` was defined
+    in, or `None` if it can't be determined (a builtin, a function
+    built dynamically with no real file, ...). Used only by
+    `unregister_components_under` below -- never anything that affects
+    a component's actual behavior."""
+    try:
+        return str(Path(inspect.getfile(render_fn)).resolve())
+    except (TypeError, OSError):
+        return None
+
+
+def unregister_components_under(directory: str) -> None:
+    """Remove every `COMPONENT_REGISTRY` entry whose render function
+    was defined in a file under `directory`.
+
+    Exists for the site loader (`arklight.parser.loader._project_imports`),
+    which evicts a project's own modules from `sys.modules` after each
+    `load_site()` call so a dev-server rebuild re-imports them fresh
+    instead of reusing a stale cached module -- see that function's
+    docstring. `COMPONENT_REGISTRY` is a plain module-level dict here,
+    not part of that eviction, so without this a rebuilt project's
+    `components/` module re-running its `@component(...)` decorators
+    used to collide with the *previous* build's still-registered
+    entries and raise `DuplicateComponentError`, even though nothing
+    about the component actually changed -- `allow_redefine=True`
+    could silence it, but that also silences a genuine same-name
+    collision between two unrelated components, which is exactly what
+    `DuplicateComponentError` exists to catch. Called with the site's
+    own directory right after the module eviction it mirrors, so only
+    that project's components are dropped: a component a project pulls
+    in from an installed package (ACC or otherwise) lives outside
+    `directory` and is left alone, same as those modules are left out
+    of the `sys.modules` eviction.
+    """
+    directory = str(Path(directory).resolve())
+    stale = [
+        name
+        for name, spec in COMPONENT_REGISTRY.items()
+        if (source := _component_source_file(spec.render_fn)) is not None
+        and (source == directory or source.startswith(directory + os.sep))
+    ]
+    for name in stale:
+        del COMPONENT_REGISTRY[name]
 
 
 def _resolve_props(spec: ComponentSpec, call_props: dict[str, Any]) -> dict[str, Any]:

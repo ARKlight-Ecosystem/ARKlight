@@ -119,13 +119,41 @@ RENDER_REPEAT_JS = """  function arkAdoptVnode(vnode, realElm) {
           // patching, so hydration never duplicates or discards
           // server-rendered content. Every later call (after a real
           // Action.append(...)/Action.remove(...)) patches for real.
+          //
+          // That "exactly these items" assumption can be false on the
+          // very first call, though: `list`/`vnodes` come from the
+          // store's *current* value for `name`, and `State(...,
+          // persist=True)` overrides that value from localStorage
+          // before this ever runs (see runtime/state.py's
+          // `initState()`) -- so a returning visitor's stored list can
+          // be a different length than what the server just rendered
+          // for a fresh, unpersisted `initial=`. Adopting past the
+          // shorter side only was leaving the mismatch as a silent
+          // baseline: extra items the persisted list added were
+          // recorded in `__arkVnode` as already on-screen (with no
+          // real `.elm` behind them) without ever actually being
+          // added to the DOM, and an item the persisted list dropped
+          // was left rendered with nothing telling `__arkVnode` it was
+          // still there -- either way, nothing visibly changed until
+          // some later Action.*(...) triggered a real `arkPatch`
+          // against that already-wrong baseline. Adopting only the
+          // overlap, then patching for real when the lengths disagree,
+          // makes the DOM match the store on this very first render
+          // instead of waiting on a mutation that may never come.
           var real = container.children;
-          for (var i = 0; i < vnodes.length && i < real.length; i++) {
+          var overlapLength = Math.min(vnodes.length, real.length);
+          for (var i = 0; i < overlapLength; i++) {
             arkAdoptVnode(vnodes[i], real[i]);
           }
-          container.__arkVnode = snabbdom.h(arkSelectorFor(container), {}, vnodes);
-          container.__arkVnode.elm = container;
+          var adopted = snabbdom.h(arkSelectorFor(container), {}, vnodes.slice(0, overlapLength));
+          adopted.elm = container;
+          container.__arkVnode = adopted;
           container.__arkRepeatInit = true;
+          if (vnodes.length !== real.length) {
+            var reconciled = snabbdom.h(arkSelectorFor(container), {}, vnodes);
+            arkPatch(container.__arkVnode, reconciled);
+            container.__arkVnode = reconciled;
+          }
           return;
         }
         var next = snabbdom.h(arkSelectorFor(container), {}, vnodes);
