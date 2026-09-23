@@ -1,10 +1,11 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
 
 from arklight.compiler.pipeline import build
-from arklight.pwa import MANIFEST_NAME, SERVICE_WORKER_NAME, PWAError, enable_pwa
+from arklight.pwa import MANIFEST_NAME, PWA_RUNTIME_NAME, SERVICE_WORKER_NAME, PWAError, enable_pwa
 
 SIMPLE_SITE = """
 from arklight import *
@@ -60,7 +61,7 @@ def test_enable_pwa_injects_every_page(tmp_path):
     for rel_path in result.updated_pages:
         html = (out_dir / rel_path).read_text()
         assert '<link rel="manifest" href="manifest.json">' in html
-        assert 'navigator.serviceWorker.register("sw.js")' in html
+        assert '<script src="ark-pwa.js" data-ark-sw-href="sw.js"></script>' in html
         assert '<meta name="theme-color" content="#000000">' in html
 
 
@@ -168,7 +169,85 @@ def post():
 
     nested_html = (out_dir / "blog" / "post.html").read_text()
     assert '<link rel="manifest" href="../manifest.json">' in nested_html
-    assert 'navigator.serviceWorker.register("../sw.js")' in nested_html
+    assert '<script src="../ark-pwa.js" data-ark-sw-href="../sw.js"></script>' in nested_html
 
     root_html = (out_dir / "index.html").read_text()
     assert '<link rel="manifest" href="manifest.json">' in root_html
+
+
+# ---------------------------------------------------------------------------
+# Regression: `arklight pwa` must never inject an inline <script>, since
+# `Site(strict_csp=True)` (the default -- arklight/backend/html/csp.py)
+# emits a `script-src 'self'` CSP with no `'unsafe-inline'` into every page.
+# An inline SW-registration/install-button script silently never runs under
+# that policy: the service worker never registers, the install button never
+# works, with no visible error outside the browser console. See pwa.py's
+# module docstring.
+# ---------------------------------------------------------------------------
+
+
+def test_enable_pwa_never_injects_an_inline_script(tmp_path):
+    out_dir = build_dir(tmp_path)
+
+    result = enable_pwa(out_dir, name="My Site", install_button=True)
+
+    for rel_path in result.updated_pages:
+        html = (out_dir / rel_path).read_text()
+        # Every <script ...> tag ARKlight's own PWA injection puts on the
+        # page must carry a src= attribute (an external load, allowed
+        # under `script-src 'self'`) -- never inline JS between the tags.
+        for script_tag in re.findall(r"<script\b[^>]*>.*?</script>", html, re.DOTALL):
+            if "ark-pwa" not in script_tag and "arklight.js" not in script_tag:
+                continue
+            assert re.search(r'\bsrc\s*=\s*"[^"]+"', script_tag), (
+                f"PWA injection left an inline <script> the default strict "
+                f"CSP would block: {script_tag!r}"
+            )
+
+
+def test_enable_pwa_sw_registration_runs_under_the_default_strict_csp(tmp_path):
+    """Every page the compiler builds carries `Site(strict_csp=True)`'s
+    `script-src 'self'` policy (no `'unsafe-inline'`) by default. The
+    PWA injection must be pure external-script loads so it actually
+    works under that policy instead of being silently blocked."""
+    out_dir = build_dir(tmp_path)
+
+    result = enable_pwa(out_dir, name="My Site")
+
+    for rel_path in result.updated_pages:
+        html = (out_dir / rel_path).read_text()
+        assert "script-src 'self'" in html or "script-src &#x27;self&#x27;" in html
+        assert "'unsafe-inline'" not in html
+        assert '<script src="ark-pwa.js" data-ark-sw-href="sw.js"></script>' in html
+
+
+def test_enable_pwa_install_button_wiring_is_external_not_inline(tmp_path):
+    out_dir = build_dir(tmp_path)
+
+    enable_pwa(out_dir, name="My Site", install_button=True)
+
+    html = (out_dir / "index.html").read_text()
+    assert '<button id="ark-pwa-install"' in html
+    # The old implementation put a <script>...</script> block with the
+    # click/beforeinstallprompt wiring directly after the button; that
+    # inline block must be gone.
+    assert "beforeinstallprompt" not in html
+    assert "deferredPrompt" not in html
+    runtime = (out_dir / PWA_RUNTIME_NAME).read_text()
+    assert "beforeinstallprompt" in runtime
+    assert "ark-pwa-install" in runtime
+
+
+def test_enable_pwa_writes_external_runtime_file(tmp_path):
+    out_dir = build_dir(tmp_path)
+
+    result = enable_pwa(out_dir, name="My Site")
+
+    runtime_path = out_dir / PWA_RUNTIME_NAME
+    assert runtime_path.exists()
+    runtime = runtime_path.read_text()
+    assert "navigator.serviceWorker.register" in runtime
+    assert "data-ark-sw-href" in runtime
+    assert PWA_RUNTIME_NAME in result.cached_paths
+    sw_contents = (out_dir / SERVICE_WORKER_NAME).read_text()
+    assert json.dumps(PWA_RUNTIME_NAME) in sw_contents
