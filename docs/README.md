@@ -279,3 +279,51 @@ up referenced without existing for several versions' worth of
 written. The fix in both cases is not a follow-up commit later --
 it's checking this numbered list before calling a documentation
 change finished.
+
+## Moving, renaming, or retiring a doc
+
+The checklist above covers *adding* a doc. Most drift in this tree
+came from the opposite direction -- a doc that moved, was renamed, or
+was deleted while other files kept pointing at its old name. Docstrings
+in `arklight/` and comments in `tests/` cite `docs/` paths too, so they
+drift the same way the Markdown does. Before calling any such change
+finished:
+
+1. **Search the whole repo for the old filename, in the same commit.**
+   `grep -rn "OLD-NAME" .` -- not just `docs/`. Code docstrings, test
+   comments, `PROGRESS.md`, and both README index tables all cite docs
+   by name.
+2. **Cite by the full path from the repo root** --
+   `docs/Foundational/ARCHITECTURE.md`, never a bare
+   `docs/ARCHITECTURE.md`. Folders are what move; a path that names
+   its folder fails loudly when it does. Never wrap a path across
+   two lines: it hides from `grep`.
+   Give a filename exactly once and spell-check it -- a stray `..md`
+   survived several passes as a filename nothing could resolve.
+3. **Retire a staging doc in this order:** first make sure its outcome
+   is captured in `CHANGELOG.md`, `PROGRESS.md`, or a Foundational doc;
+   then delete it; then, in the same pass, remove its rows from both
+   README indexes and reword every live citation. A citation that must
+   stay (a stage tag like `htmx-5` still needs a source) gets
+   `[retired -- see CHANGELOG.md]` after its first mention in that
+   file, rather than a path that no longer resolves.
+4. **Never rewrite history to fix a link.** `CHANGELOG.md` and
+   `PROGRESS.md`'s per-version log describe what was true at the time
+   and may cite docs that no longer exist. Only `PROGRESS.md`'s
+   Snapshot table is live and gets updated.
+5. **Name the repo when citing another one.** `docs/design/...` in ACC
+   or `docs/ADDENDUM.md` in C_ARKlight look exactly like dangling
+   local paths to the next reader. Say which repo, e.g. "ACC's
+   `docs/design/IMPLEMENTATION-LADDER.md`", so nobody "fixes" them.
+6. **A status change is a multi-file change.** "Proposed" to
+   "Accepted", "PLANNED" to "DONE", "unreleased" to shipped: the same
+   word lives in the doc itself, its row in `docs/Proposals/README.md`
+   or `docs/Implementation/README.md`, this file's Folder Guide,
+   `docs/Foundational/ARCHITECTURE.md`'s Milestones table, and
+   `PROGRESS.md`'s Snapshot. Grep for the old status word
+   (`planned`, `unreleased`, `not accepted`) next to the doc's name
+   before finishing.
+7. **Avoid undated relative words in permanent docs.** "Planned",
+   "not yet", "later" and "unreleased" go stale silently. Tie them to
+   a version (`planned for v0.079`, `unreleased on alpha since
+   0.06605`) so the next reader can tell whether they still hold.
