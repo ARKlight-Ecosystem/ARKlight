@@ -79,9 +79,8 @@ against the shipped fragment across a shared pool of edge-case lists
 (mixed types, surrogate pairs, `NaN`/`Infinity`, booleans-vs-numbers,
 radix and malformed numeric strings, deeply nested values) -- confirmed
 to actually catch a mismatch by deliberately breaking the Python mirror
-five different ways and rerunning it. Full suite 2595 passed (was 2320 on
-`0.06610`), plus one known failing assertion in
-`test_js_vocabulary_v0067.py`, out of scope here. `0.06611` -> `0.06612`.
+five different ways and rerunning it. Full suite 2596 passed (was 2320 on
+`0.06610`). `0.06611` -> `0.06612`.
 
 ## [0.06611] -- Bug fix: bracket-nesting indentation, part 3
 
