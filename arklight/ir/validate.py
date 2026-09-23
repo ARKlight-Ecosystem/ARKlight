@@ -176,6 +176,8 @@ from arklight.ir.schema import (
     KNOWN_BEHAVIORS,
     KNOWN_QUERY_HISTORY_MODES,
     KNOWN_REVEAL_BEHAVIORS,
+    LIST_COMPARE_KINDS,
+    LIST_EQUALITY_OPS,
     LITERAL_ARG_RULES,
     LiteralArgRule,
     MODIFIER_REGISTRY,
@@ -797,6 +799,8 @@ def _validate_derive_ref(
                 f"Computed(...) at {path} uses Derive.compare(...) with "
                 f"unknown op {op!r}. Known ops are: {known}."
             )
+    if derive.kind == "list_includes" or derive.kind in LIST_COMPARE_KINDS:
+        _validate_list_derivation_args(derive, path=path)
     if derive.kind in DIGITS_RANGES:
         low, high = DIGITS_RANGES[derive.kind]
         digits = derive.args.get("digits")
@@ -809,6 +813,59 @@ def _validate_derive_ref(
     for arg_name, rule in LITERAL_ARG_RULES.get(derive.kind, {}).items():
         _validate_literal_arg(
             derive.args[arg_name], rule, kind=derive.kind, arg_name=arg_name, path=path
+        )
+
+
+def _is_json_scalar_literal(value: object) -> bool:
+    """`v0.066`/`v0.067`: a literal the build-time mirror and the client
+    are guaranteed to read the same way -- a str, bool, `None`, a finite
+    number, or an integer within +/-2**53 (`nan`/`inf` can't be written
+    in JSON at all, and a larger integer isn't exactly representable as a
+    JavaScript number). Shared by `Predicate.one_of(...)`'s `values` and
+    `Derive.list_includes/list_any/list_all(...)`'s `value`."""
+    if value is None or isinstance(value, (bool, str)):
+        return True
+    if isinstance(value, int):
+        return abs(value) <= ONE_OF_MAX_INTEGER
+    return isinstance(value, float) and math.isfinite(value)
+
+
+def _validate_list_derivation_args(derive: DerivationRef, *, path: str) -> None:
+    """`v0.067`: the literal arguments of the list-scalar catalog's
+    `list_includes`/`list_any`/`list_all`. `op` is a member of
+    `COMPARE_OPS`, never a raw operator string executed as code (same
+    rule as `Derive.compare`). `eq`/`ne` accept any JSON scalar `value`;
+    the four relational operators compare the element read as a number,
+    so their `value` must be a number too -- a string there would ask
+    JavaScript's type-coercing `<` to order text, which the build-time
+    mirror deliberately does not reproduce."""
+    where = f"Computed(...) at {path} uses Derive.{derive.kind}(...)"
+    value = derive.args["value"]
+    scalar_message = (
+        f"{where} with value={value!r}, which isn't a str, bool, None, "
+        f"finite number, or integer within +/-2**53."
+    )
+    if derive.kind == "list_includes":
+        if not _is_json_scalar_literal(value):
+            raise ValidationError(scalar_message)
+        return
+    op = derive.args["op"]
+    if not isinstance(op, str) or op not in COMPARE_OPS:
+        known = ", ".join(sorted(COMPARE_OPS))
+        raise ValidationError(f"{where} with unknown op {op!r}. Known ops are: {known}.")
+    if op in LIST_EQUALITY_OPS:
+        if not _is_json_scalar_literal(value):
+            raise ValidationError(scalar_message)
+        return
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not _is_json_scalar_literal(value)
+    ):
+        raise ValidationError(
+            f"{where} with op={op!r} and value={value!r}, but {op!r} compares "
+            f"numbers, so value must be a finite number (an integer within "
+            f"+/-2**53)."
         )
 
 
@@ -917,11 +974,7 @@ def _validate_one_of_values(values: object, *, path: str) -> None:
             f"values; the limit is {ONE_OF_MAX_VALUES}."
         )
     for value in values:
-        if value is None or isinstance(value, (bool, str)):
-            continue
-        if isinstance(value, int) and abs(value) <= ONE_OF_MAX_INTEGER:
-            continue
-        if isinstance(value, float) and math.isfinite(value):
+        if _is_json_scalar_literal(value):
             continue
         raise ValidationError(
             f"Show(...) at {path} gives Predicate.one_of(...) the value "

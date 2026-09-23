@@ -96,6 +96,11 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
     # `true`/`false`.
     if isinstance(value, bool):
         value = "true" if value else "false"
+    # `v0.067`: `Derive.list_first`/`list_last` of an empty list is
+    # `None` (`null`). Python spells that `None`, the client's `String()`
+    # spells it `null`.
+    if value is None:
+        value = "null"
     # `v0.065`: `Derive.char_at`/`slice_string` can cut an emoji in half,
     # leaving a lone surrogate -- legal in a JavaScript string, but it
     # can't be written out as UTF-8. The browser draws such a character

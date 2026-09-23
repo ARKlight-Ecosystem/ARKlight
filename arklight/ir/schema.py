@@ -536,6 +536,24 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     "starts_with": DerivationSpec(min_names=1, max_names=1, extra_args=("substring",)),
     "ends_with": DerivationSpec(min_names=1, max_names=1, extra_args=("substring",)),
     "is_empty": DerivationSpec(min_names=1, max_names=1),
+    # `v0.067` (docs/version history/v0.067.md): JS vocabulary addendum
+    # stage 7/10 -- the list-scalar derivations catalog. Every kind reads
+    # exactly one name, a list-valued `State(...)`/`Computed(...)`
+    # (anything that isn't a list reads as an empty one), and reduces it
+    # to one scalar. `list_includes` takes a literal `value`;
+    # `list_any`/`list_all` take one of `COMPARE_OPS` plus a literal
+    # `value` (checked in `arklight.ir.validate`, not a callback).
+    # `list_includes`, `list_any` and `list_all` return a boolean, so
+    # their result can feed `Show(Predicate.truthy(...))`.
+    "list_length": DerivationSpec(min_names=1, max_names=1),
+    "list_min": DerivationSpec(min_names=1, max_names=1),
+    "list_max": DerivationSpec(min_names=1, max_names=1),
+    "list_average": DerivationSpec(min_names=1, max_names=1),
+    "list_first": DerivationSpec(min_names=1, max_names=1),
+    "list_last": DerivationSpec(min_names=1, max_names=1),
+    "list_includes": DerivationSpec(min_names=1, max_names=1, extra_args=("value",)),
+    "list_any": DerivationSpec(min_names=1, max_names=1, extra_args=("op", "value")),
+    "list_all": DerivationSpec(min_names=1, max_names=1, extra_args=("op", "value")),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
@@ -544,6 +562,15 @@ KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
 # raw operator string executed as code -- mirrors why `on_click`/
 # `action` are closed vocabularies rather than arbitrary strings.
 COMPARE_OPS = frozenset({"eq", "ne", "gt", "lt", "gte", "lte"})
+
+# `v0.067`: `Derive.list_any(...)`/`Derive.list_all(...)` reuse
+# `COMPARE_OPS` as their whole comparison vocabulary. `eq`/`ne` compare
+# an element strictly (`===`) against any JSON scalar literal; the four
+# relational operators compare the element read as a number against a
+# *numeric* literal, so a list of strings is never ordered by JavaScript's
+# type-coercing `<`.
+LIST_COMPARE_KINDS = frozenset({"list_any", "list_all"})
+LIST_EQUALITY_OPS = frozenset({"eq", "ne"})
 
 # `v0.064`: `Derive.to_fixed(...)`/`Derive.to_precision(...)`'s `digits`
 # is a literal, range-checked at build time to exactly the range
