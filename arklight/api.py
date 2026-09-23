@@ -41,7 +41,7 @@ from arklight.provider import ProviderDeclaration
 # selector in generated CSS with no further validation downstream.
 _CSS_CLASS_NAME_RE = re.compile(r"^-?[A-Za-z_][A-Za-z0-9_-]*$")
 
-# CSS Backend, pseudo-class shorthand (see docs/CSS-BACKEND-REFACTOR.md
+# CSS Backend, pseudo-class shorthand (see CSS-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md]
 # "Stage 2"): a `site.style(...)` rules key is either a plain property
 # ("background") or a pseudo-class-scoped property (":hover:background"),
 # letting a class express a simple interactive state without opening up
@@ -181,7 +181,7 @@ Item = node("Item")
 # semantic layout, text-level semantics, forms, tables, media. See
 # arklight.ir.schema.SCHEMA for the authoritative list of what each one
 # allows (required props, text-only-children, etc.) and
-# docs/DESIGN-NOTES.md for why these specifically.
+# docs/Foundational/DESIGN-NOTES.md for why these specifically.
 # ---------------------------------------------------------------------------
 
 # Semantic page/section layout.
@@ -245,7 +245,7 @@ Source = node("Source")
 #
 # Same mechanism as everything above -- each is `node("SomeType")`. See
 # arklight.ir.schema.SCHEMA for what each one allows and CHANGELOG.md /
-# docs/DESIGN-NOTES.md for why these specifically.
+# docs/Foundational/DESIGN-NOTES.md for why these specifically.
 # ---------------------------------------------------------------------------
 
 # Lists.
@@ -308,8 +308,8 @@ NoScript = node("NoScript")
 #
 # `component(...)` promotes a plain Python render function into a real,
 # named node type the compiler's own tooling knows about -- see
-# docs/Foundational/user-defined-components.md ("Option A -- macro
-# expansion") and docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md
+# docs/Foundational/USER-DEFINED-COMPONENTS.md ("Option A -- macro
+# expansion") and USER-DEFINED-COMPONENTS-IMPLEMENTATION.md
 # for the staged rollout this belongs to. Re-exported here from
 # arklight.ir.components so `from arklight import *` gives users
 # `component`/`Prop` alongside every built-in component.
@@ -383,7 +383,7 @@ def component(
     render function sets one itself) is left completely alone.
 
     `state`, if given (v0.060, Stage 4 -- see
-    `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`),
+    `USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`),
     declares this component's own local, instance-scoped reactive
     state: `{local_name: initial_value}` (the common case, mirroring
     `State("name", initial)`'s own ergonomics), or
@@ -515,7 +515,7 @@ def component(
 # state, components read it via `Bind`, and `on_click=` mutates it via a
 # closed, described set of `Action.*` helpers (never an arbitrary JS/Python
 # string -- see arklight.ir.schema.ACTION_REGISTRY and
-# docs/DESIGN-NOTES.md, "v0.0035: stateful JS -- capability, not
+# docs/Foundational/DESIGN-NOTES.md, "v0.0035: stateful JS -- capability, not
 # vocabulary", for the full design).
 # ---------------------------------------------------------------------------
 
@@ -537,7 +537,7 @@ def State(
     itself. Validation checks every `Bind(...)`/`Action.*(...)` on the
     page references a `name` declared here.
 
-    `persist=True` (`vdom-8`, docs/Backends/REFACTOR-INDEX.md row 16)
+    `persist=True` (`vdom-8`, REFACTOR-INDEX.md row 16)
     opts this one key into `localStorage` persistence: the shipped
     runtime overrides the server-rendered initial value with whatever
     was last saved under `localStorage["ark:<page-path>:<name>"]` (if
@@ -660,7 +660,7 @@ def Bind(name: str) -> ARKNode:
 def _bind_when(state: str, class_name: str) -> ClassBindSpec:
     """
     Reactive class binding (Stage 2 of "Reactive-core vdom staging" --
-    see docs/DESIGN-NOTES.md): `bind_class=Bind.when("active", "is-active")`
+    see docs/Foundational/DESIGN-NOTES.md): `bind_class=Bind.when("active", "is-active")`
     toggles `class_name` on/off as `state`'s truthiness changes,
     without ever touching the element's other static classes. A small
     structured `ClassBindSpec`, not a string -- validated against the
@@ -754,7 +754,7 @@ class Action:
     `increment`, and "put this state back the way it started" without
     hardcoding the initial value again at every call site (`reset`
     reads the store's own captured initial value). Only the most
-    commonly needed additions; see docs/DESIGN-NOTES.md for what's
+    commonly needed additions; see docs/Foundational/DESIGN-NOTES.md for what's
     deliberately left for a future version.
 
     Capability fix (live-input -> action-value): `set`'s and
@@ -932,7 +932,7 @@ class Provider:
 
 
 # ---------------------------------------------------------------------------
-# `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12): computed/derived state.
+# `vdom-4` (REFACTOR-INDEX.md row 12): computed/derived state.
 #
 # `Computed`/`Derive` close the "derived/computed state" gap named in the
 # `v0.0035` addenda -- a page-scoped value derived from other `State(...)`/
@@ -1444,7 +1444,7 @@ class Derive:
 
 
 # ---------------------------------------------------------------------------
-# `vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13): watch effects.
+# `vdom-5` (REFACTOR-INDEX.md row 13): watch effects.
 #
 # `Watch(...)` closes the "when X changes, also do Y" side-effect gap
 # `Computed(...)` deliberately leaves open (a `Computed(...)` only ever
@@ -1484,7 +1484,7 @@ def Watch(name: str, *, then: "ActionRef") -> ARKNode:
 
 
 # ---------------------------------------------------------------------------
-# `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): per-item list
+# `vdom-7` (REFACTOR-INDEX.md row 15): per-item list
 # rendering (`Repeat`) + conditional show/hide (`Show`).
 #
 # Both are real, renderable content (unlike `State(...)`/`Computed(...)`/
@@ -1562,7 +1562,7 @@ def Repeat(name: str, *, template: Callable[[], ARKNode]) -> ARKNode:
     Deliberately scoped to a *single* dynamic value per item (whatever
     `name`'s list elements themselves are, typically a string/number),
     not per-field access into a list of records -- see
-    docs/Backends/REFACTOR-INDEX.md row 15 for what's left for a future
+    REFACTOR-INDEX.md row 15 for what's left for a future
     version.
     """
     return ARKNode(type="Repeat", props={"name": name}, children=[template()])
@@ -1965,7 +1965,7 @@ class Site:
         # `site.style(...)`. Structured input only -- see `style()` below
         # for why this isn't a raw CSS string.
         self.custom_styles: dict[str, dict[str, str]] = {}
-        # Experimental (docs/EXPERIMENTAL-APIS.md): (condition, class_name,
+        # Experimental (docs/Foundational/EXPERIMENTAL-APIS.md): (condition, class_name,
         # rules) triples registered via `site.media_query(...)`, kept
         # separate from `custom_styles` above rather than overloading
         # `style()`'s key syntax -- an experimental escape hatch gets its
@@ -1977,7 +1977,7 @@ class Site:
         # "[EXPERIMENTAL FEATURE ACTIVE]" banner and, deduplicated, the
         # end-of-build summary block.
         self.experimental_usages: list = []
-        # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): user-supplied
+        # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md): user-supplied
         # `(output_files: dict[str, str]) -> dict[str, str]` callables
         # registered via `site.raw_postprocess(...)`, run in
         # registration order over the *combined* output of every
@@ -1989,7 +1989,7 @@ class Site:
         # `:root`-declared `--ark-*` custom properties that `CSSBackend`
         # used to bake in as constants. Both are read by `body`'s *own*
         # rule (`max-width: var(--ark-max-width)`, `background:
-        # var(--ark-bg)`) -- see docs/CONTAINER-WIDTH-BUG.md and the CSS
+        # var(--ark-bg)`) -- see CONTAINER-WIDTH-BUG.md and the CSS
         # backend architecture notes for why that specifically makes them
         # unreachable from any wrapper/descendant override: a CSS custom
         # property only cascades *downward*, and `body` resolves its own
@@ -2040,7 +2040,7 @@ class Site:
             if value is not None:
                 self._set_css_var_override(kwarg_name, var_name, value)
 
-        # Structural addendum (see docs/DESIGN-NOTES.md "CSS selector
+        # Structural addendum (see docs/Foundational/DESIGN-NOTES.md "CSS selector
         # algebra + at-rule vocabulary"): storage for the new
         # `Site.style_selector`/`keyframes`/`font_face`/
         # `container_query`/`supports`/`page_rule`/`import_style`
@@ -2059,8 +2059,8 @@ class Site:
         self.page_rules: list[tuple[str | None, dict[str, str]]] = []
         self.style_imports: list[str] = []
 
-        # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9 /
-        # docs/Backends/JS-BACKEND-REFACTOR-PLAN.md "The app-illusion
+        # htmx-4 (REFACTOR-INDEX.md row 9 /
+        # JS-BACKEND-REFACTOR-PLAN.md "The app-illusion
         # problem, stated precisely"): opt-in app-shell navigation for
         # sites that get wrapped in a packaging-backend shell (Android/
         # KaiOS/Desktop) where a full document reload on every internal
@@ -2258,7 +2258,7 @@ class Site:
 
     def media_query(self, condition: str, class_name: str, rules: dict[str, str]) -> None:
         """
-        EXPERIMENTAL (see `docs/EXPERIMENTAL-APIS.md`) -- register a
+        EXPERIMENTAL (see `docs/Foundational/EXPERIMENTAL-APIS.md`) -- register a
         `@media` block: `.class_name { ... }` rendered inside
         `@media (condition) { ... }` in the generated stylesheet.
 
@@ -2482,7 +2482,7 @@ class Site:
         (`::before`), and parameterized pseudo-classes (`:not(.a)`,
         `:has(> .icon)`, `:is(...)`, `:where(...)`, `:nth-child(2n+1)`)
         -- everything `Site.style(...)`'s single flat `.name { }` block
-        can't reach. See docs/DESIGN-NOTES.md ("CSS selector algebra +
+        can't reach. See docs/Foundational/DESIGN-NOTES.md ("CSS selector algebra +
         at-rule vocabulary") for why this is a separate method rather
         than widening `style()` itself.
 
@@ -2538,7 +2538,7 @@ class Site:
         """
         Register a real `@keyframes name { ... }` block -- one of the
         gaps explicitly deferred in earlier design notes ("not silently
-        dropped", see docs/DESIGN-NOTES.md). `transition` itself
+        dropped", see docs/Foundational/DESIGN-NOTES.md). `transition` itself
         already worked (it's just a property value inside `style=`),
         but there was no way to *define* a keyframe sequence to
         transition/animate through.
@@ -2820,7 +2820,7 @@ class Site:
 
     def import_style(self, url: str) -> None:
         """
-        EXPERIMENTAL (see `docs/EXPERIMENTAL-APIS.md`) -- register a
+        EXPERIMENTAL (see `docs/Foundational/EXPERIMENTAL-APIS.md`) -- register a
         sitewide `@import url("...");` statement, emitted first in
         the generated stylesheet (required -- `@import` must precede
         every other rule per the CSS spec, aside from `@charset`).
@@ -2856,7 +2856,7 @@ class Site:
         """
         \u26a0\ufe0f DEPRECATED -- officially removed. `site.raw_postprocess(fn)`
         no longer registers or runs `fn` at all; it only prints a log
-        pointing at its replacement. See `docs/EXPERIMENTAL-APIS.md`,
+        pointing at its replacement. See `docs/Foundational/EXPERIMENTAL-APIS.md`,
         `script-extension`.
 
         The full-output-dict escape hatch this used to be (`fn` handed
@@ -2893,7 +2893,7 @@ class Site:
         self, extension: "ScriptExtension | type[ScriptExtension]"
     ) -> "ScriptExtension":
         """
-        \u26a0\ufe0f EXPERIMENTAL -- see `docs/EXPERIMENTAL-APIS.md`,
+        \u26a0\ufe0f EXPERIMENTAL -- see `docs/Foundational/EXPERIMENTAL-APIS.md`,
         `script-extension`. Class-based successor to
         `site.raw_postprocess(fn)` for adding hand-written JS alongside
         the generated `arklight.js` runtime -- see
@@ -3038,7 +3038,7 @@ __all__ = [
     "Watch",
     "Derive",
     "DerivationRef",
-    # `vdom-7`/`v0.062` (docs/Backends/REFACTOR-INDEX.md row 15): these
+    # `vdom-7`/`v0.062` (REFACTOR-INDEX.md row 15): these
     # were defined in this module but missing from `__all__` --
     # reachable via `arklight.api.Repeat` etc., but not via `from
     # arklight.api import *`, the same gap `test_package_exports.py`

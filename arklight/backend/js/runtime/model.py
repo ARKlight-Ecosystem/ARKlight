@@ -1,5 +1,5 @@
 """
-`vdom-6` (docs/Backends/REFACTOR-INDEX.md row 14): two-way input
+`vdom-6` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 14): two-way input
 binding. `bind_value=Bind.model("query")` (`arklight/api.py`) compiles
 to `data-ark-model="query"` (`arklight/backend/html/attrs.py`) on an
 element -- typically an `Input`. Two small pieces, mirroring the

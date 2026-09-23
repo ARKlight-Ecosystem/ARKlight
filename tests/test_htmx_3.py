@@ -1,6 +1,6 @@
 """
-`htmx-3` (see docs/Backends/HTMX-INTEGRATION.md "Stage 3 -- Replace
-`wireActions()` wiring loop" / docs/Backends/REFACTOR-INDEX.md row 6):
+`htmx-3` (see HTMX-INTEGRATION.md [retired -- see CHANGELOG.md] "Stage 3 -- Replace
+`wireActions()` wiring loop" / REFACTOR-INDEX.md row 6):
 `wireActions()`'s `querySelectorAll`/`forEach`/per-element-
 `addEventListener` wiring loop is deleted, replaced by
 `wireActionInterceptor()` -- a single delegated `click` listener
@@ -13,10 +13,10 @@ coverage, untouched by this stage).
 
 See arklight/backend/js/runtime/dispatch.py's module docstring for why
 this lands as a delegated native `click` listener rather than the
-`htmx:beforeRequest` interceptor docs/Backends/HTMX-INTEGRATION.md
+`htmx:beforeRequest` interceptor HTMX-INTEGRATION.md
 describes.
 
-`htmx-4` (docs/Backends/REFACTOR-INDEX.md row 9) later changed
+`htmx-4` (REFACTOR-INDEX.md row 9) later changed
 `wireActionInterceptor`'s signature again -- from a fixed `store` value
 to a `getStore` getter, so app-shell navigation can re-hydrate a new
 store after a boosted swap without re-registering the listener. Tests
@@ -27,7 +27,7 @@ unaffected by which shape feeds it a store, so a store-in-scope during
 these tests always resolves the same way either signature would give
 it.
 
-`htmx-5` (docs/Backends/REFACTOR-INDEX.md row 10) renamed this
+`htmx-5` (REFACTOR-INDEX.md row 10) renamed this
 function again, to `wireClickInterceptor`, and gave it a second
 branch: it now also dispatches named-behavior clicks (previously
 routed through vendored HTMX's own `hx-on:click` attribute processing
@@ -84,9 +84,9 @@ def test_wire_actions_loop_is_gone():
 
 
 def test_wire_action_interceptor_is_present_and_exported():
-    # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): takes a getStore
+    # htmx-4 (REFACTOR-INDEX.md row 9): takes a getStore
     # getter, not a fixed store -- see runtime/dispatch.py's docstring.
-    # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): renamed again,
+    # htmx-5 (REFACTOR-INDEX.md row 10): renamed again,
     # to wireClickInterceptor/CLICK_INTERCEPTOR_JS.
     assert "function wireClickInterceptor(getStore)" in CLICK_INTERCEPTOR_JS
     js = JSBackend().render(_stateful_ir())[SCRIPT_PATH]
@@ -139,7 +139,7 @@ def test_no_op_when_store_is_falsy():
 def test_only_ships_when_actions_or_behaviors_are_used():
     # Same "only ship what's used" discipline as every other v0.0035+
     # runtime piece. Through htmx-4 this was tied to has_state alone;
-    # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10) decoupled it --
+    # htmx-5 (REFACTOR-INDEX.md row 10) decoupled it --
     # the interceptor now also ships for a behavior-only page with no
     # State(...) at all (see test_htmx_5.py). This plain page has
     # neither an action nor a behavior, so it still gets no
@@ -182,7 +182,7 @@ def test_prevent_default_is_unconditional():
 
 
 def test_guard_shape_is_one_try_catch_per_dispatch_branch():
-    # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): the interceptor
+    # htmx-5 (REFACTOR-INDEX.md row 10): the interceptor
     # now has two branches (action, behavior), each with its own
     # try/catch covering its own attribute-read and dispatch -- there
     # is still no separate per-element wiring phase, but "one shared
@@ -223,7 +223,7 @@ def test_call_site_updated_in_domcontentloaded_block():
     # "DOMContentLoaded" listener earlier in the file (see
     # tests/test_js_backend.py's identical HTMX_JS-scoping pattern).
     ready_block = js.rsplit('document.addEventListener("DOMContentLoaded", function () {', 1)[1]
-    # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): the call site now
+    # htmx-4 (REFACTOR-INDEX.md row 9): the call site now
     # passes a getter closure, not the store variable directly -- see
     # arklight/backend/js/render.py's _build_runtime_js.
     assert "wireClickInterceptor(function () { return arkStore; });" in ready_block

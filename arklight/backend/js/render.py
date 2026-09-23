@@ -37,7 +37,7 @@ and an action dispatcher) plus only the `Action.*` fragments
 (`arklight/backend/js/actions/`) that page's `on_click=` values
 actually reference. Pages with no `State(...)` get none of this --
 same "only ship what's used" discipline v0.0035 also brought to the
-named-behavior runtime below. See docs/DESIGN-NOTES.md ("v0.0035:
+named-behavior runtime below. See docs/Foundational/DESIGN-NOTES.md ("v0.0035:
 stateful JS -- capability, not vocabulary") for the full design.
 
 Every behavior/action fragment here is a small, statically-readable JS
@@ -87,8 +87,8 @@ behaviors (`on_click="toggle"`, etc.) have no modifier-attaching API
 yet -- deliberately left for a future addendum rather than
 speculatively wired up now.
 
-`htmx-1` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 1 --
-Behaviors" / `docs/Backends/REFACTOR-INDEX.md` row 4) replaces the
+`htmx-1` (see `HTMX-INTEGRATION.md` [retired -- see CHANGELOG.md] "Stage 1 --
+Behaviors" / `REFACTOR-INDEX.md` row 4) replaces the
 named-behavior wiring pass with HTMX. `wireBehaviors()` and its
 `_behaviors_block` are gone -- there is no more `DOMContentLoaded`
 query/`addEventListener` loop over `[data-ark-on-click]` elements,
@@ -117,13 +117,13 @@ declares state -- see `_build_runtime_js`'s `needs_htmx`. State-only
 pages don't yet emit any `hx-*` attribute (that's `htmx-2`/`htmx-3`
 territory: modifiers and `Action.*` dispatch still go through
 `data-ark-modifiers`/`wireActions()` unchanged by this stage), but
-`docs/Backends/REFACTOR-INDEX.md` row 4 scopes HTMX's inclusion to
+`REFACTOR-INDEX.md` row 4 scopes HTMX's inclusion to
 "behaviors or state" rather than "behaviors only" so that landing
 `htmx-2`/`htmx-3` later doesn't also have to touch this
 already-shipped condition.
 
-`htmx-2` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 2 --
-Modifiers" / `docs/Backends/REFACTOR-INDEX.md` row 5) removes
+`htmx-2` (see `HTMX-INTEGRATION.md` "Stage 2 --
+Modifiers" / `REFACTOR-INDEX.md` row 5) removes
 `arkApplyModifiers` entirely -- `arklight/backend/html/attrs.py` now
 compiles an `ActionRef`'s modifier tokens into an `hx-trigger`
 attribute at build time instead of the `data-ark-modifiers` attribute
@@ -141,8 +141,8 @@ despite the design doc's original expectation that it would; see
 `runtime/dispatch.py`'s module docstring, "Bug fix (post-`htmx-5`...)"
 section, for where and how that gap was finally closed.
 
-`htmx-3` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 3 -- Replace
-`wireActions()` wiring loop" / `docs/Backends/REFACTOR-INDEX.md` row 6)
+`htmx-3` (see `HTMX-INTEGRATION.md` "Stage 3 -- Replace
+`wireActions()` wiring loop" / `REFACTOR-INDEX.md` row 6)
 deletes `wireActions`'s `querySelectorAll('[data-ark-on-click^=
 "action:"]')`/`forEach`/per-element-`addEventListener` loop entirely.
 In its place, `runtime/dispatch.py`'s `ACTION_INTERCEPTOR_JS` registers
@@ -164,9 +164,8 @@ unmodified action button's click handling. `data-ark-on-click="action:
 untouched; only the `DOMContentLoaded` call site's `wireActions(store)`
 becomes `wireActionInterceptor(store)` below.
 
-`htmx-4` (see `docs/Backends/JS-BACKEND-REFACTOR-PLAN.md` "The
-app-illusion problem, stated precisely" / `docs/Backends/
-REFACTOR-INDEX.md` row 9) is app-shell navigation:
+`htmx-4` (see `JS-BACKEND-REFACTOR-PLAN.md` "The
+app-illusion problem, stated precisely" / `REFACTOR-INDEX.md` row 9) is app-shell navigation:
 `Site(app_shell=True)` (see `arklight/backend/html/page_render.py`)
 emits `hx-boost="true"` on `<body>`, so same-origin link clicks become
 an in-place AJAX swap instead of a full document reload -- the fix for
@@ -206,9 +205,8 @@ docstring for a third gap this stage fixes on the HTML side: why a
 state page's `data-ark-state` blob moves off `<body>` (whose own
 attributes a boosted swap never updates) when `app_shell=True`.
 
-`htmx-5` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 4 -- Audit
-and remove remaining hand-rolled plumbing" / `docs/Backends/
-REFACTOR-INDEX.md` row 10) is this project's own "audit and remove
+`htmx-5` (see `HTMX-INTEGRATION.md` "Stage 4 -- Audit
+and remove remaining hand-rolled plumbing" / `REFACTOR-INDEX.md` row 10) is this project's own "audit and remove
 hand-rolled plumbing that HTMX already duplicates" mandate cutting the
 other way: `htmx-1`'s `hx-on:click="arkRunBehavior('<name>', this)"`
 turned out to route every named-behavior click through HTMX's own
@@ -236,7 +234,7 @@ bracket-syntax `hx-trigger` filters) that construct a function from a
 string -- paths ARKlight's compiler never emits into, but which this
 line stops relying on "never emits" alone to guarantee.
 
-`vdom-4` (see `docs/Backends/REFACTOR-INDEX.md` row 12) adds
+`vdom-4` (see `REFACTOR-INDEX.md` row 12) adds
 computed/derived state: `Computed(name, deps=(...), derive=Derive.*(...))`
 (`arklight.api`). A page that declares at least one `Computed(...)`
 gets one more closed-vocabulary object alongside `actions`/
@@ -251,7 +249,7 @@ value lives in the exact same state object a `State(...)` value does,
 so `Bind(...)`/`bind_class=` read it through the unmodified
 `renderBindings`/`renderClassBindings` passes.
 
-`vdom-5` (see `docs/Backends/REFACTOR-INDEX.md` row 13) adds watch
+`vdom-5` (see `REFACTOR-INDEX.md` row 13) adds watch
 effects: `Watch(name, then=Action.*(...))` (`arklight.api.Watch`). A
 page that declares at least one `Watch(...)` gets `wireWatchers`
 (`arklight/backend/js/runtime/watch.py`) spliced in and called once
@@ -325,7 +323,7 @@ SCRIPT_PATH = "arklight.js"
 
 # _NOTIFY_JS / _NAV_HIGHLIGHT_JS / _STATE_CORE_JS used to be defined
 # inline here as triple-quoted string constants. `refactor-0` (see
-# docs/Backends/REFACTOR-INDEX.md) split them into
+# REFACTOR-INDEX.md) split them into
 # arklight/backend/js/runtime/{state,bindings,modifiers,dispatch,nav,
 # notify}.py, mirroring the actions/ and behaviors/ per-file pattern.
 # The values imported above are byte-for-byte identical to the old
@@ -366,13 +364,11 @@ def _collect_usage(
     either `on_click=` or a `Watch(...)`'s `then=` (`used_actions`,
     `vdom-5` -- see below; this is what `_actions_object_js` reads),
     whether any page declares state at all, which derivation kinds are
-    referenced by a `Computed(...)` (`vdom-4`, docs/Backends/
-    REFACTOR-INDEX.md row 12), whether any page declares a
+    referenced by a `Computed(...)` (`vdom-4`, REFACTOR-INDEX.md row 12), whether any page declares a
     `Computed(...)` at all, whether any page declares a `Watch(...)` at
-    all (`vdom-5`, docs/Backends/REFACTOR-INDEX.md row 13), whether any
-    node anywhere uses `bind_value=` (`vdom-6`, docs/Backends/
-    REFACTOR-INDEX.md row 14), and whether any page uses `Repeat(...)`/
-    `Show(...)` at all (`vdom-7`, docs/Backends/REFACTOR-INDEX.md row
+    all (`vdom-5`, REFACTOR-INDEX.md row 13), whether any
+    node anywhere uses `bind_value=` (`vdom-6`, REFACTOR-INDEX.md row 14), and whether any page uses `Repeat(...)`/
+    `Show(...)` at all (`vdom-7`, REFACTOR-INDEX.md row
     15) -- an `on_click=Action.*(...)` nested inside a `Repeat(...)`'s
     template is still a normal `IRNode` in the tree (it's the compiled
     template `IRNode`, not a separate declaration pulled out like
@@ -430,7 +426,7 @@ def _collect_usage(
     used_on_click_actions: set[str] = set()
     used_platform_apis: set[str] = set()
     has_state = any(page.state for page in ir.pages)
-    # `htmx-6` bugfix (docs/Backends/REFACTOR-INDEX.md): `needs_htmx`
+    # `htmx-6` bugfix (REFACTOR-INDEX.md): `needs_htmx`
     # used to be `has_state or ir.app_shell`, shipping the whole ~15kB
     # vendored HTMX bundle to *every* page that merely declares
     # `State(...)`, regardless of whether that page ever emits an
@@ -559,7 +555,7 @@ def collect_used_runtime_features(ir: WebsiteIR) -> RuntimeUsage:
 
 
 def _behaviors_object_js(used_behaviors: set[str]) -> str:
-    # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10; see
+    # htmx-5 (REFACTOR-INDEX.md row 10; see
     # arklight/backend/js/runtime/dispatch.py's module docstring for
     # the full audit finding): this used to build `arkBehaviors` +
     # `arkRunBehavior`, both attached to `window` so vendored HTMX's
@@ -628,7 +624,7 @@ def _platform_apis_object_js(used_platform_apis: set[str]) -> str:
 
 
 def _derivations_object_js(used_derivations: set[str]) -> str:
-    # vdom-4 (docs/Backends/REFACTOR-INDEX.md row 12): mirrors
+    # vdom-4 (REFACTOR-INDEX.md row 12): mirrors
     # `_actions_object_js`/`_behaviors_object_js` exactly -- only the
     # `Derive.*` kinds this site's IR actually references, assembled
     # as a plain local `var`, read by `createState`'s `recomputeAll()`
@@ -702,7 +698,7 @@ def _experimental_console_reminder_js(experimental_usages: list) -> str:
     lines.append(
         "    console.warn("
         + json.dumps(
-            "These are also reported at build time -- see docs/EXPERIMENTAL-APIS.md."
+            "These are also reported at build time -- see docs/Foundational/EXPERIMENTAL-APIS.md."
         )
         + ");"
     )
@@ -788,7 +784,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # at all.
     check_backend_support(used_platform_apis, backend_name="web")
 
-    # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): the click
+    # htmx-5 (REFACTOR-INDEX.md row 10): the click
     # interceptor now dispatches both actions and behaviors, and needs
     # shipping whenever either is used -- independent of has_state
     # (a behavior-only page has no State(...) at all; see
@@ -814,7 +810,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # shipping the click interceptor it would never use.
     needs_actions_object = needs_click_interceptor or has_watch
 
-    # htmx-1 (docs/Backends/REFACTOR-INDEX.md row 4) originally shipped
+    # htmx-1 (REFACTOR-INDEX.md row 4) originally shipped
     # vendored HTMX whenever a page used a named behavior or declared
     # state, because named behaviors wired through HTMX's own
     # hx-on:click attribute processing. htmx-5 removes that wiring

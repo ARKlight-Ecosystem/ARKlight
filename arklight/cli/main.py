@@ -168,7 +168,7 @@ def _stage_logger(message: str, *, mode: str) -> None:
       - an inline experimental-API banner (see
         `arklight.experimental.format_inline_banner`; always starts
         with the warning glyph) -- printed unconditionally in every
-        mode, per docs/EXPERIMENTAL-APIS.md's CLI contract ("neither
+        mode, per docs/Foundational/EXPERIMENTAL-APIS.md's CLI contract ("neither
         surface is gated behind --verbose/--debug"): an experimental-
         feature warning isn't narration, it's the entire point of
         gating the feature, so it always prints regardless of log
@@ -186,7 +186,7 @@ def _stage_logger(message: str, *, mode: str) -> None:
 # used to put on every known-alpha-limitation warning it raised. That
 # particular warning (UNROUTED_REFERENCE_ATTRS/_warn_unrouted_reference)
 # was removed once the HTML backend refactor's Stage 2 fixed the gap it
-# flagged (see docs/Backends/HTML-BACKEND-REFACTOR.md, CHANGELOG.md's
+# flagged (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md], CHANGELOG.md's
 # [0.0491]) -- the marker mechanism itself stays, generic across any
 # `[ARKlight ALPHA]`-prefixed warning a future alpha limitation might
 # raise. Matched here so the CLI can surface these clearly and always --
@@ -279,7 +279,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
 
     # arklight.config.py's "experimental"/"csp" sections are the only
     # control for the heavy-reliance nudge, the devtools console
-    # reminder (docs/EXPERIMENTAL-APIS.md), and a project-wide CSP
+    # reminder (docs/Foundational/EXPERIMENTAL-APIS.md), and a project-wide CSP
     # override (arklight/backend/html/csp.py) -- no CLI flag for any of
     # these, on purpose: a project that's decided it's fine leaning on
     # an escape hatch (or wants one CSP policy for every site it
@@ -546,7 +546,7 @@ def _cmd_pwa(args: argparse.Namespace) -> int:
         print(f"ARKlight pwa failed: {exc}", file=sys.stderr)
         return 1
 
-    # Experimental API warning (docs/EXPERIMENTAL-APIS.md) -- printed
+    # Experimental API warning (docs/Foundational/EXPERIMENTAL-APIS.md) -- printed
     # inline before the normal success output, unconditionally (not
     # gated behind any verbosity flag), same contract `arklight build`
     # follows for `site.media_query(...)`.
@@ -1182,7 +1182,7 @@ def main(argv: list[str] | None = None) -> int:
         "--install-button",
         action="store_true",
         help=(
-            "EXPERIMENTAL (see docs/EXPERIMENTAL-APIS.md): inject a native "
+            "EXPERIMENTAL (see docs/Foundational/EXPERIMENTAL-APIS.md): inject a native "
             "install-prompt button into every page, via the "
             "`beforeinstallprompt` browser event. Off by default -- prints "
             "an experimental-API warning when used, since browser support "

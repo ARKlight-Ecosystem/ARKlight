@@ -14,7 +14,7 @@ component can carry a `style={...}` dict prop (rendered as an inline
 `style` attribute by the HTML backend) or a `class_name="..."` prop
 (rendered as `class`) to layer custom rules or override these defaults.
 
-This module is the orchestrator (see docs/CSS-BACKEND-REFACTOR.md,
+This module is the orchestrator (see CSS-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md],
 Stage 4): `CSSBackend.render` is now pure composition of three sibling
 modules -- `base_stylesheet.py` (static default CSS text),
 `design_tokens.py` (`:root`/`@property` generation), and
@@ -60,7 +60,7 @@ class CSSBackend(Backend):
         # then the fixed tag/utility rules, then v0.042 custom classes
         # (`ir.custom_styles`, from `site.style(...)`), then EXPERIMENTAL
         # `@media` blocks (`ir.media_queries`, from `site.media_query(...)`,
-        # see docs/EXPERIMENTAL-APIS.md), then v0.048 Stage B's per-node
+        # see docs/Foundational/EXPERIMENTAL-APIS.md), then v0.048 Stage B's per-node
         # `@media` blocks (`ir.responsive_rules`, from a node's
         # `responsive_style={...}` prop) absolute last of all, so a
         # viewport-keyed override -- whichever of the two APIs produced
@@ -72,7 +72,7 @@ class CSSBackend(Backend):
         # practice they can never collide, since `arkgen-N` classes are
         # never author-chosen.
         #
-        # Structural addendum (docs/DESIGN-NOTES.md "CSS selector
+        # Structural addendum (docs/Foundational/DESIGN-NOTES.md "CSS selector
         # algebra + at-rule vocabulary"): `render_imports` goes first,
         # ahead of everything -- including `BASE_CSS_HEADER` -- because
         # the CSS spec requires `@import` to precede every other rule

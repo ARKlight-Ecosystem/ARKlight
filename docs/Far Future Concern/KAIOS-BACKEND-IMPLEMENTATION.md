@@ -1,7 +1,7 @@
 # KaiOS backend -- packaging ARKlight output as a KaiOS app (PLANNING)
 
 This is an **implementation** design doc: it treats KaiOS the way
-`docs/DESIGN-NOTES.md` already treats Android and Desktop --- as a
+`docs/Foundational/DESIGN-NOTES.md` already treats Android and Desktop --- as a
 `arklight kaios` **packaging backend** that wraps an existing
 `arklight build` output directory into a shippable platform artifact,
 not a new codegen target and not a rewrite of the HTML/CSS/JS
@@ -17,7 +17,7 @@ to build and ship to turn its own compiler output into a KaiOS app?**
 Status: design only. Nothing under `arklight/backend/` or
 `arklight/packer/` implements any of this yet. Same "design complete,
 implementation not started" discipline every other PLANNING section
-in `docs/DESIGN-NOTES.md` follows -- referenced from `PROGRESS.md`'s
+in `docs/Foundational/DESIGN-NOTES.md` follows -- referenced from `PROGRESS.md`'s
 snapshot table, not summarized in `README.md` until it actually
 lands.
 
@@ -34,7 +34,7 @@ general-purpose app framework.
 
 ## 2. Why this is the *easy* packaging backend, not the hard one
 
-Read against `docs/DESIGN-NOTES.md`'s Android backend section
+Read against `docs/Foundational/DESIGN-NOTES.md`'s Android backend section
 ("v0.0438"), the honest comparison matters: Android needed a JDK +
 Android SDK + Gradle + AndroidX/Google Maven, because
 `WebViewAssetLoader` only exists as compiled Kotlin/Java bytecode --
@@ -86,7 +86,7 @@ compiler already made for unrelated reasons:
   `<script src="arklight.js">` tag (see
   `arklight/backend/html/render.py`'s `SCRIPT_PATH` import) and the
   JS backend's own closed-registry discipline (§"Explicitly out of
-  scope for v0.044" in `docs/DESIGN-NOTES.md`: "Any real
+  scope for v0.044" in `docs/Foundational/DESIGN-NOTES.md`: "Any real
   JS/template-expression evaluator, `eval`, or `new Function` --
   permanent non-goal") means `arklight.js` never contains either.
   Nothing needs to change here; it's a CSP pass by construction, not
@@ -234,8 +234,8 @@ backend section) to stop scope creep before it's assumed-in later:
   today and adding one is a far larger commitment than packaging
   calls for. This applies equally to any future vendored dependency,
   not just hand-written stages -- see
-  `docs/Backends/JS-BACKEND-REFACTOR-PLAN.md`'s "Cross-cutting risk"
-  section, which flags that HTMX (proposed for the app-shell
+  `JS-BACKEND-REFACTOR-PLAN.md`'s "Cross-cutting risk" section
+  [retired -- see `CHANGELOG.md`], which flagged that HTMX (proposed for the app-shell
   navigation work that section describes, and directly relevant here
   since it's what would let a packaged KaiOS build avoid full-page
   reloads between routes) has not yet been verified against Gecko 48

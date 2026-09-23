@@ -206,7 +206,7 @@ def _format_spec(name: str, spec: NodeSpec) -> str:
     if spec.text_only_children:
         lines.append(
             "  children       : text only (Bind(...) is also allowed here --"
-            " see docs/DESIGN-NOTES.md, 'stateful JS')"
+            " see docs/Foundational/DESIGN-NOTES.md, 'stateful JS')"
         )
     elif spec.allow_children:
         lines.append("  children       : any nested component")
@@ -471,7 +471,7 @@ def search_component(query: str, *, limit: int = 5, near: str | None = None) -> 
         return (
             f"No component named {query!r} found, and nothing close enough "
             f"to suggest. Run `arklight --search <partial-name>` with a "
-            f"shorter fragment, or see docs/ARCHITECTURE.md for the full "
+            f"shorter fragment, or see docs/Foundational/ARCHITECTURE.md for the full "
             f"component list."
         )
 

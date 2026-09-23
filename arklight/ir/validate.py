@@ -32,24 +32,24 @@ Checks performed:
 8. `bind_class`, if present, is a `Bind.when(...)` reference
    (arklight.ast.nodes.ClassBindSpec) whose `state` targets a
    `State(...)` declared on the same page (Stage 2 of "Reactive-core
-   vdom staging" -- see docs/DESIGN-NOTES.md).
+   vdom staging" -- see docs/Foundational/DESIGN-NOTES.md).
 9. An `Action.*(...)`'s `.modifiers` (from `.with_modifiers(...)`,
    `.debounce(...)`, `.throttle(...)`) are each a known token from
    `arklight.ir.schema.MODIFIER_REGISTRY` -- `prevent`/`stop`/`once`
    bare, `debounce`/`throttle` as `"<name>:<ms>"` with a positive
    integer `ms` (Stage 3 of "Reactive-core vdom staging" -- see
-   docs/DESIGN-NOTES.md).
+   docs/Foundational/DESIGN-NOTES.md).
 10. `responsive_style`, if present, is a non-empty `dict[str,
     dict[str, str]]` -- each key a non-empty media-condition string
     (e.g. `"(max-width: 600px)"`), each value a non-empty dict of
     non-empty CSS property name -> string/number value (v0.048 Stage
     B, "CSS media queries + `<head>` extension" -- see
-    docs/DESIGN-NOTES.md). Structured input only, same discipline as
+    docs/Foundational/DESIGN-NOTES.md). Structured input only, same discipline as
     `site.style(...)`/`site.media_query(...)` -- never a raw CSS
     string.
 11. `meta`/`links` on `Page(...)`, if present, are structurally
     well-formed (v0.048 Stage A, "CSS media queries + `<head>`
-    extension" -- see docs/DESIGN-NOTES.md): `meta` a non-empty
+    extension" -- see docs/Foundational/DESIGN-NOTES.md): `meta` a non-empty
     `dict[str, str]` of name -> content pairs; `links` a non-empty
     `list[dict[str, str]]` of attribute -> value pairs, each carrying
     a `rel`. Structured input only, same "no raw HTML-injection escape
@@ -57,14 +57,14 @@ Checks performed:
     holds.
 12. `shell_persistent`, if `True` on a node, requires that same node
     to also carry a non-empty `id` (htmx-4, see
-    docs/Backends/REFACTOR-INDEX.md row 9): `hx-preserve` -- the HTML
+    REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 9): `hx-preserve` -- the HTML
     backend's target for this prop, see `arklight/backend/html/attrs.py`
     -- only works if htmx can find the *same* element in both the old
     and the newly-fetched DOM to keep, and the only thing it matches
     on is a stable `id`. A node with no `id` would compile to a
     `hx-preserve="true"` attribute htmx silently can't use, so this
     fails loudly at build time instead.
-13. `Computed(...)` (`vdom-4`, see docs/Backends/REFACTOR-INDEX.md row
+13. `Computed(...)` (`vdom-4`, see REFACTOR-INDEX.md row
     12) may only appear as a direct child of `Page(...)`, same as
     `State(...)`; needs a non-empty string `name`, not already used by
     a `State(...)`/other `Computed(...)` on the same page; needs a
@@ -88,7 +88,7 @@ Checks performed:
     it never takes an `Action.*(...)` reference or a `behavior_target`
     (see `_validate_reveal_props`). `State(..., media="...")`'s
     `media` prop, if present, must be a non-empty string.
-14. `Watch(...)` (`vdom-5`, see docs/Backends/REFACTOR-INDEX.md row 13)
+14. `Watch(...)` (`vdom-5`, see REFACTOR-INDEX.md row 13)
     may only appear as a direct child of `Page(...)`, same as
     `State(...)`/`Computed(...)`; its `name` must resolve to a
     `State(...)`/`Computed(...)` declared on the same page (the same
@@ -98,7 +98,7 @@ Checks performed:
     reusing `_validate_action` -- so `then` may only target a real
     `State(...)` on the page, never a `Computed(...)`.
 15. `Repeat(...)`/`Show(...)` (`vdom-7`, see
-    docs/Backends/REFACTOR-INDEX.md row 15) are, unlike 13/14 above,
+    REFACTOR-INDEX.md row 15) are, unlike 13/14 above,
     real renderable content -- they may appear anywhere ordinary
     content can, not just as a direct `Page(...)` child.
     `Repeat(name, template=...)` needs a non-empty `name` resolving to
@@ -466,7 +466,7 @@ def _validate_responsive_style(node: ARKNode, *, path: str) -> None:
     v0.048 Stage B: `responsive_style={"(max-width: 600px)": {"display":
     "none"}}` -- a per-node prop any component may carry, extending the
     existing `style={...}` convention with a viewport-keyed variant
-    (see docs/DESIGN-NOTES.md, "v0.048: CSS media queries + `<head>`
+    (see docs/Foundational/DESIGN-NOTES.md, "v0.048: CSS media queries + `<head>`
     extension"). Validated eagerly and structurally, matching
     `Site.style()`/`Site.media_query()`'s discipline, since this
     compiles straight into the generated stylesheet rather than a
@@ -576,7 +576,7 @@ def _validate_page_head_extensions(node: ARKNode, *, path: str) -> None:
 
 def _validate_shell_persistent(node: ARKNode, *, path: str) -> None:
     """
-    htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): `shell_persistent`
+    htmx-4 (REFACTOR-INDEX.md row 9): `shell_persistent`
     is inert (not just unused, but never even checked) on a site that
     never sets `Site(app_shell=True)` -- this validates the prop's own
     shape regardless, the same "fail loudly at build time, not
@@ -665,7 +665,7 @@ def _validate_state_declaration(node: ARKNode, *, path: str, parent_is_page: boo
     name = node.props.get("name")
     if not isinstance(name, str) or not name:
         raise ValidationError(f"State(...) at {path} needs a non-empty string name.")
-    # `vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): `persist`
+    # `vdom-8` (REFACTOR-INDEX.md row 16): `persist`
     # defaults to `False` (unset is fine, mirroring every other
     # optional bool prop in this module) but a value that *is*
     # provided must actually be a bool -- a truthy non-bool (e.g. a

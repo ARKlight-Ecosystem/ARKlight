@@ -145,8 +145,8 @@ def test_image_src_relative_asset_path_rewritten_for_nested_pages():
 
 
 # ---------------------------------------------------------------------------
-# HTML backend refactor Stage 2 (docs/Backends/HTML-BACKEND-REFACTOR.md /
-# docs/Backends/REFACTOR-INDEX.md row 1, `html-2`): the
+# HTML backend refactor Stage 2 (HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] /
+# REFACTOR-INDEX.md row 1, `html-2`): the
 # `UNROUTED_REFERENCE_ATTRS` fix. `srcset`/`poster`/`action`/`formaction`
 # are now route/asset-rewritten the same way `href`/`src` already were,
 # instead of only triggering a build-time warning -- see

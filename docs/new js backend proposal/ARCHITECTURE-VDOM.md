@@ -171,7 +171,7 @@ snabbdom's core, pay for diffing once" trade-off applies directly to
 ARKlight's own JS backend (`arklight/backend/js/`), which --
 independently of this document, and unlike `oop-blog/` -- has already
 taken the first step described here. Cross-referenced from
-`docs/DESIGN-NOTES.md`'s "Reactive-core vdom staging" section and
+`docs/Foundational/DESIGN-NOTES.md`'s "Reactive-core vdom staging" section and
 `PROGRESS.md`'s snapshot table, not duplicated from them.
 
 ### 6.1 Where ARKlight already stands, relative to §1-§4 above
@@ -202,7 +202,7 @@ re-litigate whether to pull in `classModule`/`attributesModule`.
 
 ### 6.2 Proposal: keying strategy for Stage 4's list rendering
 
-`docs/DESIGN-NOTES.md`'s `v0.044` names per-item list rendering
+`docs/Foundational/DESIGN-NOTES.md`'s `v0.044` names per-item list rendering
 (`Repeat(state_name, template=fn)`) as "the single biggest lift" and
 the direct successor to the `v0.0035` addendum II write-up ("comma-
 joined display is a stopgap, not the end state"). This is exactly the
@@ -226,7 +226,7 @@ point of vendoring a diff/patch algorithm in Stage 1. Proposal:
   existing `NodeSpec`/schema nodes, same as every other page-facing
   IR construct), not an arbitrary JS render function — preserving the
   "the browser never executes anything ARKlight didn't ship"
-  guarantee `docs/DESIGN-NOTES.md`'s `v0.0035` design section states
+  guarantee `docs/Foundational/DESIGN-NOTES.md`'s `v0.0035` design section states
   as non-negotiable, and which this document's own hyperscript-based
   `h(sel, data, children)` approach (§1) is naturally compatible with
   since `h()` calls can be generated from IR nodes rather than
@@ -250,7 +250,7 @@ everything downstream of it in ARKlight's actual codebase.
 
 ### 6.4 What this section deliberately does not propose
 
-Matching §6 of `docs/DESIGN-NOTES.md`'s `v0.044` "explicitly out of
+Matching §6 of `docs/Foundational/DESIGN-NOTES.md`'s `v0.044` "explicitly out of
 scope" list, carried over here rather than re-decided: no adoption of
 snabbdom's `eventlisteners` module (ARKlight's existing hand-written
 `wireActions`/`arkApplyModifiers` dispatch already covers this, and

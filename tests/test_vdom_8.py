@@ -1,5 +1,5 @@
 """
-`vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): `State(name, initial,
+`vdom-8` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 16): `State(name, initial,
 persist=True)` opts a state key into `localStorage` persistence --
 across the API, Validation, the IR (`IRPage.persist`), the HTML backend
 (`data-ark-persist` hydration attribute), and the JS backend

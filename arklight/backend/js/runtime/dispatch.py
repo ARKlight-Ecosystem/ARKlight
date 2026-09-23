@@ -11,9 +11,8 @@ this module held through `htmx-2`; see git history / CHANGELOG.md
 vendored HTMX's own `hx-on:click="arkRunBehavior('<name>', this)"`
 attribute processing (landed at `htmx-1`).
 
-**`htmx-5`** (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 4 --
-Audit and remove remaining hand-rolled plumbing" / `docs/Backends/
-REFACTOR-INDEX.md` row 10) removes the `hx-on:click` mechanism
+**`htmx-5`** (see `HTMX-INTEGRATION.md` [retired -- see CHANGELOG.md] "Stage 4 --
+Audit and remove remaining hand-rolled plumbing" / `REFACTOR-INDEX.md` row 10) removes the `hx-on:click` mechanism
 entirely and folds behavior dispatch into this one function, renamed
 from `wireActionInterceptor` to `wireClickInterceptor` accordingly.
 
@@ -114,7 +113,7 @@ left open, not the "modifier timing" gap -- that was a documented,
 deliberate scope boundary here, later closed by the bug-fix pass
 below.
 
-**Bug fix (post-`htmx-5`, see `docs/bug_fixes.md` finding 1):** the
+**Bug fix (post-`htmx-5`, see `bug_fixes.md` finding 1):** the
 gap above was live long enough to ship -- every `Action.*` click fired
 immediately regardless of any declared modifier, because this
 listener never read `hx-trigger` at all. Fixed by having
@@ -151,7 +150,7 @@ handling for this branch yet (Section 23 of the proposal keeps
 initial scope small): every platform click runs immediately,
 unconditionally, the same as an unmodified `Action.*(...)` click.
 
-`htmx-4` (docs/Backends/REFACTOR-INDEX.md row 9) changed this
+`htmx-4` (REFACTOR-INDEX.md row 9) changed this
 function's signature (then still named `wireActionInterceptor`) from
 `wireActionInterceptor(store)` to `wireActionInterceptor(getStore)`,
 taking a zero-argument getter instead of a fixed store value. This is

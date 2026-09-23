@@ -1,6 +1,6 @@
 """
 Per-derivation JS runtime fragments (`vdom-4`, see
-`docs/Backends/REFACTOR-INDEX.md` row 12).
+`REFACTOR-INDEX.md` [retired -- see CHANGELOG.md] row 12).
 
 Mirrors `arklight.backend.js.actions`: each sibling module exports
 `NAME` (matching a key in `arklight.ir.schema.DERIVATION_REGISTRY`)

@@ -8,7 +8,7 @@ accepted Rei language ladder
 ([`docs/Implementation/REI-LANGUAGE-ADDENDUM.md`](../Implementation/REI-LANGUAGE-ADDENDUM.md)),
 and this proposal's own placeholder stages below use `DC0`-`DC5`
 labels, the same convention
-[`AVM-WASM-SANDBOX-PROPOSAL..md`](<../Far Future Concern/AVM-WASM-SANDBOX-PROPOSAL..md>)
+[`AVM-WASM-SANDBOX-PROPOSAL.md`](AVM-WASM-SANDBOX-PROPOSAL.md)
 uses for its own unaccepted `A0`-`A6` ladder. Real version numbers are
 assigned only if a maintainer accepts this.
 
@@ -90,7 +90,7 @@ output for a different kind of problem.
 
 ## 2. Explicitly not AVM
 
-[`AVM-WASM-SANDBOX-PROPOSAL..md`](<../Far Future Concern/AVM-WASM-SANDBOX-PROPOSAL..md>)
+[`AVM-WASM-SANDBOX-PROPOSAL.md`](AVM-WASM-SANDBOX-PROPOSAL.md)
 also proposes WebAssembly and is easy to confuse with this one --
 worth stating the boundary as plainly as Open question 7 already does
 for "the two Reis":

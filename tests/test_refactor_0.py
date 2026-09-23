@@ -1,18 +1,18 @@
 """
-`refactor-0` (see docs/Backends/REFACTOR-INDEX.md and
-docs/Backends/JS-BACKEND-REFACTOR-PLAN.md): the module split of
+`refactor-0` (see REFACTOR-INDEX.md [retired -- see CHANGELOG.md] and
+JS-BACKEND-REFACTOR-PLAN.md): the module split of
 `arklight/backend/js/render.py`'s old `_STATE_CORE_JS` / `_NOTIFY_JS`
 / `_NAV_HIGHLIGHT_JS` constants into
 `arklight/backend/js/runtime/{state,bindings,dispatch,nav,notify}.py`.
 
 At `refactor-0` a sixth sibling, `modifiers.py`, also existed here
 (holding `arkApplyModifiers`); `htmx-2` (see
-docs/Backends/HTMX-INTEGRATION.md "Stage 2 -- Modifiers") deleted it
+HTMX-INTEGRATION.md "Stage 2 -- Modifiers") deleted it
 along with the `data-ark-modifiers` attribute it used to parse, so
 this file's coverage of it is deleted too -- see
 `tests/test_event_modifiers.py` for `htmx-2`'s own coverage.
 
-`htmx-3` (see docs/Backends/HTMX-INTEGRATION.md "Stage 3") renamed
+`htmx-3` (see HTMX-INTEGRATION.md "Stage 3") renamed
 `dispatch.py`'s export from `WIRE_ACTIONS_JS` to
 `ACTION_INTERCEPTOR_JS` and replaced the `wireActions(store)` function
 it held with `wireActionInterceptor(getStore)` -- a single delegated
@@ -20,9 +20,8 @@ it held with `wireActionInterceptor(getStore)` -- a single delegated
 loop. This file's assertions below are updated for that rename; see
 `tests/test_htmx_3.py` for this stage's own dedicated coverage.
 
-`htmx-5` (see docs/Backends/HTMX-INTEGRATION.md "Stage 4 -- Audit and
-remove remaining hand-rolled plumbing" / docs/Backends/
-REFACTOR-INDEX.md row 10) renamed the export again, to
+`htmx-5` (see HTMX-INTEGRATION.md "Stage 4 -- Audit and
+remove remaining hand-rolled plumbing" / REFACTOR-INDEX.md row 10) renamed the export again, to
 `CLICK_INTERCEPTOR_JS` (function `wireClickInterceptor`), and -- more
 significantly for this file -- pulled it *out* of `STATE_CORE_JS`
 entirely, since it now also dispatches named-behavior clicks
@@ -87,11 +86,11 @@ def _stateful_ir():
 
 
 # --- New modules expose the fragments the merged staging table says
-# --- they should (docs/Backends/REFACTOR-INDEX.md row `refactor-0`).
+# --- they should (REFACTOR-INDEX.md row `refactor-0`).
 
 
 def test_state_module_exports_create_and_init_state():
-    # `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12) adds a second,
+    # `vdom-4` (REFACTOR-INDEX.md row 12) adds a second,
     # optional `computed` parameter to `createState` -- see
     # tests/test_vdom_4.py for dedicated coverage of that stage.
     assert "function createState(initial, computed)" in CREATE_STATE_JS
@@ -127,7 +126,7 @@ def test_state_core_reassembles_reactive_pieces_in_original_order():
     # tests/test_htmx_3.py and tests/test_htmx_5.py), which is no
     # longer part of this bundle at all. `createState`'s signature
     # gained a second, optional `computed` parameter at `vdom-4`
-    # (docs/Backends/REFACTOR-INDEX.md row 12) -- see
+    # (REFACTOR-INDEX.md row 12) -- see
     # tests/test_vdom_4.py.
     names = [
         "function createState(initial, computed)",

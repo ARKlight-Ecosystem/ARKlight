@@ -1,5 +1,5 @@
 """
-`vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13): watch effects via
+`vdom-5` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 13): watch effects via
 `Watch(name, then=Action.*(...))` -- across the API, Validation, IR
 build (declaration-order extraction), and the HTML/JS backends
 (`data-ark-watch` hydration + the `wireWatchers` runtime wiring, which

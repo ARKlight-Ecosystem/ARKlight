@@ -10,7 +10,7 @@ instance-scoped reactive state -- `Bind(...)`/`on_click=Action.*(...)`/
 `bind_class=Bind.when(...)`/`bind_value=Bind.model(...)` all work
 exactly like they would against a page-level `State(...)`, and two
 call sites of the same component never share one value. See
-`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
+`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` [retired -- see CHANGELOG.md]'s Stage
 4 row, and `tests/test_user_defined_components_stage0.py` through
 `tests/test_user_defined_components_stage3.py` for the earlier stages
 this mirrors the conventions of.

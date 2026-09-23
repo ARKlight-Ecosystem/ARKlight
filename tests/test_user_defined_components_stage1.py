@@ -8,7 +8,7 @@ the end-to-end path this all exists for: a typo'd call to a
 *registered user* component now gets the same "did you mean...?"
 treatment (and the same Stage 8 confusion-recording) a typo'd built-in
 like `Headign(...)` already got -- see
-`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
+`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` [retired -- see CHANGELOG.md]'s Stage
 1 row, and `tests/test_search_feedback.py` for the built-in-only
 version of the same tests this file mirrors.
 """

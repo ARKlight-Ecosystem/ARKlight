@@ -1,6 +1,6 @@
 """
 HTML Backend refactor, Stage 2 (see
-docs/Backends/HTML-BACKEND-REFACTOR.md / docs/Backends/REFACTOR-INDEX.md
+HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] / REFACTOR-INDEX.md
 row 1, `html-2`): the second of the six staged extractions splitting
 `arklight/backend/html/render.py`'s five unrelated jobs into their own
 modules.
@@ -16,7 +16,7 @@ page assembly.
 ## The `UNROUTED_REFERENCE_ATTRS` fix
 
 This module also lands the reachability fix
-`docs/Backends/HTML-BACKEND-REFACTOR.md`'s audit flagged as open:
+`HTML-BACKEND-REFACTOR.md`'s audit flagged as open:
 `srcset` (Picture/PictureSource), `poster` (Video), and `action`/
 `formaction` (Form and submit-capable Button/Input) previously fell
 through to a build-time warning (`_warn_unrouted_reference`, now

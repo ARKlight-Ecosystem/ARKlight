@@ -1,9 +1,9 @@
 """
 User-defined, reusable components -- v0.060, Stages 0-2.
 
-See `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` for
+See `USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` [retired -- see CHANGELOG.md] for
 the staged rollout this belongs to, and
-`docs/Foundational/user-defined-components.md` for the underlying
+`docs/Foundational/USER-DEFINED-COMPONENTS.md` for the underlying
 design (Option A vs. Option B).
 
 This module is the **hybrid** the implementation doc commits to:
@@ -38,7 +38,7 @@ so a caller doesn't have to pass `class_name=` by hand just to pick up
 sane default styling.
 
 Stage 3 (see
-`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
+`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
 3 row) gives `mode="registry"` its own real differentiator:
 `register_backend_render(name, backend_name, render_fn)` (surfaced on
 the decorated component as `.register_backend(backend_name)`, see
@@ -134,7 +134,7 @@ MAX_COMPONENT_EXPANSION_DEPTH = 64
 COMPONENT_ORIGIN_PROP_KEY = "__arklight_component_origin__"
 
 # v0.060, Stage 4 ("Component-owned state" -- see
-# docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md). The
+# USER-DEFINED-COMPONENTS-IMPLEMENTATION.md). The
 # namespaced key format a `state=`-declaring component's local state
 # names are rewritten into -- see `_namespaced_state_name`. Prefixed
 # the same way `COMPONENT_ORIGIN_PROP_KEY` is (an internal, dunder-
@@ -286,7 +286,7 @@ def call_render_fn(
 class Prop:
     """
     One entry in a component's props contract -- the `NodeSpec`-shaped
-    declaration `docs/Foundational/user-defined-components.md` (Section
+    declaration `docs/Foundational/USER-DEFINED-COMPONENTS.md` (Section
     3, "What this needs that ARKlight doesn't have yet") calls for.
 
         @component(props={"active": Prop(default=None)})
@@ -315,7 +315,7 @@ class ComponentState:
     """
     One entry in a component's `state={...}` declaration -- v0.060,
     Stage 4 ("Component-owned state", see
-    docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
+    USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
 
         @component(state={"open": ComponentState(False)})
         def Accordion(label=""):
@@ -356,7 +356,7 @@ class ComponentSpec:
     props: dict[str, Prop] = field(default_factory=dict)
     mode: str = "macro"
     # v0.060, Stage 2 ("Default styling hook" -- see
-    # docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md). An
+    # USER-DEFINED-COMPONENTS-IMPLEMENTATION.md). An
     # optional `{css-property: value}` dict, same shape `Site.style(...)`
     # already accepts (pseudo-class shorthand included), registered at
     # `component(..., default_style={...})` time and validated by
@@ -366,7 +366,7 @@ class ComponentSpec:
     # styling at all, unchanged from Stage 0/1 behavior.
     default_style: dict[str, str] | None = None
     # v0.060, Stage 3 ("Option B's real differentiator" -- see
-    # docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
+    # USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
     # `backend_name -> render_fn`, populated by
     # `register_backend_render(...)`/`.register_backend(...)` --
     # never at `component(...)`/`register_component(...)` registration
@@ -379,7 +379,7 @@ class ComponentSpec:
     # `_render_once`).
     backend_render_fns: dict[str, RenderFn] = field(default_factory=dict)
     # v0.060, Stage 4 ("Component-owned state" -- see
-    # docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
+    # USER-DEFINED-COMPONENTS-IMPLEMENTATION.md).
     # `local_name -> ComponentState`, registered at `component(...,
     # state={...})` time and validated by `arklight.api.component` the
     # same way `default_style` already is. Empty for every component
@@ -666,7 +666,7 @@ def _apply_default_class(rendered: Any, class_name: str) -> Any:
     Stage 2: fold `class_name` onto `rendered`'s root, the mechanism
     behind "a user component can ship with sane default styling
     instead of forcing every caller to pass `class_name=`"
-    (`user-defined-components.md`, Option A's requirements list).
+    (`USER-DEFINED-COMPONENTS.md`, Option A's requirements list).
 
     Only applies when `rendered` is itself an `ARKNode` -- a component
     whose render function returns a list (multiple top-level siblings)
@@ -809,7 +809,7 @@ def _rewrite_component_state_refs(value: Any, name_map: dict[str, str]) -> Any:
     A name *not* in `name_map` (a prop value the caller passed in from
     the page's own `State(...)`, e.g. `Card(count_state=Bind("total"))`
     -- see the module docstring's "consume `Bind(...)`/`ActionRef`
-    values passed in as props" carve-out `user-defined-components.md`
+    values passed in as props" carve-out `USER-DEFINED-COMPONENTS.md`
     Section 4 already established as in-scope before this stage even
     existed) is left completely untouched; only a component's *own*
     locally-declared state names are ever rewritten here.
@@ -899,7 +899,7 @@ def _render_once(
     """
     The hybrid dispatch itself -- Option A vs. Option B, as an
     `if`/`elif` ladder over `spec.mode`, exactly as
-    `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`
+    `USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`
     describes it. Every branch is required to return something
     `expand_node` can keep expanding (an `ARKNode`, a string/number, a
     list of either, or `None`/`False`) -- the same shape
@@ -1027,7 +1027,7 @@ def expand_node(
     a `mode="registry"` backend override (`arklight.ir.
     component_dispatch`, which calls `expand_node(rendered)` bare) uses
     a state-owning component: not supported yet, see this module's own
-    docstring and `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s
+    docstring and `USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s
     Stage 4 "explicitly out of scope" note.
     """
     spec = COMPONENT_REGISTRY.get(node.type)

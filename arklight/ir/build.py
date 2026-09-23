@@ -39,7 +39,7 @@ class IRNode:
     type: str
     props: dict[str, Any] = field(default_factory=dict)
     children: list["IRNode | str"] = field(default_factory=list)
-    # v0.060, Stage 3 (docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md):
+    # v0.060, Stage 3 (USER-DEFINED-COMPONENTS-IMPLEMENTATION.md [retired -- see CHANGELOG.md]):
     # set (by `_ark_node_to_ir_node`, popped straight off the incoming
     # `ARKNode`'s props under `COMPONENT_ORIGIN_PROP_KEY`) when this
     # node is the rendered root of a `mode="registry"` component call
@@ -63,7 +63,7 @@ class IRPage:
     # prop on some other node -- state belongs to the page, the same
     # way `title` does. Empty for pages that declare no state.
     state: dict[str, Any] = field(default_factory=dict)
-    # `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12): page-scoped
+    # `vdom-4` (REFACTOR-INDEX.md row 12): page-scoped
     # derived state declared via `Computed(...)`, extracted the same
     # way `state` above is. `computed` is an ordered (`name`, spec)
     # list, one entry per `Computed(...)` on the page, in dependency
@@ -82,7 +82,7 @@ class IRPage:
     # `Computed(...)`.
     computed: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     computed_initial: dict[str, Any] = field(default_factory=dict)
-    # `vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13): page-scoped
+    # `vdom-5` (REFACTOR-INDEX.md row 13): page-scoped
     # watch effects declared via `Watch(name, then=Action.*(...))`,
     # extracted the same way `state`/`computed` above are. Each entry
     # is `{"name": ..., "then": {"action": ..., "state": ...,
@@ -96,7 +96,7 @@ class IRPage:
     # other, so there's no dependency graph to topologically sort.
     # Empty for pages that declare no `Watch(...)`.
     watch: list[dict[str, Any]] = field(default_factory=list)
-    # `vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): names of the
+    # `vdom-8` (REFACTOR-INDEX.md row 16): names of the
     # `State(...)` keys declared with `persist=True`, in declaration
     # order. Carries no value of its own (unlike `state`) -- it's a
     # plain list of keys the JS runtime should read an override for
@@ -155,19 +155,19 @@ class WebsiteIR:
     # dict), never a raw CSS string, same boundary the rest of the
     # project holds. Empty for sites that never call `site.style(...)`.
     custom_styles: dict[str, dict[str, str]] = field(default_factory=dict)
-    # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): (condition, class_name,
+    # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md): (condition, class_name,
     # {prop: value}) triples registered via `site.media_query(...)`.
     # Kept separate from `custom_styles` -- see `Site.media_query`'s
     # docstring for why this isn't folded into the same dict. Empty
     # for sites that never call `site.media_query(...)` (i.e. every
     # site that stays fully within the intrinsic layout model).
     media_queries: list = field(default_factory=list)
-    # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): every `ExperimentalUsage`
+    # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md): every `ExperimentalUsage`
     # recorded during compilation, in call order -- the CLI drains this
     # (deduplicated by feature id) to print the end-of-build summary
     # block via `arklight.experimental.print_summary`.
     experimental_usages: list = field(default_factory=list)
-    # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md, feature
+    # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md, feature
     # `provider-integration`; `Provider` stage 2 of 6, `v0.066` -- see
     # `docs/version history/v0.066.md` and `arklight/provider.py`):
     # straight passthrough of `Site(provider=...)`, same shape as
@@ -195,7 +195,7 @@ class WebsiteIR:
     # are, overrides this per route.
     lang: str = "en"
     # v0.048 Stage B ("CSS media queries + `<head>` extension" -- see
-    # docs/DESIGN-NOTES.md): (condition, generated_class_name,
+    # docs/Foundational/DESIGN-NOTES.md): (condition, generated_class_name,
     # {prop: value}) triples, one per media condition on every node
     # that carried a `responsive_style={...}` prop anywhere on the
     # site. Populated by `build_website_ir`/`_ark_node_to_ir_node`
@@ -207,7 +207,7 @@ class WebsiteIR:
     # a synthesized per-node class instead of an author-chosen one.
     # Empty for sites that never use `responsive_style=`.
     responsive_rules: list = field(default_factory=list)
-    # Structural addendum (see docs/DESIGN-NOTES.md "CSS selector
+    # Structural addendum (see docs/Foundational/DESIGN-NOTES.md "CSS selector
     # algebra + at-rule vocabulary"): straight passthroughs of
     # `Site.style_selector`/`keyframes`/`font_face`/`container_query`/
     # `supports`/`page_rule`/`import_style` registrations. Each keeps
@@ -222,7 +222,7 @@ class WebsiteIR:
     supports_rules: list = field(default_factory=list)
     page_rules: list = field(default_factory=list)
     style_imports: list = field(default_factory=list)
-    # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): straight
+    # htmx-4 (REFACTOR-INDEX.md row 9): straight
     # passthrough of `Site(app_shell=...)`, same shape as `lang`
     # above. `HTMLBackend` reads this to decide whether to emit
     # `hx-boost="true"` on `<body>` and route the page's state marker
@@ -269,7 +269,7 @@ class WebsiteIR:
     # (docs/Foundational/EXPERIMENTAL-APIS.md): this is a build-tool-
     # behavior toggle, not a design decision the site file itself makes.
     devtools_console_reminder: bool = True
-    # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): `(output_files: dict[str,
+    # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md): `(output_files: dict[str,
     # str]) -> dict[str, str]` callables registered via
     # `site.register_script_extension(...)`
     # (arklight.backend.script_extension.register), in call order --
@@ -294,7 +294,7 @@ class _ResponsiveStyleCollector:
     identical output. Also records one `ExperimentalUsage` per node
     (not per media condition) under the same `css-media-queries`
     feature `Site.media_query(...)` already gates (see
-    docs/EXPERIMENTAL-APIS.md): a viewport-keyed `@media` rule is a
+    docs/Foundational/EXPERIMENTAL-APIS.md): a viewport-keyed `@media` rule is a
     viewport-keyed `@media` rule regardless of which authoring surface
     produced it.
     """
@@ -798,16 +798,16 @@ def build_website_ir(
     `supports_rules`/`page_rules`/`style_imports` are the structural
     CSS addendum's registrations (`Site.style_selector`/`keyframes`/
     `font_face`/`container_query`/`supports`/`page_rule`/
-    `import_style` -- see docs/DESIGN-NOTES.md), forwarded to the
+    `import_style` -- see docs/Foundational/DESIGN-NOTES.md), forwarded to the
     matching `WebsiteIR` field unchanged. All default to empty/None so
     existing callers are unaffected.
 
-    `app_shell` (htmx-4, see docs/Backends/REFACTOR-INDEX.md row 9) is
+    `app_shell` (htmx-4, see REFACTOR-INDEX.md row 9) is
     `Site(app_shell=...)`'s straight passthrough, same shape as
     `lang`. Defaults to `False`, unchanged output for existing callers.
 
     `raw_postprocessors` is `site.register_script_extension(...)`'s
-    straight passthrough (docs/EXPERIMENTAL-APIS.md; no longer fed by
+    straight passthrough (docs/Foundational/EXPERIMENTAL-APIS.md; no longer fed by
     the deprecated `Site.raw_postprocess(...)`) -- a list of
     `(output_files) -> output_files` callables `arklight.compiler.
     pipeline.build` runs, in order, after every backend's own

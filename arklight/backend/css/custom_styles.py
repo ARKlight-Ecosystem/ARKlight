@@ -1,14 +1,14 @@
 """
 CSS Backend -- custom class rendering (`site.style(...)` registrations).
 
-CSS backend refactor, Stage 3 (see docs/CSS-BACKEND-REFACTOR.md):
+CSS backend refactor, Stage 3 (see CSS-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md]):
 `_render_custom_styles` used to live inline in `render.py` alongside
 static CSS text and orchestration. It's pure -- a `dict[str, dict[str,
 str]]` in, a CSS string out -- with no dependency on the rest of the
 backend, so it moves out unchanged into its own module, same pattern as
 Stage 2's `design_tokens.py`.
 
-CSS backend, pseudo-class shorthand (docs/CSS-BACKEND-REFACTOR.md
+CSS backend, pseudo-class shorthand (CSS-BACKEND-REFACTOR.md
 "Stage 2"): a rules key may also be ":<pseudo>:<property>" (e.g.
 ":hover:background"), validated and split out by
 `arklight.api.Site.style()` before it ever reaches `custom_styles` --
@@ -24,7 +24,7 @@ import re
 # Mirrors `arklight.api._CSS_PSEUDO_RULE_RE` exactly (kept as a
 # separate constant, not an import, so this module has no dependency
 # on `arklight.api` -- see the module docstring in
-# `docs/CSS-BACKEND-REFACTOR.md` on why each backend module stays a
+# `CSS-BACKEND-REFACTOR.md` on why each backend module stays a
 # pure function of its own inputs). `Site.style()` has already
 # rejected anything that wouldn't match this, so a non-match here would
 # mean a caller went around `Site.style()` -- see `_split_rules` below.
@@ -100,7 +100,7 @@ def render_custom_styles(custom_styles: dict[str, dict[str, str]]) -> str:
 def render_responsive_styles(responsive_rules: list[tuple[str, str, dict[str, str]]]) -> str:
     """
     v0.048 Stage B ("CSS media queries + `<head>` extension" -- see
-    docs/DESIGN-NOTES.md) -- turn `(condition, generated_class,
+    docs/Foundational/DESIGN-NOTES.md) -- turn `(condition, generated_class,
     {prop: value})` triples (one per media condition on every node
     that carried a `responsive_style={...}` prop, collected by
     `arklight.ir.build._ResponsiveStyleCollector`) into real
@@ -120,7 +120,7 @@ def render_responsive_styles(responsive_rules: list[tuple[str, str, dict[str, st
     Property names get the same `_`->`-` conversion the inline
     `style={...}` prop's `_style_dict_to_css` already does (v0.048
     Stage B "extends the existing `style={...}` convention" -- see
-    docs/DESIGN-NOTES.md), unlike `render_media_queries`/
+    docs/Foundational/DESIGN-NOTES.md), unlike `render_media_queries`/
     `render_custom_styles` above, which expect literal CSS property
     names already, since those are registered through `Site.style()`/
     `Site.media_query()` rather than authored as a Python-kwarg-shaped
@@ -135,9 +135,9 @@ def render_responsive_styles(responsive_rules: list[tuple[str, str, dict[str, st
 
     blocks = [
         "\n/* v0.048 Stage B: @media blocks -- generated from nodes' "
-        "`responsive_style={...}` props. See docs/DESIGN-NOTES.md "
+        "`responsive_style={...}` props. See docs/Foundational/DESIGN-NOTES.md "
         '("v0.048: CSS media queries + `<head>` extension") and '
-        "docs/EXPERIMENTAL-APIS.md (gated under `css-media-queries`, "
+        "docs/Foundational/EXPERIMENTAL-APIS.md (gated under `css-media-queries`, "
         "same as `site.media_query(...)`). */",
     ]
     for condition, class_name, rules in responsive_rules:
@@ -154,7 +154,7 @@ def render_responsive_styles(responsive_rules: list[tuple[str, str, dict[str, st
 
 def render_media_queries(media_queries: list[tuple[str, str, dict[str, str]]]) -> str:
     """
-    EXPERIMENTAL (see `docs/EXPERIMENTAL-APIS.md`) -- turn
+    EXPERIMENTAL (see `docs/Foundational/EXPERIMENTAL-APIS.md`) -- turn
     `site.media_query(condition, class_name, rules)` registrations
     into real `@media (condition) { .class_name { ... } }` blocks,
     kept in registration order (unlike `render_custom_styles`, which
@@ -167,7 +167,7 @@ def render_media_queries(media_queries: list[tuple[str, str, dict[str, str]]]) -
 
     blocks = [
         "\n/* Experimental: @media blocks -- registered via "
-        "`site.media_query(...)`. See docs/EXPERIMENTAL-APIS.md. */",
+        "`site.media_query(...)`. See docs/Foundational/EXPERIMENTAL-APIS.md. */",
     ]
     for condition, class_name, rules in media_queries:
         lines = [f"@media ({condition}) {{", f"  .{class_name} {{"]

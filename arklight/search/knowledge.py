@@ -4,7 +4,7 @@ registered *user* component (`arklight.ir.components.ComponentSpec`)
 is now, optionally, part of the same knowledge base a typo gets ranked
 against -- see `component_symbol_fact`/`build_knowledge_base`'s
 `components=` parameter below, and
-`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
+`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` [retired -- see CHANGELOG.md]'s Stage
 1 row for why: previously `build_knowledge_base()` only ever read
 `arklight.ir.schema.SCHEMA` (the closed, built-in vocabulary), so a
 typo'd call to a real, registered user component (`NavBarr(...)`

@@ -84,7 +84,7 @@ from arklight.api import (
     # vocabulary") -- previously defined in arklight/api.py but missing
     # from this package's `import` list, so `from arklight import *`
     # couldn't reach them even though `from arklight.api import Picture`
-    # (etc.) worked. See docs/DESIGN-NOTES.md, "v0.004: CLI scaffolding
+    # (etc.) worked. See docs/Foundational/DESIGN-NOTES.md, "v0.004: CLI scaffolding
     # (`arklight new`)", for how this was found.
     OrderedList,
     DescriptionList,
@@ -129,7 +129,7 @@ from arklight.api import (
     PlatformAPI,
     PlatformAPIRef,
     Provider,
-    # `vdom-4`..`vdom-7` (docs/Backends/REFACTOR-INDEX.md rows 12/13/15)
+    # `vdom-4`..`vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] rows 12/13/15)
     # + v0.062: previously defined in arklight/api.py but missing from
     # this package's own `import` list, same gap
     # `tests/test_package_exports.py` already found and fixed once for

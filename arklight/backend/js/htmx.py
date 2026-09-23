@@ -1,6 +1,6 @@
 """
-Vendored HTMX -- htmx-1 (see docs/Backends/HTMX-INTEGRATION.md "Stage
-1 -- Behaviors" / docs/Backends/REFACTOR-INDEX.md row 4).
+Vendored HTMX -- htmx-1 (see HTMX-INTEGRATION.md [retired -- see CHANGELOG.md] "Stage
+1 -- Behaviors" / REFACTOR-INDEX.md row 4).
 
 Source: htmx (https://htmx.org / https://github.com/bigskysoftware/htmx),
 Zero-Clause BSD licensed, version 2.0.10,
@@ -19,9 +19,8 @@ IIFE that assigns `window.htmx`, and simply concatenated ahead of
 ARKlight's own `arklight.js` IIFE in `_build_runtime_js()`
 (`arklight/backend/js/render.py`).
 
-`htmx-5` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 4 -- Audit
-and remove remaining hand-rolled plumbing" / `docs/Backends/
-REFACTOR-INDEX.md` row 10) removed the reason the two closures ever
+`htmx-5` (see `HTMX-INTEGRATION.md` "Stage 4 -- Audit
+and remove remaining hand-rolled plumbing" / `REFACTOR-INDEX.md` row 10) removed the reason the two closures ever
 needed to interact at all: through `htmx-4`, HTMX's `hx-on:*`
 attribute processing dispatched into `window.arkRunBehavior` for every
 named-behavior click -- which meant constructing a function from a

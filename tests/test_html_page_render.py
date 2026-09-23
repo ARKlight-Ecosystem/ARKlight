@@ -1,7 +1,7 @@
 """
 Unit tests for `arklight/backend/html/page_render.py` -- HTML backend
-refactor Stage 5 (see docs/Backends/HTML-BACKEND-REFACTOR.md /
-docs/Backends/REFACTOR-INDEX.md row 8, `html-5`).
+refactor Stage 5 (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] /
+REFACTOR-INDEX.md row 8, `html-5`).
 
 These test `_render_bind`/`_render_children`/`_render_node`/
 `_render_page` directly, independent of `HTMLBackend.render`/a full IR

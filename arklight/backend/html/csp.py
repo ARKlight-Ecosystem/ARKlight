@@ -77,7 +77,7 @@ Policy">` at all: the tag is inert, the page renders exactly as if it
 weren't there.
 
 **`raw_postprocess` interaction -- historical note (see
-`docs/EXPERIMENTAL-APIS.md`, `arklight/experimental.py`'s
+`docs/Foundational/EXPERIMENTAL-APIS.md`, `arklight/experimental.py`'s
 `raw-postprocess` entry for the full deprecation text).**
 `Site.raw_postprocess(fn)` is officially deprecated and no longer runs
 anything, so it can no longer inject an inline `<script>` that this

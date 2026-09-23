@@ -1,5 +1,5 @@
 """
-`simple` template for `arklight new` -- see docs/DESIGN-NOTES.md,
+`simple` template for `arklight new` -- see docs/Foundational/DESIGN-NOTES.md,
 "v0.004: CLI scaffolding (`arklight new`)".
 
 Beginner-shaped: a single `site.py` with two inline pages, mirroring
