@@ -157,6 +157,41 @@ See that file for the full resolution rules and
 `arklight/parser/loader.py` for how the resolved bindings land in each
 file's namespace before its own code executes.
 
+## Bracket-nesting indentation is checked, not just style
+
+Python doesn't care how a continuation line inside an open `(`, `[`,
+or `{` is indented -- everything up to the matching bracket is one
+logical line, so this compiles under plain Python even though it
+reads as a flat, unnested column:
+
+```python
+Page(
+Button("ok"),
+Text("hi"),
+)
+```
+
+ARKlight is stricter: a line continuing an open bracket must be
+indented *further* than the line that opened it, or the build fails
+with a `BracketIndentationError` naming the file and line. A line that
+only closes the bracket (a lone `)`, `]`, `}`, or a run of those,
+optionally with a trailing comma) is exempt -- closing flush with the
+opener's own indentation is the idiomatic style and always allowed:
+
+```python
+Page(
+    Button("ok"),
+    Text("hi"),
+)
+```
+
+This check runs on every build, right alongside preamble resolution
+(`arklight.parser.preamble.prepare_source`), as its own diagnostic in
+`arklight/parser/indentation.py` -- not a `PreambleError`, but a plain
+`SyntaxError` subclass, since it has nothing to do with `# include`/
+`# define` and both `arklight.parser.loader` and `arklight.config`
+catch it separately alongside `PreambleError`.
+
 ## Internal links are relative, not root-absolute
 
 `Link("About", href="/about")` refers to the *route* `"/about"`, the

@@ -218,24 +218,27 @@ arklight search <name>
   closed JS vocabulary: an `on_click=`/`on_reveal=` behavior (`toggle`,
   `reveal`), an `Action.*` name (`Action.increment` or bare
   `increment`), an event-modifier token (`debounce`), a `Derive.*`
-  name (`Derive.sum` or bare `sum`), or a `Predicate.*` name
-  (`Predicate.truthy` or bare `truthy`). The `Action.`/`Derive.`/
-  `Predicate.` prefix, if given, is matched case-insensitively and
-  stripped -- both the dotted authoring form and the bare registry key
-  resolve to the same entry.
+  name (`Derive.sum` or bare `sum`), a `Predicate.*` name
+  (`Predicate.truthy` or bare `truthy`), or a `PlatformAPI.*` name
+  (`PlatformAPI.notify` or bare `notify`). The `Action.`/`Derive.`/
+  `Predicate.`/`PlatformAPI.` prefix, if given, is matched
+  case-insensitively and stripped -- both the dotted authoring form
+  and the bare registry key resolve to the same entry.
 - Checked in this order: built-in components (`SCHEMA`) -> a
   project's own registered components (`COMPONENT_REGISTRY`) ->
   `on_click`/`on_reveal` behaviors -> `Action.*` -> event modifiers ->
-  `Derive.*` -> `Predicate.*`. Built-ins win a component-name
-  collision with a registered component; the JS-vocabulary registries
-  don't in practice collide with component names at all (PascalCase
-  vs. snake_case).
+  `Derive.*` -> `Predicate.*` -> `PlatformAPI.*`. Built-ins win a
+  component-name collision with a registered component; the
+  JS-vocabulary registries don't in practice collide with component
+  names at all (PascalCase vs. snake_case).
 - For a component match, prints its schema: required/optional props,
   whether it allows children, and whether it's a `Bind(...)`-able
   target (i.e. `text_only_children`). For a JS-vocabulary match,
   prints its closed shape instead -- extra props for a behavior, args
   for an action, name-count/extra-args for a derivation or predicate,
-  whether an event modifier takes a value.
+  whether an event modifier takes a value, or (for a `PlatformAPI.*`
+  match) its args, required permissions, and which backend(s), if any,
+  currently implement the capability.
 - Case-insensitive exact match wins outright, in any of the above. If
   nothing matches anywhere, prints up to 5 typo-tolerant "did you
   mean" suggestions (or says plainly that nothing was close enough) --
@@ -251,6 +254,7 @@ arklight search increment
 arklight search Action.increment   # same result, dotted authoring form
 arklight search Derive.sum
 arklight search toggle             # on_click behavior, not Action.toggle_bool
+arklight search notify             # PlatformAPI.notify, incl. permissions + implementing backends
 ```
 
 - `--limit N` -- max number of "did you mean" suggestions on a miss
@@ -278,11 +282,12 @@ arklight search --retrieve-doc [index | --<folder> [--file NAME]]
 
 - `--retrieve-doc` -- switches `search` from component lookup into
   **doc-tree retrieval**: prints exact, unmodified file contents from
-  `docs/`, nothing invented or summarized. Mutually exclusive with a
-  component `name` lookup (the literal `index` is accepted in its
-  place, meaning the same as the bare form) and with `--serve`. Only
-  works from an ARKlight source checkout -- `docs/` isn't shipped in
-  the installed package.
+  `docs/`, nothing invented or summarized -- now rendered as styled
+  Markdown (see `--color`) rather than raw bytes. Mutually exclusive
+  with a component `name` lookup (the literal `index` is accepted in
+  its place, meaning the same as the bare form) and with `--serve`.
+  Only works from an ARKlight source checkout -- `docs/` isn't shipped
+  in the installed package.
 - No folder flag -- prints the root `docs/README.md`, plus a footer
   listing the folder flags below.
 - A folder flag (`--foundational`, `--backends`, `--proposals`,
@@ -299,6 +304,18 @@ arklight search --retrieve-doc [index | --<folder> [--file NAME]]
   posture as component lookup's own suggestions. `--file` without a
   preceding folder flag is a hard error naming the folder the file
   actually lives in, if one matches.
+- `--section QUERY`, scoped to a preceding folder flag + `--file NAME`
+  -- prints just one `##` section of that file instead of the whole
+  thing. `QUERY` is a section number (the heading's own `## N. Title`
+  numbering if the file uses one, else its 1-based position in the
+  file), a heading-text fragment (matched the same way `--file`
+  matches filenames, with a "did you mean" on a near miss), or both
+  together (`--section '3 terminology'`).
+- `--color {auto,always,never}` -- controls ANSI styling of the
+  printed Markdown. `auto` (default) styles it when stdout is a
+  terminal and `NO_COLOR` isn't set; `always` forces styling (e.g.
+  piping to `less -R`); `never` prints the raw Markdown bytes
+  untouched.
 - `--limit`/`--near`/`--accept` are component-lookup-only and are
   ignored (with a notice) alongside `--retrieve-doc`.
 
@@ -306,6 +323,8 @@ arklight search --retrieve-doc [index | --<folder> [--file NAME]]
 arklight search --retrieve-doc
 arklight search --retrieve-doc --foundational
 arklight search --retrieve-doc --foundational --file architecture
+arklight search --retrieve-doc --foundational --file architecture --section '3 terminology'
+arklight search --retrieve-doc --foundational --file architecture --color always | less -R
 ```
 
 ```bash
