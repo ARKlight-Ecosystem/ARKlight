@@ -14,6 +14,7 @@ def _args(**overrides):
     defaults = dict(
         name=None,
         file=None,
+        section=None,
         limit=5,
         near=None,
         accept=False,
@@ -129,3 +130,82 @@ def test_version_history_folder_parses_despite_different_header_column():
     output = run_retrieve_doc(_args(version_history=True))
     assert "v0.001" in output
     assert "v0.063" in output
+
+
+# ---------------------------------------------------------------------------
+# --section
+# ---------------------------------------------------------------------------
+
+
+def test_section_by_positional_number_on_unnumbered_headings():
+    output = run_retrieve_doc(_args(foundational=True, file="architecture", section="2"))
+    assert "-- section 2: Core Principles" in output
+    assert "## Core Principles" in output
+    assert "Flask-like simplicity" in output
+    # Only that one section -- the next heading's content is absent.
+    assert "## Compiler Pipeline" not in output
+
+
+def test_section_by_text_fragment_case_and_punctuation_insensitive():
+    canonical = run_retrieve_doc(_args(foundational=True, file="architecture", section="2"))
+    for variant in ("core principles", "Core-Principles", "CORE PRINCIPLES"):
+        assert run_retrieve_doc(_args(foundational=True, file="architecture", section=variant)) == canonical
+
+
+def test_section_by_declared_number_on_a_numbered_doc():
+    output = run_retrieve_doc(
+        _args(proposals=True, file="platform-api-ir-proposal", section="3")
+    )
+    assert "## 3. Terminology" in output
+    assert "Platform backend" in output
+
+
+def test_section_by_number_and_text_together():
+    by_number_only = run_retrieve_doc(
+        _args(proposals=True, file="platform-api-ir-proposal", section="3")
+    )
+    by_both = run_retrieve_doc(
+        _args(proposals=True, file="platform-api-ir-proposal", section="3 terminology")
+    )
+    assert by_number_only == by_both
+
+
+def test_section_declared_number_is_not_confused_with_positional_index():
+    # "Terminology" is declared "## 3." in the file but isn't the 3rd
+    # `##` heading overall (earlier unnumbered headings like "Status"
+    # and "Framing note" precede the numbered ones).
+    output = run_retrieve_doc(
+        _args(proposals=True, file="platform-api-ir-proposal", section="3")
+    )
+    assert "-- section 3: Terminology" in output
+
+
+def test_section_requires_file(tmp_path):
+    with pytest.raises(DocRetrievalError) as excinfo:
+        run_retrieve_doc(_args(foundational=True, section="2"))
+    assert "--section requires --file NAME" in str(excinfo.value)
+
+
+def test_section_without_any_folder_flag_is_a_hard_error():
+    with pytest.raises(DocRetrievalError) as excinfo:
+        run_retrieve_doc(_args(section="2"))
+    assert "--section requires a folder flag" in str(excinfo.value)
+
+
+def test_section_unmatched_text_suggests_close_matches():
+    with pytest.raises(DocRetrievalError) as excinfo:
+        run_retrieve_doc(_args(foundational=True, file="architecture", section="core principals"))
+    assert "Did you mean" in str(excinfo.value)
+    assert "Core Principles" in str(excinfo.value)
+
+
+def test_section_number_out_of_range_lists_available_sections():
+    with pytest.raises(DocRetrievalError) as excinfo:
+        run_retrieve_doc(_args(foundational=True, file="architecture", section="999"))
+    message = str(excinfo.value)
+    assert "this file has 11 section(s)" in message
+    assert "1. Vision" in message
+
+
+def test_ignored_flag_notices_unaffected_by_section_default():
+    assert ignored_flag_notices(_args()) == []

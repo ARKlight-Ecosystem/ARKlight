@@ -37,6 +37,7 @@ from arklight.cli.deploy import DeployError
 from arklight.cli.desktop import DesktopError
 from arklight.cli.doc_retrieval import DOC_FOLDERS, DocRetrievalError, ignored_flag_notices, run_retrieve_doc
 from arklight.cli.license_gate import ensure_license_accepted
+from arklight.cli.mdrender import render_markdown, resolve_color
 from arklight.cli.whats_new import read_version, show_release_notes_if_new
 from arklight.cli.scaffold import ScaffoldError, new_project
 from arklight.cli.search import record_acceptance, resolve_exact, search_component
@@ -885,15 +886,20 @@ def _cmd_search(args: argparse.Namespace) -> int:
             print(f"arklight search: {notice}", file=sys.stderr)
 
         try:
-            print(run_retrieve_doc(args))
+            output = run_retrieve_doc(args)
         except DocRetrievalError as exc:
             print(f"arklight search: {exc}", file=sys.stderr)
             return 1
+        print(render_markdown(output, color=resolve_color(args.color)))
         return 0
 
     doc_flags_used = [folder.flag for folder in DOC_FOLDERS if getattr(args, folder.attr, False)]
     if args.file is not None:
         doc_flags_used.append("--file")
+    if getattr(args, "section", None) is not None:
+        doc_flags_used.append("--section")
+    if getattr(args, "color", "auto") != "auto":
+        doc_flags_used.append("--color")
     if doc_flags_used:
         print(
             f"arklight search: {', '.join(doc_flags_used)} only apply with "
@@ -1425,7 +1431,8 @@ def main(argv: list[str] | None = None) -> int:
         "retrieval: bare, prints the root docs/README.md; add a folder "
         "flag (--foundational, --proposals, ...) to print that folder's "
         "own README.md index; add --file NAME to also print one file's "
-        "full contents. Mutually exclusive with a component 'name' lookup "
+        "full contents, or --file NAME --section QUERY for just one "
+        "section of it. Mutually exclusive with a component 'name' lookup "
         "(the literal 'index' is accepted in its place) and with --serve.",
     )
     doc_folder_group = search_parser.add_mutually_exclusive_group()
@@ -1447,6 +1454,28 @@ def main(argv: list[str] | None = None) -> int:
         "full contents after the folder index. Matched case-insensitively "
         "against the folder's filenames by stem, with spaces/hyphens/"
         "underscores normalized (e.g. --file architecture).",
+    )
+    search_parser.add_argument(
+        "--section",
+        dest="section",
+        metavar="QUERY",
+        default=None,
+        help="With --retrieve-doc, --file NAME, and a folder flag, print "
+        "only one `##` section of that file instead of the whole thing. "
+        "QUERY is a section number (that heading's own '## N. Title' "
+        "numbering if the file uses one, else its 1-based position in the "
+        "file), a heading-text fragment (matched the same way --file "
+        "matches filenames, with a 'did you mean' on a near miss), or both "
+        "together, e.g. --section '3 terminology'.",
+    )
+    search_parser.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="With --retrieve-doc, control ANSI styling of the printed "
+        "Markdown. 'auto' (default) styles it when stdout is a terminal "
+        "and NO_COLOR isn't set; 'always' forces styling (e.g. piping to "
+        "`less -R`); 'never' prints the raw Markdown bytes untouched.",
     )
     search_parser.set_defaults(func=_cmd_search)
 
