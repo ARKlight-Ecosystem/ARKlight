@@ -308,7 +308,16 @@ def test_enable_pwa_with_install_button_records_experimental_usage_and_injects(t
 
     html = (out_dir / "index.html").read_text(encoding="utf-8")
     assert 'id="ark-pwa-install"' in html
-    assert "beforeinstallprompt" in html
+    # The click/beforeinstallprompt/appinstalled wiring lives in the
+    # external ark-pwa.js, not inlined into the page -- an inline
+    # <script> here would be silently blocked by the default strict
+    # CSP's `script-src 'self'` (no 'unsafe-inline'). See pwa.py's
+    # module docstring.
+    assert "beforeinstallprompt" not in html
+    from arklight.pwa import PWA_RUNTIME_NAME
+
+    runtime = (out_dir / PWA_RUNTIME_NAME).read_text(encoding="utf-8")
+    assert "beforeinstallprompt" in runtime
 
 
 def test_enable_pwa_install_button_is_idempotent_on_rerun(tmp_path):
