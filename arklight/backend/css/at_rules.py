@@ -1,6 +1,6 @@
 """
 CSS Backend -- at-rule + selector-rule rendering (structural addendum,
-see docs/DESIGN-NOTES.md "CSS selector algebra + at-rule vocabulary").
+see docs/Foundational/DESIGN-NOTES.md "CSS selector algebra + at-rule vocabulary").
 
 Same discipline as `custom_styles.py`'s `render_*` functions: each
 function here is pure -- structured data in, a CSS string out -- with
@@ -38,7 +38,7 @@ def render_selector_rules(selector_rules: list[tuple[str, dict[str, str]]]) -> s
 
     blocks = [
         "\n/* Structural CSS selectors -- registered via "
-        "`site.style_selector(...)`. See docs/DESIGN-NOTES.md "
+        "`site.style_selector(...)`. See docs/Foundational/DESIGN-NOTES.md "
         '("CSS selector algebra + at-rule vocabulary"). */',
     ]
     for selector, rules in selector_rules:

@@ -59,7 +59,7 @@ Three things beyond basic tag rendering are handled here:
    `ActionRef` with no modifiers attached, or one carrying only
    `"prevent"` (which has no `hx-trigger` equivalent).
 
-6. **htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): `Site(app_shell=
+6. **htmx-4 (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 9): `Site(app_shell=
    True)` emits `hx-boost="true"` on `<body>`**, turning same-origin
    link clicks into an in-place AJAX swap instead of a full document
    reload -- see `page_render.py`'s `_render_page` docstring for the
@@ -75,7 +75,7 @@ Three things beyond basic tag rendering are handled here:
 ## HTML Backend refactor -- module map
 
 This file used to hold all five of the HTML backend's unrelated jobs
-in one ~580-line module; `docs/Backends/HTML-BACKEND-REFACTOR.md`
+in one ~580-line module; `HTML-BACKEND-REFACTOR.md`
 splits them across sibling modules, staged one concern per commit:
 
 - **Stage 1** -- `tag_map.py`: IR-node-type -> HTML-tag-name mapping
@@ -154,7 +154,7 @@ class HTMLBackend(Backend):
     name = "html"
 
     def render(self, ir: WebsiteIR) -> dict[str, str]:
-        # v0.060, Stage 3 (docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md):
+        # v0.060, Stage 3 (USER-DEFINED-COMPONENTS-IMPLEMENTATION.md):
         # resolve any `mode="registry"` component instance that has an
         # `"html"` backend override registered to that override's own
         # rendered subtree, before this backend's own per-node walk

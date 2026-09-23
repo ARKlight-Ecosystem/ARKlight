@@ -10,7 +10,7 @@ attaches to a registered component, `arklight.ir.build`'s
 `arklight.ir.component_dispatch.resolve_backend_dispatch` -- the pass
 that actually swaps in a backend's own override, wired into
 `arklight.backend.html.render.HTMLBackend.render`. See
-`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
+`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` [retired -- see CHANGELOG.md]'s Stage
 3 row, and `tests/test_user_defined_components_stage0.py`/`stage1.py`/
 `stage2.py` for the earlier stages this mirrors the conventions of.
 """

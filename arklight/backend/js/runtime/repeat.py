@@ -1,5 +1,5 @@
 """
-`renderRepeat`: `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15) --
+`renderRepeat`: `vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15) --
 the runtime half of `Repeat(name, template=...)` (`arklight.api.Repeat`).
 
 Per `docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.2, list
@@ -49,7 +49,7 @@ props render correctly for the items the server already produced
 through the full, unrestricted `_render_node`/`_attr_string` pipeline
 for those), but won't be reproduced for an item added purely
 client-side via `Action.append(...)`. Both are real, documented
-limitations of this stage -- see docs/Backends/REFACTOR-INDEX.md row
+limitations of this stage -- see REFACTOR-INDEX.md row
 15 for what's left for a future version.
 """
 

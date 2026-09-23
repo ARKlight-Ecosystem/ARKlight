@@ -138,7 +138,7 @@ def is_unconditional_banner(message: str) -> bool:
     narration at all -- an inline experimental-API banner (see
     `arklight.experimental.format_inline_banner`), which always starts
     with the warning glyph and prints unconditionally regardless of
-    log mode (`docs/EXPERIMENTAL-APIS.md`'s CLI contract). Rei never
+    log mode (`docs/Foundational/EXPERIMENTAL-APIS.md`'s CLI contract). Rei never
     narrates these -- she prints them exactly as `--verbose` does,
     same as `arklight.cli.main._stage_logger` already treats them as a
     separate case from plain stage narration.

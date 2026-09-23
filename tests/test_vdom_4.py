@@ -1,5 +1,5 @@
 """
-`vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12): computed/derived
+`vdom-4` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 12): computed/derived
 state via `Computed(...)`/`Derive.*(...)` -- across the API, Validation,
 IR build (dependency ordering + build-time initial-value evaluation),
 and the HTML/JS backends (`data-ark-computed` hydration + the

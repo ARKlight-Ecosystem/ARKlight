@@ -2,7 +2,7 @@
 CSS Backend -- design tokens (`:root` custom properties + `@property`
 typing).
 
-CSS backend refactor, Stage 2 (see docs/CSS-BACKEND-REFACTOR.md): the
+CSS backend refactor, Stage 2 (see CSS-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md]): the
 `:root` block used to be baked directly into BASE_CSS as a constant --
 which is exactly why `--ark-max-width` (and, less visibly, `--ark-bg`)
 were structurally unreachable from any site-level API. ROOT_VAR_DEFAULTS

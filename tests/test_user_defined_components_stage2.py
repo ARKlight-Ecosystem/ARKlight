@@ -9,7 +9,7 @@ ships sane default styling -- folded into the site's stylesheet under
 `.<ComponentName>` and onto the rendered subtree's own root
 `class_name` -- without the caller having to pass `class_name=` by
 hand. See
-`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s Stage
+`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` [retired -- see CHANGELOG.md]'s Stage
 2 row, and `tests/test_user_defined_components_stage0.py`/
 `tests/test_user_defined_components_stage1.py` for the earlier stages
 this mirrors the conventions of.

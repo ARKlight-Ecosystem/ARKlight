@@ -1,5 +1,5 @@
 """
-`renderShow`: `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15) --
+`renderShow`: `vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15) --
 the runtime half of `Show(predicate, ...)` (`arklight.api.Show`).
 
 `docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.3 proposes

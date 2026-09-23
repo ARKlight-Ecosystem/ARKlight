@@ -1,6 +1,6 @@
 """
-`htmx-5` (see `docs/Backends/HTMX-INTEGRATION.md` "Implementation
-ladder" Stage 4 / `docs/Backends/REFACTOR-INDEX.md` row 10): audit and
+`htmx-5` (see `HTMX-INTEGRATION.md` [retired -- see CHANGELOG.md] "Implementation
+ladder" Stage 4 / `REFACTOR-INDEX.md` row 10): audit and
 remove remaining hand-rolled plumbing in `arklight.js` that duplicates
 HTMX.
 

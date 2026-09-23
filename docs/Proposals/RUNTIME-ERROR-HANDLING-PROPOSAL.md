@@ -47,7 +47,7 @@ mode given their inputs."
 
 That reasoning was correct **for the vocabulary that existed at
 v0.041**. Five stateful primitives have shipped since, under `vdom-4`
-through `vdom-8` (`docs/Backends/REFACTOR-INDEX.md`): `Computed(...)`/
+through `vdom-8` (`REFACTOR-INDEX.md`, retired -- see `CHANGELOG.md`): `Computed(...)`/
 `recomputeAll` (vdom-4), `wireWatchers` (vdom-5), `renderModelBindings`
 / `wireModelBinding` (vdom-6), `renderRepeat` (vdom-7), `renderShow`
 (vdom-7), plus the `v0.063` debounce/throttle modifiers on model

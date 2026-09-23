@@ -1,5 +1,5 @@
 """
-`production` template for `arklight new` -- see docs/DESIGN-NOTES.md,
+`production` template for `arklight new` -- see docs/Foundational/DESIGN-NOTES.md,
 "v0.004: CLI scaffolding (`arklight new`)".
 
 Mirrors a proven multi-file layout for sites that outgrow a single

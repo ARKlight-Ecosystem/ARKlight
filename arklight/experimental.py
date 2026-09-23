@@ -1,8 +1,8 @@
 """
-Experimental / legacy API registry -- see `docs/EXPERIMENTAL-APIS.md`.
+Experimental / legacy API registry -- see `docs/Foundational/EXPERIMENTAL-APIS.md`.
 
 ARKlight's default surface is intrinsic-layout-only (see
-`docs/DESIGN-NOTES.md`): nothing in it is keyed to a viewport width,
+`docs/Foundational/DESIGN-NOTES.md`): nothing in it is keyed to a viewport width,
 device class, or browser engine. A feature that steps outside that
 model isn't refused outright, but it isn't silent either -- it has to
 be registered here, and every use prints a warning, both inline (at
@@ -231,7 +231,7 @@ class ExperimentalUsage:
 
 def format_inline_banner(usage: ExperimentalUsage) -> str:
     """The compact, interleaved-with-stage-log banner, printed the
-    moment a feature is detected -- see `docs/EXPERIMENTAL-APIS.md`
+    moment a feature is detected -- see `docs/Foundational/EXPERIMENTAL-APIS.md`
     "CLI contract"."""
     feature = FEATURES[usage.feature_id]
     if usage.component:
@@ -280,7 +280,7 @@ def emit(
         raise KeyError(
             f"{feature_id!r} isn't a registered experimental feature -- "
             f"add it to arklight.experimental.FEATURES first (see "
-            f"docs/EXPERIMENTAL-APIS.md)."
+            f"docs/Foundational/EXPERIMENTAL-APIS.md)."
         )
     usage = ExperimentalUsage(feature_id=feature_id, component=component)
     if on_warning is not None:

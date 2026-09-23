@@ -1,5 +1,5 @@
 """
-`vdom-6` (docs/Backends/REFACTOR-INDEX.md row 14): two-way input
+`vdom-6` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 14): two-way input
 binding via `bind_value=Bind.model(...)` -- across the API, Validation,
 the HTML backend (`value=` pre-fill + `data-ark-model` compilation),
 and the JS backend (`renderModelBindings`/`wireModelBinding` wiring).

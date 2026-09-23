@@ -1,5 +1,5 @@
 """
-`vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): per-item list
+`vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15): per-item list
 rendering (`Repeat`) + conditional show/hide (`Show`) -- across the
 API, Validation, the HTML backend (per-item SSR fallback + JSON
 template spec / `data-ark-show` + `hidden`), and the JS backend

@@ -5,7 +5,7 @@ Covers `arklight.api.component`/`Prop`, `arklight.ir.components`'s
 expansion pass (Option A -- the default `mode="macro"`), its props
 contract enforcement, its cycle/depth guards, and the experimental
 `mode="registry"` (Option B) selector -- see
-`docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`.
+`USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` [retired -- see CHANGELOG.md].
 """
 
 import pytest

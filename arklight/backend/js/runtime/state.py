@@ -5,12 +5,12 @@ Notice-parses it, and wires the store's subscribers to the render
 passes in `arklight.backend.js.runtime.bindings`).
 
 Split out of `arklight/backend/js/render.py`'s old `_STATE_CORE_JS`
-(`refactor-0`, see `docs/Backends/REFACTOR-INDEX.md`) -- pure move, no
+(`refactor-0`, see `REFACTOR-INDEX.md` [retired -- see CHANGELOG.md]) -- pure move, no
 JS output change. Mirrors the `actions/`/`behaviors/` per-file
 pattern: `arklight.backend.js.runtime` reassembles these fragments in
 the same order the monolithic string used to hold them.
 
-`htmx-4` (docs/Backends/REFACTOR-INDEX.md row 9) changes where
+`htmx-4` (REFACTOR-INDEX.md row 9) changes where
 `initState()` reads its JSON blob from. Per htmx's own docs, an
 `hx-boost`ed swap replaces `<body>`'s *innerHTML* only, never the
 `<body>` tag's own attributes -- so a `data-ark-state` attribute
@@ -24,7 +24,7 @@ and falls back to the `<body>` attribute (the non-app_shell shape,
 unchanged), so the same function handles both without needing to know
 `app_shell` was set.
 
-`vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12): `createState` gains
+`vdom-4` (REFACTOR-INDEX.md row 12): `createState` gains
 a second, optional `computed` argument -- the same dependency-ordered
 `(name, spec)` pairs `IRPage.computed` carries (see
 `arklight/ir/build.py`), JSON-round-tripped as plain 2-element arrays
@@ -53,7 +53,7 @@ is a no-op and `derivations` (whose declaration is itself gated on
 `initState()` below reads the sibling `data-ark-computed` attribute
 the same way it already reads `data-ark-state`, and passes it through.
 
-`vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13): `initState()` also
+`vdom-5` (REFACTOR-INDEX.md row 13): `initState()` also
 reads a sibling `data-ark-watch` attribute (`IRPage.watch`, the same
 marker/`<body>`-attribute duality `data-ark-state`/`data-ark-computed`
 already use) and, once the store is constructed, hands it to
@@ -69,19 +69,19 @@ a `ReferenceError` on any stateful page with no watch effects at all,
 `typeof` is the standard safe way to probe for a maybe-undeclared
 identifier without that risk.
 
-`vdom-6` (docs/Backends/REFACTOR-INDEX.md row 14): the `store.subscribe`
+`vdom-6` (REFACTOR-INDEX.md row 14): the `store.subscribe`
 callback also calls `renderModelBindings(store)`
 (`arklight/backend/js/runtime/model.py`), same `typeof`-guarded,
 only-shipped-when-used pattern as `wireWatchers` just above -- a page
 with no `bind_value=` anywhere never declares that function.
 
-`vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): the same callback
+`vdom-7` (REFACTOR-INDEX.md row 15): the same callback
 also calls `renderRepeat(store)`/`renderShow(store)`
 (`arklight/backend/js/runtime/repeat.py`/`show.py`), same
 `typeof`-guarded, only-shipped-when-used pattern again -- a page with
 no `Repeat(...)`/`Show(...)` never declares one or the other.
 
-`vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): `initState()` also
+`vdom-8` (REFACTOR-INDEX.md row 16): `initState()` also
 reads a sibling `data-ark-persist` attribute (`IRPage.persist`, the
 same marker/`<body>`-attribute duality every other `data-ark-*` piece
 of hydration state already uses) -- a plain list of `State(...)` names

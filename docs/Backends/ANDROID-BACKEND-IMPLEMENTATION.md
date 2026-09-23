@@ -1,7 +1,7 @@
 # Android Backend Implementation: Staged Order
 
 Status: **Stages 0-4 done**, Stages 5/6/7 not started. This file does
-not restate the design already written in `docs/DESIGN-NOTES.md`
+not restate the design already written in `docs/Foundational/DESIGN-NOTES.md`
 ("v0.0438: Android backend -- androidx.webkit.WebViewAssetLoader
 packaging") -- it exists only to turn that section's prose "Staging"
 list into a trackable table, the same role `REFACTOR-INDEX.md` plays
@@ -52,7 +52,7 @@ vs. shared-runtime split.
 
 ## Staged order
 
-Same nine rungs `docs/DESIGN-NOTES.md`'s "Staging" list under "v0.0438:
+Same nine rungs `docs/Foundational/DESIGN-NOTES.md`'s "Staging" list under "v0.0438:
 Android backend" describes, renumbered 0-7 in landing order (see
 "Numbering" above) -- this table adds status tracking and file-level
 pointers on top of that list, it doesn't change what any rung does.

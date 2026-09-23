@@ -87,7 +87,7 @@ _HEAD_MARKER_START = "<!-- arklight:pwa:head -->"
 _HEAD_MARKER_END = "<!-- /arklight:pwa:head -->"
 _SW_MARKER_START = "<!-- arklight:pwa:sw -->"
 _SW_MARKER_END = "<!-- /arklight:pwa:sw -->"
-# EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md, feature id
+# EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md, feature id
 # "experimental-install-pwa") -- markers for the opt-in native
 # install-prompt button (`arklight pwa ... --install-button`), same
 # find-and-replace-on-rerun pattern as the two pairs above.
@@ -122,7 +122,7 @@ class PWAResult:
     updated_pages: list[str] = field(default_factory=list)
     cached_paths: list[str] = field(default_factory=list)
     cache_name: str = ""
-    # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): populated with one
+    # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md): populated with one
     # `ExperimentalUsage` when `install_button=True` was passed to
     # `enable_pwa()`, empty otherwise. The CLI drains this the same
     # way `arklight build` drains `WebsiteIR.experimental_usages`.
@@ -275,7 +275,7 @@ def _render_pwa_runtime() -> str:
 
 def _render_install_block() -> str:
     """
-    EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md, "experimental-install-pwa")
+    EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md, "experimental-install-pwa")
     -- a small, dependency-free button that surfaces the browser's
     native install prompt via `beforeinstallprompt`. Hidden by default
     (`display: none` inline, matching the rest of ARKlight's "no
@@ -358,7 +358,7 @@ def enable_pwa(
     into a PWA: writes `manifest.json` + `sw.js` + `ark-pwa.js` into it
     and injects the tags every `.html` page needs to pick them up.
 
-    `install_button` (EXPERIMENTAL, see docs/EXPERIMENTAL-APIS.md) --
+    `install_button` (EXPERIMENTAL, see docs/Foundational/EXPERIMENTAL-APIS.md) --
     when True, also injects a native install-prompt button into every
     page (see `_render_install_block`). Off by default; every call
     made with it on is recorded in the returned `PWAResult.

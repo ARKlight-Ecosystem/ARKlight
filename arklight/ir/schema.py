@@ -40,7 +40,7 @@ SCHEMA: dict[str, NodeSpec] = {
     # driven entirely off this dict and TEXT_ONLY_TYPES below -- they
     # just give users more of standard HTML to reach for. Grouped by
     # what they're commonly used for in a real static site; see
-    # docs/DESIGN-NOTES.md for how this addresses the v0.003 ceiling.
+    # docs/Foundational/DESIGN-NOTES.md for how this addresses the v0.003 ceiling.
     # ------------------------------------------------------------------
     # Semantic page/section layout (HTML5 sectioning + grouping content).
     "Header": NodeSpec(),
@@ -111,7 +111,7 @@ SCHEMA: dict[str, NodeSpec] = {
     # native form/progress widgets, a zero-JS dialog, the rest of
     # HTML's text-level semantics (including bidi + ruby), table
     # column grouping, video captions, image maps, iframes, and a
-    # <noscript> fallback. See docs/DESIGN-NOTES.md and CHANGELOG.md
+    # <noscript> fallback. See docs/Foundational/DESIGN-NOTES.md and CHANGELOG.md
     # for the full rationale per group.
     # ------------------------------------------------------------------
     # Lists: v0.003's first pass only ever produced <ul> (via `List`).
@@ -197,7 +197,7 @@ SCHEMA: dict[str, NodeSpec] = {
     # anything gated behind a `toggle`/`copy`/`dismiss` behavior can
     # have a `NoScript` sibling explaining what's missing.
     "NoScript": NodeSpec(),
-    # vdom-7 (docs/Backends/REFACTOR-INDEX.md row 15): per-item list
+    # vdom-7 (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15): per-item list
     # rendering + conditional show/hide. Both are real, renderable
     # content -- unlike `State`/`Computed`/`Watch` below, which are
     # page-scoped declarations Validation/IR-build pull out of the tree
@@ -347,7 +347,7 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
     # as much as a `+1`; a form/counter/toggle demo needs a "put it
     # back the way it started" control), rather than every site
     # re-deriving them from `set`/`increment` by hand. Only the most
-    # commonly needed additions land here; see docs/DESIGN-NOTES.md
+    # commonly needed additions land here; see docs/Foundational/DESIGN-NOTES.md
     # ("v0.0035: stateful JS vocabulary addendum") for the rest of the
     # candidates (list append/remove, derived/computed state, debounced
     # actions, input-bound `set`) deliberately left for a future
@@ -360,7 +360,7 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
     # that assume a list-valued `State(...)` rather than a scalar one
     # -- deliberately just the two minimal list mutations (append one
     # value, remove by index), not a full list-editing vocabulary. See
-    # docs/DESIGN-NOTES.md for what's still left for a future version.
+    # docs/Foundational/DESIGN-NOTES.md for what's still left for a future version.
     # ------------------------------------------------------------------
     "append": ActionSpec(args=("value",), state_args=("value",)),
     "remove": ActionSpec(args=("index",)),
@@ -382,7 +382,7 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
 KNOWN_ACTIONS = frozenset(ACTION_REGISTRY)
 
 
-# Stage 3 of "Reactive-core vdom staging" (see docs/DESIGN-NOTES.md):
+# Stage 3 of "Reactive-core vdom staging" (see docs/Foundational/DESIGN-NOTES.md):
 # event modifiers -- a timing/dispatch concern orthogonal to what an
 # action does, so it's solved once as a wrapper around the click
 # dispatcher rather than duplicated into every `ACTION_REGISTRY` entry.
@@ -431,7 +431,7 @@ KNOWN_MODIFIERS = frozenset(MODIFIER_REGISTRY)
 KNOWN_QUERY_HISTORY_MODES = frozenset({"replace", "push"})
 
 
-# `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12; docs/Foundational/
+# `vdom-4` (REFACTOR-INDEX.md row 12; docs/Foundational/
 # DESIGN-NOTES.md "Computed/derived state"): closed-vocabulary derived
 # state, the same shape discipline as `ACTION_REGISTRY`/
 # `BEHAVIOR_REGISTRY` above -- a new `*Spec` dataclass, a new
@@ -635,7 +635,7 @@ LITERAL_ARG_RULES: dict[str, dict[str, LiteralArgRule]] = {
 }
 
 
-# `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): `Show(...)`'s
+# `vdom-7` (REFACTOR-INDEX.md row 15): `Show(...)`'s
 # closed-vocabulary predicate, the same shape discipline as
 # `DERIVATION_REGISTRY` above but scaled down.
 #

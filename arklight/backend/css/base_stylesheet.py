@@ -2,7 +2,7 @@
 Default stylesheet content -- pure data, no logic.
 
 Stage 1 of the CSS backend service-oriented refactor (see
-docs/CSS-BACKEND-REFACTOR.md for the full rationale). This module's
+CSS-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] for the full rationale). This module's
 only job is to hold the static CSS text ARKlight ships out of the box.
 It imports nothing from the rest of the backend and exposes nothing
 callable -- just two string constants -- so it can never gain
@@ -451,7 +451,7 @@ map, area {
 /* v0.003 -- intrinsic responsive layout utilities.                    */
 /*                                                                      */
 /* ARKlight's `Page` never gets a `<head>` hook (see                   */
-/* docs/DESIGN-NOTES.md), so there is no `@media`/`@container` query    */
+/* docs/Foundational/DESIGN-NOTES.md), so there is no `@media`/`@container` query    */
 /* available to any generated site -- responsiveness has to come from  */
 /* the browser reflowing content from available width alone, not from  */
 /* a rule keyed to a width threshold. These utility classes are the    */

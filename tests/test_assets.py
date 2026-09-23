@@ -2,7 +2,7 @@
 `arklight build` auto-copies a top-level `assets/` folder (next to the
 site's entry file) into `<output_dir>/assets`. Previously this was a
 manual, easy-to-forget `cp -r assets dist/assets` step -- see
-docs/DESIGN-NOTES.md.
+docs/Foundational/DESIGN-NOTES.md.
 """
 
 from pathlib import Path

@@ -1,7 +1,6 @@
 """
-`htmx-4` (see docs/Backends/JS-BACKEND-REFACTOR-PLAN.md "The
-app-illusion problem, stated precisely" / docs/Backends/
-REFACTOR-INDEX.md row 9): app-shell navigation.
+`htmx-4` (see JS-BACKEND-REFACTOR-PLAN.md [retired -- see CHANGELOG.md] "The
+app-illusion problem, stated precisely" / REFACTOR-INDEX.md row 9): app-shell navigation.
 
 `Site(app_shell=True)` emits `hx-boost="true"` on `<body>` (turning
 same-origin link clicks into an in-place AJAX swap instead of a full

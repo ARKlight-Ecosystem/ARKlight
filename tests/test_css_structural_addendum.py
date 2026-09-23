@@ -295,7 +295,7 @@ def test_import_style_is_flagged_experimental():
     # above), an @import URL's contents can't be validated by ARKlight --
     # they're fetched and applied by the browser at request time -- so
     # this goes through the same css-media-queries-style experimental
-    # gate (docs/EXPERIMENTAL-APIS.md).
+    # gate (docs/Foundational/EXPERIMENTAL-APIS.md).
     site = _new_site()
     site.import_style("https://fonts.googleapis.com/css2?family=Inter")
     assert len(site.experimental_usages) == 1

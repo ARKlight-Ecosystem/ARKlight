@@ -130,7 +130,7 @@ def _record_name_error_feedback_best_effort(message: str) -> None:
 
 # Name of the top-level, next-to-`site.py` folder ARKlight auto-copies
 # into the output directory (verbatim, recursively) if it exists. Fixes
-# the "404 images" gotcha documented in docs/DESIGN-NOTES.md: previously
+# the "404 images" gotcha documented in docs/Foundational/DESIGN-NOTES.md: previously
 # a site's `assets/` (images, fonts, favicons, ...) had to be copied by
 # hand with `cp -r assets ARK/assets` after every build.
 ASSETS_DIR_NAME = "assets"
@@ -253,7 +253,7 @@ def compile_site_file(
         _record_validation_feedback_best_effort(str(exc))
         raise CompileError(str(exc)) from exc
 
-    # Experimental API warnings (docs/EXPERIMENTAL-APIS.md): every
+    # Experimental API warnings (docs/Foundational/EXPERIMENTAL-APIS.md): every
     # opt-in call the site made (currently just `site.media_query(...)`)
     # was already recorded on `site.experimental_usages` at call time --
     # print the inline "[EXPERIMENTAL FEATURE ACTIVE]" banner for each
@@ -285,7 +285,7 @@ def compile_site_file(
         # the loop just above. This is that feature's own inline
         # "[EXPERIMENTAL FEATURE ACTIVE]" detection point.
         on_warning=log,
-        # Structural addendum (docs/DESIGN-NOTES.md "CSS selector
+        # Structural addendum (docs/Foundational/DESIGN-NOTES.md "CSS selector
         # algebra + at-rule vocabulary"): straight passthroughs, same
         # as `custom_styles`/`media_queries` above.
         selector_rules=site.selector_rules,
@@ -295,13 +295,13 @@ def compile_site_file(
         supports_rules=site.supports_rules,
         page_rules=site.page_rules,
         style_imports=site.style_imports,
-        # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): straight
+        # htmx-4 (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 9): straight
         # passthrough, same shape as the CSS addendum fields above --
         # no CLI flag equivalent (unlike `lang`/`css_var_overrides`),
         # since app-shell navigation is a whole-site authoring
         # decision the site file itself makes, not a per-build override.
         app_shell=site.app_shell,
-        # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): straight passthrough,
+        # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md): straight passthrough,
         # same shape as the CSS addendum fields above -- `build()` below
         # is what actually runs these, after every backend's own
         # render()+postprocess() pass.
@@ -555,7 +555,7 @@ def _copy_assets(entry_path: str | Path, out_dir: Path) -> list[Path]:
 
     This was previously a manual, easy-to-forget step (`cp -r assets
     ARK/assets`) -- a real gap, not a template-only concern, per
-    docs/DESIGN-NOTES.md. No-op (returns an empty list) when there's no
+    docs/Foundational/DESIGN-NOTES.md. No-op (returns an empty list) when there's no
     `assets/` folder to copy.
     """
     assets_src = Path(entry_path).resolve().parent / ASSETS_DIR_NAME

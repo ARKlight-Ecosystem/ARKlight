@@ -1,6 +1,6 @@
 """
 HTML Backend refactor, Stage 3 (see
-docs/Backends/HTML-BACKEND-REFACTOR.md / docs/Backends/REFACTOR-INDEX.md
+HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] / REFACTOR-INDEX.md
 row 3, `html-3`): the third of the six staged extractions splitting
 `arklight/backend/html/render.py`'s five unrelated jobs into their own
 modules.
@@ -14,7 +14,7 @@ or `page_render.py` (Stages 4-5) -- those depend on this module, not
 the other way around, matching the target shape's stated dependency
 direction.
 
-Sequenced ahead of `htmx-1` (see `docs/Backends/REFACTOR-INDEX.md`)
+Sequenced ahead of `htmx-1` (see `REFACTOR-INDEX.md`)
 deliberately: the HTMX attribute-emission rewrite
 (`data-ark-on-click`/`data-ark-modifiers` -> `hx-on:click`/
 `hx-trigger`) lands directly in this module once it starts, rather
@@ -28,8 +28,8 @@ same generated HTML byte-for-byte as before this module existed.
 compatibility with anything that already imported them from there,
 same as Stages 1-2.
 
-`htmx-1` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 1 --
-Behaviors" / `docs/Backends/REFACTOR-INDEX.md` row 4) originally
+`htmx-1` (see `HTMX-INTEGRATION.md` "Stage 1 --
+Behaviors" / `REFACTOR-INDEX.md` row 4) originally
 landed here as promised above: a plain string `on_click` (a named
 behavior -- `"toggle"`, `"scroll-to"`, `"copy"`, `"dismiss"`) emitted
 `hx-on:click="arkRunBehavior('<name>', this)"` instead of
@@ -57,8 +57,8 @@ module's docstring). Everything about
 `data-ark-on-click`/`data-ark-action-state`/`data-ark-action-args` for
 the `ActionRef` case is unaffected by any of this and still current.
 
-`htmx-2` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 2 --
-Modifiers" / `docs/Backends/REFACTOR-INDEX.md` row 5) changes one more
+`htmx-2` (see `HTMX-INTEGRATION.md` "Stage 2 --
+Modifiers" / `REFACTOR-INDEX.md` row 5) changes one more
 piece of an `ActionRef`'s attribute shape: `.with_modifiers(...)` /
 `.debounce(...)` / `.throttle(...)` tokens no longer render as the
 `data-ark-modifiers="prevent,debounce:300"` attribute the now-deleted
@@ -97,7 +97,7 @@ PASSTHROUGH_ATTRS = {
     "min", "max", "step", "pattern", "rows", "cols", "for", "multiple",
     "selected", "maxlength", "minlength", "autocomplete", "accept", "action",
     "method", "enctype", "novalidate", "label", "size", "autofocus", "form",
-    # Stage 2 (docs/Backends/HTML-BACKEND-REFACTOR.md) discovery: `formaction`
+    # Stage 2 (HTML-BACKEND-REFACTOR.md) discovery: `formaction`
     # was missing here entirely, so it always rendered as `data-formaction`
     # instead of a real HTML attribute, independent of the routing question
     # -- see routing.py's module docstring, "A separate, pre-existing bug".
@@ -156,7 +156,7 @@ BEHAVIOR_PROP_ATTRS = {
 }
 
 
-# htmx-2 (docs/Backends/HTMX-INTEGRATION.md "Stage 2 -- Modifiers"):
+# htmx-2 (HTMX-INTEGRATION.md "Stage 2 -- Modifiers"):
 # ARKlight modifier token -> HTMX hx-trigger modifier token. Only
 # covers the two boolean modifiers that have a real HTMX equivalent --
 # "once" maps straight across, "stop" maps to HTMX's "consume" (which
@@ -312,7 +312,7 @@ def _attr_string(
         if key == "on_click" and isinstance(value, str):
             # htmx-1 originally wired a named behavior through HTMX's
             # `hx-on:click="arkRunBehavior('<name>', this)"`. `htmx-5`
-            # (docs/Backends/HTMX-INTEGRATION.md "Stage 4 -- Audit and
+            # (HTMX-INTEGRATION.md "Stage 4 -- Audit and
             # remove remaining hand-rolled plumbing" / docs/Backends/
             # REFACTOR-INDEX.md row 10) reverts the attribute shape
             # back to `data-ark-on-click`, matched-pair with the
@@ -355,7 +355,7 @@ def _attr_string(
             continue
 
         if key == "shell_persistent":
-            # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): a bool
+            # htmx-4 (REFACTOR-INDEX.md row 9): a bool
             # prop that compiles to htmx's own `hx-preserve="true"` --
             # the built-in mechanism for keeping an element (matched
             # by `id`, which Validation already requires alongside
@@ -419,8 +419,8 @@ def _attr_string(
             elif attr_name in ASSET_OR_ROUTE_AWARE_ATTRS and isinstance(value, str) and value:
                 value = _resolve_src_ref(value, current_route=current_route, route_to_path=route_to_path)
             elif attr_name in SRCSET_ATTRS and isinstance(value, str) and value:
-                # UNROUTED_REFERENCE_ATTRS fix (docs/Backends/HTML-BACKEND-REFACTOR.md
-                # audit / docs/Backends/REFACTOR-INDEX.md row 1): `srcset`
+                # UNROUTED_REFERENCE_ATTRS fix (HTML-BACKEND-REFACTOR.md
+                # audit / REFACTOR-INDEX.md row 1): `srcset`
                 # packs multiple URLs into one value, so it gets its own
                 # resolver rather than reusing _resolve_route_ref/_resolve_src_ref
                 # directly -- see routing.py's module docstring.

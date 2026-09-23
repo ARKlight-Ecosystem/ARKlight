@@ -1,5 +1,5 @@
 """
-`wireWatchers`: `vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13) --
+`wireWatchers`: `vdom-5` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 13) --
 the runtime half of `Watch(name, then=Action.*(...))`
 (`arklight.api.Watch`).
 

@@ -1,7 +1,7 @@
 """
 Unit tests for `arklight/backend/html/head_meta.py` -- HTML backend
-refactor Stage 4 (see docs/Backends/HTML-BACKEND-REFACTOR.md /
-docs/Backends/REFACTOR-INDEX.md row 7, `html-4`).
+refactor Stage 4 (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] /
+REFACTOR-INDEX.md row 7, `html-4`).
 
 These test `_render_head_meta` directly, independent of
 `HTMLBackend.render`/a full IR build -- the same "independent

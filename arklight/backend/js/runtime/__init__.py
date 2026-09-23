@@ -1,7 +1,7 @@
 """
 Reactive-state runtime fragments (`refactor-0`, see
-`docs/Backends/REFACTOR-INDEX.md` and
-`docs/Backends/JS-BACKEND-REFACTOR-PLAN.md`).
+`REFACTOR-INDEX.md` [retired -- see CHANGELOG.md] and
+`JS-BACKEND-REFACTOR-PLAN.md`).
 
 Splits `arklight/backend/js/render.py`'s old `_STATE_CORE_JS` /
 `_NOTIFY_JS` / `_NAV_HIGHLIGHT_JS` constants (145+ lines, one
@@ -18,16 +18,16 @@ monolithic string held them.
 At `refactor-0`, `STATE_CORE_JS` below was byte-for-byte the old
 `_STATE_CORE_JS` value, and a sixth sibling -- `modifiers.py` -- sat
 between `state.py` and `dispatch.py`, holding `arkApplyModifiers`.
-`htmx-2` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 2 --
-Modifiers" / `docs/Backends/REFACTOR-INDEX.md` row 5) deleted that
+`htmx-2` (see `HTMX-INTEGRATION.md` "Stage 2 --
+Modifiers" / `REFACTOR-INDEX.md` row 5) deleted that
 module and its export entirely: modifier tokens now compile to an
 `hx-trigger` attribute at build time (`arklight/backend/html/attrs.py`)
 instead of being parsed by a shipped runtime function, so there is
 nothing left for a `modifiers.py` sibling to hold. `STATE_CORE_JS` is
 reassembled the same way, minus that one piece.
 
-`htmx-3` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 3 -- Replace
-`wireActions()` wiring loop" / `docs/Backends/REFACTOR-INDEX.md` row 6)
+`htmx-3` (see `HTMX-INTEGRATION.md` "Stage 3 -- Replace
+`wireActions()` wiring loop" / `REFACTOR-INDEX.md` row 6)
 renamed `dispatch.py`'s export from `WIRE_ACTIONS_JS` to
 `ACTION_INTERCEPTOR_JS` -- the per-element `querySelectorAll`/
 `forEach` wiring loop it used to hold is gone, replaced by a single
@@ -35,9 +35,8 @@ delegated `click` listener (`wireActionInterceptor`). See that
 module's docstring for why this isn't literally the `htmx:beforeRequest`
 interceptor `HTMX-INTEGRATION.md` describes.
 
-`htmx-5` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 4 -- Audit
-and remove remaining hand-rolled plumbing" / `docs/Backends/
-REFACTOR-INDEX.md` row 10) renamed that export again, to
+`htmx-5` (see `HTMX-INTEGRATION.md` "Stage 4 -- Audit
+and remove remaining hand-rolled plumbing" / `REFACTOR-INDEX.md` row 10) renamed that export again, to
 `CLICK_INTERCEPTOR_JS` (function `wireClickInterceptor`), and pulled
 it out of `STATE_CORE_JS` entirely -- it's no longer a piece of the
 reactive-state bundle. This module's docstring above described
@@ -55,7 +54,7 @@ alongside `STATE_CORE_JS` (createState/bindings/initState) whenever
 `has_state` alone -- the two are shipped independently now, not always
 together.
 
-`vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13) adds a sixth
+`vdom-5` (REFACTOR-INDEX.md row 13) adds a sixth
 sibling, `watch.py` (`WIRE_WATCHERS_JS` / `wireWatchers`), for
 `Watch(name, then=Action.*(...))` effects. Unlike the other five
 pieces, it's not folded into `STATE_CORE_JS` -- it's only shipped on a
@@ -64,7 +63,7 @@ used" discipline `_actions_object_js`/`_behaviors_object_js`/
 `_derivations_object_js` already follow, rather than being part of
 the always-present reactive core every stateful page ships.
 
-`vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15) adds two more
+`vdom-7` (REFACTOR-INDEX.md row 15) adds two more
 siblings the same way: `repeat.py` (`RENDER_REPEAT_JS` /
 `renderRepeat`) for `Repeat(name, template=...)`, and `show.py`
 (`RENDER_SHOW_JS` / `renderShow`) for `Show(predicate, ...)`. Neither

@@ -21,10 +21,12 @@ most haven't, and shouldn't. This doc names the rule that already
 governs which is which -- used ad hoc in `arklight/api.py`'s and
 `arklight/backend/css/design_tokens.py`'s own comments ("reachability
 rule", "unreachable-value bug class") and worked out the hard way
-across three real bugs (`docs/CONTAINER-WIDTH-BUG.md`) -- so future
-work applies it up front instead of re-deriving it per change. The
-first deliberate application of it is the planned HTML backend
-refactor, `docs/HTML-BACKEND-REFACTOR.md`.
+across three real bugs (`docs/CONTAINER-WIDTH-BUG.md`, no longer in the
+tree -- see `CHANGELOG.md`) -- so future work applies it up front
+instead of re-deriving it per change. The first deliberate application
+of it was the HTML backend refactor (all six stages shipped; its
+staging doc, `docs/Backends/HTML-BACKEND-REFACTOR.md`, was removed once
+it finished -- see `CHANGELOG.md` for the per-stage record).
 
 ## The rule
 
@@ -148,6 +150,8 @@ style choice."
 
 ## Applying this
 
-`docs/HTML-BACKEND-REFACTOR.md` is the first place this rule gets run
-deliberately against a whole file, before any module split happens --
-worth reading alongside this doc rather than as a separate exercise.
+The HTML backend refactor (`HTML-BACKEND-REFACTOR.md`, removed once its
+six stages shipped) was the first place this rule got run deliberately
+against a whole file, before any module split happened -- its
+per-stage record in `CHANGELOG.md` is the worked example to read
+alongside this doc.

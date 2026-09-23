@@ -1,5 +1,5 @@
 """
-Stage 2 of "Reactive-core vdom staging" (docs/DESIGN-NOTES.md):
+Stage 2 of "Reactive-core vdom staging" (docs/Foundational/DESIGN-NOTES.md):
 reactive class binding via `Bind.when(...)` / `bind_class=`.
 """
 
@@ -125,7 +125,7 @@ def test_js_backend_ships_nothing_extra_without_state():
     js = JSBackend().render(ir)["arklight.js"]
     assert "renderClassBindings" not in js
     # htmx-3 added two more lines to the generated header comment,
-    # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9) added two more on
+    # htmx-4 (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 9) added two more on
     # top of that, and htmx-5 (row 10) rewrote the header's
     # description of the click-dispatch mechanism, changing its line
     # count again (see arklight/backend/js/render.py's

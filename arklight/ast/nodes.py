@@ -67,7 +67,7 @@ class ClassBindSpec:
     string, validated against the page's declared `State(...)` names at
     compile time (an unknown `state` target fails the build) and never
     a class-name string built by concatenation at runtime. See
-    docs/DESIGN-NOTES.md ("Reactive-core vdom staging", Stage 2).
+    docs/Foundational/DESIGN-NOTES.md ("Reactive-core vdom staging", Stage 2).
     """
 
     state: str
@@ -110,14 +110,14 @@ class ActionRef:
     validated against `arklight.ir.schema.ACTION_REGISTRY` at compile
     time (unknown action name, or a `state` target that isn't declared
     on the page, both fail the build) and never becomes a JS/Python
-    string that gets executed. See docs/DESIGN-NOTES.md ("v0.0035:
+    string that gets executed. See docs/Foundational/DESIGN-NOTES.md ("v0.0035:
     stateful JS -- capability, not vocabulary").
     """
 
     action: str
     state: str
     args: dict[str, Any] = field(default_factory=dict)
-    # Stage 3 ("Reactive-core vdom staging", see docs/DESIGN-NOTES.md):
+    # Stage 3 ("Reactive-core vdom staging", see docs/Foundational/DESIGN-NOTES.md):
     # event modifiers -- `prevent`/`stop`/`once` stored verbatim, and
     # `debounce`/`throttle` stored as `"debounce:<ms>"`/`"throttle:<ms>"`
     # tokens. Deliberately a tuple of plain strings (not a nested
@@ -183,7 +183,7 @@ class DerivationRef:
     """
     A reference to a closed-vocabulary derivation -- e.g.
     `Derive.multiply("price", "qty")`. Used as a `Computed(...)`'s
-    `derive=` value (`vdom-4`, see docs/Backends/REFACTOR-INDEX.md row
+    `derive=` value (`vdom-4`, see REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row
     12 / docs/Foundational/DESIGN-NOTES.md "Computed/derived state").
 
     Mirrors `ActionRef`'s shape and reasoning: a small structured
@@ -217,7 +217,7 @@ class PredicateRef:
     """
     A reference to a closed-vocabulary predicate -- e.g.
     `Predicate.truthy("flag")`. Used as a `Show(...)`'s first
-    (positional) argument (`vdom-7`, see docs/Backends/REFACTOR-INDEX.md
+    (positional) argument (`vdom-7`, see REFACTOR-INDEX.md
     row 15).
 
     Mirrors `DerivationRef`'s shape and reasoning: a small structured

@@ -3,7 +3,7 @@
 
 See `arklight.ir.schema.BEHAVIOR_REGISTRY` for the spec (this behavior
 reads an optional `toggle_class` prop, default "is-open") and
-`docs/DESIGN-NOTES.md` ("v0.0035: stateful JS -- capability, not
+`docs/Foundational/DESIGN-NOTES.md` ("v0.0035: stateful JS -- capability, not
 vocabulary") for why behaviors live as one small fragment per file
 instead of one hand-maintained runtime string.
 """

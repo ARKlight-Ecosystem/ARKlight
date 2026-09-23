@@ -673,7 +673,7 @@ class string). Two new closed-vocabulary mechanisms do the actual work:
     even `BASE_CSS_HEADER`, because the CSS spec requires `@import` to
     precede every other rule (aside from `@charset`, which ARKlight
     doesn't emit) -- see `CSSBackend.render`'s ordering comment.
-    EXPERIMENTAL (see `docs/EXPERIMENTAL-APIS.md`, `css-import`):
+    EXPERIMENTAL (see `docs/Foundational/EXPERIMENTAL-APIS.md`, `css-import`):
     unlike every other addition in this section, the imported file's
     contents can't be validated by ARKlight -- it's fetched and
     applied by the browser at request time -- so this is gated behind
@@ -888,7 +888,7 @@ CI-only stages below) remain open. Placed here, right after Stage 8 above rather
 than near `v0.044`, because the real dependency this milestone has is
 on Stage 8's persistence work, not on anything in `v0.044` proper --
 see "Why this sits after Stage 8, not after v0.044" below. Per the
-current roadmap table (`docs/ARCHITECTURE.md`), this milestone is
+current roadmap table (`docs/Foundational/ARCHITECTURE.md`), this milestone is
 `v0.080`; the Desktop backend is `v0.100`. The two swapped order
 because of the head start described under "Updated direction" just below.
 

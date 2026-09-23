@@ -1,6 +1,6 @@
 """
 Tests for the experimental/legacy API framework -- see
-docs/EXPERIMENTAL-APIS.md and arklight/experimental.py.
+docs/Foundational/EXPERIMENTAL-APIS.md and arklight/experimental.py.
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ def test_responsive_style_shares_the_css_media_queries_gate(tmp_path):
     """v0.048 Stage B: a node's `responsive_style={...}` prop is a
     second entry point into the same `css-media-queries` feature gate
     `site.media_query(...)` already uses -- see
-    docs/EXPERIMENTAL-APIS.md."""
+    docs/Foundational/EXPERIMENTAL-APIS.md."""
     site_file = tmp_path / "site.py"
     site_file.write_text(
         "from arklight import Site, Page, Container, Text\n"

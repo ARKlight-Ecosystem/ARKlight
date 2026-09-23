@@ -1,7 +1,7 @@
 """
 User-defined components, Stage 3: per-backend render dispatch.
 
-See `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s
+See `USER-DEFINED-COMPONENTS-IMPLEMENTATION.md` [retired -- see CHANGELOG.md]'s
 Stage 3 row for the milestone this belongs to, and
 `arklight.ir.components`'s module docstring for how a `mode="registry"`
 component call ends up tagged with a `ComponentOrigin` in the first
@@ -113,7 +113,7 @@ def _render_backend_override(
     # caller). A backend override subtree that itself calls a `state=`-
     # declaring component raises `ComponentError` here, same as any
     # other bare `expand_node()` call would -- not supported yet, see
-    # `docs/Foundational/USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s
+    # `USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`'s
     # Stage 4 "explicitly out of scope" note.
     rendered = expand_node(rendered)
     spec = COMPONENT_REGISTRY.get(component_name)

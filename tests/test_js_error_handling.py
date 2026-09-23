@@ -7,7 +7,7 @@ behavior/action can't silently take down interactivity for the rest
 of the page -- and the person sees a visible notice instead of
 nothing at all.
 
-`htmx-3` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 3") renamed
+`htmx-3` (see `HTMX-INTEGRATION.md` [retired -- see CHANGELOG.md] "Stage 3") renamed
 `wireActions()` to `wireActionInterceptor()` and replaced its
 per-element wiring loop with a single delegated `click` listener --
 see `arklight/backend/js/runtime/dispatch.py`'s module docstring.
@@ -15,9 +15,8 @@ see `arklight/backend/js/runtime/dispatch.py`'s module docstring.
 updated for that shape; see `tests/test_htmx_3.py` for this stage's
 own dedicated coverage.
 
-`htmx-5` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 4 -- Audit
-and remove remaining hand-rolled plumbing" / `docs/Backends/
-REFACTOR-INDEX.md` row 10) renamed `wireActionInterceptor()` again, to
+`htmx-5` (see `HTMX-INTEGRATION.md` "Stage 4 -- Audit
+and remove remaining hand-rolled plumbing" / `REFACTOR-INDEX.md` row 10) renamed `wireActionInterceptor()` again, to
 `wireClickInterceptor()`, and removed `wireBehaviors()`'s successor,
 `arkRunBehavior()`, entirely: behavior dispatch now happens inside
 `wireClickInterceptor()`'s own `"behavior:"` branch, guarded by its
