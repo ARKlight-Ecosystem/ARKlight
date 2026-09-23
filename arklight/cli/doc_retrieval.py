@@ -3,10 +3,10 @@
 existing `arklight search` subcommand (`arklight/cli/search.py`,
 wired in `arklight/cli/main.py`).
 
-Staged in `docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md` for
-`v0.064`, from `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md`. Read
-this module alongside that proposal -- section numbers referenced
-below (`SS3`, `SS4.3`, ...) point back to it.
+Accepted from `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md`,
+shipped `v0.064` (see `docs/version history/v0.064.md`). Read this
+module alongside that proposal -- section numbers referenced below
+(`SS3`, `SS4.3`, ...) point back to it.
 
 This is a dev-time CLI convenience, not a compiler feature: it prints
 exact, unmodified bytes from files already in the repo's `docs/` tree
