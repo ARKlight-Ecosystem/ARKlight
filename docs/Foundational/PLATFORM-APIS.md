@@ -26,6 +26,14 @@ implementation in Kotlin, a Desktop implementation in C).
 > implements the target. The compiler is not a collection of
 > platform-specific API calls.
 
+**Looking one up:** `arklight search <name>` (e.g. `arklight search
+notify`, or the dotted form `arklight search PlatformAPI.notify`)
+prints a Platform API's args, required permissions, and which
+backend(s) currently implement it -- see
+[`CLI-REFERENCE.md`](CLI-REFERENCE.md). `PLATFORM_API_REGISTRY` lives
+outside `arklight.ir.schema` (see `arklight/ir/platform_api.py`), so
+this lookup was previously missing and has only just been wired in.
+
 ## Architectural model
 
 ```text
