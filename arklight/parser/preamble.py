@@ -146,6 +146,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterator, Mapping
 
 from arklight.ir.components import ALLOW_REDEFINE_MARKER
+from arklight.parser.indentation import BracketIndentationError, check_bracket_nesting
 
 _INCLUDE_RE = re.compile(r"^#\s*include\s*<\s*([^<>\s]+)\s*>\s*$")
 
@@ -642,12 +643,23 @@ def resolve_preamble(source: str, *, filename: str = "<site>") -> dict[str, Any]
 def prepare_source(source: str, *, filename: str = "<site>") -> PreparedSource:
     """Everything a loader needs before it can run `source`: the
     validated preamble (names to bind) and the source with every
-    `# define` applied. This is the one call each loader makes."""
+    `# define` applied. This is the one call each loader makes.
+
+    Also runs the bracket-nesting indentation check
+    (`arklight.parser.indentation.check_bracket_nesting`) against the
+    define-applied source -- the text that is actually about to run --
+    raising `BracketIndentationError` for a continuation line inside an
+    open `(`, `[`, or `{` that isn't indented further than the line
+    that opened it. `BracketIndentationError` is a `SyntaxError`
+    subclass, not a `PreambleError` one (`indentation.py` stays free
+    of any dependency on this module); callers that already catch
+    `PreambleError` here (`arklight.parser.loader`, `arklight.config`)
+    catch it alongside, explicitly, for that reason.
+    """
     resolved = resolve_preamble_detailed(source, filename=filename)
-    return PreparedSource(
-        resolved=resolved,
-        source=_apply_defines_checked(source, resolved.defines, filename=filename),
-    )
+    applied = _apply_defines_checked(source, resolved.defines, filename=filename)
+    check_bracket_nesting(applied, filename=filename)
+    return PreparedSource(resolved=resolved, source=applied)
 
 
 # ---------------------------------------------------------------------------

@@ -39,6 +39,7 @@ from typing import Any, Callable, Iterator
 
 from arklight.api import Site
 from arklight.parser.discover import DiscoveredSite, discover
+from arklight.parser.indentation import BracketIndentationError
 from arklight.parser.preamble import (
     PreambleError,
     PreparedSource,
@@ -47,6 +48,12 @@ from arklight.parser.preamble import (
     prepare_source,
     retired_star_import_notice,
 )
+
+# `prepare_source` can raise either: a malformed/unresolved preamble
+# directive, or (see `arklight.parser.indentation`) a bracket-nesting
+# indentation violation. Both are compiler-level, both should fail the
+# load the same way, so every site handles them as one pair.
+_PrepareSourceError = (PreambleError, BracketIndentationError)
 
 
 class SiteLoadError(RuntimeError):
@@ -210,7 +217,7 @@ def load_site(
     with _project_imports(site_dir, on_notice):
         try:
             prepared = prepare_source(source, filename=filename)
-        except PreambleError as exc:
+        except _PrepareSourceError as exc:
             raise SiteLoadError(str(exc)) from exc
 
         try:
@@ -231,8 +238,9 @@ def load_site(
             module.__dict__.update(prepared.resolved.bindings)
             code = compile(prepared.source, filename, mode="exec")
             exec(code, module.__dict__)  # noqa: S102 -- intentional: this is the framework's job
-        except PreambleError as exc:
-            # A project module this file imported had a bad preamble.
+        except _PrepareSourceError as exc:
+            # A project module this file imported had a bad preamble,
+            # or one of its lines failed the bracket-nesting check.
             raise SiteLoadError(f"Error while running {file_path}: {exc}") from exc
         except Exception as exc:  # noqa: BLE001 -- surface any user code error clearly
             raise SiteLoadError(f"Error while running {file_path}: {exc}") from exc

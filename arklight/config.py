@@ -133,6 +133,7 @@ def load_config(start_dir: str | Path) -> dict[str, Any]:
 
     # Imported here, not at module level: the loader pulls in the whole
     # compiler front end, which nothing else in this module needs.
+    from arklight.parser.indentation import BracketIndentationError
     from arklight.parser.loader import run_source
     from arklight.parser.preamble import PreambleError
 
@@ -141,11 +142,13 @@ def load_config(start_dir: str | Path) -> dict[str, Any]:
         source = path.read_text(encoding="utf-8")
         # Same trust model as a site.py load, and the same front door:
         # every Python file ARKlight takes in gets its preamble read, so
-        # `# define PORT -> 8347` works here like anywhere else.
+        # `# define PORT -> 8347` works here like anywhere else, and its
+        # bracketed lines are held to the same nesting rule too.
         run_source(namespace, source, filename=str(path))
-    except PreambleError as exc:
-        # A PreambleError is a SyntaxError subclass; catch it first so a
-        # bad directive isn't reported as "invalid Python".
+    except (PreambleError, BracketIndentationError) as exc:
+        # Both are SyntaxError subclasses; catch them first so a bad
+        # directive or an un-nested bracket isn't reported as plain
+        # "invalid Python".
         raise ConfigError(f"{path}: {exc}") from exc
     except SyntaxError as exc:
         raise ConfigError(f"{path}: invalid Python -- {exc}") from exc
