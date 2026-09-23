@@ -5,6 +5,84 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06612] -- JS vocabulary addendum, stage 7/10: the list-scalar derivations catalog (`v0.067`'s other piece)
+
+Numbered by the same out-of-band increment scheme as `[0.06601]`-`[0.06611]`.
+`v0.067`'s slot has two independent pieces (`docs/version history/v0.067.md`);
+`Provider` stage 3/6 shipped already as `[0.06518]` and rolled into the
+`0.066` milestone. This ships the other one: `Derive.list_length`,
+`list_min`, `list_max`, `list_average`, `list_first`, `list_last`,
+`list_includes`, `list_any` and `list_all` -- nine kinds that reduce a
+list-valued `State(...)`/`Computed(...)` to one scalar.
+
+- **A value that isn't a list reads as an empty list** (`Array.isArray`
+  is the client-side test), so a string, a number, an object, `null`,
+  and a name never given a value all behave like `[]`. `list_length` is
+  list-only; `Derive.count` remains the sibling that also measures a
+  string or an object.
+- **Numeric kinds read each element like the math catalog reads a state
+  value** -- `Number(x) || 0`, so `NaN` and `-0` become `+0` -- narrowed
+  to numbers, strings and booleans; `null`, a nested list and an object
+  read as `0`. `list_min`/`list_max` of an empty list are `Infinity`/
+  `-Infinity`, exactly like `Math.min()`/`Math.max()` with no arguments;
+  `list_average` of an empty list is `NaN` (`0 / 0`). `list_first`/
+  `list_last` return the element itself, or `null` for an empty list.
+- **`list_includes`, `list_any` and `list_all` return a boolean**, so any
+  of the three can feed `Show(Predicate.truthy(...))`. `list_includes`
+  is `Array.prototype.includes` under strict (`===`) equality against one
+  literal. `list_any`/`list_all` are `some`/`every` over **one fixed
+  comparison** -- `op` is a member of the existing six `compare`
+  operators, checked at build time exactly like `Derive.compare`, never a
+  callback; `eq`/`ne` compare the element itself against any literal
+  scalar, the four relational operators compare the element read as a
+  number against a numeric literal. An empty list -- or a value that
+  isn't a list -- makes `list_any` `false` and `list_all` vacuously
+  `true`, the same as `[].some(...)`/`[].every(...)`.
+- **`arklight/ir/js_list.py`** (new) is the build-time mirror, the same
+  role `js_numeric.py`/`js_string.py`/`js_predicate.py` already play: it
+  reproduces `Number(string)`'s own grammar (radix literals, `Infinity`,
+  JS whitespace -- not Python's more permissive `float()`) and
+  `===`-equality (never Python's `1 == True`), so a page's
+  server-rendered `Bind(...)` text never disagrees with what the client
+  recomputes. `arklight.ir.build._evaluate_derivation` dispatches the
+  nine kinds through it.
+- **`Bind(...)`'s HTML pre-fill of `None` now renders `null`**, not
+  Python's `None` -- needed for `list_first`/`list_last` of an empty
+  list, and it also corrects an unset `State(...)`'s own pre-fill to
+  match what the client already writes back.
+- **Every literal argument is validated at build time**
+  (`_validate_list_derivation_args`, sharing its JSON-scalar check with
+  `Predicate.one_of(...)`'s existing one): `list_includes`'s `value` and
+  `list_any`/`list_all`'s `op` must be one of `COMPARE_OPS`, with `value`
+  a JSON scalar for `eq`/`ne` and a finite number for the relational
+  four.
+- **No fragment spreads a list into a call or needs a modern browser:**
+  loops and indexing throughout, not `Math.min(...list)` (which throws
+  past roughly 100k items) or `.at()` (missing before 2022); checked
+  against a 500,000-item list in Node.
+- **`v0.067` is closed by this increment**, and the docs status table and
+  roadmap rows are updated to match. It stays an out-of-band increment
+  rather than rolling up to a plain `0.067` package version.
+
+`tests/test_js_vocabulary_v0067.py` (new) has 265 tests: the `Derive.*`
+API, registry/fragment lockstep, validation (bad and boundary literal
+arguments, every compare operator, arity/deps, sharing the scalar check
+with `one_of`), exact build-time initial values across the catalog,
+`js_list.py`'s `js_to_number`/`js_strict_equal` against JavaScript's own
+string-to-number grammar and `===` (surrogate-pair strings, `2**53`
+rounding, radix literals, non-ASCII digits), HTML pre-fill (including the
+`null` spelling and a `Show` guard driven by a boolean-kind Computed),
+JS-backend shipping (only the used kind ships; no `eval`/`new Function`/
+spread/`.at`), a 500,000-item Node stack-depth check, and a roughly
+15,000-case Node parity sweep comparing every kind's build-time result
+against the shipped fragment across a shared pool of edge-case lists
+(mixed types, surrogate pairs, `NaN`/`Infinity`, booleans-vs-numbers,
+radix and malformed numeric strings, deeply nested values) -- confirmed
+to actually catch a mismatch by deliberately breaking the Python mirror
+five different ways and rerunning it. Full suite 2595 passed (was 2320 on
+`0.06610`), plus one known failing assertion in
+`test_js_vocabulary_v0067.py`, out of scope here. `0.06611` -> `0.06612`.
+
 ## [0.06611] -- Bug fix: bracket-nesting indentation, part 3
 
 Follow-up correction to `0.06603`'s `arklight/parser/indentation.py`:
@@ -19,6 +97,7 @@ no changes), since a correctly-indented-but-endlessly-nested tree is
 just as unreadable as a flat one. `tests/test_indentation.py` extended;
 `docs/Foundational/AUTHORING-GUIDE.md` updated to match. `0.06610` ->
 `0.06611`.
+
 
 ## [0.06610] -- Bug fix: htmx wiring hardening
 
