@@ -13,7 +13,7 @@
 **A Python-first compiler for building static websites where developers work
 with a structured component API, No templating language, while the output remains ordinary, dependency-free `Hyper Text Markup Language` `Cascading Style Sheets` `JavaScript`.**
 
-Moto: **Write Once, Compile Everywhere**
+Motto: **Write Once, Compile Everywhere**
 
 </div>
 </td>
