@@ -5,6 +5,21 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06611] -- Bug fix: bracket-nesting indentation, part 3
+
+Follow-up correction to `0.06603`'s `arklight/parser/indentation.py`:
+a closing-only line (a lone `)`/`]`/`}`, or a run of those) is no
+longer exempt from every indentation check -- it must now be flush
+with the line that opened the bracket it closes, so a `container(...)`
+whose `)` drifts off its opener's column is caught instead of silently
+passing. Also adds a nesting-depth cap: `(`/`[`/`{` nesting past 8
+levels now raises `TreeNestingTooDeepError` (a `BracketIndentationError`
+subclass, so existing `except BracketIndentationError` call sites need
+no changes), since a correctly-indented-but-endlessly-nested tree is
+just as unreadable as a flat one. `tests/test_indentation.py` extended;
+`docs/Foundational/AUTHORING-GUIDE.md` updated to match. `0.06610` ->
+`0.06611`.
+
 ## [0.06610] -- Bug fix: htmx wiring hardening
 
 `arklight/backend/js/render.py` hardened so the emitted htmx wiring plays

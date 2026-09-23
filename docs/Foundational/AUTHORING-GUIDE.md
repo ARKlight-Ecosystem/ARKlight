@@ -175,8 +175,9 @@ ARKlight is stricter: a line continuing an open bracket must be
 indented *further* than the line that opened it, or the build fails
 with a `BracketIndentationError` naming the file and line. A line that
 only closes the bracket (a lone `)`, `]`, `}`, or a run of those,
-optionally with a trailing comma) is exempt -- closing flush with the
-opener's own indentation is the idiomatic style and always allowed:
+optionally with a trailing comma) must be flush with the opener's own
+indentation -- that's the one indentation such a line is allowed to
+have, not just the recommended one:
 
 ```python
 Page(
@@ -184,6 +185,27 @@ Page(
     Text("hi"),
 )
 ```
+
+A closer that drifts off that line -- even by one space, even though
+it's still "just closing brackets" -- is rejected too:
+
+```python
+page(
+       container(
+             ...
+      )                 # <- BracketIndentationError: not flush with
+                         #    the `container(` on the line above
+)
+```
+
+Nesting depth is capped as well: past 8 levels of `(`/`[`/`{`, the
+build fails with `BracketIndentationError` (its
+`TreeNestingTooDeepError` subclass) regardless of how carefully every
+line is indented -- a tree that deep stops being readable no matter
+what, and the fix is to pull a branch out into its own function, not
+to indent it more carefully. A missing comma between siblings is a
+different, ordinary `SyntaxError` from Python's own grammar and has
+nothing to do with either of these checks.
 
 This check runs on every build, right alongside preamble resolution
 (`arklight.parser.preamble.prepare_source`), as its own diagnostic in
