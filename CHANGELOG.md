@@ -5,6 +5,83 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.06610] -- Bug fix: htmx wiring hardening
+
+`arklight/backend/js/render.py` hardened so the emitted htmx wiring plays
+nicely with the rest of the reactive JS runtime instead of fighting it.
+`tests/test_htmx_5.py` extended. Full suite 2320 passed. `0.06609` -> `0.06610`;
+roadmap `v0.067` untouched. Out-of-band, same slot-sharing precedent as the
+`0.0650x` series.
+
+## [0.06609] -- Bug fix: serialization mismatch + `--near` flag fixes
+
+Fixed an HTML/search serialization mismatch in
+`arklight/backend/html/page_render.py` and `arklight/search/engine.py`, and
+fixed `arklight search --near` in `arklight/cli/search.py`.
+`tests/test_html_page_render.py`/`tests/test_search.py`/
+`tests/test_js_vocabulary_v0061.py`/`tests/test_vdom_4.py` extended.
+`0.06608` -> `0.06609`.
+
+## [0.06608] -- Bug fix: PWA service-worker injection bugs
+
+`arklight/pwa.py` hardened against service-worker injection bugs.
+`tests/test_pwa.py`/`tests/test_experimental_apis.py` extended.
+`0.06607` -> `0.06608`.
+
+## [0.06607] -- Bug fix: component breakage during dev builds + hydration bugs
+
+Fixed user-defined component breakage during dev builds and hydration
+mismatches: `arklight/backend/js/runtime/repeat.py`,
+`arklight/ir/components.py`, `arklight/parser/loader.py`.
+`tests/test_loader.py` extended. `0.06606` -> `0.06607`.
+
+## [0.06606] -- Docs-only: sync docs with the search/doc-retrieval changes
+
+`docs/Foundational/AUTHORING-GUIDE.md`/`CLI-REFERENCE.md`/`PLATFORM-APIS.md`
+and `docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md` updated to match
+`0.06604`/`0.06605`. No code changed. `0.06605` -> `0.06606`.
+
+## [0.06605] -- Bug fix: `arklight search --retrieve-doc` Markdown rendering + `--section`
+
+`arklight search --retrieve-doc` can now render Markdown output directly and
+gained a `--section` flag (`arklight/cli/doc_retrieval.py`, new
+`arklight/cli/mdrender.py`, `arklight/cli/main.py` wiring).
+`tests/test_doc_retrieval.py`/`tests/test_mdrender.py` (new) extended.
+`0.06604` -> `0.06605`.
+
+## [0.06604] -- Bug fix: `arklight search` extended to cover Platform APIs
+
+`arklight/cli/search.py` extended so `arklight search` covers Platform API
+entries. `tests/test_search.py` extended. `0.06603` -> `0.06604`.
+
+## [0.06603] -- Bug fix: preamble parser nesting, part 2
+
+Follow-up correction to `0.06602`: new `arklight/parser/indentation.py`
+module (indentation-aware line scanning), wired into
+`arklight/config.py`/`arklight/parser/loader.py`/`preamble.py`.
+`tests/test_indentation.py` (new). `0.06602` -> `0.06603`.
+
+## [0.06602] -- Bug fix: preamble parser nesting, part 1
+
+`arklight/parser/preamble.py` widened to correctly handle nested/indented
+`# include`/`# define` directives. `0.06601` -> `0.06602`.
+
+## [0.06601] -- Docs-only: four new design proposals filed
+
+Four new proposals filed against `docs/Proposals/` since `v0.066` closed,
+all **Proposed**, none accepted, no code changed:
+
+- `KAIOS-NATIVE-TARGET-PROPOSAL.md` -- KaiOS as a target-specialized backend.
+- `AVM-WASM-SANDBOX-PROPOSAL..md` -- running third-party packages in a
+  WebAssembly sandbox.
+- `REISCRIPT1-PROPOSAL.md` -- Rei the language: ARKlight-native syntax as a
+  DSL alternative to the Python authoring surface.
+- `REI-DYNAMIC-CLASS-WASM-PROPOSAL.md`.
+
+Also landed/updated in this span: `docs/Implementation/REI-LANGUAGE-ADDENDUM.md`,
+`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`,
+`docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md`. `0.066` -> `0.06601`.
+
 ## [0.066] -- Milestone rollup: `v0.066` is done
 
 Version moves from the `0.0650x` out-of-band increments to the milestone
