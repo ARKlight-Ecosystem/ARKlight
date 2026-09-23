@@ -109,6 +109,7 @@ def project_files(
     include_release_job: bool = False,
     project_subdir: str | None = None,
     allow_navigation: tuple[str, ...] | list[str] = (),
+    system_bar_color: str | None = None,
 ) -> dict[str, str]:
     """
     Return `{relative_path: contents}` for every *generated text* file
@@ -148,10 +149,25 @@ def project_files(
     browser. Empty by default, which is also what keeps the generated
     manifest free of the `INTERNET` permission -- only a non-empty list
     adds it, since an in-WebView external page can't load without one.
+
+    `system_bar_color` is the already-resolved `android.status_bar_color`
+    (see `arklight.cli.android`): an opaque `#RRGGBB` string, or `None`
+    for "use the Material theme colours" -- in which case every file
+    below is exactly what it was before this parameter existed. When
+    set, it is written once as an `ark_site_background` colour resource
+    and drives the window background, the splash background, the
+    status/navigation bars (unless `edge_to_edge`, where they stay
+    transparent over the page) and the bar icon lightness, which
+    follows this colour's luminance rather than the phone's day/night
+    setting -- see `relative_luminance`.
     """
     for host in allow_navigation:
         if not HOST_PATTERN_RE.match(host):
             raise ValueError(f"Invalid allow_navigation host {host!r}.")
+    if system_bar_color is not None:
+        if not _HEX_COLOR_RE.match(system_bar_color):
+            raise ValueError(f"Invalid system_bar_color {system_bar_color!r}.")
+        system_bar_color = system_bar_color.upper()
     package_path = _package_path(package_id)
     java_dir = f"app/src/main/java/{package_path}"
 
@@ -174,10 +190,14 @@ def project_files(
         f"{java_dir}/ArkSeal.kt": _kt_with_package(_ARK_SEAL_KT, package_id),
         f"{java_dir}/MemoryGuard.kt": _kt_with_package(_MEMORY_GUARD_KT, package_id),
         "app/src/main/res/values/strings.xml": _strings_xml(app_name),
-        "app/src/main/res/values/colors.xml": _COLORS_XML,
-        "app/src/main/res/values-night/colors.xml": _COLORS_NIGHT_XML,
-        "app/src/main/res/values/themes.xml": _themes_xml(has_splash),
-        "app/src/main/res/values-night/themes.xml": _themes_night_xml(has_splash),
+        "app/src/main/res/values/colors.xml": _colors_xml(system_bar_color),
+        "app/src/main/res/values-night/colors.xml": _colors_xml(system_bar_color, night=True),
+        "app/src/main/res/values/themes.xml": _themes_xml(
+            has_splash, system_bar_color, edge_to_edge
+        ),
+        "app/src/main/res/values-night/themes.xml": _themes_night_xml(
+            has_splash, system_bar_color, edge_to_edge
+        ),
         ".github/workflows/android-build.yml": _github_ci_workflow_yml(
             app_name,
             package_id,
@@ -1458,8 +1478,95 @@ _COLORS_NIGHT_XML = """\
 """
 
 
-def _themes_xml(has_splash: bool) -> str:
-    splash_theme = _SPLASH_STARTING_THEME_LIGHT if has_splash else ""
+# `#RRGGBB` only -- the one form `arklight.cli.android` resolves a
+# colour to, and the one `ark_site_background` is written as.
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+# WCAG's relative luminance at which black text and white text have the
+# same contrast ratio against the background: ((L + 0.05) / 0.05 ==
+# 1.05 / (L + 0.05) gives L ~= 0.179). Above it dark status-bar icons
+# read better; below it light ones do.
+_LUMINANCE_ICON_THRESHOLD = 0.179
+
+
+def relative_luminance(hex_color: str) -> float:
+    """WCAG 2.x relative luminance (0.0 black .. 1.0 white) of `#RRGGBB`."""
+    if not _HEX_COLOR_RE.match(hex_color):
+        raise ValueError(f"Invalid colour {hex_color!r} -- expected #RRGGBB.")
+
+    def linear(channel: int) -> float:
+        c = channel / 255
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (int(hex_color[i : i + 2], 16) for i in (1, 3, 5))
+    return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+
+
+def uses_dark_bar_icons(hex_color: str) -> bool:
+    """True when dark status/navigation-bar icons suit `hex_color`."""
+    return relative_luminance(hex_color) > _LUMINANCE_ICON_THRESHOLD
+
+
+def _colors_xml(bar_color: str | None, night: bool = False) -> str:
+    base = _COLORS_NIGHT_XML if night else _COLORS_XML
+    if bar_color is None:
+        return base
+    block = f'''
+    <!-- The site's own background colour, resolved when this project was
+         scaffolded (android.status_bar_color in arklight.config.py). It
+         paints the window behind the WebView, the splash screen and, unless
+         edge_to_edge is on, the system bars. One colour serves day and
+         night because the page itself doesn't change with the phone's
+         setting. Edit it here to tweak it by hand. -->
+    <color name="ark_site_background">{bar_color}</color>
+'''
+    return base.replace("</resources>\n", block + "</resources>\n")
+
+
+def _bar_theme_items(day: bool, bar_color: str | None, edge_to_edge: bool) -> str:
+    """
+    The window-background and system-bar `<item>`s of `Theme.ArkApp`.
+
+    `bar_color=None` reproduces the Material-theme lines exactly as they
+    were before `android.status_bar_color` existed (icon lightness from
+    `day`, i.e. the phone's day/night setting). Otherwise icon lightness
+    comes from the colour's luminance -- the same answer in both theme
+    files -- and, with `edge_to_edge`, the bars stay transparent so the
+    page's own background shows through them.
+    """
+    if bar_color is None:
+        light = "true" if day else "false"
+        return (
+            '        <item name="android:statusBarColor" tools:targetApi="21">'
+            "@android:color/transparent</item>\n"
+            f'        <item name="android:windowLightStatusBar" tools:targetApi="23">{light}</item>\n'
+            '        <item name="android:navigationBarColor" tools:targetApi="27">'
+            "?attr/colorSurface</item>\n"
+            f'        <item name="android:windowLightNavigationBar" tools:targetApi="27">{light}</item>'
+        )
+    light = "true" if uses_dark_bar_icons(bar_color) else "false"
+    bars = "@android:color/transparent" if edge_to_edge else "@color/ark_site_background"
+    return (
+        '        <item name="android:windowBackground">@color/ark_site_background</item>\n'
+        f'        <item name="android:statusBarColor" tools:targetApi="21">{bars}</item>\n'
+        f'        <item name="android:windowLightStatusBar" tools:targetApi="23">{light}</item>\n'
+        f'        <item name="android:navigationBarColor" tools:targetApi="27">{bars}</item>\n'
+        f'        <item name="android:windowLightNavigationBar" tools:targetApi="27">{light}</item>'
+    )
+
+
+def _splash_theme(day: bool, bar_color: str | None) -> str:
+    theme = _SPLASH_STARTING_THEME_LIGHT if day else _SPLASH_STARTING_THEME_DARK
+    if bar_color is None:
+        return theme
+    return theme.replace("@color/md_theme_background", "@color/ark_site_background")
+
+
+def _themes_xml(
+    has_splash: bool, bar_color: str | None = None, edge_to_edge: bool = False
+) -> str:
+    splash_theme = _splash_theme(True, bar_color) if has_splash else ""
+    bar_items = _bar_theme_items(True, bar_color, edge_to_edge)
     return f'''\
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!--
@@ -1487,17 +1594,17 @@ def _themes_xml(has_splash: bool) -> str:
         <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
         <item name="colorOutline">@color/md_theme_outline</item>
 
-        <item name="android:statusBarColor" tools:targetApi="21">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
-        <item name="android:navigationBarColor" tools:targetApi="27">?attr/colorSurface</item>
-        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+{bar_items}
     </style>
 {splash_theme}</resources>
 '''
 
 
-def _themes_night_xml(has_splash: bool) -> str:
-    splash_theme = _SPLASH_STARTING_THEME_DARK if has_splash else ""
+def _themes_night_xml(
+    has_splash: bool, bar_color: str | None = None, edge_to_edge: bool = False
+) -> str:
+    splash_theme = _splash_theme(False, bar_color) if has_splash else ""
+    bar_items = _bar_theme_items(False, bar_color, edge_to_edge)
     return f'''\
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Dark-mode mirror of values/themes.xml. -->
@@ -1516,10 +1623,7 @@ def _themes_night_xml(has_splash: bool) -> str:
         <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
         <item name="colorOutline">@color/md_theme_outline</item>
 
-        <item name="android:statusBarColor" tools:targetApi="21">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
-        <item name="android:navigationBarColor" tools:targetApi="27">?attr/colorSurface</item>
-        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+{bar_items}
     </style>
 {splash_theme}</resources>
 '''

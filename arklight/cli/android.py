@@ -64,9 +64,12 @@ only place it's been told it may write).
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
+import unicodedata
 from dataclasses import dataclass, field
+from html.parser import HTMLParser
 from pathlib import Path
 
 from arklight.backend.android import runtime
@@ -77,9 +80,17 @@ from arklight.config import ConfigError, load_config, section
 # metadata" subsection for the full key list. A project with no
 # `arklight.config.py` at all (or one with no `"android"` section)
 # still scaffolds a buildable, if generically named and unbranded, app.
+#
+# `app_name` and `package_id` default to `None` ("the project didn't
+# say") rather than a placeholder string, so `scaffold_project` can tell
+# "not configured" from "configured" and derive them from the build
+# directory instead -- see docs/Proposals/ANDROID-IDENTITY-SYSTEM-BAR-
+# SYNC.md sections 2.1/2.2. `_FALLBACK_APP_NAME`/`_FALLBACK_PACKAGE_ID`
+# are what an unconfigured, unnamed project ends up with, as before.
 _DEFAULTS: dict[str, object] = {
-    "app_name": "ARKlight App",
-    "package_id": "com.arklight.app",
+    "app_name": None,
+    "package_id": None,
+    "status_bar_color": "auto",
     "version_name": "1.0.0",
     "version_code": 1,
     "icon": None,
@@ -88,6 +99,31 @@ _DEFAULTS: dict[str, object] = {
     "edge_to_edge": False,
     "allow_navigation": [],
 }
+
+_FALLBACK_APP_NAME = "ARKlight App"
+_FALLBACK_PACKAGE_ID = "com.arklight.app"
+_DEFAULT_SOURCE = "default -- nothing in the build named the app"
+
+# The compiler's own placeholder `Site(name=...)`. It reaches `<title>`
+# on a page that sets none, but it isn't a name anyone chose.
+_PLACEHOLDER_SITE_NAME = "arklight-site"
+
+# Namespace of a derived package id. Reverse-domain ids imply you own
+# the domain -- fine for a personal test install, not for publishing;
+# the CLI says so. See the proposal's section 5.1.
+_DERIVED_PACKAGE_PREFIX = "com.arklight."
+_MAX_SLUG_LENGTH = 40
+
+# Java + Kotlin hard keywords: an unescaped one as a package segment is
+# a compile error in the generated `package` line.
+_RESERVED_WORDS = frozenset(
+    """abstract as assert boolean break byte case catch char class const
+    continue default do double else enum extends false final finally float
+    for fun goto if implements import in instanceof int interface is long
+    native new null object package private protected public return short
+    static strictfp super switch synchronized this throw throws transient
+    true try typealias typeof val var void volatile when while""".split()
+)
 
 # Config-file `orientation` values -> `android:screenOrientation`
 # manifest attribute values (see `runtime.py`'s `project_files`
@@ -141,6 +177,21 @@ class ScaffoldResult:
     # included) will auto-generate its own debug key, so debug APKs
     # from different builds won't share a signature.
     has_debug_keystore: bool = False
+    # Where each piece of identity came from, for the CLI to report --
+    # see `_resolve_app_name`, `_resolve_package_id` and
+    # `_resolve_system_bars`.
+    app_name_source: str = ""
+    package_id_source: str = ""
+    # Opaque `#RRGGBB` driving the bars/window/splash, or None when the
+    # Material theme colours are in use.
+    system_bar_color: str | None = None
+    system_bar_source: str = ""
+    # Set when `status_bar_color = "auto"` found a value it couldn't use
+    # and fell back to Material; says which value and why.
+    system_bar_note: str | None = None
+    # True when the package id was set in `arklight.config.py` (so the
+    # CLI's "choose your own id" reminder is unnecessary).
+    package_id_configured: bool = False
 
 
 def _find_enclosing_git_root(project_dir: Path) -> Path | None:
@@ -182,6 +233,415 @@ def _validate_package_id(package_id: str) -> None:
             f"digits, underscores only; no segment may start with a digit), "
             f"e.g. 'com.example.myapp'."
         )
+
+
+# --------------------------------------------------------------------
+# Identity + system bars derived from the build directory
+# (docs/Proposals/ANDROID-IDENTITY-SYSTEM-BAR-SYNC.md section 2)
+# --------------------------------------------------------------------
+
+
+class _HeadScanner(HTMLParser):
+    """
+    Collect what `index.html`'s `<head>` says about the site: its
+    `<title>`, its `theme-color` meta tags and its stylesheet links.
+    Stops at `</head>`. Entities are decoded exactly once
+    (`convert_charrefs=True`).
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.in_head = False
+        self.done = False
+        self._in_title = False
+        self._title_parts: list[str] = []
+        self.theme_colors: list[tuple[str, str]] = []  # (content, media)
+        self.stylesheets: list[str] = []
+
+    @property
+    def title(self) -> str | None:
+        text = " ".join("".join(self._title_parts).split())
+        return text or None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self.done:
+            return
+        attr = {k.lower(): (v or "") for k, v in attrs}
+        if tag == "head":
+            self.in_head = True
+        elif tag == "body":
+            self.done = True
+        elif not self.in_head:
+            return
+        elif tag == "title":
+            self._in_title = True
+        elif tag == "meta" and attr.get("name", "").strip().lower() == "theme-color":
+            self.theme_colors.append((attr.get("content", ""), attr.get("media", "")))
+        elif (
+            tag == "link"
+            and "stylesheet" in attr.get("rel", "").lower().split()
+            and attr.get("href")
+        ):
+            self.stylesheets.append(attr["href"])
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.done:
+            return
+        if tag == "title":
+            self._in_title = False
+        elif tag == "head":
+            self.in_head = False
+            self.done = True
+
+    def handle_data(self, data: str) -> None:
+        if self._in_title and not self.done:
+            self._title_parts.append(data)
+
+
+def _scan_head(build_dir: Path) -> _HeadScanner:
+    scanner = _HeadScanner()
+    try:
+        text = (build_dir / "index.html").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return scanner
+    scanner.feed(text)
+    scanner.close()
+    return scanner
+
+
+def _is_named(name: object) -> bool:
+    return (
+        isinstance(name, str)
+        and bool(name.strip())
+        and name.strip().casefold() != _PLACEHOLDER_SITE_NAME
+    )
+
+
+def _resolve_app_name(
+    build_dir: Path, configured: object, head: _HeadScanner
+) -> tuple[str, str]:
+    """
+    Pick the app's display name and say where it came from. First hit
+    wins: `android.app_name`; the PWA `manifest.json`'s `name` (present
+    once `arklight pwa` has run); the home page's `<title>` (which for a
+    page with no title of its own is `Site(name=...)`); then the generic
+    "ARKlight App". The compiler's placeholder site name doesn't count
+    as a name.
+    """
+    if configured is not None:
+        if not isinstance(configured, str) or not configured.strip():
+            raise AndroidError(
+                f"android.app_name must be a non-empty string, got {configured!r}."
+            )
+        return configured, "from android.app_name in arklight.config.py"
+
+    manifest = build_dir / "manifest.json"
+    if manifest.is_file():
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = None
+        name = data.get("name") if isinstance(data, dict) else None
+        if _is_named(name):
+            return " ".join(name.split()), "from manifest.json name"
+
+    if _is_named(head.title):
+        return head.title, "from index.html <title>"  # type: ignore[return-value]
+
+    return _FALLBACK_APP_NAME, _DEFAULT_SOURCE
+
+
+def _slugify_app_name(app_name: str) -> str:
+    """
+    Turn an app name into one legal `applicationId` segment: accents
+    folded to ASCII, everything non-alphanumeric collapsed to `_`,
+    lowercase, a leading digit prefixed with `app_`, a Java/Kotlin
+    keyword suffixed with `_app`, nothing ASCII at all becoming `app`,
+    at most 40 characters. (A hyphen, the natural separator, isn't legal
+    in an `applicationId` segment, hence `_`.)
+    """
+    folded = unicodedata.normalize("NFKD", app_name).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "_", folded.lower()).strip("_")
+    slug = slug[:_MAX_SLUG_LENGTH].rstrip("_")
+    if not slug:
+        return "app"
+    if slug[0].isdigit():
+        slug = f"app_{slug}"
+    if slug in _RESERVED_WORDS:
+        slug = f"{slug}_app"
+    return slug[:_MAX_SLUG_LENGTH].rstrip("_")
+
+
+def _resolve_package_id(
+    configured: object, app_name: str, app_name_source: str
+) -> tuple[str, str]:
+    """
+    `android.package_id` if set (validated as ever); otherwise
+    `com.arklight.<slug of the app name>`; and if nothing named the app,
+    the old `com.arklight.app` so a nameless project is unchanged.
+    """
+    if configured is not None:
+        _validate_package_id(configured)  # type: ignore[arg-type]
+        return configured, "from android.package_id in arklight.config.py"  # type: ignore[return-value]
+    if app_name_source == _DEFAULT_SOURCE:
+        return _FALLBACK_PACKAGE_ID, _DEFAULT_SOURCE
+    package_id = _DERIVED_PACKAGE_PREFIX + _slugify_app_name(app_name)
+    _validate_package_id(package_id)
+    return package_id, "derived from app name"
+
+
+# The 16 basic CSS colour names plus `orange` (and the `grey` spelling
+# of `gray`). Anything else named is deliberately not understood: a bar
+# painted a colour the page doesn't have is worse than an unmatched one.
+_NAMED_COLORS: dict[str, str] = {
+    "black": "#000000",
+    "silver": "#C0C0C0",
+    "gray": "#808080",
+    "grey": "#808080",
+    "white": "#FFFFFF",
+    "maroon": "#800000",
+    "red": "#FF0000",
+    "purple": "#800080",
+    "fuchsia": "#FF00FF",
+    "green": "#008000",
+    "lime": "#00FF00",
+    "olive": "#808000",
+    "yellow": "#FFFF00",
+    "navy": "#000080",
+    "blue": "#0000FF",
+    "teal": "#008080",
+    "aqua": "#00FFFF",
+    "orange": "#FFA500",
+}
+
+_HEX_RE = re.compile(r"^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$")
+_FUNC_RE = re.compile(r"^(rgba?|hsla?)\(\s*(.*?)\s*\)$", re.DOTALL)
+_NUMBER_RE = re.compile(r"^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$")
+
+
+def _to_number(token: str, suffix: str = "") -> float | None:
+    """Parse `token` as a number, requiring `suffix` (e.g. '%') if given."""
+    if suffix:
+        if not token.endswith(suffix):
+            return None
+        token = token[: -len(suffix)]
+    return float(token) if _NUMBER_RE.match(token) else None
+
+
+def _is_opaque_alpha(token: str) -> bool:
+    if token.endswith("%"):
+        value = _to_number(token, "%")
+        return value is not None and value >= 100
+    value = _to_number(token)
+    return value is not None and value >= 1
+
+
+def _clamp_byte(value: float) -> int:
+    return max(0, min(255, int(value + 0.5)))
+
+
+def _hsl_to_rgb(h: float, s: float, l: float) -> tuple[int, int, int]:
+    h = (h % 360) / 360
+    s = max(0.0, min(1.0, s))
+    l = max(0.0, min(1.0, l))
+    if s == 0:
+        v = _clamp_byte(l * 255)
+        return v, v, v
+    q = l * (1 + s) if l < 0.5 else l + s - l * s
+    p = 2 * l - q
+
+    def channel(t: float) -> float:
+        t %= 1
+        if t < 1 / 6:
+            return p + (q - p) * 6 * t
+        if t < 1 / 2:
+            return q
+        if t < 2 / 3:
+            return p + (q - p) * (2 / 3 - t) * 6
+        return p
+
+    return (
+        _clamp_byte(channel(h + 1 / 3) * 255),
+        _clamp_byte(channel(h) * 255),
+        _clamp_byte(channel(h - 1 / 3) * 255),
+    )
+
+
+def _parse_css_color(value: object) -> str | None:
+    """
+    Parse an opaque solid CSS colour to `#RRGGBB`, or return None.
+
+    Understood: hex (`#rgb`, `#rrggbb`, and the alpha forms when alpha is
+    full), `rgb()`/`rgba()` and `hsl()`/`hsla()` in comma or space
+    syntax with full alpha, and the named colours in `_NAMED_COLORS`.
+    Not understood (None): gradients, images, `var(...)`, `transparent`,
+    any translucent value and any other named colour.
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.strip().lower()
+    text = re.sub(r"\s*!important\s*$", "", text)
+    if not text:
+        return None
+
+    if text in _NAMED_COLORS:
+        return _NAMED_COLORS[text]
+
+    match = _HEX_RE.match(text)
+    if match:
+        digits = match.group(1)
+        if len(digits) in (3, 4):
+            digits = "".join(c * 2 for c in digits)
+        if len(digits) == 8:
+            if digits[6:] != "ff":
+                return None
+            digits = digits[:6]
+        return "#" + digits.upper()
+
+    match = _FUNC_RE.match(text)
+    if not match:
+        return None
+    func, body = match.group(1), match.group(2)
+    tokens = body.replace(",", " ").replace("/", " ").split()
+    if len(tokens) not in (3, 4):
+        return None
+    if len(tokens) == 4 and not _is_opaque_alpha(tokens[3]):
+        return None
+
+    if func.startswith("rgb"):
+        channels: list[int] = []
+        for token in tokens[:3]:
+            pct = _to_number(token, "%")
+            if pct is not None:
+                channels.append(_clamp_byte(pct * 255 / 100))
+                continue
+            num = _to_number(token)
+            if num is None:
+                return None
+            channels.append(_clamp_byte(num))
+        r, g, b = channels
+    else:
+        hue_token = tokens[0]
+        turns = _to_number(hue_token, "turn")
+        degrees = _to_number(hue_token, "deg")
+        hue = turns * 360 if turns is not None else degrees
+        if hue is None:
+            hue = _to_number(hue_token)
+        sat = _to_number(tokens[1], "%")
+        light = _to_number(tokens[2], "%")
+        if sat is None:
+            sat = _to_number(tokens[1])
+        if light is None:
+            light = _to_number(tokens[2])
+        if hue is None or sat is None or light is None:
+            return None
+        r, g, b = _hsl_to_rgb(hue, sat / 100, light / 100)
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+_CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+_ROOT_RULE_RE = re.compile(r":root\s*\{([^}]*)\}")
+_ARK_BG_RE = re.compile(r"--ark-bg\s*:\s*([^;}]+)")
+
+
+def _stylesheet_ark_bg(build_dir: Path, head: _HeadScanner) -> str | None:
+    """
+    The raw `--ark-bg` value declared in a `:root` rule of a local
+    stylesheet linked from `index.html` -- the one every page shares.
+    The last declaration wins, as in the cascade.
+    """
+    root = build_dir.resolve()
+    found: str | None = None
+    for href in head.stylesheets:
+        href = href.split("#", 1)[0].split("?", 1)[0]
+        if not href or "//" in href or ":" in href.split("/", 1)[0]:
+            continue  # external, or some other scheme
+        candidate = (root / href.lstrip("/")).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            continue
+        if not candidate.is_file():
+            continue
+        try:
+            css = _CSS_COMMENT_RE.sub("", candidate.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+        for rule in _ROOT_RULE_RE.finditer(css):
+            for decl in _ARK_BG_RE.finditer(rule.group(1)):
+                found = decl.group(1).strip()
+    return found
+
+
+@dataclass(frozen=True)
+class _SystemBars:
+    color: str | None  # opaque #RRGGBB, or None = Material theme colours
+    source: str
+    note: str | None = None
+
+
+def _resolve_system_bars(build_dir: Path, configured: object, head: _HeadScanner) -> _SystemBars:
+    """
+    Resolve `android.status_bar_color`: `"material"` (the Material theme
+    colours, as before), any single CSS colour, or `"auto"` (default) --
+    match the site: a `theme-color` meta tag if there is one, else the
+    stylesheet's `--ark-bg`. This is the page's *background*, one colour
+    for the whole app, not a pixel average of the rendered page.
+
+    An explicit value that isn't an opaque solid colour is an
+    `AndroidError`. An `"auto"` source that isn't one falls back to
+    Material and says so in `note`.
+    """
+    if not isinstance(configured, str) or not configured.strip():
+        raise AndroidError(
+            f"android.status_bar_color must be 'auto', 'material' or a CSS colour, "
+            f"got {configured!r}."
+        )
+    mode = configured.strip().lower()
+
+    if mode == "material":
+        return _SystemBars(None, 'android.status_bar_color = "material"')
+
+    if mode != "auto":
+        color = _parse_css_color(configured)
+        if color is None:
+            raise AndroidError(
+                f"Invalid android.status_bar_color {configured!r} -- use 'auto', "
+                f"'material', or an opaque solid CSS colour: hex (#1a1a2e), rgb(...), "
+                f"hsl(...) or one of the basic colour names (white, black, navy, ...). "
+                f"Gradients, images, var(...), transparent and translucent values "
+                f"aren't supported."
+            )
+        return _SystemBars(color, "from android.status_bar_color in arklight.config.py")
+
+    # "auto": a theme-color meta tag first (ignoring dark-only `media`
+    # variants, which have no counterpart here yet), then the stylesheet.
+    raw: str | None = None
+    source = ""
+    for content, media in head.theme_colors:
+        if "dark" not in media.lower():
+            raw, source = content.strip(), "theme-color meta tag"
+            break
+    if raw is None:
+        raw = _stylesheet_ark_bg(build_dir, head)
+        source = "stylesheet --ark-bg"
+
+    if raw is None:
+        return _SystemBars(
+            None,
+            "Material theme colours",
+            "no theme-color meta tag or --ark-bg found in the build",
+        )
+    color = _parse_css_color(raw)
+    if color is None:
+        return _SystemBars(
+            None,
+            "Material theme colours",
+            f"the {source} value {raw!r} isn't a solid opaque colour ARKlight can "
+            f"read (gradients, images, var(...) and translucent values aren't "
+            f"supported) -- set android.status_bar_color to choose one",
+        )
+    return _SystemBars(color, f"from {source}")
 
 
 def _validate_version_code(version_code: object) -> int:
@@ -315,6 +775,11 @@ def scaffold_project(
     `runtime._github_ci_workflow_yml`'s docstring for what the job
     does.
 
+    Anything the config doesn't say is derived from the build directory
+    -- app name, package id, system-bar colour; see `_resolve_app_name`,
+    `_resolve_package_id` and `_resolve_system_bars`, and
+    docs/Proposals/ANDROID-IDENTITY-SYSTEM-BAR-SYNC.md.
+
     Raises AndroidError for a missing/malformed build directory, a
     non-empty `output_dir`, an invalid/malformed `"android"` config
     section, a missing/unsupported icon or splash image, or a missing
@@ -346,12 +811,12 @@ def scaffold_project(
         raise AndroidError(str(exc)) from exc
     android_cfg = section(config, "android", _DEFAULTS)
 
-    app_name = android_cfg["app_name"]
-    if not isinstance(app_name, str) or not app_name.strip():
-        raise AndroidError(f"android.app_name must be a non-empty string, got {app_name!r}.")
-
-    package_id = android_cfg["package_id"]
-    _validate_package_id(package_id)
+    head = _scan_head(build_dir)
+    app_name, app_name_source = _resolve_app_name(build_dir, android_cfg["app_name"], head)
+    package_id, package_id_source = _resolve_package_id(
+        android_cfg["package_id"], app_name, app_name_source
+    )
+    system_bars = _resolve_system_bars(build_dir, android_cfg["status_bar_color"], head)
 
     version_name = android_cfg["version_name"]
     if not isinstance(version_name, str) or not version_name.strip():
@@ -408,6 +873,7 @@ def scaffold_project(
         include_release_job=include_release_job,
         project_subdir=project_subdir,
         allow_navigation=allow_navigation,
+        system_bar_color=system_bars.color,
     )
 
     written: list[Path] = []
@@ -444,4 +910,10 @@ def scaffold_project(
         package_id=package_id,
         has_debug_keystore=debug_keystore_path is not None,
         enclosing_git_root=enclosing_git_root,
+        app_name_source=app_name_source,
+        package_id_source=package_id_source,
+        system_bar_color=system_bars.color,
+        system_bar_source=system_bars.source,
+        system_bar_note=system_bars.note,
+        package_id_configured=android_cfg["package_id"] is not None,
     )
