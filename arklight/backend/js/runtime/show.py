@@ -2,7 +2,7 @@
 `renderShow`: `vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15) --
 the runtime half of `Show(predicate, ...)` (`arklight.api.Show`).
 
-`docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.3 proposes
+`ARCHITECTURE-VDOM.md` [retired -- see CHANGELOG.md] SS6.3 proposes
 `Show`/conditional rendering as a vnode swap between the real subtree
 and a comment-node placeholder, through the vendored `patch()`
 (`arklight/backend/js/vdom.py`) -- the same mechanism `vdom-7` gives

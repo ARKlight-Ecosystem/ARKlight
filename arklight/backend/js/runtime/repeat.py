@@ -2,7 +2,7 @@
 `renderRepeat`: `vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15) --
 the runtime half of `Repeat(name, template=...)` (`arklight.api.Repeat`).
 
-Per `docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.2, list
+Per `ARCHITECTURE-VDOM.md` [retired -- see CHANGELOG.md] SS6.2, list
 items are reconciled by *value*, not by index: each item's vnode `key`
 is `JSON.stringify(item)` itself. That's a deliberate, documented
 simplification for this stage -- it assumes no duplicate values in a

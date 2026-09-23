@@ -291,7 +291,7 @@ arklight search --retrieve-doc [index | --<folder> [--file NAME]]
 - No folder flag -- prints the root `docs/README.md`, plus a footer
   listing the folder flags below.
 - A folder flag (`--foundational`, `--backends`, `--proposals`,
-  `--implementation`, `--js-backend`, `--far-future`,
+  `--implementation`, `--far-future`,
   `--version-history`, one per `docs/README.md`'s own Folder Guide) --
   prints that folder's own `README.md` index, plus a footer listing
   the files available inside it.
