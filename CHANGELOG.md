@@ -5,6 +5,18 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [0.067] -- Milestone rollup: `v0.067` is done
+
+`v0.067`'s two pieces -- `Provider` stage 3/6 (`[0.06518]`) and JS
+vocabulary addendum stage 7/10, the list-scalar derivations catalog
+(`[0.06612]`) -- were both DONE as of `[0.06612]`; the package version
+now rolls up from that out-of-band increment to the plain `0.067`,
+same treatment `[0.066]` got. No code changed.
+
+Also recorded: **user-defined functions** is DONE, per maintainer
+confirmation. Removed from `PROGRESS.md`'s "Planned, not yet scheduled
+to a version" list.
+
 ## [0.06612] -- JS vocabulary addendum, stage 7/10: the list-scalar derivations catalog (`v0.067`'s other piece)
 
 Numbered by the same out-of-band increment scheme as `[0.06601]`-`[0.06611]`.
