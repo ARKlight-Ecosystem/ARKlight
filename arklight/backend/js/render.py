@@ -342,7 +342,20 @@ def _walk(node: IRNode):
 def _collect_usage(
     ir: WebsiteIR,
 ) -> tuple[
-    set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool, bool, bool, set[str]
+    set[str],
+    set[str],
+    set[str],
+    bool,
+    set[str],
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+    set[str],
+    bool,
 ]:
     """
     Inspect the site's IR for what the runtime actually needs to ship:
@@ -393,11 +406,46 @@ def _collect_usage(
     branch) -- never folded into `used_actions`, since a Platform API
     call never targets `State(...)` the way `Action.*(...)`/`Watch(...)`
     do.
+
+    Also returns `has_hx_trigger` (`htmx-6` bugfix) -- whether any
+    `on_click=Action.*(...)` anywhere carries a modifier that actually
+    compiles to an `hx-trigger` attribute (see
+    `arklight.backend.html.attrs._modifiers_to_hx_trigger`: everything
+    except a bare tuple or one containing only `"prevent"`). This is
+    the real "does this site need vendored HTMX for state" condition
+    -- see `_build_runtime_js`'s `needs_htmx`, which used to use the
+    broader (and wrong) `has_state` for this instead.
     """
+    # Deferred (function-body, not module-level) import: `attrs.py`
+    # sits under `arklight.backend.html`, whose package `__init__`
+    # imports `arklight.backend.html.render` -> `page_render.py` ->
+    # `from arklight.backend.js.render import SCRIPT_PATH` -- a
+    # straight module-level import back into *this* module would be
+    # circular. By the time `_collect_usage` actually runs, this
+    # module has always finished loading, so resolving the import here
+    # only ever touches `sys.modules`, never re-enters this file.
+    from arklight.backend.html.attrs import _modifiers_to_hx_trigger
+
     used_behaviors: set[str] = set()
     used_on_click_actions: set[str] = set()
     used_platform_apis: set[str] = set()
     has_state = any(page.state for page in ir.pages)
+    # `htmx-6` bugfix (docs/Backends/REFACTOR-INDEX.md): `needs_htmx`
+    # used to be `has_state or ir.app_shell`, shipping the whole ~15kB
+    # vendored HTMX bundle to *every* page that merely declares
+    # `State(...)`, regardless of whether that page ever emits an
+    # `hx-*` attribute at all. Per this module's own htmx-1 docstring
+    # paragraph, state only actually needs HTMX for the `hx-trigger`
+    # `Action.*(...)` event modifiers compile to (htmx-2) -- and per
+    # `_modifiers_to_hx_trigger` (`arklight/backend/html/attrs.py`),
+    # that's only true for `once`/`debounce`/`throttle`/`stop`; a bare
+    # `on_click=Action.increment("count")` with no modifiers, or one
+    # with only `"prevent"`, compiles to no `hx-trigger` attribute at
+    # all and so never touches HTMX. `has_hx_trigger` tracks the real
+    # condition directly, so a stateful page that never uses a
+    # trigger-changing modifier now ships no HTMX -- same "only ship
+    # what's used" discipline as every other flag in this function.
+    has_hx_trigger = False
     used_derivations: set[str] = {
         spec["kind"] for page in ir.pages for _name, spec in page.computed
     }
@@ -416,6 +464,8 @@ def _collect_usage(
                 used_behaviors.add(on_click)
             elif isinstance(on_click, ActionRef):
                 used_on_click_actions.add(on_click.action)
+                if _modifiers_to_hx_trigger(on_click.modifiers) is not None:
+                    has_hx_trigger = True
             elif isinstance(on_click, PlatformAPIRef):
                 used_platform_apis.add(on_click.capability)
             if isinstance(node.props.get("bind_value"), str) and node.props.get("bind_value"):
@@ -456,6 +506,7 @@ def _collect_usage(
         has_reveal,
         has_query,
         used_platform_apis,
+        has_hx_trigger,
     )
 
 
@@ -497,6 +548,7 @@ def collect_used_runtime_features(ir: WebsiteIR) -> RuntimeUsage:
         _has_reveal,
         _has_query,
         used_platform_apis,
+        _has_hx_trigger,
     ) = _collect_usage(ir)
     return RuntimeUsage(
         used_behaviors=frozenset(used_behaviors),
@@ -719,6 +771,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         has_reveal,
         has_query,
         used_platform_apis,
+        has_hx_trigger,
     ) = _collect_usage(ir)
 
     # `v0.065`: every `PlatformAPI.*(...)` capability this site's IR
@@ -770,14 +823,29 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # project's own "no eval, no new Function" invariant doesn't
     # permit) -- named behaviors no longer touch any hx-* attribute at
     # all, so they're dropped from this condition. What's left: state
-    # (hx-trigger on Action.* modifiers, htmx-2) and ir.app_shell alone
-    # (hx-boost/hx-preserve, htmx-4 -- see this module's docstring,
-    # htmx-4 paragraph, point 1, for why a plain nav-only page in an
-    # app_shell site still needs HTMX loaded even with no
-    # behaviors/state used anywhere). A behavior-only page -- the
-    # common "toggle a menu, nothing else" case -- now ships no HTMX at
-    # all.
-    needs_htmx = has_state or ir.app_shell
+    # that actually emits hx-trigger (Action.* modifiers, htmx-2) and
+    # ir.app_shell alone (hx-boost/hx-preserve, htmx-4 -- see this
+    # module's docstring, htmx-4 paragraph, point 1, for why a plain
+    # nav-only page in an app_shell site still needs HTMX loaded even
+    # with no behaviors/state used anywhere). A behavior-only page --
+    # the common "toggle a menu, nothing else" case -- now ships no
+    # HTMX at all.
+    #
+    # htmx-6 (bugfix): the state half of this used to be the broader
+    # `has_state` -- true for *any* page that merely declares
+    # `State(...)`, even one whose every `Action.*(...)` on_click has
+    # no modifiers (or only `"prevent"`) and so compiles to no
+    # `hx-trigger` attribute at all. That shipped the full vendored
+    # HTMX bundle "for free" on the common plain-counter shape (see
+    # tests/test_js_backend.py's `test_js_runtime_includes_state_core_
+    # and_used_actions_only`), with nothing on the page for it to do.
+    # `has_hx_trigger` (`_collect_usage`) tracks the real condition --
+    # whether any `on_click=Action.*(...)` modifier actually compiles
+    # to `hx-trigger` -- so a stateful page that never uses
+    # once/debounce/throttle/stop now ships no HTMX either, matching
+    # the "only ship what's used" discipline every other flag here
+    # already follows.
+    needs_htmx = has_hx_trigger or ir.app_shell
 
     parts: list[str] = [
         "// Generated by ARKlight -- v0.0035 runtime + Stage 1-2 of the",
