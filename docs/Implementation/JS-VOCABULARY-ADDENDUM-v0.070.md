@@ -13,7 +13,8 @@ order it ships in and why."
 **Two other, independently accepted proposals share slots in this
 range rather than getting their own:** `v0.064` also carries
 `arklight search --retrieve-doc` (see
-[`SEARCH-RETRIEVE-DOC-ADDENDUM.md`](SEARCH-RETRIEVE-DOC-ADDENDUM.md)),
+[`docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md`](../Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md),
+shipped -- see `docs/version history/v0.064.md`),
 and `v0.065`-`v0.070` also carry `Provider`'s six-rung ladder (see
 [`PROVIDER-SDK-ADDENDUM.md`](PROVIDER-SDK-ADDENDUM.md)). Neither
 changes this ladder's own scope or ordering below -- they're

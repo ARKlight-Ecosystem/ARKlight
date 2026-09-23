@@ -83,9 +83,9 @@ path 2 (and, for the first, to path 1 too):
    `SymbolFact`-shaped consumer keeps working unmodified.
 5. This addendum file itself, updated in place from "Stage 0 plan" to
    "Stage 1 shipped" once the above lands -- one rung, not a ladder,
-   the same single-stage shape
-   `docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md` used for its
-   own single, self-contained CLI addition.
+   the same single-stage shape `arklight search --retrieve-doc`'s own
+   implementation entry used for its single, self-contained CLI
+   addition before that entry was retired as fully rolled up.
 
 ### Explicitly out of scope
 
@@ -135,6 +135,7 @@ addendum accompanies for the full diff; summary below.
 | 1 | `knowledge.py` + `cli/search.py` capability fix, tests | SHIPPED (unreleased, `alpha`) |
 
 See `PROGRESS.md`/`CHANGELOG.md` for the internal record once this is
-rolled into a version-history entry; not yet given one, same
-"unreleased on `alpha`" status `SEARCH-RETRIEVE-DOC-ADDENDUM.md`'s own
-follow-up section carries.
+rolled into a version-history entry; not yet given one, the same
+"shipped, unreleased on `alpha`" gap `arklight search --retrieve-doc`'s
+own follow-up fixes sat in before their `0.06605`/`0.06606` entries
+landed.
