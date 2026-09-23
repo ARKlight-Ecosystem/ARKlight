@@ -543,7 +543,10 @@ arklight --upgrade-alpha
   `pip install -e .` again in place) so the CLI reflects it
   immediately. Only works for a git-checkout/editable install. A
   standalone action, like `--version` -- it doesn't require (or use) a
-  subcommand.
+  subcommand. Works with or without a virtualenv: on a system Python
+  with no venv, where pip refuses to install into an "externally
+  managed" environment (PEP 668), the reinstall step retries once with
+  `--break-system-packages` and prints a note when it does.
 
 `arklight --help` (or a bare `arklight` with no subcommand) prints the
 full list of subcommands with a short description of each.
