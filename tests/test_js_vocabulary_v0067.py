@@ -444,7 +444,7 @@ def test_html_prefill_spells_null_and_booleans_the_javascript_way():
     assert binds["has_b"] == "true"
     assert binds["has_z"] == "false"
     assert binds["n"] == "2"
-    assert binds["hi"] == "95.0"  # same spelling every numeric derivation already has
+    assert binds["hi"] == "95"  # JS `String(95.0)`, per the 0.06609 formatting fix
     assert binds["nothing"] == "Infinity"
     assert binds["mean"] == "NaN"
 
