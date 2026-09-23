@@ -11,7 +11,7 @@
 # ARKlight Compiler Framework
 
 **A Python-first compiler for building static websites where developers work
-with a structured component API, while the output remains ordinary, dependency-free `Hyper Text Markup Language` `Casscading Style Sheets` `JavaScript`.**
+with a structured component API, No templating language, while the output remains ordinary, dependency-free `Hyper Text Markup Language` `Cascading Style Sheets` `JavaScript`.**
 
 Moto: **Write Once, Compile Everywhere**
 
