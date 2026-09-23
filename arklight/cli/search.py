@@ -30,14 +30,27 @@ from `arklight search` at all -- not even the JS vocabulary's own
 equivalent of "the exact right name", let alone a typo of one.
 `search_component()` now also tries each of those, in a fixed
 priority order (components first, since that's the vocabulary this
-command was built for and the one the ranking/suggestion pipeline
-below still only covers), before falling back to the existing
-component-only suggestion pipeline. A leading `Action.`/`Derive.`/
-`Predicate.` prefix is accepted and stripped -- that's how these names
-are actually written in a site file (`Action.increment(...)`,
-`Derive.sum(...)`, `Predicate.truthy(...)`), so requiring the bare
-registry key (`increment`, `sum`, `truthy`) instead would make the
-lookup fight the very syntax it exists to help with.
+command was built for), before falling back to the suggestion
+pipeline. A leading `Action.`/`Derive.`/`Predicate.` prefix is
+accepted and stripped -- that's how these names are actually written
+in a site file (`Action.increment(...)`, `Derive.sum(...)`,
+`Predicate.truthy(...)`), so requiring the bare registry key
+(`increment`, `sum`, `truthy`) instead would make the lookup fight the
+very syntax it exists to help with.
+
+Two more closed vocabularies were, until the search-knowledge-state-
+and-keywords capability fix below, invisible to *both* the exact-match
+path above and the typo-tolerant suggestion pipeline: the four
+reactive-state declarations (`State`/`Bind`/`Computed`/`Watch`,
+`arklight.api` -- never `NodeSpec` entries in `SCHEMA`, see
+`arklight.search.knowledge.STATE_KEYWORDS`'s own comment for why) and
+the six-plus-one closed registries just named. `arklight.search.
+knowledge.build_knowledge_base()` now folds `STATE_KEYWORDS` and every
+one of those registries into its output unconditionally, so the
+ranking pipeline's suggestions cover them too; `search_component()`
+gained its own small `_resolve_state_keyword` exact-match path for the
+first, alongside `_resolve_js_vocab` for the rest. See
+`docs/Implementation/SEARCH-KNOWLEDGE-STATE-AND-KEYWORDS-ADDENDUM.md`.
 
 Both `resolve_exact` and `search_component` now check
 `COMPONENT_REGISTRY` too, falling back to it only when `SCHEMA` has no
@@ -46,13 +59,19 @@ match -- same "built-ins always win a name collision" rule
 built-in name is completely unchanged; `tests/test_search.py`'s
 existing exact-match/suggestion assertions still hold. `resolve_exact`
 itself stays component-only on purpose: it backs the CLI's `--accept`
-flag, which feeds `arklight.search.stats`' usage-acceptance table -- a
-signal the ranking pipeline only ever reads back for *component*
-suggestions (`SearchEngine.knowledge` never includes JS-vocabulary
-names), so recording acceptance of e.g. `increment` there would be
-silently inert. The new JS-vocabulary lookup (`_resolve_js_vocab`) is
-therefore a separate, additive path that `search_component` also
-tries, not a change to what `--accept` can record.
+flag (`arklight.cli.main`'s `args.accept` branch calls `resolve_exact`
+directly, not `search_component`), which feeds `arklight.search.
+stats`' usage-acceptance table. That's still true after the search-
+knowledge-state-and-keywords capability fix below, even though
+`SearchEngine.knowledge` now *does* include `STATE_KEYWORDS` and every
+closed registry's names (the usage/known-typo signals those feed rank
+suggestions for them too now) -- `--accept` itself was never routed
+through the ranking pipeline's knowledge base, only through
+`resolve_exact`, so `--accept increment`/`--accept State` still prints
+"isn't an exact component name" exactly as before. The new
+`_resolve_state_keyword`/`_resolve_js_vocab` lookups are separate,
+additive paths that `search_component` also tries, not a change to
+what `--accept` can record.
 
 One more closed, compiler-validated vocabulary lived outside
 `arklight.ir.schema` entirely and was missed by the sweep above:
@@ -100,6 +119,7 @@ from arklight.ir.schema import (
     RevealSpec,
 )
 from arklight.search.engine import default_engine
+from arklight.search.knowledge import STATE_KEYWORDS
 
 # Ordered (label, registry, dotted-prefix-if-any) -- checked in this
 # order by `_resolve_js_vocab`, after the component vocabulary has
@@ -230,6 +250,42 @@ def _format_component_spec(name: str, spec: ComponentSpec) -> str:
         lines.append(f"  backend overrides: {backends}")
 
     return "\n".join(lines)
+
+
+def _format_state_spec(name: str, required_args: tuple[str, ...]) -> str:
+    """Same job `_format_spec`/`_format_component_spec` do for a
+    `NodeSpec`/`ComponentSpec`, for one of the four reactive-state
+    declarations (`arklight.search.knowledge.STATE_KEYWORDS`) instead
+    -- these are plain `arklight.api` functions, not `NodeSpec`
+    entries (see that module's own comment for why), so there's no
+    `allow_children`/`text_only_children` story to report, only the
+    required argument name(s) `STATE_KEYWORDS` already carries."""
+    lines = [f"{name} (reactive-state declaration -- direct child of Page(...))"]
+    if required_args:
+        lines.append(f"  required args  : {', '.join(required_args)}")
+    else:
+        lines.append("  required args  : (none)")
+    return "\n".join(lines)
+
+
+def _resolve_state_keyword(query: str) -> str | None:
+    """Exact-match (case-insensitive) lookup against `STATE_KEYWORDS`
+    (`State`/`Bind`/`Computed`/`Watch`) -- the same job
+    `_resolve_js_vocab` below does for the seven closed registries,
+    kept as its own tiny function rather than folded into
+    `_JS_VOCAB_SOURCES` because these four are bare `PascalCase`
+    declarations (`State(...)`), not `Namespace.name(...)` dotted
+    calls, and read from `arklight.search.knowledge.STATE_KEYWORDS`
+    rather than an `arklight.ir.schema` registry. Returns a formatted
+    result string, or `None` if `query` doesn't match any of the four
+    -- same "no bare name" contract `_resolve_js_vocab` has, for the
+    same reason: no CLI `--accept` use case for this vocabulary
+    either (see this module's docstring)."""
+    lowered = {name.lower(): name for name in STATE_KEYWORDS}
+    canonical = lowered.get(query.lower())
+    if canonical is None:
+        return None
+    return _format_state_spec(canonical, STATE_KEYWORDS[canonical])
 
 
 def _format_behavior_spec(name: str, label: str, spec: BehaviorSpec | RevealSpec) -> str:
@@ -384,10 +440,14 @@ def search_component(query: str, *, limit: int = 5, near: str | None = None) -> 
     usage graph has actually seen used" error -- validating first
     closes that gap.
 
-    The suggestion fallback below is still component-only -- the
-    ranking pipeline's knowledge base doesn't include the JS-vocabulary
-    registries (see this module's docstring), so a typo of e.g.
-    `increment` doesn't yet get a "did you mean" of its own.
+    The suggestion fallback below now draws from the full knowledge
+    base -- `SCHEMA`, `COMPONENT_REGISTRY`, `STATE_KEYWORDS`, and every
+    closed registry `_resolve_js_vocab` below checks -- since the
+    search-knowledge-state-and-keywords capability fix folded all of
+    them into `arklight.search.knowledge.build_knowledge_base()`. A
+    typo of e.g. `increment`, `debounce`, or `Statee` now gets a "did
+    you mean" the same way a typo'd component name always has; see
+    `docs/Implementation/SEARCH-KNOWLEDGE-STATE-AND-KEYWORDS-ADDENDUM.md`.
     """
     if near is not None:
         default_engine().validate_near(near)
@@ -397,6 +457,10 @@ def search_component(query: str, *, limit: int = 5, near: str | None = None) -> 
         if canonical in SCHEMA:
             return _format_spec(canonical, SCHEMA[canonical])
         return _format_component_spec(canonical, COMPONENT_REGISTRY[canonical])
+
+    state_result = _resolve_state_keyword(query)
+    if state_result is not None:
+        return state_result
 
     js_vocab_result = _resolve_js_vocab(query)
     if js_vocab_result is not None:

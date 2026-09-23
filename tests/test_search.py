@@ -247,3 +247,64 @@ def test_search_every_platform_api_registry_entry_is_reachable():
         result = search_component(name)
         assert result.startswith(f"PlatformAPI.{name}")
         assert "No component named" not in result
+
+
+# -- search-knowledge-state-and-keywords capability fix ---------------------
+
+
+def test_search_finds_state_by_exact_name():
+    result = search_component("State")
+    assert result.startswith("State")
+    assert "reactive-state declaration" in result
+    assert "name" in result
+    assert "No component named" not in result
+
+
+def test_search_finds_bind_case_insensitively():
+    result = search_component("bind")
+    assert result.startswith("Bind")
+    assert "reactive-state declaration" in result
+
+
+def test_search_finds_computed_by_exact_name():
+    result = search_component("Computed")
+    assert result.startswith("Computed")
+
+
+def test_search_finds_watch_and_reports_both_required_args():
+    result = search_component("Watch")
+    assert result.startswith("Watch")
+    assert "name" in result
+    assert "then" in result
+
+
+def test_search_state_keyword_still_loses_to_a_real_component_on_collision():
+    # No real name collides today, but the precedence contract should
+    # hold if a user ever registers e.g. a component named "Bind".
+    register_component("Bind", _dummy_render)
+    result = search_component("Bind")
+    assert "reactive-state declaration" not in result
+
+
+def test_search_typo_of_state_keyword_gets_a_suggestion():
+    result = search_component("Statee")
+    assert "No component named 'Statee' found" in result
+    assert "State" in result
+
+
+def test_search_typo_of_computed_gets_a_suggestion():
+    result = search_component("Computeed")
+    assert "No component named 'Computeed' found" in result
+    assert "Computed" in result
+
+
+def test_search_typo_of_action_registry_entry_gets_a_suggestion():
+    result = search_component("incrment")
+    assert "No component named 'incrment' found" in result
+    assert "increment" in result
+
+
+def test_search_typo_of_event_modifier_gets_a_suggestion():
+    result = search_component("debunce")
+    assert "No component named 'debunce' found" in result
+    assert "debounce" in result
