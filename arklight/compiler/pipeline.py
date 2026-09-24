@@ -48,6 +48,7 @@ from arklight.compiler.asset_check import (
     collect_required_assets,
     format_report,
 )
+from arklight.compiler.link_check import check_links, format_report as format_link_report
 from arklight.compiler.sbom import build_sbom_text
 from arklight.ir import binary as binary_ir
 from arklight.ir.build import WebsiteIR, build_website_ir
@@ -529,20 +530,40 @@ def build(
         generated=set(output_files),
         assets_dir_name=ASSETS_DIR_NAME,
     )
-    if asset_problems:
-        report = format_report(
-            asset_problems,
-            total_required=len(required_assets),
-            entry_path=Path(entry_path).resolve(),
-            assets_src=assets_src,
-        )
-        print(report, file=sys.stderr, flush=True)
-        raise CompileError(
-            f"Asset check failed: {len(asset_problems)} of {len(required_assets)} "
-            f"required asset(s) missing or not an exact name match (full report above). "
-            f"Nothing was written."
-        )
+    link_total, link_problems = check_links(ir, generated=set(output_files))
+    if asset_problems or link_problems:
+        failures = []
+        if asset_problems:
+            print(
+                format_report(
+                    asset_problems,
+                    total_required=len(required_assets),
+                    entry_path=Path(entry_path).resolve(),
+                    assets_src=assets_src,
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+            failures.append(
+                f"Asset check failed: {len(asset_problems)} of {len(required_assets)} "
+                f"required asset(s) missing or not an exact name match"
+            )
+        if link_problems:
+            print(
+                format_link_report(
+                    link_problems,
+                    total_checked=link_total,
+                    entry_path=Path(entry_path).resolve(),
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+            failures.append(
+                f"Link check failed: {len(link_problems)} internal link(s) don't resolve"
+            )
+        raise CompileError("; ".join(failures) + " (full report above). Nothing was written.")
     log(f"Asset check passed: {len(required_assets)} required asset(s), all present.")
+    log(f"Link check passed: {link_total} internal link(s), all resolve.")
 
     log("Generating build manifest (sbom.txt)...")
     output_files["sbom.txt"] = build_sbom_text(ir, version=__version__)

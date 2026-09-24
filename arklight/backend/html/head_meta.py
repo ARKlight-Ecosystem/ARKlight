@@ -35,7 +35,7 @@ from __future__ import annotations
 
 from html import escape
 
-from arklight.backend.html.routing import _relative_asset_path
+from arklight.backend.html.routing import _is_external_ref, _relative_asset_path
 from arklight.ir.build import IRPage
 
 
@@ -104,8 +104,12 @@ def _render_head_meta(
     if description:
         tags.append(f'  <meta name="description" content="{escape(str(description), quote=True)}">\n')
     if favicon:
-        favicon_href = _relative_asset_path(
-            str(favicon).lstrip("/"), current_route=current_route, route_to_path=route_to_path
+        favicon_href = (
+            str(favicon)
+            if _is_external_ref(str(favicon))
+            else _relative_asset_path(
+                str(favicon).lstrip("/"), current_route=current_route, route_to_path=route_to_path
+            )
         )
         tags.append(f'  <link rel="icon" href="{escape(favicon_href, quote=True)}">\n')
     if og_title:
@@ -115,8 +119,12 @@ def _render_head_meta(
             f'  <meta property="og:description" content="{escape(str(og_description), quote=True)}">\n'
         )
     if og_image:
-        og_image_href = _relative_asset_path(
-            str(og_image).lstrip("/"), current_route=current_route, route_to_path=route_to_path
+        og_image_href = (
+            str(og_image)
+            if _is_external_ref(str(og_image))
+            else _relative_asset_path(
+                str(og_image).lstrip("/"), current_route=current_route, route_to_path=route_to_path
+            )
         )
         tags.append(f'  <meta property="og:image" content="{escape(og_image_href, quote=True)}">\n')
 

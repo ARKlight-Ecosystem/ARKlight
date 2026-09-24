@@ -5,6 +5,40 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Pre-write asset + link gates, remaining link-resolution fixes
+
+`build()` now checks, before it writes anything, that every asset and
+internal link the site references actually resolves -- and halts with a
+plain-text report on stderr (not routed through `on_stage`, the narrator,
+or `warnings`; no flag silences it) when one doesn't.
+
+- **Asset gate** (`arklight/compiler/asset_check.py`): walks the IR into an
+  in-memory list of required assets (`src`/`poster`/`srcset`, page
+  `favicon`/`og_image`, `url(...)` in `style` and `@font-face`, `href`s into
+  `assets/`), then compares against real directory listings by *exact*
+  name -- never `exists()`, which lies on case-insensitive filesystems.
+  Files the build generates (`styles.css`, `arklight.js`, ...) satisfy a
+  reference; anything else must be under `assets/`.
+- **Link gate** (`arklight/compiler/link_check.py`): an internal `href` must
+  name a registered page (trailing slash and `?query` accepted), a file the
+  build generates, or something under `assets/`; a `#fragment` must match an
+  `id` on the target page (`#`/`#top` always valid). Reports include a "did
+  you mean" hint. **Behavior change:** an unknown root-relative `href`
+  (e.g. `/nope`) used to pass through silently and now fails the build.
+  `action`/`formaction` and `href`s without a leading slash are not checked.
+- **Resolution fixes** (`backend/html/routing.py`, `attrs.py`,
+  `head_meta.py`): `/about/` and `/about?x=1` now resolve to relative
+  paths instead of staying root-absolute; `url(...)` inside an inline
+  `style` is rewritten per page depth (it previously broke on any nested
+  page); a full-URL `favicon`/`og_image` (`https://...`) is no longer
+  mangled into `https:/...`.
+
+Not covered: ids/refs built at runtime from state, `behavior_target`
+selectors, and stale files left in `<out>/assets/` from a previous build
+(the copy still merges rather than cleans).
+
+`tests/test_asset_check.py` and `tests/test_link_check.py` added.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Unknown-prop build notice + `usemap` bugfix
 
 `arklight/backend/html/attrs.py`'s `_attr_string` silently compiled any

@@ -221,8 +221,16 @@ same string you'd pass to `@site.page(...)`. The HTML backend resolves
 this to the correct relative file path at build time (`about.html`,
 `../about.html`, etc., depending on where the linking page lives), so
 navigation works whether you open the file directly from disk or
-deploy the `ARK/` folder as-is. External URLs, `#fragments`, and
-`mailto:`/`tel:` links are left untouched.
+deploy the `ARK/` folder as-is. A trailing slash (`/about/`) and a
+`?query` on a route are accepted. External URLs and `mailto:`/`tel:`
+links are left untouched.
+
+The build also **checks** internal links before it writes anything, and
+halts with a report if one doesn't resolve: an `href="/abuot"` that names
+no page, or an `href="/about#nope"` / `href="#nope"` whose `id` doesn't
+exist on the target page (`#` and `#top` are always fine). Assets get the
+same treatment -- every `src`, `favicon`, `og_image`, and `url(...)` you
+reference must exist in `assets/` under exactly that name (case included).
 
 ## Head metadata (title, description, favicon, Open Graph, meta/links)
 

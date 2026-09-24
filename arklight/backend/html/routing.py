@@ -66,6 +66,7 @@ observable through a `data-formaction` fallback attribute; see
 from __future__ import annotations
 
 import posixpath
+import re
 
 # Attribute names whose value may be resolved relative to the current
 # page ("/", "/about", ...) instead of emitted verbatim. `href` (Link)
@@ -128,22 +129,54 @@ def _is_internal_route_ref(value: str) -> bool:
     return True
 
 
+def _match_route(path: str, route_to_path: dict[str, str]) -> str | None:
+    """Return the registered route a link path names, or None.
+
+    Exact match first. Then one forgiving step: a trailing slash on a
+    non-root path (`/about/`) names the same page as `/about`, because
+    the build emits `about.html` for it either way. Case is never
+    folded -- `/About` is not `/about` on a case-sensitive host, and
+    the link check reports it rather than guessing. `path` must already
+    have its `?query` and `#fragment` removed."""
+    if path in route_to_path:
+        return path
+    if len(path) > 1 and path.endswith("/"):
+        trimmed = path.rstrip("/")
+        if trimmed in route_to_path:
+            return trimmed
+    return None
+
+
+_EXTERNAL_REF = re.compile(r"^(?:[a-z][a-z0-9+.\-]*:|//)", re.I)
+
+
+def _is_external_ref(value: str) -> bool:
+    """True for anything with a scheme (`https:`, `mailto:`, `data:`) or a
+    protocol-relative `//host` -- values that must never be rewritten into
+    a relative file path."""
+    return bool(_EXTERNAL_REF.match(value.strip()))
+
+
 def _resolve_route_ref(value: str, *, current_route: str, route_to_path: dict[str, str]) -> str:
     """Rewrite an internal route reference into a relative file path
     from the current page's output location. Unknown routes are left
-    as-is (better a working absolute link than a silently broken one) --
-    this is also what makes rewriting `action`/`formaction` through
-    this same function safe: a form action targeting an external API
-    never matches a registered route, so it always falls into this
-    "leave as-is" path. See the module docstring."""
-    route, _, fragment = value.partition("#")
-    target_path = route_to_path.get(route)
-    if target_path is None:
+    as-is here (the build's link check, `compiler/link_check.py`, is what
+    reports them -- this function is also called for `action`/`formaction`,
+    where a form targeting an external API never matches a registered
+    route and must pass through untouched). A `?query` and `#fragment`
+    are preserved; a trailing slash on the route is accepted."""
+    route_and_query, _, fragment = value.partition("#")
+    route, _, query = route_and_query.partition("?")
+    matched = _match_route(route, route_to_path)
+    if matched is None:
         return value  # not a known route -- leave untouched
+    target_path = route_to_path[matched]
 
     current_path = route_to_path[current_route]
     current_dir = posixpath.dirname(current_path) or "."
     relative = posixpath.relpath(target_path, current_dir)
+    if query:
+        relative = f"{relative}?{query}"
     return f"{relative}#{fragment}" if fragment else relative
 
 
@@ -183,7 +216,7 @@ def _resolve_src_ref(value: str, *, current_route: str, route_to_path: dict[str,
     if value.startswith("data:"):
         return value
 
-    if _is_internal_route_ref(value) and value.partition("#")[0] in route_to_path:
+    if _is_internal_route_ref(value) and _match_route(value.partition("#")[0].partition("?")[0], route_to_path) is not None:
         return _resolve_route_ref(value, current_route=current_route, route_to_path=route_to_path)
 
     asset_path = value.lstrip("/")
@@ -227,3 +260,34 @@ def _relative_asset_path(asset_path: str, *, current_route: str, route_to_path: 
     current_path = route_to_path[current_route]
     current_dir = posixpath.dirname(current_path) or "."
     return posixpath.relpath(asset_path, current_dir)
+
+
+_CSS_URL = re.compile(r"""url\(\s*(['"]?)(.*?)\1\s*\)""", re.I)
+
+
+def _resolve_style_urls(css: str, *, current_route: str, route_to_path: dict[str, str]) -> str:
+    """Rewrite each `url(...)` in an inline `style` value so it resolves
+    from the current page's output location.
+
+    `styles.css` lives at the site root, so a `url(assets/bg.png)` inside
+    it is already correct. An inline `style="..."` is resolved against the
+    *page*, so the same string is wrong on any page not at the root
+    (`blog/post.html` would look in `blog/assets/`). External URLs,
+    `data:` URIs, `#fragment` references (`url(#gradient)`), and route
+    values are left alone; everything else is treated as a root-relative
+    asset path, exactly like `src`."""
+    if "url(" not in css.lower():
+        return css
+
+    def rewrite(match: re.Match) -> str:
+        quote, target = match.group(1), match.group(2).strip()
+        if not target or target.startswith("#") or _is_external_ref(target):
+            return match.group(0)
+        if _match_route(target.partition("#")[0].partition("?")[0], route_to_path) is not None:
+            return match.group(0)
+        relative = _relative_asset_path(
+            target.lstrip("/"), current_route=current_route, route_to_path=route_to_path
+        )
+        return f"url({quote}{relative}{quote})"
+
+    return _CSS_URL.sub(rewrite, css)
