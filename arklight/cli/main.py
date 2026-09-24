@@ -45,7 +45,7 @@ from arklight.cli.templates import TEMPLATES
 from arklight.cli.upgrade import upgrade_to_alpha
 from arklight.compiler import rei
 from arklight.compiler.pipeline import BuildResult, CompileError, build
-from arklight.config import ConfigError, load_config, section
+from arklight.config import ConfigError, load_config, overdrive_enabled, section
 from arklight.ir import binary as binary_ir
 from arklight.ir.validate import ValidationError
 from arklight.packer.bundle import PackError, pack, unpack
@@ -309,6 +309,15 @@ def _cmd_build(args: argparse.Namespace) -> int:
         )
         return 1
 
+    # `overdrive` (top-level flag): waives the gates' *unverifiable*
+    # findings -- see `arklight.compiler.overdrive`. Validated here so a
+    # bad value gets the same "build failed" treatment as `csp`'s.
+    try:
+        overdrive = overdrive_enabled(project_config)
+    except ConfigError as exc:
+        print(f"ARKlight build failed: {exc}", file=sys.stderr)
+        return 1
+
     # `rei.default_mode` (proposal §2) only resolves `mode` when no
     # `--verbose`/`--debug`/`--narrate` flag was passed above -- a flag
     # always wins over the project's pinned default.
@@ -349,6 +358,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
                 lang=args.lang,
                 strict_csp_override=strict_csp_override,
                 devtools_console_reminder=devtools_console_reminder,
+                overdrive=overdrive,
             )
     except CompileError as exc:
         if args.debug:

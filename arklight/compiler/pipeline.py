@@ -43,12 +43,14 @@ from arklight.backend.base import Backend
 from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
+from arklight.config import ConfigError, load_config, overdrive_enabled
 from arklight.compiler.asset_check import (
     check_required_assets,
     collect_required_assets,
     format_report,
 )
 from arklight.compiler.link_check import check_links, format_report as format_link_report
+from arklight.compiler.overdrive import ASSET_WAIVABLE, LINK_WAIVABLE, format_notice
 from arklight.compiler.sbom import build_sbom_text
 from arklight.ir import binary as binary_ir
 from arklight.ir.build import WebsiteIR, build_website_ir
@@ -413,6 +415,7 @@ def build(
     lang: str | None = None,
     strict_csp_override: bool | None = None,
     devtools_console_reminder: bool = True,
+    overdrive: bool | None = None,
 ) -> BuildResult:
     """
     Full pipeline: Python source file -> rendered files written to `output_dir`.
@@ -444,12 +447,24 @@ def build(
     `compile_arklight_file`'s docstring for how the overrides apply
     without a `Site(...)` to defer to).
 
+    `overdrive`, if `None` (the default), is read from the project's
+    `arklight.config.py` (`CONFIG = {"overdrive": True}`, next to the
+    entry file) -- read here rather than only in the CLI so every caller
+    agrees. `True`/`False` overrides the config. See
+    `arklight.compiler.overdrive` for exactly what it waives.
+
     Also always writes `sbom.txt` -- a per-build manifest of what this
     specific compile actually contains (see `arklight.compiler.sbom`
     for the format and what it deliberately does/doesn't claim).
     """
     log = on_stage or _noop_stage_logger
     backends = backends if backends is not None else default_backends()
+
+    if overdrive is None:
+        try:
+            overdrive = overdrive_enabled(load_config(Path(entry_path).resolve().parent))
+        except ConfigError as exc:
+            raise CompileError(str(exc)) from exc
 
     if _looks_like_arklight_file(entry_path):
         ir = compile_arklight_file(
@@ -531,6 +546,20 @@ def build(
         assets_dir_name=ASSETS_DIR_NAME,
     )
     link_total, link_problems = check_links(ir, generated=set(output_files))
+    asset_waived: list = []
+    if overdrive:
+        # Only the *unverifiable* findings are waived (see overdrive.py);
+        # each one is still printed, every build, on stderr.
+        asset_waived = [p for p in asset_problems if p.kind in ASSET_WAIVABLE]
+        link_waived = [p for p in link_problems if p.kind in LINK_WAIVABLE]
+        asset_problems = [p for p in asset_problems if p.kind not in ASSET_WAIVABLE]
+        link_problems = [p for p in link_problems if p.kind not in LINK_WAIVABLE]
+        if asset_waived or link_waived:
+            print(
+                format_notice(asset_waived, link_waived, entry_path=Path(entry_path).resolve()),
+                file=sys.stderr,
+                flush=True,
+            )
     if asset_problems or link_problems:
         failures = []
         if asset_problems:
@@ -562,7 +591,8 @@ def build(
                 f"Link check failed: {len(link_problems)} internal link(s) don't resolve"
             )
         raise CompileError("; ".join(failures) + " (full report above). Nothing was written.")
-    log(f"Asset check passed: {len(required_assets)} required asset(s), all present.")
+    verified_assets = len(required_assets) - (len(asset_waived) if overdrive else 0)
+    log(f"Asset check passed: {verified_assets} required asset(s), all present.")
     log(f"Link check passed: {link_total} internal link(s), all resolve.")
 
     log("Generating build manifest (sbom.txt)...")

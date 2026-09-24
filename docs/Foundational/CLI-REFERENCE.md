@@ -105,6 +105,19 @@ arklight build <entry.py> [-o OUTPUT_DIR] [--open | --no-open] [--verbose] [--de
     only decides what a build with *no* `--verbose`/`--debug`/
     `--narrate` flag does -- a flag on the command line always wins
     for that invocation.
+- **Overdrive** (`arklight.config.py`, no flag). Before writing anything,
+  `build` halts on internal links and assets it can't resolve. Two of
+  those findings are *unverifiable* rather than provably wrong -- an
+  `href` naming no registered page (`/api/login`), and a `src`/`url(...)`
+  outside `assets/` that nothing generates (`/api/avatar`), either of
+  which a server might legitimately supply. To let those through, add
+  one line: `CONFIG = {"overdrive": True}`. Every reference it lets
+  through is still listed on stderr on every build, and a missing or
+  wrong-case file *inside* `assets/`, a dead `#fragment`, and a path that
+  escapes the output folder stay fatal. The value must be exactly `True`
+  or `False`; anything else fails the build. It applies to
+  `arklight build`, `live-streaming`, and library `build()` calls alike
+  (`build(..., overdrive=True/False)` overrides the file).
 - `--max-width VALUE` -- overrides the page's max content width
   (`--ark-max-width`), e.g. `90rem`, `1400px`, `100%`. Takes
   precedence over `Site(max_width=...)` in the site file, without

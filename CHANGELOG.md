@@ -5,6 +5,26 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- `overdrive`: opt in to unverifiable references
+
+New top-level `arklight.config.py` flag, `CONFIG = {"overdrive": True}`
+(default `False`), that turns the two *unverifiable* findings of the
+pre-write gates -- an unknown internal `href`, and a reference outside
+`assets/` the build can't supply -- from build-halting errors into an
+always-printed "passed through UNVERIFIED" report on stderr
+(`arklight/compiler/overdrive.py`). Provably broken references (missing or
+wrong-case file inside `assets/`, directory-for-file, path escaping the
+output folder, dead `#fragment`) stay fatal. Read inside `build()` itself
+(new `overdrive=None` kwarg; an explicit `True`/`False` beats the file), so
+`arklight build`, `live-streaming` and library callers agree. A non-bool
+value is a `ConfigError`, never coerced.
+
+Also: `check_links` now counts only links that fully resolve, so the "N
+internal link(s)" figures in the stage log and failure report no longer
+include a link that is itself being reported.
+
+`tests/test_overdrive.py` added.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Pre-write asset + link gates, remaining link-resolution fixes
 
 `build()` now checks, before it writes anything, that every asset and
