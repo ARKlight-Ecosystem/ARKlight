@@ -33,6 +33,7 @@ see `_copy_assets` below.
 from __future__ import annotations
 
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -42,6 +43,11 @@ from arklight.backend.base import Backend
 from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
+from arklight.compiler.asset_check import (
+    check_required_assets,
+    collect_required_assets,
+    format_report,
+)
 from arklight.compiler.sbom import build_sbom_text
 from arklight.ir import binary as binary_ir
 from arklight.ir.build import WebsiteIR, build_website_ir
@@ -508,6 +514,35 @@ def build(
                 f"{type(result).__name__!r}."
             )
         output_files = result
+
+    # Asset gate -- runs after every backend/postprocess has produced the
+    # final file set and *before* anything touches disk, so a failure
+    # leaves no half-written output. The report goes straight to stderr
+    # (not through `log`, the narrator, or `warnings`) and there is no
+    # flag to silence it. See `arklight.compiler.asset_check`.
+    log("Checking required assets...")
+    required_assets = collect_required_assets(ir)
+    assets_src = Path(entry_path).resolve().parent / ASSETS_DIR_NAME
+    asset_problems = check_required_assets(
+        required_assets,
+        assets_src=assets_src,
+        generated=set(output_files),
+        assets_dir_name=ASSETS_DIR_NAME,
+    )
+    if asset_problems:
+        report = format_report(
+            asset_problems,
+            total_required=len(required_assets),
+            entry_path=Path(entry_path).resolve(),
+            assets_src=assets_src,
+        )
+        print(report, file=sys.stderr, flush=True)
+        raise CompileError(
+            f"Asset check failed: {len(asset_problems)} of {len(required_assets)} "
+            f"required asset(s) missing or not an exact name match (full report above). "
+            f"Nothing was written."
+        )
+    log(f"Asset check passed: {len(required_assets)} required asset(s), all present.")
 
     log("Generating build manifest (sbom.txt)...")
     output_files["sbom.txt"] = build_sbom_text(ir, version=__version__)

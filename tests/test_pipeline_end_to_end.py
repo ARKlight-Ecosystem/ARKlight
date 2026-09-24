@@ -224,6 +224,8 @@ def test_build_on_stage_reports_every_stage_in_order(tmp_path):
         "Postprocessing backend 'html'...",
         "Postprocessing backend 'css'...",
         "Postprocessing backend 'js'...",
+        "Checking required assets...",
+        "Asset check passed: 0 required asset(s), all present.",
         "Generating build manifest (sbom.txt)...",
         f"Writing {len(result.output_files)} file(s) -> {out_dir}/...",
         "Copying assets...",
