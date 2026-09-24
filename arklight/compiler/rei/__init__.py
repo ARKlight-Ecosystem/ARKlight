@@ -107,6 +107,14 @@ _STAGE_PATTERNS: tuple[_StagePattern, ...] = (
         ),
     ),
     _pat(
+        r"Checking required assets\.\.\.",
+        lambda m: _line("Checking that every asset your site references exists, by exact name."),
+    ),
+    _pat(
+        r"Asset check passed: (?P<n>\d+) required asset\(s\), all present\.",
+        lambda m: _line(f"All {m.group('n')} referenced asset(s) are present."),
+    ),
+    _pat(
         r"Generating build manifest \(sbom\.txt\)\.\.\.",
         lambda m: _line("Writing the build manifest, sbom.txt."),
     ),
