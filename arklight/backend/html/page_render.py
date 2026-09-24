@@ -134,7 +134,7 @@ def _evaluate_predicate(predicate: PredicateRef, *, page_state: dict) -> bool:
 
 
 def _render_show(
-    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict
+    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict, path: str = "root"
 ) -> str:
     """
     `vdom-7`: `Show(predicate, ...)` renders its children unconditionally
@@ -160,7 +160,11 @@ def _render_show(
     visible = _evaluate_predicate(predicate, page_state=page_state)
     hidden_attr = "" if visible else " hidden"
     inner = _render_children(
-        node.children, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+        node.children,
+        current_route=current_route,
+        route_to_path=route_to_path,
+        page_state=page_state,
+        path=path,
     )
     return f'<div data-ark-show="{predicate_json}"{hidden_attr}>{inner}</div>'
 
@@ -243,7 +247,7 @@ def _repeat_template_spec(node: IRNode) -> dict:
 
 
 def _render_repeat(
-    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict
+    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict, path: str = "root"
 ) -> str:
     """
     `vdom-7`: `Repeat(name, template=...)` renders one real copy of its
@@ -267,6 +271,7 @@ def _render_repeat(
             current_route=current_route,
             route_to_path=route_to_path,
             page_state=page_state,
+            path=f"{path}/item[{index}]",
         )
         for index, item in enumerate(items)
     )
@@ -277,14 +282,29 @@ def _render_repeat(
 
 
 def _render_children(
-    children: list, *, current_route: str, route_to_path: dict[str, str], page_state: dict
+    children: list,
+    *,
+    current_route: str,
+    route_to_path: dict[str, str],
+    page_state: dict,
+    path: str = "root",
 ) -> str:
     rendered = []
-    for child in children:
+    for i, child in enumerate(children):
         if isinstance(child, IRNode):
             rendered.append(
                 _render_node(
-                    child, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+                    child,
+                    current_route=current_route,
+                    route_to_path=route_to_path,
+                    page_state=page_state,
+                    # Same structural-path convention `arklight/ir/validate.py`'s
+                    # `validate_node` already uses ("{path}/{type}[{i}]") -- not
+                    # a source file:line (nothing downstream of `load_site()`
+                    # keeps that around), but enough for an author to find the
+                    # offending node again by counting siblings from the page
+                    # root. Used by `_attr_string`'s unknown-prop notice below.
+                    path=f"{path}/{child.type}[{i}]",
                 )
             )
         else:
@@ -292,18 +312,33 @@ def _render_children(
     return "".join(rendered)
 
 
-def _render_node(node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict) -> str:
+def _render_node(
+    node: IRNode,
+    *,
+    current_route: str,
+    route_to_path: dict[str, str],
+    page_state: dict,
+    path: str = "root",
+) -> str:
     if node.type == "Bind":
         return _render_bind(node, page_state=page_state)
 
     if node.type == "Repeat":
         return _render_repeat(
-            node, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+            node,
+            current_route=current_route,
+            route_to_path=route_to_path,
+            page_state=page_state,
+            path=path,
         )
 
     if node.type == "Show":
         return _render_show(
-            node, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+            node,
+            current_route=current_route,
+            route_to_path=route_to_path,
+            page_state=page_state,
+            path=path,
         )
 
     tag = _tag_for(node)
@@ -313,13 +348,18 @@ def _render_node(node: IRNode, *, current_route: str, route_to_path: dict[str, s
         route_to_path=route_to_path,
         page_state=page_state,
         node_type=node.type,
+        path=path,
     )
 
     if tag in VOID_TAGS:
         return f"<{tag}{attrs} />"
 
     inner = _render_children(
-        node.children, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+        node.children,
+        current_route=current_route,
+        route_to_path=route_to_path,
+        page_state=page_state,
+        path=path,
     )
     return f"<{tag}{attrs}>{inner}</{tag}>"
 
@@ -383,7 +423,15 @@ def _render_page(
     # stay separate in the JSON hydration blob).
     render_state = {**page.state, **page.computed_initial}
     body_inner = _render_children(
-        page.root.children, current_route=page.route, route_to_path=route_to_path, page_state=render_state
+        page.root.children,
+        current_route=page.route,
+        route_to_path=route_to_path,
+        page_state=render_state,
+        # Matches `arklight/ir/validate.py`'s `validate_page`, which roots
+        # this same page's validation path at `f"page:{route}"` -- same
+        # convention, same route-qualified root, so a path in this stage's
+        # notices reads the same way a path in a build-failure message does.
+        path=f"page:{page.route}",
     )
     stylesheet_href = _relative_asset_path(
         STYLESHEET_PATH, current_route=page.route, route_to_path=route_to_path

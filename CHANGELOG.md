@@ -5,6 +5,41 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Unknown-prop build notice + `usemap` bugfix
+
+`arklight/backend/html/attrs.py`'s `_attr_string` silently compiled any
+unrecognized prop key into a generic `data-{name}` attribute rather than
+dropping it -- correct, but gave the author nothing to notice a typo by,
+since a correct prop and a typo'd one render as visually-identical `data-*`
+markup. Now raises an unconditional, `[ARKlight ALPHA]`-marked build
+warning (never gated behind `--verbose`/`--narrate`, same contract as any
+other alpha-limitation notice) naming the prop, the node type, and a
+structural path -- `arklight/ir/validate.py`'s existing path convention,
+now also threaded through `_render_node`/`_render_children`/`_render_show`/
+`_render_repeat` in `page_render.py`. Non-fatal: the build still succeeds,
+this just flags a plausible mistake for the author to go check.
+
+**Caught a real bug while landing this**: `usemap` was missing from
+`PASSTHROUGH_ATTRS`, so `<img usemap="#rooms">` silently compiled to
+`<img data-usemap="#rooms">` -- inert, not a functioning image map --
+since `v0.003`'s second addendum. Fixed alongside; the existing image-map
+test now asserts on the real attribute instead of only on `<map>`/`<area>`.
+
+Also resolves the `0.06504` CSP-injection fix's draft status
+(`docs/Proposals/CSP-TRUSTED-ORIGIN-INJECTION-BUGFIX.md`): re-verified
+against current code and tests, maintainer-confirmed as a plain bug fix
+that doesn't get a dedicated version slot or `pyproject` bump. And
+re-verifies issue-register entries #1-#4/#6 (`docs/Proposals/
+ARKlight-ISSUE-REGISTER.md`) directly against current code rather than
+trusting the `0.06607`-`0.06609` PROGRESS rows alone -- all five are
+genuinely fixed, entries updated accordingly.
+
+`tests/test_html_attrs.py`/`tests/test_html_backend.py`/
+`tests/test_vocabulary_addendum_2.py` extended; full suite 2749 passed.
+Landed without a version bump or a confirmed slot -- same treatment as
+`0.06504`; a maintainer should confirm the slot (or confirm it stays
+unslotted).
+
 ## [0.067] -- Milestone rollup: `v0.067` is done
 
 `v0.067`'s two pieces -- `Provider` stage 3/6 (`[0.06518]`) and JS
