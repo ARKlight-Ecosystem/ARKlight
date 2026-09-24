@@ -98,7 +98,28 @@ CONFIG_FILENAME = "arklight.config.py"
 # `Site(...)` kwargs. Missing key or missing section both mean
 # `"plain"` (today's unnamed default) -- this is opt-in end to end.
 # See docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md.
+#
+# "overdrive" is the one top-level *flag* rather than a section: a bare
+# `"overdrive": True` line. Read by `arklight.compiler.pipeline.build()`
+# itself (so `arklight build`, `live-streaming`, and library callers all
+# agree), it turns two of the pre-write gates' findings -- an unknown
+# internal `href`, and a reference outside `assets/` the build can't
+# supply -- from build-halting errors into an always-printed
+# "passed through unverified" report. Everything provably broken stays
+# fatal. Default `False`. See `arklight/compiler/overdrive.py`.
 _KNOWN_SECTIONS = {"live_streaming", "android", "desktop", "experimental", "csp", "rei"}
+
+
+def overdrive_enabled(config: dict[str, Any]) -> bool:
+    """`CONFIG["overdrive"]` as a strict bool (missing means `False`).
+
+    A non-bool (`"yes"`, `1`) is rejected rather than coerced: this
+    switch loosens a safety check, so a typo'd value must fail loudly,
+    not quietly turn it on -- or off."""
+    value = config.get("overdrive", False)
+    if not isinstance(value, bool):
+        raise ConfigError(f"`CONFIG['overdrive']` must be True or False, got {value!r}.")
+    return value
 
 
 class ConfigError(Exception):

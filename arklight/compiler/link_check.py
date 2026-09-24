@@ -103,7 +103,9 @@ def _fragment_problem(fragment: str, target_route: str, ids: set[str]) -> str | 
 
 
 def check_links(ir: WebsiteIR, *, generated: set[str]) -> tuple[int, list[LinkProblem]]:
-    """Return `(links_checked, problems)`. Pure: reads the IR only."""
+    """Return `(links_resolved, problems)` -- the count is links that fully
+    resolved, so it never includes a link that appears in `problems`.
+    Pure: reads the IR only."""
     routes = {page.route: "" for page in ir.pages}  # dict shape `_match_route` expects
     ids = _ids_by_route(ir)
     problems: dict[tuple[str, str], list[str]] = {}
@@ -131,10 +133,11 @@ def check_links(ir: WebsiteIR, *, generated: set[str]) -> tuple[int, list[LinkPr
             where = f"{route} <{node.type} href>"
 
             if href.startswith("#"):
-                checked += 1
                 detail = _fragment_problem(href[1:], route, ids[route])
                 if detail:
                     record(raw, "dead-fragment", detail, where)
+                else:
+                    checked += 1
                 return
 
             if not href.startswith("/"):
@@ -144,16 +147,16 @@ def check_links(ir: WebsiteIR, *, generated: set[str]) -> tuple[int, list[LinkPr
             path, _, _query = path_and_query.partition("?")
             matched = _match_route(path, routes)
             if matched is not None:
-                checked += 1
                 detail = _fragment_problem(fragment, matched, ids[matched]) if fragment else None
                 if detail:
                     record(raw, "dead-fragment", detail, where)
+                else:
+                    checked += 1
                 return
 
             rel = posixpath.normpath(path.lstrip("/"))
             if rel in generated or rel == "assets" or rel.startswith("assets/"):
                 return  # a generated file, or the asset gate's business
-            checked += 1
             lower = path.lower().rstrip("/") or "/"
             near = [r for r in routes if r.lower() == lower] or difflib.get_close_matches(path, list(routes), n=1)
             hint = f"  Did you mean {near[0]!r}?" if near else ""
@@ -175,13 +178,14 @@ def check_links(ir: WebsiteIR, *, generated: set[str]) -> tuple[int, list[LinkPr
 
 
 def format_report(problems: list[LinkProblem], *, total_checked: int, entry_path: Path) -> str:
+    # `total_checked` is the count of *other* links that did resolve.
     bar = "=" * 72
     lines = [
         bar,
         "ARKlight LINK CHECK FAILED -- build halted, nothing was written.",
         f"  site file: {entry_path}",
         "",
-        f"  {len(problems)} internal link(s) don't resolve ({total_checked} internal link(s) checked):",
+        f"  {len(problems)} internal link(s) don't resolve ({total_checked} other internal link(s) resolved fine):",
         "",
     ]
     for problem in problems:
