@@ -118,15 +118,17 @@ README for the full rationale.
 
 ### [`docs/Far Future Concern/`](<Far Future Concern/README.md>) — working reference
 
-Speculative/backlog material for backends that aren't a near-term
-priority. **Working reference only** — cleared out if a backend is
-dropped, or graduated elsewhere if it's picked up.
+Speculative/backlog material that isn't a near-term priority --
+mostly backends, plus one post-`v1.0` data-service idea. **Working
+reference only** — cleared out if an item is dropped, or graduated
+elsewhere if it's picked up.
 
 | File | Covers |
 | --- | --- |
 | [`kaios-app-design-doc.md`](<Far Future Concern/kaios-app-design-doc.md>) | Design doc for a potential KaiOS app. |
 | [`KAIOS-BACKEND-IMPLEMENTATION.md`](<Far Future Concern/KAIOS-BACKEND-IMPLEMENTATION.md>) | Implementation notes for a KaiOS backend. |
 | [`WINDOWS-PHONE-BACKEND.md`](<Far Future Concern/WINDOWS-PHONE-BACKEND.md>) | Notes on a (very) speculative Windows Phone backend. |
+| [`POCKETBASE-REIMPLEMENTATION-PROPOSAL.md`](<Far Future Concern/POCKETBASE-REIMPLEMENTATION-PROPOSAL.md>) | Proposal, designated `v1.2` (after `v1.0` ships), for a PocketBase-shaped, standard-library-only data service whose *definition* layer is authorable in Python or Rei with identical meaning. **Not accepted, holds no version slot.** |
 
 ### [`docs/version history/`](<version history/README.md>) — permanent
 
