@@ -69,9 +69,18 @@ A second, separate issue: item keys are derived from `JSON.stringify(item)`,
 so duplicate primitive values produce duplicate keys and identical items can
 collide and under-render. That duplicate-key limitation was already
 known/documented — the persistence hydration incompatibility is the newly
-demonstrated defect.
+demonstrated defect (the duplicate-key limitation itself remains open; see
+#11).
 
-**Status:** confirmed alpha bug.
+**Status:** fixed in `0.06607` -- re-verified directly against
+`arklight/backend/js/runtime/repeat.py`'s current `renderRepeat`: the first
+call now adopts only the overlap between the server-rendered DOM and the
+store's (possibly persisted) list length, then patches for real if the two
+disagree, instead of adopting past the shorter side and leaving the
+mismatch as a silent, un-reconciled baseline. `docs/version history/`
+doesn't carry a dedicated writeup for this specific bug (the `0.06607` row
+bundles it with #2 under "hydration bugs"), but the fix is real and
+covered. (Originally: confirmed alpha bug.)
 
 ### 2. Imported `@component` definitions break dev rebuilds
 
@@ -82,7 +91,14 @@ underlying problem is compiler/dev-loop lifecycle state surviving between
 builds. Particularly awkward since the production scaffold encourages
 component organization across modules.
 
-**Status:** confirmed tooling bug.
+**Status:** fixed in `0.06607` -- re-verified directly against
+`arklight/parser/loader.py`'s `_project_imports`: `unregister_components_under`
+now clears `COMPONENT_REGISTRY` entries from a site's own directory before
+its modules re-run on a rebuild, so a legitimate same-component re-import no
+longer collides with the previous build's still-registered entry.
+`allow_redefine=True` remains available for genuine intentional
+redefinition, but is no longer needed just to survive an ordinary dev
+rebuild. (Originally: confirmed tooling bug.)
 
 ### 3. PWA-generated inline scripts conflict with strict CSP
 
@@ -101,7 +117,13 @@ inserted. Not "PWA doesn't work" — more precisely, PWA script injection and
 the default strict-CSP policy are currently inconsistent. Potential fixes:
 externalize those scripts, or deliberately adjust the generated CSP.
 
-**Status:** confirmed cross-feature integration bug.
+**Status:** fixed in `0.06608` -- re-verified directly against
+`arklight/pwa.py`: service-worker registration/install wiring is now a
+generated external file (`ark-pwa.js`), loaded via `<script src="...">`
+and a `data-ark-sw-href` attribute rather than inlined, so it renders under
+the default strict CSP (`script-src 'self'`) without needing
+`Site(strict_csp=False)`. The externalize-it fix this entry's own "Potential
+fixes" line named. (Originally: confirmed cross-feature integration bug.)
 
 ### 4. Server/runtime serialization mismatch: `0.0` vs `0`
 
@@ -112,7 +134,13 @@ failure, but it shows the compiler's initial-value serialization and
 runtime coercion/formatting don't share exactly the same representation
 semantics.
 
-**Status:** confirmed minor rendering mismatch.
+**Status:** fixed in `0.06609` -- re-verified directly against
+`arklight/backend/html/page_render.py`'s `_render_bind`: every float
+(finite or not) is now routed through the JS-`String()`-accurate formatter
+`arklight/ir/js_string.py` already uses for the string-derivation catalog,
+so `0.0` now server-renders as `"0"`, matching what the client runtime's own
+coercion produces on its next render instead of visibly correcting it a
+moment later. (Originally: confirmed minor rendering mismatch.)
 
 ### 5. Positional component errors leak raw Python `TypeError`
 
@@ -136,7 +164,11 @@ unknown component silently fell back rather than producing the
 documented/error behavior implied by the help text. Minor, but a genuine
 documentation/behavior mismatch.
 
-**Status:** confirmed minor CLI inconsistency.
+**Status:** fixed in `0.06609` -- re-verified directly against
+`arklight/cli/search.py`'s `search_component`: `near`, when given, is now
+validated unconditionally before the exact-match check, so an unknown
+`--near` name always raises instead of silently falling back to ordinary
+suggestion behavior. (Originally: confirmed minor CLI inconsistency.)
 
 ---
 
@@ -857,12 +889,13 @@ encyclopedic funeral procession for every imperfect semicolon:
 
 ### Must-fix correctness issues
 
-1. `persist=True` + `Repeat` hydration.
-2. Imported-component dev rebuild registration.
-3. PWA inline scripts vs strict CSP.
-4. Initial/runtime numeric serialization mismatch.
-5. Raw Python `TypeError` leaking through component validation.
-6. CLI `--near` documentation/behavior mismatch.
+1. ~~`persist=True` + `Repeat` hydration.~~ Fixed, `0.06607`.
+2. ~~Imported-component dev rebuild registration.~~ Fixed, `0.06607`.
+3. ~~PWA inline scripts vs strict CSP.~~ Fixed, `0.06608`.
+4. ~~Initial/runtime numeric serialization mismatch.~~ Fixed, `0.06609`.
+5. Raw Python `TypeError` leaking through component validation. Partly
+   addressed, `0.06506` (see #5/#32 above).
+6. ~~CLI `--near` documentation/behavior mismatch.~~ Fixed, `0.06609`.
 
 ### Biggest capability gaps
 

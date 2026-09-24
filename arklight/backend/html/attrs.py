@@ -76,6 +76,7 @@ shape changed this stage.
 from __future__ import annotations
 
 import json
+import warnings
 from html import escape
 
 from arklight.ast.nodes import ActionRef, ClassBindSpec, ModelBindSpec, PlatformAPIRef
@@ -126,7 +127,13 @@ PASSTHROUGH_ATTRS = {
     # v0.003 (second addendum): <track> (video/audio captions).
     "kind", "srclang", "default",
     # v0.003 (second addendum): image maps (<area>).
-    "shape", "coords",
+    # Bugfix (found via the unknown-prop compiler notice above): `usemap`
+    # -- the <img> half of the pairing, without which `<map name="rooms">`
+    # has nothing pointing at it -- was missing from this list entirely,
+    # so it silently compiled to `data-usemap` instead of the real
+    # attribute: inert data on the page, not a functioning image map.
+    # `shape`/`coords` (the <area> half) were already here and correct.
+    "shape", "coords", "usemap",
     # v0.003 (second addendum): <iframe> embeds.
     "allow", "allowfullscreen", "sandbox", "referrerpolicy",
 }
@@ -232,6 +239,12 @@ def _attr_string(
     # again that dropping and later re-adding the parameter isn't
     # worth the churn.
     node_type: str = "node",
+    # `_render_node`/`_render_children` (`page_render.py`) thread this
+    # through using the same "{path}/{type}[{i}]" convention
+    # `arklight/ir/validate.py`'s `validate_node` already uses -- see the
+    # unknown-prop notice below, the reason `node_type` above was kept
+    # around unused for.
+    path: str = "root",
 ) -> str:
     props = dict(props)  # local copy -- may splice the initial bound class in below
 
@@ -428,7 +441,27 @@ def _attr_string(
 
             if attr_name not in PASSTHROUGH_ATTRS and not attr_name.startswith("data-"):
                 # Unknown props are still emitted as data-* attributes rather
-                # than silently dropped, so nothing a user writes disappears.
+                # than silently dropped, so nothing a user writes disappears --
+                # but silently doesn't mean quietly: this is exactly as likely
+                # to be a typo (`clas_name=` instead of `class_name=`) as a
+                # deliberate custom data attribute, and the two look identical
+                # once compiled, so there is nothing left in the *output* for
+                # an author to notice. Flagged here, unconditionally (never
+                # gated behind --verbose/--narrate, same "always prints"
+                # contract as any other `[ARKlight ALPHA]`-marked warning --
+                # see `arklight/cli/main.py`'s `_print_alpha_warnings`) with
+                # the structural `path` the caller threaded in, so a mistake
+                # is something the author can go find and fix, not a
+                # silently-compiled `data-*` attribute they'd never spot in
+                # the generated HTML.
+                warnings.warn(
+                    f"[ARKlight ALPHA] Unknown prop {key!r} on {node_type!r} at "
+                    f"{path} was compiled to a generic {f'data-{attr_name}'!r} "
+                    f"attribute instead of a recognized one -- if this was a "
+                    f"typo, fix it at {path}; if it's deliberate, nothing else "
+                    f"to do here, this is the documented fallback.",
+                    stacklevel=2,
+                )
                 attr_name = f"data-{attr_name}"
 
         if value is True:
