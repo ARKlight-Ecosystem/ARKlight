@@ -353,6 +353,22 @@ def _ark_node_to_ir_node(
     # narrowly scoped).
     component_origin = props.pop(COMPONENT_ORIGIN_PROP_KEY, None)
 
+    # `Provider`, stage 4 of 6 (`v0.068` -- see
+    # `docs/Implementation/PROVIDER-SDK-ADDENDUM.md`): unlike
+    # `responsive_style` above, `scripts` is *not* popped -- it's a real
+    # `Page(...)` prop the HTML backend reads directly off `page.root`
+    # (`arklight/backend/html/head_meta.py`, same convention `links`/
+    # `meta` already use), not a compile-time-only one lifted onto its
+    # own IRNode field. This only records the gate: one `ExperimentalUsage`
+    # per `Page(scripts=[...])`, reusing `collector.experimental_usages`
+    # (already folded into `WebsiteIR.experimental_usages`, see
+    # `build_website_ir` below) rather than adding a second, parallel
+    # list just for this one prop.
+    if node.type == "Page" and props.get("scripts"):
+        collector.experimental_usages.append(
+            experimental.emit("provider-scripts", on_warning=on_warning, component="Page")
+        )
+
     children: list[IRNode | str] = []
     for child in node.children:
         if isinstance(child, ARKNode):

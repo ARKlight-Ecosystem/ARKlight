@@ -39,6 +39,14 @@ What this module deliberately does NOT touch, and why:
 - **`css-import` (`Site.import_style(url)`, EXPERIMENTAL-APIS.md) is
   unaffected** for the same reason: an `@import` URL is a `style-src`
   concern, and `style-src` is never restricted here.
+- **`Page(scripts=[...])` (`Provider`, stage 4 of 6, v0.068,
+  `provider-scripts` in EXPERIMENTAL-APIS.md) IS affected** -- it emits
+  a real `<script src="...">`, a `script-src` concern, so the origin it
+  points at needs adding to `Site(trusted_script_origins=[...])` (or
+  `Site(strict_csp=False)`) the same as any other external script this
+  policy wasn't told to trust. Nothing here does that automatically:
+  declaring the script and trusting its origin are two separate,
+  deliberate opt-ins.
 
 What it does set, and why each line is safe for every existing site:
 

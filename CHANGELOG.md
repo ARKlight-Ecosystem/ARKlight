@@ -94,6 +94,45 @@ Landed without a version bump or a confirmed slot -- same treatment as
 `0.06504`; a maintainer should confirm the slot (or confirm it stays
 unslotted).
 
+## [0.06613] -- Capability fix: `Provider`, stage 4/6: external script loading (the `v0.068` slot's first-shipped piece)
+
+Numbered by the same out-of-band increment scheme as `[0.06601]`-`[0.06612]`.
+`v0.068`'s slot has two independent pieces (`docs/version history/v0.068.md`);
+JS vocabulary addendum stage 8/10 remains PLANNED. This ships the other one:
+`Provider`, stage 4 of 6 (`docs/Implementation/PROVIDER-SDK-ADDENDUM.md`),
+resolving the accepted proposal's own open question §7.1 -- a declared
+`Provider` alone doesn't get a real vendor SDK (the actual Firebase JS SDK,
+say) loaded into the page.
+
+- **`Page(scripts=[{"src": "https://example.com/sdk.js", ...}])`** -- an
+  authored way to add an external `<script src>` to a page's `<head>`, the
+  same `{attribute: value}`-dict shape `Page(links=[...])` already uses.
+- **Validation** (`arklight/ir/validate.py`'s `_validate_page_head_extensions`):
+  a non-empty list of non-empty attribute dicts; every entry needs a `src`
+  (nothing to load otherwise); a `"javascript:"` `src` is rejected outright
+  -- this loads an external file, it isn't an inline-code escape hatch.
+- **Rendering** (`arklight/backend/html/head_meta.py`): verbatim `<script
+  ...></script>` tags, no asset-path resolution (same reasoning `links`
+  already documents), appended last in `<head>`, after every other
+  extension point.
+- **Gating** (`arklight/experimental.py`): new `provider-scripts` entry,
+  `upstream_candidate=False` -- deliberately separate from
+  `provider-integration` so a page can declare a `Provider` with no script,
+  or load a script with no declared `Provider`, and each records its own
+  `ExperimentalUsage` (`arklight/ir/build.py`, off `Page(...)`'s own
+  `scripts` prop).
+- **CSP interaction documented, not automated**: unlike `css-import`,
+  `Page(scripts=[...])` emits a real `script-src` reference -- its origin
+  still needs `Site(trusted_script_origins=[...])` (or
+  `Site(strict_csp=False)`) to actually load under this project's default
+  `script-src 'self'` policy. Noted in the experimental warning's detail
+  lines and in `arklight/backend/html/csp.py`'s own docstring.
+
+`tests/test_provider.py` (53 -> 65 tests)/`tests/test_html_head_meta.py`
+(13 -> 16 tests) extended; full suite 2815 passed. `0.06612` -> `0.06613`;
+out-of-band, no roadmap row, roadmap `v0.068` untouched (JS vocabulary
+stage 8/10 remains PLANNED).
+
 ## [0.067] -- Milestone rollup: `v0.067` is done
 
 `v0.067`'s two pieces -- `Provider` stage 3/6 (`[0.06518]`) and JS

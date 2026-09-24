@@ -18,7 +18,7 @@ import pytest
 import arklight
 from arklight import Page, Heading, Provider, Site, experimental
 from arklight.compiler.pipeline import build, compile_site_file
-from arklight.ir.validate import ValidationError, validate_provider
+from arklight.ir.validate import ValidationError, validate_page, validate_provider
 from arklight.provider import PROVIDER_CAPABILITIES, ProviderDeclaration
 
 
@@ -514,3 +514,96 @@ def test_config_object_is_set_before_a_script_extension_appended_after_it(tmp_pa
     # A ScriptExtension is appended after the whole runtime, so anything
     # it reads must already exist -- i.e. sit before the closing of the IIFE.
     assert js.index("window.ARKLIGHT_PROVIDER") < js.rindex("})();")
+
+
+# ---------------------------------------------------------------------------
+# Stage 4 of 6 (v0.068): external script loading -- Page(scripts=[...])
+# ---------------------------------------------------------------------------
+
+
+def _page_with_scripts(scripts):
+    return Page(Heading("Hi"), scripts=scripts)
+
+
+def test_scripts_entry_requires_src():
+    page = _page_with_scripts([{"defer": "true"}])
+    with pytest.raises(ValidationError, match='"src"'):
+        validate_page("/", page)
+
+
+def test_scripts_rejects_a_javascript_url():
+    page = _page_with_scripts([{"src": "javascript:alert(1)"}])
+    with pytest.raises(ValidationError, match="javascript:"):
+        validate_page("/", page)
+
+
+def test_scripts_entry_must_be_a_non_empty_dict():
+    with pytest.raises(ValidationError, match="non-empty"):
+        validate_page("/", _page_with_scripts([{}]))
+
+
+def test_scripts_must_be_a_non_empty_list():
+    with pytest.raises(ValidationError, match="non-empty list"):
+        validate_page("/", _page_with_scripts([]))
+
+
+def test_scripts_attribute_values_must_be_strings():
+    with pytest.raises(ValidationError, match="string value"):
+        validate_page("/", _page_with_scripts([{"src": "https://example.com/sdk.js", "async": True}]))
+
+
+def test_a_valid_scripts_entry_passes_validation():
+    validate_page("/", _page_with_scripts([{"src": "https://example.com/sdk.js", "defer": "true"}]))
+
+
+def test_provider_scripts_is_a_registered_feature():
+    assert "provider-scripts" in experimental.FEATURES
+
+
+def test_provider_scripts_never_trips_the_heavy_reliance_nudge():
+    assert experimental.FEATURES["provider-scripts"].upstream_candidate is False
+
+
+_SITE_WITH_SCRIPTS = (
+    "from arklight import Site, Page, Heading\n"
+    "site = Site(name='Test')\n"
+    "@site.page('/')\n"
+    "def home():\n"
+    "    return Page(Heading('Hi'), scripts=[{'src': 'https://example.com/sdk.js'}])\n"
+)
+
+
+def test_a_page_with_scripts_records_provider_scripts_usage(tmp_path):
+    site_file = tmp_path / "site.py"
+    site_file.write_text(_SITE_WITH_SCRIPTS)
+    ir = compile_site_file(site_file)
+    assert [u.feature_id for u in ir.experimental_usages] == ["provider-scripts"]
+
+
+def test_provider_scripts_is_gated_separately_from_provider_integration(tmp_path):
+    # A Provider declaration with no Page(scripts=...) records only
+    # provider-integration; a Page(scripts=...) with no declared
+    # Provider records only provider-scripts. The two are independent
+    # gates, per PROVIDER-SDK-ADDENDUM.md's stage 4 note.
+    site_file = tmp_path / "site.py"
+    site_file.write_text(_SITE_WITH)
+    ir = compile_site_file(site_file)
+    assert "provider-scripts" not in [u.feature_id for u in ir.experimental_usages]
+
+
+def test_build_renders_the_script_tag_in_the_page(tmp_path):
+    site_file = tmp_path / "site.py"
+    site_file.write_text(_SITE_WITH_SCRIPTS)
+    build(site_file, tmp_path / "ARK")
+    html = (tmp_path / "ARK" / "index.html").read_text()
+    assert '<script src="https://example.com/sdk.js"></script>' in html
+
+
+def test_a_build_with_scripts_prints_the_provider_scripts_banner(tmp_path):
+    site_file = tmp_path / "site.py"
+    site_file.write_text(_SITE_WITH_SCRIPTS)
+    messages: list[str] = []
+    build(site_file, tmp_path / "ARK", on_stage=messages.append)
+    banners = [m for m in messages if m.startswith("\u26a0")]
+    assert len(banners) == 1
+    assert "provider-scripts" in banners[0]

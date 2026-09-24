@@ -217,6 +217,45 @@ FEATURES: dict[str, ExperimentalFeature] = {
         # uses a Provider, the same reasoning `css-media-queries` uses.
         upstream_candidate=False,
     ),
+    "provider-scripts": ExperimentalFeature(
+        id="provider-scripts",
+        inline_note="The script's contents can't be validated by ARKlight, and it runs with full page access.",
+        detail_lines=[
+            "Page(scripts=[...]) adds an external <script src=\"...\"> to this",
+            "page's <head> -- the small primitive Provider, stage 4 of 6",
+            "(docs/Implementation/PROVIDER-SDK-ADDENDUM.md), adds so a real",
+            "vendor SDK (the actual Firebase JS SDK, say) can be loaded at",
+            "all. The referenced file is fetched and run at request time,",
+            "from whatever the URL resolves to then -- unlike everything",
+            "else ARKlight emits, its contents can't be validated ahead of",
+            "time, and once it runs it has the same full page access any",
+            "other same-origin script would.",
+            "Gated separately from provider-integration on purpose:",
+            "declaring a Provider's capability contract carries none of",
+            "this risk by itself, and folding the two together would",
+            "either under-warn script loading or over-warn every plain",
+            "Provider declaration that never needs one.",
+            "The site's own Content-Security-Policy (arklight/backend/",
+            "html/csp.py) still applies -- script-src defaults to 'self',",
+            "so a script src on another origin also needs that origin",
+            "added via Site(trusted_script_origins=[...]), or the build",
+            "will ship a page whose own CSP blocks the tag it just added.",
+        ],
+        legacy_note=(
+            "Not a legacy API -- this is new, gated the same day it's "
+            "introduced. A Page(scripts=[...]) entry is opaque to ARKlight "
+            "the same way an @import URL (css-import) or a Provider's "
+            "external service (provider-integration) is: retained as an "
+            "explicit escape hatch for loading a vendor SDK a declared "
+            "Provider needs, not the default path for anything ARKlight "
+            "can generate itself."
+        ),
+        # Same reasoning as `provider-integration`: needing to load an
+        # external vendor SDK is a deliberate boundary of what a static-
+        # site compiler can own, not a sign ARKlight is missing a
+        # built-in feature.
+        upstream_candidate=False,
+    ),
 }
 
 
