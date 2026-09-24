@@ -88,6 +88,7 @@ from arklight.backend.html.routing import (
     _resolve_route_ref,
     _resolve_src_ref,
     _resolve_srcset_ref,
+    _resolve_style_urls,
 )
 
 # Prop names that map straight through to HTML attributes.
@@ -426,6 +427,8 @@ def _attr_string(
 
             if attr_name == "style" and isinstance(value, dict):
                 value = _style_dict_to_css(value)
+            if attr_name == "style" and isinstance(value, str):
+                value = _resolve_style_urls(value, current_route=current_route, route_to_path=route_to_path)
 
             if attr_name in ROUTE_AWARE_ATTRS and isinstance(value, str) and _is_internal_route_ref(value):
                 value = _resolve_route_ref(value, current_route=current_route, route_to_path=route_to_path)

@@ -115,6 +115,10 @@ _STAGE_PATTERNS: tuple[_StagePattern, ...] = (
         lambda m: _line(f"All {m.group('n')} referenced asset(s) are present."),
     ),
     _pat(
+        r"Link check passed: (?P<n>\d+) internal link\(s\), all resolve\.",
+        lambda m: _line(f"All {m.group('n')} internal link(s) resolve to a real page."),
+    ),
+    _pat(
         r"Generating build manifest \(sbom\.txt\)\.\.\.",
         lambda m: _line("Writing the build manifest, sbom.txt."),
     ),
