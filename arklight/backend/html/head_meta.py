@@ -72,6 +72,18 @@ def _render_head_meta(
         through `_relative_asset_path`, since a `links` entry is at
         least as likely to point at an external origin (preconnect,
         webfonts) as a local asset.
+      scripts -- `Provider`, stage 4 of 6 (v0.068, EXPERIMENTAL --
+        see `arklight/experimental.py`'s `provider-scripts` entry):
+        list[dict[str, str]] of attribute -> value pairs, each
+        rendered as a single external `<script ...></script>` tag
+        (e.g. `{"src": "https://example.com/sdk.js", "defer": "true"}`),
+        for loading a real vendor SDK a declared `Site(provider=...)`
+        needs at runtime. Same verbatim, attribute-dict shape as
+        `links` (validated in `arklight.ir.validate`, which also
+        requires a `src`) -- an external URL is fetched and run at
+        request time, so remember it still needs to clear the page's
+        own `script-src` CSP (`Site(trusted_script_origins=[...])`,
+        `arklight/backend/html/csp.py`) to actually load.
 
     Bugfix: `favicon`/`og_image` are documented as root-relative asset
     paths (e.g. "/assets/favicon.ico"), but `_relative_asset_path`
@@ -146,4 +158,20 @@ def _render_head_meta(
                 for attr, value in link.items()
             )
             tags.append(f"  <link{attrs_html}>\n")
+
+    # `Provider`, stage 4 of 6 (v0.068) -- see the docstring above.
+    # Rendered last, after every other <head> tag, so an SDK script
+    # that expects e.g. a meta tag or preconnect hint already in the
+    # document sees it. Gating (the `provider-scripts` experimental
+    # banner) already happened at IR-build time
+    # (`arklight.ir.build._ark_node_to_ir_node`); this function only
+    # ever renders, matching every other prop here.
+    extra_scripts = page.root.props.get("scripts")
+    if extra_scripts:
+        for script in extra_scripts:
+            attrs_html = "".join(
+                f' {escape(str(attr), quote=True)}="{escape(str(value), quote=True)}"'
+                for attr, value in script.items()
+            )
+            tags.append(f"  <script{attrs_html}></script>\n")
     return "".join(tags)

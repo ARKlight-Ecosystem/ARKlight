@@ -1,9 +1,9 @@
 # Provider SDK Addendum: Staged Order, v0.065 -> v0.070
 
-**Status:** Stages 1-3 of 6 SHIPPED (`0.06514`, `0.06516`, `0.06518`);
-stages 4-6 PLANNED, interleaved one stage per version alongside the JS
-vocabulary addendum's own stages 5-10 in the same `v0.065`-`v0.070`
-milestone range. This file turns the accepted
+**Status:** Stages 1-4 of 6 SHIPPED (`0.06514`, `0.06516`, `0.06518`,
+`0.06613`); stages 5-6 PLANNED, interleaved one stage per version
+alongside the JS vocabulary addendum's own stages 5-10 in the same
+`v0.065`-`v0.070` milestone range. This file turns the accepted
 [`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`](../Proposals/PROVIDER-SDK-PROPOSAL.md)
 into a trackable landing order, the same role
 `JS-VOCABULARY-ADDENDUM-v0.070.md` plays for the JS vocabulary
@@ -86,18 +86,30 @@ output -- the same "only ship what's used" gate as every other JS
 backend object, present in the runtime only when a page's IR actually
 declares a `Provider`.
 
-### v0.068 -- Stage 4 of 6: external script loading (PLANNED)
+### v0.068 -- Stage 4 of 6: external script loading (SHIPPED, `0.06613`)
 
 Resolves the proposal's own open question §7.1: a `Provider`
 declaration alone doesn't get a real vendor SDK (the actual Firebase
 JS SDK, say) loaded into the page. Adds the small, separately-gated
-primitive that makes the contract usable end-to-end -- a gated
-`Page(scripts=[...])`-shaped addition, its own experimental-feature
-entry rather than folded into `provider-integration` (loading an
-arbitrary external script is a distinct risk from declaring a
-capability contract, and gating them together would either
-under-warn the script-loading case or over-warn every plain
-`Provider` declaration that never needs one).
+primitive that makes the contract usable end-to-end: `Page(scripts=
+[{"src": "https://.../sdk.js", ...}])`, validated the same
+`{attribute: value}`-dict, `rel`/`src`-required structural discipline
+`links` already uses (`arklight.ir.validate._validate_page_head_extensions`),
+rendered as verbatim `<script ...></script>` tags at the end of
+`<head>` (`arklight/backend/html/head_meta.py`). Gated as its own
+`provider-scripts` experimental feature rather than folded into
+`provider-integration` (loading an arbitrary external script is a
+distinct risk from declaring a capability contract, and gating them
+together would either under-warn the script-loading case or over-warn
+every plain `Provider` declaration that never needs one) -- a page can
+carry one without the other, and each records its own, independent
+`ExperimentalUsage`. Unlike a bare `Provider` declaration, a script
+`src` on another origin also has to clear the page's own
+`script-src 'self'` CSP default (`arklight/backend/html/csp.py`) via
+`Site(trusted_script_origins=[...])`, or the tag the build just added
+will be blocked by the very policy the same build emits -- noted in
+both the experimental warning's detail lines and the CSP module's own
+docstring.
 
 ### v0.069 -- Stage 5 of 6: `arklight search` integration (PLANNED)
 
@@ -130,7 +142,7 @@ even as this surface grows.
 | 1 of 6 | The contract (`Provider.declare`, `Site(provider=...)`, `provider-integration` gating) | SHIPPED (`0.06514`) |
 | 2 of 6 | IR and validation integration | SHIPPED (`0.06516`) |
 | 3 of 6 | JS backend emission (`window.ARKLIGHT_PROVIDER`) | SHIPPED (`0.06518`) |
-| 4 of 6 | External script loading | PLANNED |
+| 4 of 6 | External script loading (`Page(scripts=[...])`, `provider-scripts` gate) | SHIPPED (`0.06613`) |
 | 5 of 6 | `arklight search` integration | PLANNED |
 | 6 of 6 | Capability enum finalization | PLANNED (capstone) |
 

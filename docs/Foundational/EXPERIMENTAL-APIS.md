@@ -87,6 +87,19 @@ experimental API.** That currently means:
   `arklight.js` and in `sbom.txt`. Excluded from the heavy-reliance nudge
   (`upstream_candidate=False`): a Provider is a deliberate boundary, not a
   missing feature. Design record: `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`.
+- `provider-scripts` -- `Page(scripts=[{"src": "...", ...}])`, `Provider`
+  stage 4 of 6 (v0.068, `docs/Implementation/PROVIDER-SDK-ADDENDUM.md`):
+  an authored way to add an external `<script src>` to a page's `<head>`,
+  so a declared Provider's real vendor SDK (the actual Firebase JS SDK,
+  say) can actually be loaded. Gated separately from `provider-integration`
+  -- a page can use either without the other. Flagged for the same reason
+  `css-import` is: the referenced file is fetched and run at request
+  time, so its contents can't be validated by ARKlight the way everything
+  else it generates is. Also needs its origin added to
+  `Site(trusted_script_origins=[...])` (`arklight/backend/html/csp.py`)
+  to actually load -- the default `script-src 'self'` CSP this project
+  ships doesn't trust it automatically. Excluded from the heavy-reliance
+  nudge (`upstream_candidate=False`), same reasoning as `provider-integration`.
 
 This list grows as new escape hatches are added. **There is no
 "experimental by convention" bucket** -- if a feature isn't in

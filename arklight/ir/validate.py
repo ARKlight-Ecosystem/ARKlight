@@ -573,6 +573,58 @@ def _validate_page_head_extensions(node: ARKNode, *, path: str) -> None:
                     f"attribute -- every <link> needs one, got {link!r}."
                 )
 
+    # `Provider`, stage 4 of 6 (`v0.068` -- see
+    # `docs/Implementation/PROVIDER-SDK-ADDENDUM.md` and
+    # `arklight/experimental.py`'s `provider-scripts` entry): same
+    # structural `{attribute: value}` discipline as `links` just above,
+    # not a raw HTML-injection escape hatch. `src` is required (this
+    # primitive exists to load an *external* script; an entry with no
+    # `src` has nothing to load) and, unlike `links`, a bare
+    # `"javascript:"` value is rejected outright -- that scheme runs as
+    # inline code the moment the browser parses it, which is exactly
+    # the unchecked-inline-execution surface `script-src` (no
+    # `'unsafe-inline'`, see `arklight/backend/html/csp.py`) exists to
+    # close, so ARKlight refuses to generate it up front rather than
+    # rely on the runtime CSP to catch it.
+    scripts = node.props.get("scripts")
+    if scripts is not None:
+        if not isinstance(scripts, list) or not scripts:
+            raise ValidationError(
+                f"Page(...) at {path} has scripts={scripts!r}, which must "
+                f"be a non-empty list of {{attribute: value}} dicts, e.g. "
+                f'[{{"src": "https://example.com/sdk.js"}}].'
+            )
+        for i, script in enumerate(scripts):
+            if not isinstance(script, dict) or not script:
+                raise ValidationError(
+                    f"Page(...) at {path} scripts[{i}] must be a non-empty "
+                    f"dict of {{attribute: value}}, got {script!r}."
+                )
+            for attr, value in script.items():
+                if not isinstance(attr, str) or not attr.strip():
+                    raise ValidationError(
+                        f"Page(...) at {path} scripts[{i}] has a non-string "
+                        f"or empty attribute name key, got {attr!r}."
+                    )
+                if not isinstance(value, str):
+                    raise ValidationError(
+                        f"Page(...) at {path} scripts[{i}][{attr!r}] needs "
+                        f"a string value, got {value!r}."
+                    )
+            src = script.get("src")
+            if not src:
+                raise ValidationError(
+                    f'Page(...) at {path} scripts[{i}] is missing a "src" '
+                    f"attribute -- every entry needs an external URL to "
+                    f"load, got {script!r}."
+                )
+            if src.strip().lower().startswith("javascript:"):
+                raise ValidationError(
+                    f"Page(...) at {path} scripts[{i}][\"src\"] can't be a "
+                    f'"javascript:" URL -- Page(scripts=[...]) loads an '
+                    f"external file, it isn't an inline-code escape hatch."
+                )
+
 
 def _validate_shell_persistent(node: ARKNode, *, path: str) -> None:
     """
