@@ -136,6 +136,20 @@ recomputes. No new IR node, no parser, nothing that touches
 `tests/test_js_vocabulary_v0068.py` added; full suite 2834 passed.
 `0.067` -> `0.068`.
 
+## [0.06614] -- Capability fix: `Provider`, stage 5/6: `arklight search` integration (the `v0.069` slot's first-shipped piece)
+
+- `arklight/provider.py`: `PROVIDER_REGISTRY`, `register_provider(...)`,
+  `resolve_provider(name)` (exact, case-insensitive label lookup).
+- `arklight/api.py`: `Site(provider=...)` registers its declaration.
+- `arklight/cli/search.py`: `arklight search <provider-name>` prints the
+  declared label and capabilities (declared order) and names
+  `window.ARKLIGHT_PROVIDER`. Checked after every component and
+  closed-vocabulary lookup; no typo-suggestion path for provider labels.
+- Limitation: `arklight search` doesn't load a site file, so a provider is
+  only visible in a process that has constructed its `Site`.
+- `tests/test_provider_search.py` (15 tests); full suite 2849 passed.
+  `0.06613` -> `0.06614`; `pyproject.toml` unchanged (milestone rollup only).
+
 ## [0.06613] -- Capability fix: `Provider`, stage 4/6: external script loading (the `v0.068` slot's first-shipped piece)
 
 Numbered by the same out-of-band increment scheme as `[0.06601]`-`[0.06612]`.

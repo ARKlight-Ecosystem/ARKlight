@@ -1,7 +1,7 @@
 # Provider SDK Addendum: Staged Order, v0.065 -> v0.070
 
-**Status:** Stages 1-4 of 6 SHIPPED (`0.06514`, `0.06516`, `0.06518`,
-`0.06613`); stages 5-6 PLANNED, interleaved one stage per version
+**Status:** Stages 1-5 of 6 SHIPPED (`0.06514`, `0.06516`, `0.06518`,
+`0.06613`, `0.06614`); stage 6 PLANNED, interleaved one stage per version
 alongside the JS vocabulary addendum's own stages 5-10 in the same
 `v0.065`-`v0.070` milestone range. This file turns the accepted
 [`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`](../Proposals/PROVIDER-SDK-PROPOSAL.md)
@@ -111,7 +111,7 @@ will be blocked by the very policy the same build emits -- noted in
 both the experimental warning's detail lines and the CSP module's own
 docstring.
 
-### v0.069 -- Stage 5 of 6: `arklight search` integration (PLANNED)
+### v0.069 -- Stage 5 of 6: `arklight search` integration (SHIPPED, `0.06614`)
 
 Extends `arklight search`'s existing schema-lookup reflection to a
 registered `Provider`'s capability contract -- `arklight search
@@ -143,7 +143,7 @@ even as this surface grows.
 | 2 of 6 | IR and validation integration | SHIPPED (`0.06516`) |
 | 3 of 6 | JS backend emission (`window.ARKLIGHT_PROVIDER`) | SHIPPED (`0.06518`) |
 | 4 of 6 | External script loading (`Page(scripts=[...])`, `provider-scripts` gate) | SHIPPED (`0.06613`) |
-| 5 of 6 | `arklight search` integration | PLANNED |
+| 5 of 6 | `arklight search` integration | SHIPPED (`0.06614`) |
 | 6 of 6 | Capability enum finalization | PLANNED (capstone) |
 
 See `docs/version history/v0.065.md` through `v0.070.md` for each

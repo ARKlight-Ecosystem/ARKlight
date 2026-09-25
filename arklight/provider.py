@@ -104,3 +104,49 @@ class ProviderDeclaration:
                 f"than once -- name each capability a single time."
             )
         object.__setattr__(self, "capabilities", tuple(caps))
+
+
+# ---------------------------------------------------------------------------
+# `Provider`, stage 5 of 6 (`v0.069`): `arklight search` integration.
+#
+# A registry of every `ProviderDeclaration` a `Site(provider=...)` has
+# attached in this process, keyed by the declaration's `name`. It is the
+# same shape as `arklight.ir.components.COMPONENT_REGISTRY`: populated as
+# a side effect of building the site, read by `arklight search` so the
+# declared contract can be looked up by name. Like user components, it is
+# only populated in a process that has actually constructed the `Site`;
+# `arklight search` alone never loads a project's site file, so a provider
+# is only visible to it in that situation. See `arklight.cli.search`.
+# ---------------------------------------------------------------------------
+
+PROVIDER_REGISTRY: dict[str, ProviderDeclaration] = {}
+
+
+def register_provider(declaration: ProviderDeclaration) -> None:
+    """Record `declaration` in `PROVIDER_REGISTRY` under its `name`.
+
+    Called from `Site.__init__` when `Site(provider=...)` is given. A
+    later declaration with the same `name` replaces the earlier one --
+    one provider per `Site`, and a name is a free label, so two sites
+    that reuse a label are simply the last one constructed.
+    """
+    if not isinstance(declaration, ProviderDeclaration):
+        raise ValueError(
+            "register_provider() needs a ProviderDeclaration, got "
+            f"{declaration!r}."
+        )
+    PROVIDER_REGISTRY[declaration.name] = declaration
+
+
+def resolve_provider(name: str) -> ProviderDeclaration | None:
+    """Case-insensitive lookup of a registered provider by its `name`.
+
+    Returns the declaration, or `None` if no registered provider carries
+    that label. Exact match on the label, ignoring case; no fuzzy
+    matching (a provider name is a free label, not a closed vocabulary).
+    """
+    lowered = {key.lower(): key for key in PROVIDER_REGISTRY}
+    canonical = lowered.get(name.lower())
+    if canonical is None:
+        return None
+    return PROVIDER_REGISTRY[canonical]
