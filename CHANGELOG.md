@@ -136,6 +136,26 @@ recomputes. No new IR node, no parser, nothing that touches
 `tests/test_js_vocabulary_v0068.py` added; full suite 2834 passed.
 `0.067` -> `0.068`.
 
+## [0.06615] -- Capability fix: JS vocabulary addendum, stage 9/10: cross-language formatting/case batteries (the `v0.069` slot's first piece)
+
+- 7 new `Derive.*` kinds, each one name, no literal arguments:
+  `to_ordinal` (`1` -> `"1st"`, `11` -> `"11th"`), `humanize_bytes`
+  (1024-based, `1536` -> `"1.5 KB"`, capped at `PB`), `humanize_duration`
+  (seconds as at most two units, `8100` -> `"2h 15m"`), and the case
+  converters `to_snake_case`, `to_camel_case`, `to_kebab_case`,
+  `to_title_case`.
+- Build-time mirrors: `arklight/ir/js_numeric.py` (`js_to_ordinal`,
+  `js_humanize_bytes`, `js_humanize_duration`) and
+  `arklight/ir/js_string.py` (`js_split_words` + the four converters).
+- Case converters split words the same way as the client: a regex chain
+  over Unicode general categories (`\p{L}`, `\p{N}`, `\p{Lu}`, `\p{Ll}`).
+- Fixed: `js_numeric.js_number_to_string` was a separate `repr`-based
+  copy that printed whole floats with a trailing `.0` (`45.0`). It now
+  reuses `js_string.js_number_to_string`, which matches `String(x)`.
+- `tests/test_js_vocabulary_v0069.py` (66 tests, incl. a Node parity
+  sweep over the shipped fragments); full suite 2915 passed.
+  `0.06614` -> `0.06615`; `pyproject.toml` unchanged (milestone rollup only).
+
 ## [0.06614] -- Capability fix: `Provider`, stage 5/6: `arklight search` integration (the `v0.069` slot's first-shipped piece)
 
 - `arklight/provider.py`: `PROVIDER_REGISTRY`, `register_provider(...)`,

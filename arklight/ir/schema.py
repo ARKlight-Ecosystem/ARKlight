@@ -570,6 +570,17 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     "saturating_subtract": DerivationSpec(min_names=2, max_names=2, extra_args=("min", "max")),
     "value_or": DerivationSpec(min_names=1, max_names=1, extra_args=("fallback",)),
     "first_present": DerivationSpec(min_names=2, max_names=None),
+    # `v0.069` (docs/version history/v0.069.md): JS vocabulary addendum
+    # stage 9/10 -- cross-language formatting/case batteries (Rails-style
+    # inflection and human-readable byte/duration strings). Each reads one
+    # name and takes no literal arguments.
+    "to_ordinal": DerivationSpec(min_names=1, max_names=1),
+    "humanize_bytes": DerivationSpec(min_names=1, max_names=1),
+    "humanize_duration": DerivationSpec(min_names=1, max_names=1),
+    "to_snake_case": DerivationSpec(min_names=1, max_names=1),
+    "to_camel_case": DerivationSpec(min_names=1, max_names=1),
+    "to_kebab_case": DerivationSpec(min_names=1, max_names=1),
+    "to_title_case": DerivationSpec(min_names=1, max_names=1),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)

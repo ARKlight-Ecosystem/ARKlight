@@ -506,6 +506,11 @@ _STRING_UNARY: dict[str, Callable[[str], Any]] = {
     "reverse_string": js_string.js_reverse,
     "string_length": js_string.js_length,
     "is_empty": js_string.js_is_empty,
+    # `v0.069`: JS vocabulary addendum stage 9/10 -- case converters.
+    "to_snake_case": js_string.js_to_snake_case,
+    "to_camel_case": js_string.js_to_camel_case,
+    "to_kebab_case": js_string.js_to_kebab_case,
+    "to_title_case": js_string.js_to_title_case,
 }
 _STRING_WITH_ARGS: dict[str, Callable[[str, dict[str, Any]], Any]] = {
     "pad_start": lambda s, a: js_string.js_pad_start(s, a["length"], a["fill"]),
@@ -683,6 +688,14 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
             if value is not None and value != "":
                 return value
         return values[-1]
+    # `v0.069` (docs/version history/v0.069.md): JS vocabulary addendum
+    # stage 9/10 -- formatting idioms, via `arklight/ir/js_numeric.py`.
+    if kind == "to_ordinal":
+        return js_numeric.js_to_ordinal(_coerce_number(get(names[0])))
+    if kind == "humanize_bytes":
+        return js_numeric.js_humanize_bytes(_coerce_number(get(names[0])))
+    if kind == "humanize_duration":
+        return js_numeric.js_humanize_duration(_coerce_number(get(names[0])))
     return None  # unreachable once Validation has run
 
 
