@@ -903,8 +903,12 @@ class Provider:
         )
 
     This is a **contract only**. `name` is a free label (not a fixed list
-    of vendors); `capabilities` is drawn from a closed vocabulary
-    (`arklight.provider.PROVIDER_CAPABILITIES`) so a typo fails the build.
+    of vendors); `capabilities` draws from four finalized well-known
+    names (`arklight.provider.PROVIDER_CAPABILITIES`: `auth`, `read`,
+    `write`, `subscribe`) so a typo still fails the build, plus an open
+    `custom:`-prefixed escape hatch (`v0.070`, stage 6 of 6) for a
+    capability your service needs that those four don't cover --
+    `Provider.declare(name="firebase", capabilities=["auth", "custom:inventory-sync"])`.
     ARKlight ships no vendor SDK, makes no network calls, has no opinion
     about auth, and does not implement, audit or guarantee the service
     the declaration points at -- the concrete implementation is your own
@@ -917,8 +921,10 @@ class Provider:
     summary block, and the reports every experimental feature already
     gets in `arklight.js` and `sbom.txt`).
 
-    The capability vocabulary is provisional until the last stage of the
-    Provider ladder finalizes it.
+    The capability vocabulary is finalized as of stage 6 (`v0.070`) --
+    see `arklight/provider.py` for why a closed core plus a namespaced
+    custom prefix, rather than either a fully open or a fully closed
+    set.
     """
 
     @staticmethod

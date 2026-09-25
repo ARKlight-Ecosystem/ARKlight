@@ -132,8 +132,9 @@ Checks performed:
     template.
 19. `Site(provider=...)` (`Provider` stage 2 of 6, `v0.066` -- see
     `docs/version history/v0.066.md` and `arklight/provider.py`), if
-    present, is re-checked against the same closed, provisional
-    capability vocabulary (`arklight.provider.PROVIDER_CAPABILITIES`)
+    present, is re-checked against the same finalized capability
+    vocabulary (`arklight.provider.PROVIDER_CAPABILITIES` plus the
+    `custom:`-prefixed escape hatch, finalized at stage 6, `v0.070`)
     `ProviderDeclaration.__post_init__` already enforces at
     construction time -- see `validate_provider`. Unlike every other
     check in this module, a `Provider` declaration is not part of the
@@ -166,7 +167,7 @@ from arklight.ast.nodes import (
     is_state_ref,
 )
 from arklight.ir.platform_api import PLATFORM_API_REGISTRY
-from arklight.provider import PROVIDER_CAPABILITIES, ProviderDeclaration
+from arklight.provider import PROVIDER_CAPABILITIES, ProviderDeclaration, is_known_capability
 from arklight.ir.schema import (
     ACTION_REGISTRY,
     COMPARE_OPS,
@@ -1472,9 +1473,11 @@ def validate_ark_ast(pages: dict[str, ARKNode]) -> None:
 
 def validate_provider(provider: ProviderDeclaration | None) -> None:
     """
-    Re-check a declared `Site(provider=...)` against the closed,
-    provisional capability vocabulary (`Provider` stage 2 of 6,
-    `v0.066` -- see this module's docstring, check 19, and
+    Re-check a declared `Site(provider=...)` against the finalized
+    capability vocabulary -- the four well-known names plus the
+    `custom:`-prefixed escape hatch (`Provider` stage 2 of 6, `v0.066`,
+    re-checked here; the vocabulary itself finalized at stage 6,
+    `v0.070` -- see this module's docstring, check 19, and
     `arklight/provider.py`).
 
     A no-op when `provider` is `None` (the common case -- most sites
@@ -1504,7 +1507,7 @@ def validate_provider(provider: ProviderDeclaration | None) -> None:
     """
     if provider is None:
         return
-    unknown = sorted({cap for cap in provider.capabilities if cap not in PROVIDER_CAPABILITIES})
+    unknown = sorted({cap for cap in provider.capabilities if not is_known_capability(cap)})
     if unknown:
         raise ValidationError(
             f"Site(provider=...) declares unknown capabilit{'y' if len(unknown) == 1 else 'ies'} "

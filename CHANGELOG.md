@@ -5,6 +5,66 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [wip v0.070] -- Capability fix: `Provider`, stage 6/6: capability vocabulary finalized + `custom:` escape hatch
+
+Resolves the accepted proposal's own open question §7.2 -- whether
+`capabilities` stays free-form or becomes a closed, finalized set --
+placed last on purpose so it's decided from five stages of real usage
+(IR threading, JS emission, script loading, `arklight search`) instead
+of guessed at stage 1. None of that usage ever needed a fifth
+well-known name, so `PROVIDER_CAPABILITIES` (`auth`, `read`, `write`,
+`subscribe`) is locked in as-is; "provisional" is retired from
+`arklight/provider.py`, `arklight/ir/validate.py` and
+`arklight/experimental.py`.
+
+Finalizing the *known* four doesn't mean closing the vocabulary
+outright: a Provider exists so a site can point at *any* external
+service, the same way a user-defined component covers markup ARKlight
+has no built-in name for, so a hard four-name ceiling would cut
+against that. Stage 6 also opens a namespaced escape hatch:
+
+- **`CUSTOM_CAPABILITY_PREFIX = "custom:"`** -- `Provider.declare(name=...,
+  capabilities=["auth", "custom:inventory-sync"])` names a capability
+  the four well-known ones don't cover, without touching
+  `PROVIDER_CAPABILITIES` or waiting on a new ARKlight release.
+  `arklight/provider.py`'s `is_custom_capability(cap)`/
+  `is_known_capability(cap)`.
+- Researched against two existing precedents for extending a small
+  closed protocol without renegotiating it before landing on this
+  shape: the Language Server Protocol's `experimental`/vendor-
+  namespaced capability keys, and OAuth's `custom:`-prefixed scope
+  convention.
+- **Typo discipline unchanged**: an unprefixed name is still checked
+  strictly against the closed four -- `"raed"` still fails as an
+  unknown capability, not accepted as a new custom one. Only a name
+  that opts in with the prefix gets the open treatment.
+- **Custom labels are format-checked**, not merely non-empty: lowercase,
+  starting with a letter, `-`/`_` allowed mid-label
+  (`custom:inventory-sync`), no doubled or trailing separators -- so
+  `custom:`, `custom:Auth`, `custom:-x` still error. Reusing a
+  well-known name under the prefix (`custom:read`) gets its own error
+  pointing at the unprefixed form, rather than silently accepting a
+  confusingly-named duplicate.
+- `arklight/ir/validate.py`'s `validate_provider` re-check, `arklight/
+  api.py`'s `Provider.declare` docstring, `arklight/experimental.py`'s
+  `provider-integration` detail lines, and `arklight/cli/search.py`'s
+  `_format_provider_spec` (now tags a `custom:`-prefixed capability as
+  `(custom)` and explains the prefix) all updated to match.
+
+Full suite 2912 passed -- the 3 failures present on this checkout (a
+stale doc citation in `PROGRESS.md`, two package-metadata tests) are
+pre-existing and confirmed unchanged on a clean `git stash` diff, not
+caused by this change. `tests/test_provider.py` still 82 tests (all
+existing assertions about the closed four's error text pass unchanged;
+no new test file added yet for the `custom:` path itself).
+
+**wip**: no version bump yet -- `v0.070`'s other piece (JS vocabulary
+stage 10/10) is still PLANNED, and this entry itself has not been
+squared away into a dedicated `tests/test_provider_custom_capability.py`
+pass or `docs/version history/v0.070.md`/`PROVIDER-SDK-ADDENDUM.md`
+updates. `PROGRESS.md`'s `v0.070` row records this as WIP, version slot
+unconfirmed.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- `overdrive`: opt in to unverifiable references
 
 New top-level `arklight.config.py` flag, `CONFIG = {"overdrive": True}`

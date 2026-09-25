@@ -118,7 +118,12 @@ from arklight.ir.schema import (
     PredicateSpec,
     RevealSpec,
 )
-from arklight.provider import ProviderDeclaration, resolve_provider
+from arklight.provider import (
+    CUSTOM_CAPABILITY_PREFIX,
+    ProviderDeclaration,
+    is_custom_capability,
+    resolve_provider,
+)
 from arklight.search.engine import default_engine
 from arklight.search.knowledge import STATE_KEYWORDS
 
@@ -277,9 +282,24 @@ def _format_provider_spec(declaration: ProviderDeclaration) -> str:
     (`window.ARKLIGHT_PROVIDER`) is named so the reader knows where the
     same data is visible at runtime; there are no DOM hooks or state
     keys to report, since a capability isn't wired to either yet (see
-    `arklight/provider.py`)."""
+    `arklight/provider.py`).
+
+    Stage 6 (`v0.070`) marks each capability as it's declared: a bare
+    name is one of the four finalized well-known ones, a `custom:`-
+    prefixed one is this site's own -- so the reader doesn't have to
+    hold `PROVIDER_CAPABILITIES` in their head to tell which is which.
+    """
     lines = [f"{declaration.name} (declared provider, Site(provider=...))"]
-    lines.append(f"  capabilities   : {', '.join(declaration.capabilities)}")
+    labeled = [
+        f"{cap} (custom)" if is_custom_capability(cap) else cap
+        for cap in declaration.capabilities
+    ]
+    lines.append(f"  capabilities   : {', '.join(labeled)}")
+    if any(is_custom_capability(cap) for cap in declaration.capabilities):
+        lines.append(
+            f"  custom         : a {CUSTOM_CAPABILITY_PREFIX!r}-prefixed name is this "
+            f"site's own, not one of the four well-known capabilities"
+        )
     lines.append("  runtime        : window.ARKLIGHT_PROVIDER (read-only, in arklight.js)")
     return "\n".join(lines)
 
