@@ -554,6 +554,22 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     "list_includes": DerivationSpec(min_names=1, max_names=1, extra_args=("value",)),
     "list_any": DerivationSpec(min_names=1, max_names=1, extra_args=("op", "value")),
     "list_all": DerivationSpec(min_names=1, max_names=1, extra_args=("op", "value")),
+    # `v0.068` (docs/version history/v0.068.md): JS vocabulary addendum
+    # stage 8/10 -- cross-language numeric batteries, things JS's own
+    # `Math` has no built-in for at all. `lerp` is an ordered triple
+    # (value `a`, value `b`, weight `t`), same shape as `clamp`;
+    # `midpoint` is an ordered pair. `saturating_add`/`saturating_subtract`
+    # read two state names and take their fixed clamp bounds as literal
+    # `min`/`max` args (checked in `arklight.ir.validate`, `min <= max`).
+    # `value_or` reads one name plus a literal `fallback`. `first_present`
+    # is variadic like `sum`, but needs at least two names -- one name
+    # would just be `value_or` with a fallback of `None`.
+    "lerp": DerivationSpec(min_names=3, max_names=3),
+    "midpoint": DerivationSpec(min_names=2, max_names=2),
+    "saturating_add": DerivationSpec(min_names=2, max_names=2, extra_args=("min", "max")),
+    "saturating_subtract": DerivationSpec(min_names=2, max_names=2, extra_args=("min", "max")),
+    "value_or": DerivationSpec(min_names=1, max_names=1, extra_args=("fallback",)),
+    "first_present": DerivationSpec(min_names=2, max_names=None),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
@@ -633,6 +649,18 @@ LITERAL_ARG_RULES: dict[str, dict[str, LiteralArgRule]] = {
     "starts_with": {"substring": _ANY_STR},
     "ends_with": {"substring": _ANY_STR},
 }
+
+# `v0.068`: `Derive.saturating_add(...)`/`Derive.saturating_subtract(...)`'s
+# `min`/`max` -- literal integer bounds, same `+/-2**53` ceiling
+# `ONE_OF_MAX_INTEGER` gives `Predicate.one_of(...)`'s values (an
+# arbitrarily wide float bound isn't meaningfully different for a UI
+# clamp, and staying integer-only keeps this table's `LiteralArgRule`
+# shape instead of inventing a float-capable one). `min > max` is
+# checked separately in `arklight.ir.validate` -- it isn't expressible
+# as a single-argument `LiteralArgRule`.
+_SATURATING_BOUND = LiteralArgRule("int", -(2**53), 2**53)
+LITERAL_ARG_RULES["saturating_add"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
+LITERAL_ARG_RULES["saturating_subtract"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
 
 
 # `vdom-7` (REFACTOR-INDEX.md row 15): `Show(...)`'s

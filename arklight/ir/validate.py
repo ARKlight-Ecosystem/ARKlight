@@ -853,6 +853,21 @@ def _validate_derive_ref(
             )
     if derive.kind == "list_includes" or derive.kind in LIST_COMPARE_KINDS:
         _validate_list_derivation_args(derive, path=path)
+    if derive.kind == "value_or":
+        fallback = derive.args["fallback"]
+        if not _is_json_scalar_literal(fallback):
+            raise ValidationError(
+                f"Computed(...) at {path} uses Derive.value_or(...) with "
+                f"fallback={fallback!r}, which isn't a str, bool, None, "
+                f"finite number, or integer within +/-2**53."
+            )
+    if derive.kind in ("saturating_add", "saturating_subtract"):
+        low, high = derive.args.get("min"), derive.args.get("max")
+        if isinstance(low, int) and isinstance(high, int) and low > high:
+            raise ValidationError(
+                f"Computed(...) at {path} uses Derive.{derive.kind}(...) with "
+                f"min={low!r} above max={high!r}. min must not be above max."
+            )
     if derive.kind in DIGITS_RANGES:
         low, high = DIGITS_RANGES[derive.kind]
         digits = derive.args.get("digits")

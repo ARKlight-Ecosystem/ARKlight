@@ -34,6 +34,27 @@ _INF = math.inf
 _DECIMAL_CONTEXT = Context(prec=500)
 
 
+def js_lerp(a: float, b: float, t: float) -> float:
+    """`v0.068`: C++20 `std::lerp(a, b, t)` -- linear interpolation,
+    `a + t * (b - a)`, with the two edge cases C++20 added a stdlib
+    function specifically to get right: `t == 0` returns exactly `a`
+    and `t == 1` returns exactly `b`, even where floating-point
+    rounding would otherwise nudge `a + t * (b - a)` off by a bit."""
+    if t == 0:
+        return a
+    if t == 1:
+        return b
+    return a + t * (b - a)
+
+
+def js_midpoint(a: float, b: float) -> float:
+    """`v0.068`: C++20 `std::midpoint(a, b)` -- `a + (b - a) / 2`
+    rather than the naive `(a + b) / 2`, so a pair of very large
+    same-sign floats never round through an intermediate that
+    overflows before the division happens."""
+    return a + (b - a) / 2
+
+
 def js_divide(a: float, b: float) -> float:
     """`a / b` with JavaScript's float semantics (`x / 0` is
     `Infinity`/`-Infinity`/`NaN`, never a `ZeroDivisionError`)."""

@@ -656,6 +656,33 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
         return _LIST_UNARY[kind](get(names[0]))
     if kind in _LIST_WITH_ARGS:
         return _LIST_WITH_ARGS[kind](get(names[0]), args)
+    # `v0.068` (docs/version history/v0.068.md): JS vocabulary addendum
+    # stage 8/10 -- cross-language numeric batteries, via
+    # `arklight/ir/js_numeric.py`'s `js_lerp`/`js_midpoint`.
+    if kind == "lerp":
+        a, b, t = (_coerce_number(get(name)) for name in names)
+        return js_numeric.js_lerp(a, b, t)
+    if kind == "midpoint":
+        a, b = (_coerce_number(get(name)) for name in names)
+        return js_numeric.js_midpoint(a, b)
+    if kind == "saturating_add":
+        a, b = (_coerce_number(get(name)) for name in names)
+        return min(max(a + b, args["min"]), args["max"])
+    if kind == "saturating_subtract":
+        a, b = (_coerce_number(get(name)) for name in names)
+        return min(max(a - b, args["min"]), args["max"])
+    if kind == "value_or":
+        # Mirrors the client's `v === null || v === undefined || v === ""`:
+        # JSON has no `undefined`, so `None` already stands in for both
+        # `null` and a name that was never set.
+        value = get(names[0])
+        return args["fallback"] if value is None or value == "" else value
+    if kind == "first_present":
+        values = [get(name) for name in names]
+        for value in values:
+            if value is not None and value != "":
+                return value
+        return values[-1]
     return None  # unreachable once Validation has run
 
 
