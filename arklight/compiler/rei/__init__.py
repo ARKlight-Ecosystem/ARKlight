@@ -1,7 +1,7 @@
 """
 Rei -- the compiler narrator (`arklight build --narrate`).
 
-Implements `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`
+Implements `docs/Foundational/DESIGN-NOTES.md`
 (`v0.065`, shipped as `0.06510` -- see
 `docs/version history/v0.065.md`).
 

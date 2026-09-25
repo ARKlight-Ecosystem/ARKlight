@@ -1042,7 +1042,7 @@ def main(argv: list[str] | None = None) -> int:
         "project can pin this as its default via arklight.config.py's "
         "CONFIG = {'rei': {'default_mode': 'narrate'}} instead of "
         "passing the flag every time -- see "
-        "docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md.",
+        "docs/Foundational/DESIGN-NOTES.md.",
     )
     build_parser.add_argument(
         "--max-width",

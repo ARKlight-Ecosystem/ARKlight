@@ -153,7 +153,7 @@ the error first.
 **Status:** addressed in `0.06506` -- a positional call now raises a
 `ComponentError` naming the component, the keyword-only rule and the
 declared props, with the call's `file:line`; see
-[`COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`](COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md).
+[`DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md#design-record-component-call-diagnostics-006506).
 (Originally: confirmed diagnostic-quality bug.)
 
 ### 6. `--near` behavior doesn't match its documented expectation
@@ -193,7 +193,7 @@ vocabulary simply doesn't currently provide the operation.
 
 **Status:** addressed in `0.06503` -- `Action.set`/`Action.append` now accept
 `Bind("name")` as their `value`; see
-[`ACTION-VALUE-FROM-STATE-PROPOSAL.md`](ACTION-VALUE-FROM-STATE-PROPOSAL.md).
+[`DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md#design-record-bind-as-an-action-argument-006503).
 (Originally: deliberate current capability gap.)
 
 ### 8. No general-purpose arbitrary expression layer
@@ -488,7 +488,7 @@ does, wherever practical.
 **Status:** partly addressed in `0.06506` -- the positional-call boundary
 (#5) and the `props=`-vs-render-function-signature boundary now raise
 `ComponentError` before Python's own `TypeError` can surface; see
-[`COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`](COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md).
+[`DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md#design-record-component-call-diagnostics-006506).
 Other boundaries (built-in components, errors raised inside a render
 function's own body) are unchanged. (Originally: validation-boundary
 weakness.)

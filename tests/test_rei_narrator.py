@@ -1,5 +1,5 @@
 """Tests for the Rei compiler narrator (`--narrate`), `v0.065` --
-see docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md and
+see docs/Foundational/DESIGN-NOTES.md and
 docs/version history/v0.065.md.
 """
 

@@ -21,8 +21,8 @@ proposal's own §3 ("Fit with ARKlight's doctrine") already frames this
 as easier fail-loudly enforcement for a language ARKlight owns than
 for Python's `loader.py`; the maintainer's 2026-09-21 acceptance turns
 that from a playground exploration into a real missing capability
-being closed, the same shape `ACTION-VALUE-FROM-STATE-PROPOSAL.md`
-(issue-register #7) and `PROVIDER-SDK-ADDENDUM.md` already are.
+being closed, the same shape the `Bind`-as-action-argument fix
+(issue-register #7, `docs/Foundational/DESIGN-NOTES.md`) and `PROVIDER-SDK-ADDENDUM.md` already are.
 
 ## Scope filter: what's in this ladder, and what isn't
 

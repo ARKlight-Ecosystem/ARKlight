@@ -3,7 +3,7 @@
 existing `arklight search` subcommand (`arklight/cli/search.py`,
 wired in `arklight/cli/main.py`).
 
-Accepted from `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md`,
+Accepted from `docs/Foundational/DESIGN-NOTES.md`,
 shipped `v0.064` (see `docs/version history/v0.064.md`). Read this
 module alongside that proposal -- section numbers referenced below
 (`SS3`, `SS4.3`, ...) point back to it.
@@ -266,7 +266,7 @@ def _docs_root() -> Path:
     if not root.is_dir():
         raise DocRetrievalError(
             "docs/ not found. --retrieve-doc reads files already in the "
-            "repo (see docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md "
+            "repo (see docs/Foundational/DESIGN-NOTES.md "
             "section 1), so it only works from an ARKlight source "
             "checkout, not an installed package."
         )

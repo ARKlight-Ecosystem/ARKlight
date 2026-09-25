@@ -369,7 +369,8 @@ Checked against `docs/README.md`'s philosophy list and
   include-vs-use questions from the prior draft no longer apply in the
   same way, since `errhanlib.ARKlight` now binds names (`Try`, `Log`)
   the ordinary way `stdlib.ARKlight` does.
-- **`REI-COMPILER-NARRATOR-PROPOSAL.md`, `PROJECT-KNOWELEDGE-PROPOSAL.md`:**
+- **The Rei compiler narrator record in `docs/Foundational/DESIGN-NOTES.md`,
+  `PROJECT-KNOWELEDGE-PROPOSAL.md`:**
   possible consumers of a handler's messages (open question 7).
 - **`PLATFORM-API-IR-PROPOSAL.md`:** the backend-specific-libs
   direction overlaps `errhanlib`'s naming convention (open question

@@ -97,7 +97,7 @@ CONFIG_FILENAME = "arklight.config.py"
 # override relationship `--max-width`/`--bg`/etc. already have with
 # `Site(...)` kwargs. Missing key or missing section both mean
 # `"plain"` (today's unnamed default) -- this is opt-in end to end.
-# See docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md.
+# See docs/Foundational/DESIGN-NOTES.md.
 #
 # "overdrive" is the one top-level *flag* rather than a section: a bare
 # `"overdrive": True` line. Read by `arklight.compiler.pipeline.build()`
