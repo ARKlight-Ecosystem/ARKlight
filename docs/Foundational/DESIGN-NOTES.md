@@ -2071,3 +2071,978 @@ location and reason, before any file is written. That tighter feedback
 loop (validate against a precise error vs. "does this look right in a
 browser") is a real, mechanism-level advantage for AI-assisted
 iteration, independent of Python's general popularity.
+
+---
+
+## Graduated proposal design records
+
+Design records of proposals that were accepted and fully shipped, moved here
+from `docs/Proposals/` when those files were retired (per the graduation rule in
+`docs/Proposals/README.md`). Each is kept **as filed** -- only heading levels and
+relative link paths were adjusted -- because the reasoning, deliberate limits, and
+out-of-scope decisions are the part `CHANGELOG.md` and `docs/version history/` do
+not carry. The old filename is named in each entry so `grep -rn OLD-NAME .` still
+lands here. Behavior and usage live in `AUTHORING-GUIDE.md` and `CLI-REFERENCE.md`.
+
+
+### Design record: search retrieve-doc mode (v0.064)
+
+*Graduated from `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md`, retired in commit `1059df1`; recoverable with `git show 1059df1^:docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md`.*
+
+#### Status at graduation
+
+**Accepted -- shipped as `v0.064`; see `docs/version history/v0.064.md`.**
+Follows the format and conventions of
+[`docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](../Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md).
+The content below is left as filed -- it's the design record this
+proposal was accepted on -- and is not rewritten to reflect
+in-progress implementation detail; see the addendum above for the
+current landing order and status.
+
+**A version-number note, kept for history:** this proposal originally
+disclaimed targeting `v0.064` (the currently installed version at
+filing time was `0.062`, and `v0.064` was already reserved for JS
+vocabulary addendum stage 4). At acceptance, a maintainer chose to
+interleave this proposal into `v0.064` anyway rather than push every
+later reserved slot down by one -- the same "two pieces of work, one
+milestone" precedent `v0.041` already set. The JS vocabulary addendum
+stage 4 work `v0.064` was already reserved for is unaffected; the two
+are independent and simply share a slot. See §6.
+
+**Origin:** a request to add a way for `arklight search` to return
+project documentation -- starting from the doc tree's own index, and
+drilling into a specific folder and then a specific file from there --
+without leaving the terminal or knowing `docs/`'s folder layout by
+heart.
+
+#### TL;DR
+
+A new `--retrieve-doc` flag on the existing `arklight search`
+subcommand (`arklight/cli/search.py`, wired in `arklight/cli/main.py`)
+that switches `search` from component-schema lookup into **doc-tree
+retrieval** mode. Three flags, stackable, each narrowing the previous:
+
+```bash
+arklight search --retrieve-doc                        # docs/README.md (the root index)
+arklight search --retrieve-doc index                   # same as above, explicit
+arklight search --retrieve-doc --foundational           # docs/Foundational/README.md (that folder's index)
+arklight search --retrieve-doc --foundational --file architecture   # + docs/Foundational/ARCHITECTURE.md, appended
+```
+
+- No dir flag, no `--file` -> prints the **root** `docs/README.md`,
+  plus a short "how to go deeper" footer listing the available `--<dir>`
+  flags. This is the "readme plus extra how to get them" behavior.
+- A dir flag alone (`--foundational`, `--proposals`, etc.) -> prints
+  that folder's own `README.md` index, plus a footer listing the
+  `--file` names available inside it.
+- A dir flag **and** `--file NAME` -> prints the folder's index *and*
+  the named file's full contents, in one scrollable output, separated
+  by a rule -- "appended... and prints \[it\] in the terminal as
+  \[the\] output," per the request that prompted this.
+
+Nothing here touches the compiler, the IR, or generated output -- like
+`arklight search`'s existing component-lookup mode and
+`ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s `assistant` subcommand, this is
+a dev-time CLI convenience, entirely read-only over files already in
+the repo.
+
+#### 1. Why this belongs on `search`, not a new subcommand
+
+`arklight search <name>` is already ARKlight's "look something up
+without opening a file" command -- read-only reflection over
+`SCHEMA`, typo-tolerant ranking, no side effects unless `--accept` is
+passed (`arklight/cli/search.py`'s own module docstring). Doc
+retrieval is the same shape of task pointed at a different corpus:
+instead of `SCHEMA` (component names -> `NodeSpec`), it reflects over
+`docs/` (folder names -> `README.md` index -> individual files). Reusing
+`search` means:
+
+- One mental model ("`arklight search` is where I look things up"),
+  not two commands that both mean "find me something."
+- The existing `--limit`/typo-tolerant machinery
+  (`arklight.search.engine.default_engine()`) is *right there* to
+  reuse for "did you mean" on a mistyped `--file` value (§4.3) --
+  standing up a second, parallel fuzzy-matcher for docs would
+  duplicate what `_suggest()` already does for component names.
+- It matches the precedent `ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`
+  already set for *not* reflexively reaching for a new subcommand: that
+  proposal's `arklight assistant` is a genuinely different
+  interaction shape (an open-ended conversational session). Doc
+  retrieval isn't -- it's one deterministic lookup per invocation,
+  exactly like today's `arklight search Picture`, so it belongs next
+  to that, not next to `assistant`.
+
+This proposal is deliberately scoped narrower than
+`ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`: Raeliana (if built) answers
+open-ended questions by drawing from the doc tree and synthesizing;
+`--retrieve-doc` does no synthesis at all -- it prints exact,
+unmodified file contents, nothing invented, nothing summarized. The
+two are complementary, not competing: `--retrieve-doc` is a fast,
+deterministic "just show me the file" path that would remain useful
+even if `arklight assistant` is later built and accepted.
+
+#### 2. Command surface
+
+```bash
+arklight search --retrieve-doc
+arklight search --retrieve-doc index
+arklight search --retrieve-doc --foundational
+arklight search --retrieve-doc --proposals
+arklight search --retrieve-doc --foundational --file architecture
+arklight search --retrieve-doc --proposals --file url-state-as-primitive
+```
+
+- `--retrieve-doc` -- the mode switch. Mutually exclusive with the
+  existing `name` positional (component lookup) and `--serve`, the
+  same way `--serve` is already mutually exclusive with `name`
+  (`_cmd_search`'s existing check in `arklight/cli/main.py`). The only
+  positional value accepted alongside it is the literal `index` (§3),
+  reserved for future full-tree lookups (§7).
+- One **directory flag**, optional, choosing which lifecycle folder to
+  look in -- mutually exclusive with each other (`argparse`
+  `add_mutually_exclusive_group`), mirroring `docs/README.md`'s own
+  Folder Guide one-for-one:
+
+  | Flag | Folder |
+  | --- | --- |
+  | `--foundational` | `docs/Foundational/` |
+  | `--backends` | `docs/Backends/` |
+  | `--proposals` | `docs/Proposals/` |
+  | `--implementation` | `docs/Implementation/` |
+  | `--js-backend` | `docs/new js backend proposal/` (removed later, along with its folder) |
+  | `--far-future` | `docs/Far Future Concern/` |
+  | `--version-history` | `docs/version history/` |
+
+- `--file NAME`, optional, **requires** a directory flag (§4.4) --
+  selects one file inside that folder by its filename stem, matched
+  case-insensitively with spaces/hyphens/underscores normalized (so
+  `--file architecture`, `--file Architecture`, and
+  `--file ARCHITECTURE` all resolve to `ARCHITECTURE.md`; see §4.3 for
+  why this is a value flag and not one boolean flag per file).
+
+`--limit`, `--near`, and `--accept` are component-lookup-only flags
+and have no meaning here; passed alongside `--retrieve-doc` they print
+a short stderr notice that they were ignored, the same "explain what
+happened, don't silently drop it" posture `_cmd_search` already uses
+for `--accept` on a non-exact match.
+
+#### 3. Root retrieval: `--retrieve-doc` alone, or with `index`
+
+```
+$ arklight search --retrieve-doc
+```
+
+Prints `docs/README.md` verbatim, followed by a footer block:
+
+```
+---
+Go deeper with a folder flag:
+  --foundational      permanent design record (architecture, design notes, ...)
+  --backends          per-backend staging docs (desktop, android, neutralino, ...)
+  --proposals         unsettled proposals awaiting a decision
+  --implementation    staged implementation ladders for accepted proposals
+  --js-backend        competing new-JS-backend architecture proposals
+  --far-future        speculative/backlog backend material
+  --version-history   per-milestone shipped-feature summaries
+
+Then add --file NAME to print one file from that folder in full.
+Example: arklight search --retrieve-doc --foundational --file architecture
+```
+
+`arklight search --retrieve-doc index` is defined to be **identical**
+to the bare form above -- `index` is accepted as an explicit,
+self-documenting way to say "the root index," for scripts or muscle
+memory that prefer not to rely on an implicit default. Any other
+positional value alongside `--retrieve-doc` (without a dir flag) is
+rejected for now (§7 covers why this is deliberately left for a
+follow-up rather than accepted silently).
+
+#### 4. Folder retrieval: a directory flag, with or without `--file`
+
+##### 4.1 Directory flag alone
+
+```
+$ arklight search --retrieve-doc --foundational
+```
+
+Prints that folder's own `README.md` (`docs/Foundational/README.md`)
+verbatim -- every lifecycle folder in `docs/` already has one, per
+`docs/README.md`'s Folder Guide ("Each subfolder now has its own
+`README.md` with a fuller overview and index"), so this needs no new
+content, only a lookup table from flag to path. Followed by the same
+kind of footer as §3, scoped to that folder's own files:
+
+```
+---
+Files in docs/Foundational/ (use --file NAME):
+  architecture              High-level system design: parsing, IR, backend rendering.
+  configurability           The "reachability rule" for constant -> kwarg/CLI-flag growth.
+  deployment-cli             The arklight CLI: build/deploy workflows and commands.
+  design-notes               Rationale and trade-offs behind key design decisions.
+  experimental-apis          Unstable/opt-in APIs and their stability guarantees.
+  system-design-agreements   The "compiler first, runtime last" design agreement.
+  user-defined-components    User-defined components: props, styling, registry modes.
+```
+
+The right-hand descriptions are the same "Covers" column text already
+in each folder's `README.md` index table -- reused, not
+re-authored, so there is exactly one place (the `README.md` itself)
+that has to stay accurate, matching the "every fact should live in
+exactly one of them" rule `docs/README.md`'s "Adding a new doc"
+section already states for the doc tree generally.
+
+##### 4.2 Directory flag + `--file`
+
+```
+$ arklight search --retrieve-doc --foundational --file architecture
+```
+
+Prints `docs/Foundational/README.md`, then a visual separator, then
+the full contents of `docs/Foundational/ARCHITECTURE.md` -- both to
+stdout, in one output, in that order:
+
+```
+<... docs/Foundational/README.md contents ...>
+
+================================================================================
+docs/Foundational/ARCHITECTURE.md
+================================================================================
+
+<... docs/Foundational/ARCHITECTURE.md contents ...>
+```
+
+No footer after the file body -- once a specific file has been
+printed, there's nothing further to "go deeper" into; the person has
+what they asked for. (Whether a file that itself links to others, like
+`ARCHITECTURE.md`'s cross-references, should surface those links as
+suggested next `--file` values is an open question, §7.)
+
+##### 4.3 Why `--file NAME` is one value flag, not one boolean flag per file
+
+The request that prompted this proposal used `--architecture` as the
+example spelling. That reads naturally for one file, but doesn't scale
+as written: `docs/Foundational/` alone has seven files, and the full
+tree (§2's table) has more than thirty non-`README.md` files today,
+growing every time a proposal is accepted and graduates into
+`Implementation/` or `Foundational/`. A dedicated boolean per file
+means every new doc file requires an `argparse` change in
+`arklight/cli/main.py` just to become reachable -- the same "grows
+without bound" problem `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`
+flags for other unbounded catalogs. `--file NAME` is the one-flag
+equivalent of the same idea: the *directory* flags stay as named
+booleans because that set is small and stable (it's the lifecycle
+folder list, which changes rarely and deliberately, per
+`docs/README.md`'s own Folder Guide), while the *file* selector inside
+a folder stays a value flag because that set is neither small nor
+stable.
+
+##### 4.4 Why `--file` requires a directory flag
+
+Filenames are not guaranteed unique across folders forever (nothing
+stops two future docs in different folders from both being named, say,
+`DESIGN-NOTES.md`), and resolving `--file` against the whole tree
+without a folder to scope it to would mean silently picking one on a
+collision -- exactly the kind of implicit, unannounced tie-break this
+project's "fail loudly, stay inspectable" posture
+(`docs/README.md`'s Philosophy section) argues against. `--file`
+without a preceding directory flag is a hard error:
+
+```
+$ arklight search --retrieve-doc --file architecture
+arklight search: --file requires a folder flag (--foundational, --proposals, ...). ARCHITECTURE.md lives in docs/Foundational/ -- try --foundational --file architecture.
+```
+
+The error message names the folder(s) a case-insensitive match for
+`NAME` was actually found in (reusing the same lookup table `--file`
+itself resolves against), so the fix is one copy-paste away rather
+than a guessing game.
+
+#### 5. Relationship to the existing typo-tolerant search pipeline
+
+`arklight search <name>`'s component lookup already falls back to
+`SearchEngine.search()` (retrieval -> structural importance ->
+ranking) on a miss, rather than a hard error
+(`arklight/cli/search.py`'s `_suggest`). This proposal's MVP (§6, stage
+1) keeps doc-name matching deliberately simpler -- exact,
+case-insensitive, punctuation-normalized stem matching only, per §4 --
+but an unmatched `--file` value should still fail the same way
+component lookup does: not a bare "not found," but a short
+"did you mean" list, computed with plain string-similarity
+(`difflib.get_close_matches` against that folder's filename stems) as
+a starting point. Whether to eventually route this through the same
+`SearchEngine` component-ranking pipeline `_suggest()` already uses
+(so a typo in a doc name benefits from the same structural-importance
+signal a typo in a component name does) is left as a possible later
+refinement, not required for an initial landing -- see §7.
+
+#### 6. Scope
+
+##### In scope (this proposal)
+
+- The `--retrieve-doc` mode switch on `arklight search`, mutually
+  exclusive with `name` (except the literal `index`) and `--serve`.
+- Root retrieval: bare `--retrieve-doc` / `--retrieve-doc index` ->
+  `docs/README.md` + footer (§3).
+- The seven directory flags in §2's table, one per existing lifecycle
+  folder, each printing that folder's own `README.md` + a
+  files-available footer when given alone (§4.1).
+- `--file NAME`, scoped to a preceding directory flag, appending one
+  file's full contents after the folder index (§4.2), with the
+  matching rules and error behavior in §4.3-4.4.
+- A basic "did you mean" fallback on an unmatched `--file` value (§5),
+  scoped to `difflib`-level matching for this stage.
+- Root `README.md`'s CLI section and `docs/Foundational/DEPLOYMENT-CLI.md`
+  updated to document the new flags, following the existing
+  `arklight search` entry's format.
+
+##### Explicitly out of scope for this proposal
+
+- **Routing `--file` typo suggestions through `SearchEngine`'s full
+  ranking pipeline** (structural importance, usage history) rather
+  than plain `difflib` -- a possible follow-up once the simpler
+  version has shipped and it's clear the extra machinery is worth it
+  for a corpus this much smaller than the component schema (§5, §7).
+- **Full-tree retrieval by file name alone, without a directory
+  flag** -- i.e. `arklight search --retrieve-doc architecture`
+  resolving `ARCHITECTURE.md` by searching every folder. Deferred to
+  §7 pending a decision on collision handling once/if filenames ever
+  do collide across folders.
+- **Synthesis, summarization, or Q&A over doc contents.** This
+  proposal only ever prints exact, unmodified file bytes -- anything
+  resembling "answer my question by drawing from multiple docs" is
+  `ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s territory (§1), not this
+  proposal's.
+- **Any change to `arklight build`'s output, the IR, or anything
+  shipped to a visitor's browser.** Same as
+  `ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md` §5: exclusively a
+  developer-facing CLI convenience, no interaction with "the browser
+  never executes Python" / "no eval" (`docs/README.md`'s Philosophy
+  section), since nothing here ships to compiled output.
+- **A frozen version number at filing time.** As noted in Status
+  originally, this proposal did not reserve `v0.064` or any other slot
+  when filed -- that was a maintainer decision made at acceptance
+  time, which assigned it `v0.064`, interleaved with the JS vocabulary
+  addendum stage already reserved there, per the updated Status note
+  above.
+
+#### 7. Open questions for a maintainer
+
+- **Full-tree lookup without a directory flag** (§6, out of scope for
+  this stage): once filenames are unique enough in practice to make
+  this safe, is a bare `arklight search --retrieve-doc <file-stem>`
+  (no dir flag) worth adding as a shortcut, with the current
+  dir-flag-required form staying available for the explicit/scripted
+  case? This proposal leans toward "yes, as a stage-2 follow-up" but
+  takes no final position.
+- **Should a printed file's own cross-references become suggested
+  next `--file` values** (§4.2's parenthetical) -- e.g. after printing
+  `ARCHITECTURE.md`, noting "this file also links to `DESIGN-NOTES.md`,
+  try `--file design-notes`"? Would need a lightweight
+  markdown-link-to-sibling-file scan, not full link resolution.
+- **Should `--retrieve-doc` output go through a pager** (like `less`)
+  when stdout is a TTY, the way `git log`/`git diff` do, given some of
+  these files (e.g. `CHANGELOG.md`-adjacent ones) are long? This
+  proposal assumes plain `print()` to stdout for the first landing,
+  consistent with every other `arklight search` output today, but
+  flags pager support as a nice-to-have rather than deciding it here.
+- **Root `README.md` and `CHANGELOG.md`/`PROGRESS.md` retrieval** --
+  should a folder-flag-equivalent exist for the three files that live
+  at the repo root rather than under `docs/` (e.g. `--changelog`,
+  `--progress`, or treating `--retrieve-doc` with no dir flag as
+  already covering `README.md` per §3, but leaving `CHANGELOG.md`/
+  `PROGRESS.md` unreachable through this flag entirely)? This proposal
+  takes no position and leaves it for a maintainer to decide alongside
+  acceptance.
+
+
+### Design record: Rei compiler narrator (v0.065)
+
+*Graduated from `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`, retired in commit `1059df1`; recoverable with `git show 1059df1^:docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`.*
+
+#### Status at graduation
+
+**Accepted -- interleaved into `v0.065`'s milestone slot as a third
+piece of work, alongside JS vocabulary addendum stage 5 and
+`Provider` stage 1 of 6. Shipped as `0.06510` -- see
+[`docs/version history/v0.065.md`](<../version history/v0.065.md>).**
+
+**A version-number note, kept for history:** at filing time, `v0.065`
+was already the shared slot for two accepted, staged pieces of work
+(JS vocabulary addendum stage 5 and `Provider` stage 1 of 6 -- see
+`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`). A maintainer chose to
+interleave this proposal into `v0.065` as a third piece rather than
+push every later reserved slot down by one. This is the same
+precedent `v0.041` set (CLI/pipeline hardening + two JS vocabulary
+addenda sharing one slot) and `v0.064` repeated (`--retrieve-doc` +
+JS vocabulary addendum stage 4) -- see
+`docs/Foundational/DESIGN-NOTES.md`'s own version-number
+note for that instance. `v0.065`'s other two pieces of work are
+unaffected; all three are independent and simply share a milestone
+number.
+
+**Origin and scope note:** an earlier draft of this idea (not filed
+in this repo) sketched a much larger system -- a structured compiler
+event bus, a formal diagnostic redesign, multiple output modes
+(`--explain`, `--explain=verbose`, `--trace`, `--log=shadow`), an
+`arklight explain <event-id>` subcommand, IDE integration, and a
+seven-stage rollout. At acceptance, a maintainer deliberately
+narrowed that down to what's described below: **one CLI flag and one
+config line, nothing else.** Anything from the earlier draft not
+mentioned in this document (the event schema, a diagnostic-object
+redesign, `--trace`, `arklight explain <id>`, IDE integration) is
+**not** part of this proposal. Revisiting any of that later needs its
+own proposal filed on its own merits, not an assumed extension of
+this one.
+
+#### TL;DR
+
+A new `--narrate` flag on `arklight build`, sibling to the existing
+`--verbose`/`--debug` (`docs/Foundational/CLI-REFERENCE.md`). Instead
+of `--verbose`'s `[ARKlight] ...` stage lines, `--narrate` prints the
+same pipeline progress as short natural-language sentences, in the
+voice of **Rei**, ARKlight's compiler narrator. A new `rei` section in
+`arklight.config.py` lets a project pin its own default log mode
+(`plain` / `verbose` / `narrate`) so a team doesn't have to type the
+flag on every invocation. On a schema violation specifically (an
+unknown component type or a prop-shape mismatch), Rei's narration of
+the failure appends one fixed line pointing at the real tool that
+already resolves it -- `arklight search <name>` -- the same
+"terse diagnostic plus a pointer to a real tool" pattern `rustc`
+already uses (`try `rustc --explain E0308``), not a hint she invents
+on the spot (§5). That's the entire feature.
+
+```bash
+arklight build site.py --narrate
+```
+
+```python
+# arklight.config.py
+CONFIG = {
+    "rei": {
+        "default_mode": "narrate",   # "plain" (default) | "verbose" | "narrate"
+    },
+}
+```
+
+#### 1. CLI surface
+
+- `--narrate` -- opt-in, off by default, exactly like `--verbose`.
+  Mutually exclusive with `--verbose`/`--debug`: at most one log mode
+  wins per invocation, following the same "last flag on the command
+  line wins, no silent stacking" rule `docs/Foundational/CLI-REFERENCE.md`
+  already documents for `--open`/`--no-open`.
+- Narrates the same stage boundaries `--verbose` already prints
+  (discovery, component expansion, normalization, validation, IR
+  build, each backend's render/postprocess, `raw_postprocess`
+  functions, writing files, copying assets) -- no new stages, no new
+  compiler hooks. `--narrate` is a second renderer over the exact
+  same stage-completion calls `--verbose` already makes in
+  `arklight/cli/main.py`'s build path, not a parallel instrumentation
+  pass.
+- Experimental-feature warnings and alpha-limitation warnings
+  (`CLI-REFERENCE.md`'s "Two more things print unconditionally"
+  section) are unaffected -- they print exactly as they do today,
+  regardless of log mode.
+
+#### 2. Config surface
+
+A new `rei` section, added to `arklight/config.py`'s `_KNOWN_SECTIONS`
+the same way `live_streaming`/`android`/`desktop` already work (one
+line in the schema set, plus whatever module reads it -- see that
+module's own docstring on why the schema stays this small and flat):
+
+```python
+CONFIG = {
+    "rei": {
+        "default_mode": "narrate",
+    },
+}
+```
+
+- `default_mode` -- one of `"plain"` (the current, unnamed default
+  behavior), `"verbose"`, or `"narrate"`. Sets what a bare
+  `arklight build` does for this project without a flag.
+- A CLI flag (`--verbose` or `--narrate`) always overrides the config
+  default for that one invocation -- the config only changes what
+  happens when *no* log-mode flag is passed, the same override
+  relationship `--max-width`/`--bg`/etc. already have with
+  `Site(...)` kwargs.
+- No key means `"plain"` -- a project with no `arklight.config.py`,
+  or one with no `rei` section, is completely unaffected. This is an
+  opt-in feature end to end: absent from the CLI, absent from config,
+  nothing changes.
+
+#### 3. First-compile introduction
+
+When `--narrate` is active (via flag or config default) **and** the
+build's output directory either doesn't exist yet or exists but is
+empty, Rei prints a short introduction and a summary of the active
+`rei` config (source: flag or config-file default, and the resolved
+`default_mode`) before the first narrated stage line. This is a
+one-time-per-fresh-output-directory banner, not a one-time-ever
+banner -- deleting or clearing the output directory and rebuilding
+shows it again, the same "detect a fresh build from the output
+directory's state" signal the rest of the pipeline already has
+available (it already knows whether it's writing into an existing
+tree). On every build after that first one for a given output
+directory, Rei skips the introduction and narrates stages directly.
+
+#### 4. Implementation approach
+
+Rei is a **pure-Python, deterministic pattern renderer** -- no JSON,
+no config files of her own, no network access, and no LLM. Given the
+same stage-completion call, she produces the same sentence, every
+time; this is a design requirement, not an incidental property, since
+`--narrate` output should be as reproducible as `--verbose` output
+already is.
+
+**ELIZA as a studied reference, not a dependency.** The classic ELIZA
+pattern-matching technique (keyword/pattern -> templated response,
+no understanding, no model) is the right shape for this problem: Rei
+never needs to understand a build, only to describe a small, closed
+set of known stage-completion events in varied natural-language
+phrasing. A reference ELIZA implementation is vendored into the repo
+*for study purposes only* -- read as a design reference for how a
+minimal pattern/template engine is structured, then set aside. Rei's
+actual renderer is an original, custom implementation purpose-built
+for compiler stage events (which are structured data, not free text),
+not a reuse or adaptation of ELIZA's script-transformation code
+itself. Unlike Raeliana (which reads/serializes structured doc-index
+data), Rei has no need for JSON or any other serialized data format
+at all -- her stage-to-sentence mapping is plain Python data
+(dicts/lists of template strings) living in the module that renders
+her, which is sufficient for a closed, small vocabulary of build
+stages and keeps her free of any runtime dependency beyond the
+standard library.
+
+#### 5. On a schema violation, point to `arklight search <name>`
+
+When a build narrated with `--narrate` fails on a `ValidationError`
+that names a specific component type against
+`arklight.ir.schema.SCHEMA` -- either an unrecognized type
+(`"Unknown component type 'Pciture' at ..."`,
+`arklight/ir/validate.py`'s two `SCHEMA.get(node.type) is None`
+sites) or a known type with a prop-shape violation (e.g. a missing
+required prop) -- Rei's narration of that failure appends one fixed
+line naming the exact, already-existing tool that resolves it:
+
+```
+[Rei] Compilation halted.
+
+[Rei] Unknown component type 'Pciture' at pages/home.py:12.
+
+Try: arklight search Pciture
+```
+
+`arklight search <name>` (`arklight/cli/search.py`) already does
+the real work here -- exact lookup against `SCHEMA` on a hit, and
+the existing typo-tolerant ranking pipeline
+(`arklight.search.engine`) on a miss, which is precisely the "does
+`Picture` take `sources=` or `srcs=`" job that module's own
+docstring describes. Rei does not re-implement, call into, or wrap
+that pipeline herself -- she has no typo-correction logic of her own
+and never guesses a corrected name. The line she prints is a fixed
+template with the *literal* offending name substituted in, taken
+directly from the same `node.type` (or component name) the
+`ValidationError` already carries -- the same "explain compiler
+facts, never invent them" boundary the rest of this proposal holds
+her to (§4's determinism requirement, and the original concept
+sketch's "Rei may not invent" rule this proposal inherits). Compare
+`rustc`'s own pattern: a terse diagnostic plus a fixed
+`For more information about this error, try `rustc --explain E0308`.`
+line -- a pointer to a real tool, not an explanation generated on
+the spot.
+
+**This is not Rei becoming a conversational assistant.** She prints
+exactly one line, once, using the error's own data; she does not run
+`arklight search` for the user, does not show its output inline, does
+not answer "why is this wrong," and takes no follow-up input. That
+boundary is deliberate and matches this document's own §6 scope
+limits below.
+
+**Scope of this pointer, deliberately narrow:** only the SCHEMA-backed
+errors above. Validation failures against a *different* registry --
+unknown `on_click`/`Action.*` name, an undeclared `Bind`/`State`
+target, an unknown modifier -- are not schema-lookup problems, and
+`arklight search` doesn't cover them (it reflects `SCHEMA` only, not
+`ACTION_REGISTRY`/`BEHAVIOR_REGISTRY`/`PREDICATE_REGISTRY`/
+`DERIVATION_REGISTRY`). Rei narrates those failures the same way §3-
+§4 already describe, with no tool pointer appended, rather than
+printing a command that wouldn't actually help. Extending
+`arklight search` itself (or adding an equivalent lookup) to cover
+those other registries, so a future version of this pointer could
+cover them too, is explicitly out of scope for this proposal -- see
+§7.
+
+Also out of scope, for a different reason: `DuplicateComponentError`/
+`DuplicateStyleNameError` (`arklight.ir.components`/`arklight.api`,
+raised by `register_component`/`register_backend_render`/
+`Site.style(...)` on a same-name re-registration without
+`allow_redefine=True`). These aren't `ValidationError`s at all, and
+they aren't raised from `arklight/ir/validate.py` -- they fire while
+the site file's own `component(...)`/`site.style(...)` calls run, which
+is *inside* the pipeline's first ("Discovering site...") stage, not
+before it. `load_site` re-raises any exception from running the site
+file as `SiteLoadError`, which the pipeline turns into a
+`CompileError`, so this is an ordinary build failure, not a raw Python
+traceback. Under `--narrate` it is therefore narrated like any other
+build failure: that stage's line, then `[Rei] Compilation halted.` and
+the error text, with no `arklight search` pointer (there is no
+`component_name` on it). *Correction, made when `v0.065` shipped: this
+paragraph originally claimed such a build "never gets far enough for
+`--narrate` to say anything" and "is a plain Python traceback"; that
+was wrong about where in the pipeline these errors fire.* Giving
+import-time errors their own bespoke narrated treatment, or a pointer,
+is still not part of this proposal -- that would be its own proposal,
+not an implicit extension of §5.
+
+#### 6. Relationship to Raeliana and Miko
+
+Unchanged from the original concept sketch's separation, restated
+briefly since both those assistants are discussed in
+`docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`:
+
+- **Raeliana** -- read-only, doc-grounded question answering. Not
+  authorized for implementation yet (see that proposal's own status).
+- **Miko** -- exploratory, tool-mediated conversation. Staged as
+  `v0.079`, not yet built.
+- **Rei** -- doesn't converse, isn't asked anything, and isn't
+  invoked by name at all from the CLI (`--narrate`/`--verbose` are
+  the actual flags; "Rei" is the voice behind `--narrate`'s output,
+  the same relationship `docs/README.md`'s Philosophy section has to
+  the project as a whole). No shared code, no shared trust model, no
+  dependency between any of the three.
+
+#### 7. Explicitly out of scope
+
+Everything the earlier, unfiled draft described beyond §1-§5 above:
+a structured compiler event bus or event-ID scheme, a diagnostic
+object redesign, `--trace` / machine-readable event output, a
+`--plain` sub-mode of `--narrate` (there is exactly one narrate
+style; a plainer alternative is just `--verbose` or no flag), an
+`arklight explain <event-id>` subcommand, IDE integration, and any
+notion of multiple narrator personalities. Also out of scope: any
+tool pointer beyond §5's single, fixed
+`Try: arklight search <name>` line -- no pointers for
+action/behavior/predicate/derivation-registry errors (§5's own scope
+note), no other suggested commands for any other failure category,
+and no extension of `arklight search` itself to cover those other
+registries (that would be its own proposal, on its own merits). None
+of this is committed. If any of it is wanted later, it needs its own
+proposal, filed and accepted on its own terms -- not treated as an
+implicit stage 2 of this one.
+
+#### 8. Open questions for a maintainer
+
+- Exact wording/tone for each stage's narrated sentence(s) -- left to
+  implementation, not fixed by this proposal.
+- Whether `--narrate` should also cover `arklight pack`/`unpack`/
+  `pwa`/`android`/`desktop`'s own build-adjacent output, or stay
+  scoped to `arklight build` only for this first landing. This
+  proposal assumes `arklight build`-only and leaves the rest for a
+  future follow-up.
+
+
+### Design record: Bind as an action argument (0.06503)
+
+*Graduated from `docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`, retired in commit `1059df1`; recoverable with `git show 1059df1^:docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`.*
+
+#### Status at graduation
+
+Implemented, alpha (`0.06503`). Out-of-band, numbered capability fix per
+`docs/Foundational/V1-DEFINITION.md`'s "Issue triage during Alpha"
+section -- not a broken promise but a missing one, so it doesn't wait for
+whichever milestone is already in flight. Traces to
+[`ARKlight-ISSUE-REGISTER.md`](../Proposals/ARKlight-ISSUE-REGISTER.md) #7.
+
+#### The missing capability
+
+The vocabulary can bind an input to state (`bind_value=Bind.model(...)`,
+`vdom-6`) and can append to a list (`Action.append(name, value)`), but
+`value` was a compile-time literal. Nothing said "pass whatever this state
+holds *right now* as the argument," so the conventional
+`[type a task] [Add]` control wasn't expressible; the Focus Board
+application fell back to quick-add buttons.
+
+`Bind`'s own docstring already promises the reading ("reference a
+`State(...)` value from wherever a literal value is accepted"). An action
+argument is such a place -- and it was the one that failed worst:
+`Action.append("tasks", Bind("draft"))` passed Validation and then died in
+the HTML backend with a raw `TypeError: Object of type ARKNode is not JSON
+serializable`.
+
+#### Design
+
+**Spelling.** `Bind("draft")` in an argument position. No new public name.
+
+```python
+State("draft", "")
+State("tasks", [])
+Input(bind_value=Bind.model("draft"))
+Button("Add", on_click=Action.append("tasks", Bind("draft")))
+Watch("tasks", then=Action.reset("draft"))     # clear the input after adding
+Repeat("tasks", template=lambda: Text(RepeatItem.value()))
+```
+
+The clear-after-add step needs no new construct: `Watch(...)` (`vdom-5`)
+already reuses the action dispatcher, and `renderModelBindings` already
+syncs state back into the input.
+
+**Wire shape.** `Action.*` converts the `Bind` at construction into the
+plain JSON object `{"__state__": "<name>"}`. A plain dict, not a
+dataclass, because a dataclass nested in `ActionRef.args` is flattened by
+`dataclasses.asdict` during `.arklight` encoding and loses its type tag
+(the documented `ItemIndexRef` gap in `arklight/ir/binary.py`). A dict
+survives that round trip, `json.dumps` in every serialization site (HTML
+`data-ark-action-args`, the `data-ark-watch` blob, `Repeat` template
+specs) and needs no per-backend translation. `__state__` is a reserved key.
+
+**Resolution.** At dispatch time, in the browser:
+`arklight/backend/js/runtime/action_args.py` swaps each marker for
+`store.get(name)` and passes the action fragment a plain args object -- so
+`set`/`append` are unchanged and no fragment learns markers exist. Dispatch
+time means a `.debounce(...)`d click reads the value when the action
+*runs*. The resolver returns a new object because a `Watch(...)`'s parsed
+args live for the whole page. It is inlined (one shared source string)
+into both `wireClickInterceptor` and `wireWatchers` rather than shipped as
+a third top-level function, so each fragment stays self-contained.
+No eval, no `new Function`: the name is only ever a store key.
+
+**Validation** (`_validate_action_args`), all build-time:
+
+- the argument must be opted in by `ActionSpec.state_args` -- today only
+  `set` and `append`, `value`. `increment`/`decrement`'s `delta` and
+  `remove`'s `index` are refused: an input-bound *string* would silently
+  concatenate (`0 + "5"` -> `"05"`) or, for `remove`'s strict `!==`,
+  silently match nothing;
+- the marker must be exactly `{"__state__": <non-empty str>}`; a literal
+  dict carrying the reserved key is refused rather than misread;
+- the name must be a `State(...)` or `Computed(...)` declared on the page.
+  Reading a `Computed` is fine; it is still never an action *target*;
+- a leftover `Bind` node in args (an `ActionRef` built by hand) gets a
+  pointed error instead of the old raw `TypeError`.
+
+**Component-owned state.** `_rewrite_component_state_refs` renames markers
+in action args together with the action's target, so a component's local
+`draft` and `items` move to their namespaced page keys as a pair.
+
+#### Known limits (deliberate)
+
+- `Bind.model("draft", debounce=300)` delays the write-back into state, so
+  a click inside that window reads the *previous* value. Don't debounce
+  the input a submit button reads from.
+- Values from an `Input` are strings. That is why numeric actions are not
+  opted in.
+- Only top-level argument values are read; `Bind` nested inside a list or
+  dict argument is not resolved.
+- No Enter-to-submit. Keyboard events are outside this fix.
+- Not `Action.set_from_input` (`DESIGN-NOTES.md`): that was about binding
+  state to `input`/`change` events, which `bind_value=` already covers.
+
+#### Tests
+
+`tests/test_action_value_from_state.py`: API conversion, every validation
+rule above, HTML/`Watch`/`Repeat` serialization, `.arklight` round trip,
+component-state renaming, `arklight search` output, and two Node-driven
+tests that run the real `WIRE_WATCHERS_JS` and `CLICK_INTERCEPTOR_JS`
+(each fails if resolution is disabled). Also checked once by hand against
+jsdom with a full build: add, add again, input cleared, debounced click.
+
+
+### Design record: CSP origin injection fix (0.06504)
+
+*Graduated from `docs/Proposals/CSP-TRUSTED-ORIGIN-INJECTION-BUGFIX.md`, retired in commit `1059df1`; recoverable with `git show 1059df1^:docs/Proposals/CSP-TRUSTED-ORIGIN-INJECTION-BUGFIX.md`.*
+
+#### Status at graduation
+
+Implemented, alpha. Out-of-band, numbered bug fix per
+`docs/Foundational/V1-DEFINITION.md`'s "Issue triage during Alpha"
+section -- a broken contract, not a missing feature, so it doesn't
+wait for whichever milestone is already in flight.
+
+#### The broken contract
+
+`arklight/backend/html/csp.py` exists to give every ARKlight-built
+site a strict `script-src` -- no `'unsafe-eval'`, no `'unsafe-inline'`
+-- and says so directly, twice: in the module's own docstring, and
+again in `arklight/api.py`'s `Site.__init__`, where the comment above
+`trusted_script_origins` states "there's no kwarg that reintroduces
+`'unsafe-eval'` or `'unsafe-inline'`."
+
+That promise wasn't kept. `_render_csp_meta_tag` (`csp.py`) splices
+every `trusted_script_origins` entry verbatim, space-separated,
+straight into the `script-src` directive's value. The only validation
+`Site.__init__` did (`api.py`) was "non-empty string" -- nothing
+checked *what* the string contained. Two ways that let the promise
+break, both confirmed with a direct repro against `_render_csp_meta_tag`
+before the fix:
+
+- `Site(trusted_script_origins=["'unsafe-inline'"])` put
+  `'unsafe-inline'` straight into `script-src`, silently undoing the
+  entire guarantee this module exists to provide.
+- `Site(trusted_script_origins=["https://cdn.example.com; frame-ancestors *"])`
+  used the `;` to close `script-src` early and open a brand-new
+  `frame-ancestors` directive -- a directive this kwarg was never
+  supposed to be able to add at all.
+
+#### Stage 1 -- root cause + fix (this patch)
+
+`Site.__init__` (`arklight/api.py`) now rejects, at `Site()`
+construction, any `trusted_script_origins` entry that:
+
+- contains whitespace or a `;` (either splits one entry into what
+  renders as multiple `script-src` sources, or terminates the
+  directive early and injects an unrelated one), or
+- is `'unsafe-inline'`/`'unsafe-eval'` (quoted or not), the two
+  keywords this kwarg's own documented contract says can never reach
+  `script-src`.
+
+This is a build-time `ValueError`, per this project's fails-loudly-at-
+build-time-or-not-at-all rule (`docs/README.md`'s Philosophy section)
+-- the bad value is caught at `Site()` construction, not discovered
+later as a weakened policy in a real browser. `csp.py` itself is
+unchanged: the fix is entirely "never let a bad value reach it" rather
+than "sanitize it on the way out," so every existing caller that only
+ever passed clean origins sees no behavior change.
+
+#### Stage 2 -- regression tests (this patch)
+
+`tests/test_csp.py` gained five tests: the two injection repros above,
+a bare-whitespace two-origins-in-one-string case, and a
+same-list-of-clean-origins case confirming the fix doesn't reject
+anything legitimate. Full suite: 1502 -> 1507 passing, no existing
+test's behavior changed.
+
+#### Stage 3 -- changelog / version-history entry
+
+Not included in this patch -- left for whoever cuts the next numbered
+release to fold in alongside its own entry, per this project's
+one-entry-per-shipped-version convention (`docs/version history/`,
+`CHANGELOG.md`).
+
+
+### Design record: component call diagnostics (0.06506)
+
+*Graduated from `docs/Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`, retired in commit `1059df1`; recoverable with `git show 1059df1^:docs/Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`.*
+
+#### Status at graduation
+
+Implemented, alpha (`0.06506`). Out-of-band, numbered capability fix per
+`docs/Foundational/V1-DEFINITION.md`'s "Issue triage during Alpha"
+section, the same slot-sharing precedent as `0.0650`-`0.06505`; the
+roadmap's `v0.065` is untouched. Traces to
+[`ARKlight-ISSUE-REGISTER.md`](../Proposals/ARKlight-ISSUE-REGISTER.md) #5 (positional
+component errors leak a raw `TypeError`) and #32 (component API
+diagnostics aren't consistently compiler-native). Not a broken promise
+but a missing one: `@component`'s own docstring already says a misused
+component "fails the build with a clear message instead of a raw Python
+`TypeError`", and two boundaries didn't keep it.
+
+#### The gap
+
+`@component` checks props against the `props=` contract at *expansion*
+time (`_resolve_props`), and that check is compiler-quality:
+`ComponentError` naming the component, the unexpected or missing prop and
+the declared ones. But Python gets to a call first, in two places:
+
+1. **The call site.** A component's call-site marker was declared
+   `marker(**call_props)`, so `Stat("a", "b")` never reached ARKlight's
+   own checks. Python refused it with `Stat() takes 0 positional
+   arguments but 2 were given`: true about Python, silent about the
+   actual rule (props are keyword-only) and about what `Stat` accepts.
+2. **The render function.** Expansion calls `render_fn(**resolved_props)`,
+   where `resolved_props` holds exactly the keys `props=` declares. If
+   `props=` names a prop the function has no parameter for, or the
+   function has a required parameter `props=` doesn't declare, the call
+   raised a raw `TypeError` from inside the expansion pass, with no
+   mention of `props=`.
+
+Reproduced first, on `alpha` at `0.06505`:
+
+```python
+@component(props={"label": Prop(), "value": Prop(default=0)})
+def Stat(label, value=0): ...
+
+Stat("a", "b")   # TypeError: Stat() takes 0 positional arguments but 2 were given
+```
+
+Through `compile_site_file` that surfaced as `Error while building
+page(s): Stat() takes 0 positional arguments but 2 were given`, with no
+file or line.
+
+#### Design
+
+**Positional calls.** The marker now accepts `*args` only so a positional
+call reaches ARKlight's own check, then raises `ComponentError` (already
+the type every other component misuse raises, and already wrapped into
+`CompileError` by the pipeline). The message names the component, the
+argument count, the rule (keyword props only), the declared props, a
+by-name example built from them, and a note that positional *children*
+have no equivalent on a user-defined component. It also carries the
+offending call's `file:line`, read from the caller's frame, so it points
+into the user's own site file. A component that declares no props says
+so ("takes no arguments at all"); one called with more arguments than it
+has props says how many it declares.
+
+```text
+Component 'Stat' was called with 2 positional arguments, but user-defined
+components accept keyword props only. Declared props: ['label', 'value'].
+Pass each value by name instead, e.g. Stat(label=..., value=...).
+Positional children are not supported on a user-defined component; pass
+content through a declared prop. (called at site.py:12)
+```
+
+**Props vs. signature.** Expansion, and a `mode="registry"` backend
+override's dispatch, now go through `call_render_fn`, which runs
+`inspect.Signature.bind(**resolved_props)` first. A binding failure
+becomes a `ComponentError` naming the component, Python's own binding
+reason, the declared props and the function's parameters, and stating the
+rule (every declared prop is passed by keyword, so each must be a
+parameter or the function must take `**kwargs`, and every required
+parameter must be declared).
+
+Why bind-checking is safe: `bind` never runs the function, and because
+`resolved_props` holds exactly the declared props, every call it rejects
+was already certain to raise `TypeError`. It cannot reject a working
+component. Errors raised *inside* the render function are never
+rewritten. A callable `inspect.signature` can't introspect is called
+unchecked, as before.
+
+**Why at call time and not registration.** Checking `props=` against the
+signature in `@component(...)` would fail a broken component at import
+even if nothing ever uses it, which changes behavior for existing
+projects. Checking at use fails exactly the builds that were already
+going to fail, only with a better message.
+
+#### Behavior changes
+
+- A positional component call now raises `ComponentError` (a
+  `RuntimeError`), not `TypeError`. Nothing in the tree caught the old
+  `TypeError`; anything outside it that did should catch `ComponentError`.
+- A `props=`/signature mismatch now raises `ComponentError` from the
+  expansion pass rather than `TypeError`.
+- Valid components, valid calls and every build that succeeded before are
+  unchanged.
+
+#### Not done, on purpose
+
+- **Positional children for components.** Deliberately not made to work.
+  It would need a declared "children" prop and a spelling for it, which
+  is a design question, not a diagnostic. The message says they're
+  unsupported.
+- **Auto-mapping positional arguments onto props.** The error suggests the
+  keyword form instead. Order-based matching would make `props=`'s
+  declaration order part of the public contract.
+- **Type-checking the values of ARKlight's built-in components' misuse.**
+  Only user-defined components are in scope.
+- **A registration-time signature audit** (see above).
+
+#### Verification
+
+`tests/test_component_call_diagnostics.py` (19 tests): message contents,
+singular/plural, no-props and too-many-args cases, unchanged keyword
+calls, the call-site location through `compile_site_file`, mismatch in
+both directions, `**kwargs` and defaulted extras still accepted, a
+`TypeError` raised in the function body left alone, `mode="registry"`
+components, and a backend override whose signature disagrees with its
+component's `props=`.

@@ -2,7 +2,7 @@
 `resolveActionArgs`: the runtime half of the live-input -> action-value
 capability fix (`Action.append("tasks", Bind("draft"))`, see
 `arklight.api.Action`, `arklight.ast.nodes.STATE_REF_KEY`,
-`docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`).
+`docs/Foundational/DESIGN-NOTES.md`).
 
 An `ActionRef`'s args reach the browser as JSON -- in
 `data-ark-action-args` for an `on_click=`, in the `data-ark-watch` blob

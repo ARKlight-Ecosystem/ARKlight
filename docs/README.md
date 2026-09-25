@@ -47,7 +47,7 @@ record for the project, updated in place rather than removed.
 | [`GETTING-STARTED.md`](Foundational/GETTING-STARTED.md) | Install (pip and the Debian/Ubuntu package), the annotated repository layout, and the `pytest` workflow (moved out of the root `README.md`, which keeps only a two-line pointer). |
 | [`AUTHORING-GUIDE.md`](Foundational/AUTHORING-GUIDE.md) | The full public component/behavior/state API reference (moved out of the root `README.md`, which keeps only the quickstart). |
 | [`DEPLOYMENT-CLI.md`](Foundational/DEPLOYMENT-CLI.md) | `arklight deploy`: the spec and the provider boundary (ARKlight builds, the provider's own CLI deploys), and what shipped -- Cloudflare Workers via Wrangler, alpha-only so far. |
-| [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
+| [`DESIGN-NOTES.md`](Foundational/DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions, plus the graduated design records of fully-shipped proposals (rationale, deliberate limits, out-of-scope decisions) retired from `docs/Proposals/`. |
 | [`EXPERIMENTAL-APIS.md`](Foundational/EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`SYSTEM-DESIGN-AGREEMENTS.md`](Foundational/SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |
 | [`USER-DEFINED-COMPONENTS.md`](Foundational/USER-DEFINED-COMPONENTS.md) | User-defined, reusable components (v0.060, shipped in full) -- props, default styling, macro/registry modes, component-owned state, and scope boundaries. |
@@ -223,8 +223,8 @@ not as a live warning about this tree's current state):
 - A version slot getting silently double-booked (two or three pieces
   of work assigned the same `v0.0xx` without a note explaining it) is
   the same failure in a different table -- see
-  `docs/Proposals/SEARCH-RETRIEVE-DOC-PROPOSAL.md`'s and
-  `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md`'s own
+  `docs/Foundational/DESIGN-NOTES.md`'s search retrieve-doc and Rei
+  compiler narrator design records' own
   "version-number note, kept for history" sections for how to handle
   it *with* a note instead of silently.
 
@@ -294,7 +294,20 @@ finished:
    README indexes and reword every live citation. A citation that must
    stay (a stage tag like `htmx-5` still needs a source) gets
    `[retired -- see CHANGELOG.md]` after its first mention in that
-   file, rather than a path that no longer resolves.
+   file, rather than a path that no longer resolves. A `docs/Proposals/`
+   file specifically is never just deleted: its rationale, deliberate
+   limits, and out-of-scope decisions don't survive in `CHANGELOG.md`
+   or `docs/version history/` (those record *what* shipped, not *why*
+   it was designed that way) -- move that content into
+   `docs/Foundational/DESIGN-NOTES.md` as a "Design record: ..." section
+   **first**, noting `*Graduated from `docs/Proposals/<file>.md`, ...*`,
+   then delete the proposal. `tests/test_doc_citations.py` fails the
+   build if a `docs/Proposals/` file is cited but neither exists nor has
+   a matching "Graduated from" note -- treat that failure as "the design
+   record was deleted, not graduated," not as a link to patch around.
+   That test also fails on any stale `docs/<Folder>/<file>.md` citation
+   in code, tests, or docs, catching what a link-only check (which
+   skips backtick path mentions) misses.
 4. **Never rewrite history to fix a link.** `CHANGELOG.md` and
    `PROGRESS.md`'s per-version log describe what was true at the time
    and may cite docs that no longer exist. Only `PROGRESS.md`'s

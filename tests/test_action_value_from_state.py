@@ -4,7 +4,7 @@ Capability fix: live-input -> action-value.
 `Action.append("tasks", Bind("draft"))` / `Action.set("x", Bind("y"))`
 -- an `Action.*(...)` argument that reads a `State(...)`/`Computed(...)`
 when the action runs, instead of a compile-time literal. See
-`docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`,
+`docs/Foundational/DESIGN-NOTES.md`,
 `arklight.ast.nodes.STATE_REF_KEY` (wire shape),
 `arklight.ir.validate._validate_action_args` (build-time rules),
 `arklight/backend/js/runtime/action_args.py` (resolution).

@@ -774,7 +774,7 @@ class Action:
     and it is read by name from the store -- never evaluated as an
     expression. Other actions' arguments (`increment`'s `delta`,
     `remove`'s `index`) reject a `Bind(...)` at build time. See
-    `docs/Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`.
+    `docs/Foundational/DESIGN-NOTES.md`.
     """
 
     @staticmethod
@@ -2077,7 +2077,8 @@ class Site:
         # `Site(...)` feature flag.
         self.app_shell = bool(app_shell)
 
-        # Runtime policy enforcement (docs/Foundational/RUNTIME-POLICY.md):
+        # Runtime policy enforcement (docs/Foundational/WHAT-ARKLIGHT-IS.md's
+        # "Closed-vocabulary" point + docs/Foundational/CONFIGURABILITY.md):
         # closed-vocabulary/no-eval was already a *compile-time* guarantee
         # (nothing ARKlight's own compiler emits ever constructs a
         # function from a string -- see WHAT-ARKLIGHT-IS.md's "Closed-

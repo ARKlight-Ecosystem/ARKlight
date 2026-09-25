@@ -28,7 +28,7 @@ knowledge.
 | [`GETTING-STARTED.md`](GETTING-STARTED.md) | Install (`pip install -e .` and the Debian/Ubuntu `arklight-installer` package), the annotated repository layout, and the `pytest` workflow -- moved out of the root `README.md` so it can't go stale there. |
 | [`AUTHORING-GUIDE.md`](AUTHORING-GUIDE.md) | The full public component/behavior/state API: routing, head metadata, layout, styling, behaviors, the component vocabulary, the ARK Bundle format, and `arklight.config.py`. |
 | [`DEPLOYMENT-CLI.md`](DEPLOYMENT-CLI.md) | `arklight deploy`: a thin wrapper that delegates to a hosting provider's own CLI (Cloudflare Workers/Wrangler, the only provider so far) rather than reimplementing provider deployment logic. Implemented on `alpha` as `0.06515`; the doc holds the spec, the boundary, and what is deliberately not built. |
-| [`DESIGN-NOTES.md`](DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions. |
+| [`DESIGN-NOTES.md`](DESIGN-NOTES.md) | Rationale and trade-offs behind key design decisions, plus the graduated design records of fully-shipped proposals (rationale, deliberate limits, out-of-scope decisions) retired from `docs/Proposals/`. |
 | [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md) | APIs that are unstable or opt-in (`experimental.py`), and their stability guarantees. |
 | [`SYSTEM-DESIGN-AGREEMENTS.md`](SYSTEM-DESIGN-AGREEMENTS.md) | The "compiler first, runtime last" design agreement: which work the compiler must own vs. delegate to the target runtime, when the compiler may specialize per-target, and the four-question architecture decision rule for judging any new feature against it. |
 | [`USER-DEFINED-COMPONENTS.md`](USER-DEFINED-COMPONENTS.md) | Design for user-defined, reusable components (v0.060). |

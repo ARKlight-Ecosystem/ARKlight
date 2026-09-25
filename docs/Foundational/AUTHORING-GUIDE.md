@@ -444,7 +444,7 @@ only `set`/`append`'s `value` accept it -- `increment`, `decrement` and
 which would concatenate or never match rather than do arithmetic). Don't
 put `debounce=` on the `Bind.model(...)` a submit button reads from: a
 click inside the delay would read the previous value. Design record:
-[`../Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md`](../Proposals/ACTION-VALUE-FROM-STATE-PROPOSAL.md).
+[`DESIGN-NOTES.md`](DESIGN-NOTES.md#design-record-bind-as-an-action-argument-006503).
 
 ## Calling a user-defined component
 
@@ -468,7 +468,7 @@ render function's parameters (a declared prop the function has no
 parameter for, or a required parameter `props=` doesn't declare): one
 `ComponentError` naming both sides. To put content inside a component,
 pass it through a declared prop. Design record:
-[`../Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md`](../Proposals/COMPONENT-CALL-DIAGNOSTICS-PROPOSAL.md).
+[`DESIGN-NOTES.md`](DESIGN-NOTES.md#design-record-component-call-diagnostics-006506).
 
 ## Runtime errors (`ARKLIGHT_ON_ERROR`)
 

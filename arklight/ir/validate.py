@@ -124,8 +124,7 @@ Checks performed:
     (`arklight.ir.schema.KNOWN_QUERY_HISTORY_MODES`) and requires
     `query=` to be set alongside it.
 18. An `Action.*(...)` argument that reads state (`Bind("name")`, stored
-    as `{"__state__": "name"}`; `0.06503`, `docs/Proposals/
-    ACTION-VALUE-FROM-STATE-PROPOSAL.md`) must be an argument the
+    as `{"__state__": "name"}`; `0.06503`, `docs/Foundational/DESIGN-NOTES.md`) must be an argument the
     action opts in (`ActionSpec.state_args`), be a well-formed marker,
     and name a `State(...)`/`Computed(...)` declared on the same page --
     see `_validate_action_args`. Applies wherever an `ActionRef` is
@@ -209,7 +208,8 @@ class ValidationError(Exception):
     set *only* at those SCHEMA-lookup sites (`--narrate`'s Rei renderer
     uses its presence, not any parsing of `str(self)`, to decide
     whether to append the `arklight search <name>` pointer -- see
-    `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md` §5). Every other
+    `docs/Foundational/DESIGN-NOTES.md`, "Design record: Rei compiler
+    narrator" §5). Every other
     `ValidationError` in this module (Bind/on_click/modifier/behavior
     checks, etc.) leaves this `None`, which is exactly how Rei knows
     *not* to print a pointer for those -- structured data reaching the

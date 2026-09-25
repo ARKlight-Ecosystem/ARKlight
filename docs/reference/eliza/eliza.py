@@ -1,7 +1,8 @@
 """
 Reference ELIZA implementation -- STUDY MATERIAL ONLY.
 
-Vendored per `docs/Proposals/REI-COMPILER-NARRATOR-PROPOSAL.md` §4:
+Vendored per `docs/Foundational/DESIGN-NOTES.md` ("Design record: Rei
+compiler narrator") §4:
 read as a
 design reference for how a minimal keyword/pattern -> templated-
 response engine (Joseph Weizenbaum's 1966 ELIZA, in its classic
