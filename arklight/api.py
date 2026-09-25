@@ -32,7 +32,7 @@ from arklight.ast.nodes import (
     state_ref,
 )
 from arklight.backend.css import selectors as css_selectors
-from arklight.provider import ProviderDeclaration
+from arklight.provider import ProviderDeclaration, register_provider
 
 # v0.042: custom CSS class names must look like a real, single CSS class
 # identifier -- letters/digits/hyphens/underscores, not starting with a
@@ -2240,6 +2240,9 @@ class Site:
                     f"capabilities=[...]) returns, got {provider!r}."
                 )
             self.provider = provider
+            # `Provider` stage 5 (`v0.069`): make the declared contract
+            # visible to `arklight search <name>` in this process.
+            register_provider(provider)
             self.experimental_usages.append(experimental.emit("provider-integration"))
 
     def _set_css_var_override(self, kwarg_name: str, var_name: str, value: str) -> None:

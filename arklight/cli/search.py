@@ -118,6 +118,7 @@ from arklight.ir.schema import (
     PredicateSpec,
     RevealSpec,
 )
+from arklight.provider import ProviderDeclaration, resolve_provider
 from arklight.search.engine import default_engine
 from arklight.search.knowledge import STATE_KEYWORDS
 
@@ -266,6 +267,39 @@ def _format_state_spec(name: str, required_args: tuple[str, ...]) -> str:
     else:
         lines.append("  required args  : (none)")
     return "\n".join(lines)
+
+
+def _format_provider_spec(declaration: ProviderDeclaration) -> str:
+    """`Provider` stage 5 (`v0.069`): the declared contract of a site's
+    `Provider.declare(...)`, as `arklight search <name>` prints it. Only
+    what the declaration actually holds -- its label and its capability
+    list, in declared order. The config object it ships in `arklight.js`
+    (`window.ARKLIGHT_PROVIDER`) is named so the reader knows where the
+    same data is visible at runtime; there are no DOM hooks or state
+    keys to report, since a capability isn't wired to either yet (see
+    `arklight/provider.py`)."""
+    lines = [f"{declaration.name} (declared provider, Site(provider=...))"]
+    lines.append(f"  capabilities   : {', '.join(declaration.capabilities)}")
+    lines.append("  runtime        : window.ARKLIGHT_PROVIDER (read-only, in arklight.js)")
+    return "\n".join(lines)
+
+
+def _resolve_provider(query: str) -> str | None:
+    """Exact-match (case-insensitive) lookup against the providers this
+    process has registered (`arklight.provider.PROVIDER_REGISTRY`, filled
+    by `Site(provider=...)`). Returns a formatted result string, or
+    `None` if no registered provider carries that label.
+
+    Checked after every component and closed-vocabulary lookup, so a
+    provider whose label happens to match a component name never shadows
+    the component -- the same \"built-ins win a name collision\" rule the
+    rest of this module follows. A provider label is a free string, so
+    there is no typo-suggestion path for it here.
+    """
+    declaration = resolve_provider(query)
+    if declaration is None:
+        return None
+    return _format_provider_spec(declaration)
 
 
 def _resolve_state_keyword(query: str) -> str | None:
@@ -465,6 +499,10 @@ def search_component(query: str, *, limit: int = 5, near: str | None = None) -> 
     js_vocab_result = _resolve_js_vocab(query)
     if js_vocab_result is not None:
         return js_vocab_result
+
+    provider_result = _resolve_provider(query)
+    if provider_result is not None:
+        return provider_result
 
     suggestions = _suggest(query, limit=limit, near=near)
     if not suggestions:
