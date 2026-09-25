@@ -2,8 +2,10 @@
 `Provider`. Stage 1 of 6 (`v0.065`) laid down the contract itself;
 stage 6 of 6 (`v0.070`, see below) finalizes its capability vocabulary.
 
-Accepted from `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`; the per-version
-preview is in `docs/version history/v0.065.md`. A `Provider` is how a
+Settled design record: `docs/Foundational/PROVIDER-SDK.md` (the
+six-rung `v0.065`-`v0.070` ladder that staged this is fully shipped and
+has been retired from `docs/Proposals/`/`docs/Implementation/`; see
+that file for the graduation). A `Provider` is how a
 site *declares* that it talks to an external service at runtime (a
 hosted database, an auth service, a hand-rolled API). It is named
 "Provider", not "backend", because `arklight/backend/` already means

@@ -25,8 +25,10 @@ re-verification section.
 
 **Naming note.** "Backend" is avoided on purpose:
 `arklight/backend/` already means *output target* (HTML, CSS, JS,
-Android, Desktop), and `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`
-named `Provider` specifically to dodge that collision. "ARKbase" is a
+Android, Desktop), and `docs/Foundational/PROVIDER-SDK.md` (accepted,
+staged `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`, since retired --
+six-rung ladder fully shipped) named `Provider` specifically to dodge
+that collision. "ARKbase" is a
 working title, not a decision (Open question 3).
 
 ## Origin
@@ -365,11 +367,12 @@ implementers) is Open question 8.
 
 ## 11. What acceptance would have to amend
 
-- `docs/Proposals/PROVIDER-SDK-PROPOSAL.md` Section 2 ("No shipped
-  implementations").
-- `docs/Implementation/PROVIDER-SDK-ADDENDUM.md`'s scope filter, which
-  lists "any server ARKlight stands up or deploys" as out of scope on
-  purpose and says nothing in that ladder authorizes it.
+- `docs/Foundational/PROVIDER-SDK.md` Section 2 ("No shipped
+  implementations") -- design record of the since-retired
+  `docs/Proposals/PROVIDER-SDK-PROPOSAL.md` (six-rung ladder fully
+  shipped). Its scope section lists "any server ARKlight stands up or
+  deploys" as out of scope on purpose and says nothing in it
+  authorizes it.
 - `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` Section 7
   (client data primitive) would gain a forcing use case; Section 8
   would be reopened for B7.

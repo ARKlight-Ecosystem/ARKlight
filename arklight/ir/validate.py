@@ -575,7 +575,7 @@ def _validate_page_head_extensions(node: ARKNode, *, path: str) -> None:
                 )
 
     # `Provider`, stage 4 of 6 (`v0.068` -- see
-    # `docs/Implementation/PROVIDER-SDK-ADDENDUM.md` and
+    # `docs/Foundational/PROVIDER-SDK.md` and
     # `arklight/experimental.py`'s `provider-scripts` entry): same
     # structural `{attribute: value}` discipline as `links` just above,
     # not a raw HTML-injection escape hatch. `src` is required (this

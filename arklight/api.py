@@ -895,8 +895,9 @@ class Provider:
     """
     EXPERIMENTAL (`docs/Foundational/EXPERIMENTAL-APIS.md`, feature
     `provider-integration`). A way for a site to declare that it talks
-    to an external service at runtime (`v0.065`, stage 1 of 6; accepted
-    from `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`):
+    to an external service at runtime (`v0.065`-`v0.070`, six-rung
+    ladder now fully shipped; design record
+    `docs/Foundational/PROVIDER-SDK.md`):
 
         site = Site(
             provider=Provider.declare(name="firebase", capabilities=["auth", "read"]),

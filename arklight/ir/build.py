@@ -354,7 +354,7 @@ def _ark_node_to_ir_node(
     component_origin = props.pop(COMPONENT_ORIGIN_PROP_KEY, None)
 
     # `Provider`, stage 4 of 6 (`v0.068` -- see
-    # `docs/Implementation/PROVIDER-SDK-ADDENDUM.md`): unlike
+    # `docs/Foundational/PROVIDER-SDK.md`): unlike
     # `responsive_style` above, `scripts` is *not* popped -- it's a real
     # `Page(...)` prop the HTML backend reads directly off `page.root`
     # (`arklight/backend/html/head_meta.py`, same convention `links`/

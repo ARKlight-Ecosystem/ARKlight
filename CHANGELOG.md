@@ -5,7 +5,7 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
-## [wip v0.070] -- Capability fix: `Provider`, stage 6/6: capability vocabulary finalized + `custom:` escape hatch
+## [0.06616] -- Capability fix: `Provider`, stage 6/6 (capstone): capability vocabulary finalized + `custom:` escape hatch
 
 Resolves the accepted proposal's own open question §7.2 -- whether
 `capabilities` stays free-form or becomes a closed, finalized set --
@@ -51,19 +51,33 @@ against that. Stage 6 also opens a namespaced escape hatch:
   `_format_provider_spec` (now tags a `custom:`-prefixed capability as
   `(custom)` and explains the prefix) all updated to match.
 
-Full suite 2912 passed -- the 3 failures present on this checkout (a
-stale doc citation in `PROGRESS.md`, two package-metadata tests) are
-pre-existing and confirmed unchanged on a clean `git stash` diff, not
-caused by this change. `tests/test_provider.py` still 82 tests (all
-existing assertions about the closed four's error text pass unchanged;
-no new test file added yet for the `custom:` path itself).
+Full suite 2959 passed -- the 1 failure present on this checkout
+(`test_doc_citations.py::test_live_docs_citations_resolve`, a stale
+`docs/Implementation/SEARCH-RETRIEVE-DOC-ADDENDUM.md` citation in
+`PROGRESS.md`) is pre-existing and confirmed unchanged against a clean
+baseline (2914 passed / 1 failed before this change), not caused by
+this change. New, dedicated `tests/test_provider_custom_capability.py`
+(45 tests) covers the finalized vocabulary and the `custom:` path end
+to end -- predicates, `Provider.declare`, `validate_provider`, and
+`arklight search`'s `(custom)` tagging; `tests/test_provider.py`'s own
+65 tests about the closed four's error text pass unchanged.
 
-**wip**: no version bump yet -- `v0.070`'s other piece (JS vocabulary
-stage 10/10) is still PLANNED, and this entry itself has not been
-squared away into a dedicated `tests/test_provider_custom_capability.py`
-pass or `docs/version history/v0.070.md`/`PROVIDER-SDK-ADDENDUM.md`
-updates. `PROGRESS.md`'s `v0.070` row records this as WIP, version slot
-unconfirmed.
+Closes the six-rung `Provider` ladder (`v0.065`-`v0.070`, stages 1-6
+shipped as `0.06514`/`0.06516`/`0.06518`/`0.06613`/`0.06614`/`0.06616`).
+Its accepted proposal and implementation addendum are retired from
+`docs/Proposals/`/`docs/Implementation/` and graduated into the
+settled design record `docs/Foundational/PROVIDER-SDK.md`, per that
+folder's own graduation rule; `docs/Foundational/DESIGN-NOTES.md`
+carries the "Graduated from" note. `docs/version history/v0.070.md`
+rewritten to the shipped-`Provider`/PLANNED-JS-vocabulary split (same
+two-piece-slot precedent as `v0.064.md`), and every citation the
+retirement left dangling (`arklight/api.py`, `experimental.py`,
+`ir/build.py`, `ir/validate.py`, five other docs, and `PROGRESS.md`'s
+own historical rows) repointed or marked retired.
+
+`0.069` -> `0.06616`; out-of-band, no roadmap row of its own, roadmap
+`v0.070` untouched -- its other piece, JS vocabulary stage 10/10,
+remains PLANNED. `PROGRESS.md`'s `v0.06616` row records this as DONE.
 
 ## [Unreleased -- draft, version slot unconfirmed] -- `overdrive`: opt in to unverifiable references
 
