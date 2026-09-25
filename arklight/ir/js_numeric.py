@@ -24,6 +24,8 @@ import math
 from decimal import ROUND_HALF_UP, Context, Decimal
 from fractions import Fraction
 
+from arklight.ir.js_string import js_number_to_string
+
 _NAN = math.nan
 _INF = math.inf
 
@@ -245,17 +247,6 @@ def js_lcm(values: list[float]) -> float:
     return result
 
 
-def js_number_to_string(x: float) -> str:
-    """`String(x)` for the range `toFixed` falls back to it for
-    (`|x| >= 1e21`), where both languages use exponent notation and
-    the shortest round-tripping digits (`1e+21`, `1.2345e+25`)."""
-    if math.isnan(x):
-        return "NaN"
-    if math.isinf(x):
-        return "Infinity" if x > 0 else "-Infinity"
-    return repr(x)
-
-
 def js_to_fixed(x: float, digits: int) -> str:
     """`Number.prototype.toFixed(digits)`. Rounds an exact tie away
     from zero (`(2.5).toFixed(0) === \"3\"`), which Python's own
@@ -301,3 +292,76 @@ def js_to_precision(x: float, digits: int) -> str:
     if exponent >= 0:
         return f"{sign}{digit_string[: exponent + 1]}.{digit_string[exponent + 1 :]}"
     return f"{sign}0.{'0' * (-(exponent + 1))}{digit_string}"
+
+
+# ---------------------------------------------------------------------------
+# `v0.069` (JS vocabulary addendum stage 9/10): formatting idioms. Each is a
+# build-time twin of its `arklight/backend/js/derivations/<kind>.py` fragment.
+# ---------------------------------------------------------------------------
+
+_ORDINAL_SUFFIX = {1: "st", 2: "nd", 3: "rd"}
+
+
+def js_to_ordinal(x: float) -> str:
+    """`to_ordinal`: `1` -> `\"1st\"`, `11` -> `\"11th\"`. A non-finite or
+    non-integer value is returned as its plain string, no suffix."""
+    if not math.isfinite(x) or math.floor(x) != x:
+        return js_number_to_string(x)
+    magnitude = abs(x)
+    tens = magnitude % 100
+    last = magnitude % 10
+    suffix = "th"
+    if not 11 <= tens <= 13:
+        suffix = _ORDINAL_SUFFIX.get(last, "th")
+    return js_number_to_string(x) + suffix
+
+
+_BYTE_UNITS = ("B", "KB", "MB", "GB", "TB", "PB")
+
+
+def js_humanize_bytes(x: float) -> str:
+    """`humanize_bytes`: a 1024-based byte count, one decimal place, a
+    trailing `.0` dropped, capped at `PB`. A value that rounds up to
+    `1024` of one unit is shown in the next unit instead."""
+    if not math.isfinite(x):
+        return js_number_to_string(x)
+    sign = "-" if x < 0 else ""
+    value = abs(x)
+    if value < 1024:
+        return f"{sign}{js_number_to_string(value)} B"
+    index = 0
+    while value >= 1024 and index < len(_BYTE_UNITS) - 1:
+        value = value / 1024
+        index += 1
+    if float(js_to_fixed(value, 1)) >= 1024 and index < len(_BYTE_UNITS) - 1:
+        value = value / 1024
+        index += 1
+    text = js_to_fixed(value, 1)
+    if text.endswith(".0"):
+        text = text[:-2]
+    return f"{sign}{text} {_BYTE_UNITS[index]}"
+
+
+_DURATION_UNITS = (("d", 86400.0), ("h", 3600.0), ("m", 60.0), ("s", 1.0))
+
+
+def js_humanize_duration(x: float) -> str:
+    """`humanize_duration`: seconds as at most two units, e.g. `8100` ->
+    `\"2h 15m\"`. Whole seconds only; a zero second unit is dropped."""
+    if not math.isfinite(x):
+        return js_number_to_string(x)
+    sign = "-" if x < 0 else ""
+    seconds = float(math.floor(abs(x)))
+    if seconds == 0:
+        return "0s"
+    index = 0
+    while math.floor(seconds / _DURATION_UNITS[index][1]) == 0:
+        index += 1
+    label, size = _DURATION_UNITS[index]
+    text = sign + js_number_to_string(float(math.floor(seconds / size))) + label
+    if index < 3:
+        next_label, next_size = _DURATION_UNITS[index + 1]
+        second = math.floor((seconds % size) / next_size)
+        if second > 0:
+            text += " " + js_number_to_string(float(second)) + next_label
+    return text

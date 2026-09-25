@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from decimal import Decimal
 from typing import Any
 
@@ -243,3 +244,83 @@ def js_ends_with(text: str, substring: str) -> bool:
 
 def js_is_empty(text: str) -> bool:
     return text == ""
+
+
+# ---------------------------------------------------------------------------
+# `v0.069` (JS vocabulary addendum stage 9/10): the case converters. The word
+# split mirrors the client's regex chain in
+# `arklight/backend/js/derivations/to_snake_case.py` exactly: the two
+# case-boundary passes are lookahead-based, so each is computed against the
+# string as it stood before that pass, and `\p{L}`/`\p{N}`/`\p{Lu}`/`\p{Ll}`
+# are Unicode general categories on code points (the `u` flag), which Python's
+# `unicodedata` reproduces.
+# ---------------------------------------------------------------------------
+
+
+def _category(ch: str) -> str:
+    return unicodedata.category(ch)
+
+
+def _is_lower_or_digit(ch: str) -> bool:
+    return _category(ch) == "Ll" or _category(ch).startswith("N")
+
+
+def _is_word_char(ch: str) -> bool:
+    return _category(ch).startswith(("L", "N"))
+
+
+def js_split_words(text: str) -> list[str]:
+    """Split `text` into words the way the case converters do."""
+    chars = list(text)
+    # Pass 1: `/([\p{Ll}\p{N}])(?=\p{Lu})/gu` -> `"$1 "`.
+    spaced: list[str] = []
+    for i, ch in enumerate(chars):
+        spaced.append(ch)
+        if _is_lower_or_digit(ch) and i + 1 < len(chars) and _category(chars[i + 1]) == "Lu":
+            spaced.append(" ")
+    # Pass 2: `/(\p{Lu})(?=\p{Lu}\p{Ll})/gu` -> `"$1 "`.
+    stage = spaced
+    spaced2: list[str] = []
+    for i, ch in enumerate(stage):
+        spaced2.append(ch)
+        if (
+            _category(ch) == "Lu"
+            and i + 2 < len(stage)
+            and _category(stage[i + 1]) == "Lu"
+            and _category(stage[i + 2]) == "Ll"
+        ):
+            spaced2.append(" ")
+    # Split on runs of anything that isn't a letter or number.
+    words: list[str] = []
+    current: list[str] = []
+    for ch in spaced2:
+        if _is_word_char(ch):
+            current.append(ch)
+        elif current:
+            words.append("".join(current))
+            current = []
+    if current:
+        words.append("".join(current))
+    return words
+
+
+def _capitalize_word(word: str) -> str:
+    """`w.replace(/^./u, c => c.toUpperCase())`, on an already-lowercased word."""
+    return word[:1].upper() + word[1:]
+
+
+def js_to_snake_case(text: str) -> str:
+    return "_".join(word.lower() for word in js_split_words(text))
+
+
+def js_to_kebab_case(text: str) -> str:
+    return "-".join(word.lower() for word in js_split_words(text))
+
+
+def js_to_camel_case(text: str) -> str:
+    lowered = [word.lower() for word in js_split_words(text)]
+    return "".join(word if i == 0 else _capitalize_word(word) for i, word in enumerate(lowered))
+
+
+def js_to_title_case(text: str) -> str:
+    return " ".join(_capitalize_word(word.lower()) for word in js_split_words(text))

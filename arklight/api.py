@@ -1498,6 +1498,51 @@ class Derive:
         name's (still-empty) value."""
         return DerivationRef(kind="first_present", names=tuple(names))
 
+    # `v0.069` (docs/version history/v0.069.md): JS vocabulary addendum
+    # stage 9/10 -- cross-language formatting/case batteries.
+
+    @staticmethod
+    def to_ordinal(name: str) -> DerivationRef:
+        """`v0.069`: an ordinal suffix for a whole number -- `1` -> `"1st"`,
+        `2` -> `"2nd"`, `11` -> `"11th"`, `23` -> `"23rd"`. A non-integer
+        or non-finite value is returned as its plain string."""
+        return DerivationRef(kind="to_ordinal", names=(name,))
+
+    @staticmethod
+    def humanize_bytes(name: str) -> DerivationRef:
+        """`v0.069`: a byte count as a short, binary (1024-based) string --
+        `1536` -> `"1.5 KB"`, `512` -> `"512 B"`, capped at `PB`."""
+        return DerivationRef(kind="humanize_bytes", names=(name,))
+
+    @staticmethod
+    def humanize_duration(name: str) -> DerivationRef:
+        """`v0.069`: a duration in seconds as at most two units --
+        `45` -> `"45s"`, `90` -> `"1m 30s"`, `8100` -> `"2h 15m"`."""
+        return DerivationRef(kind="humanize_duration", names=(name,))
+
+    @staticmethod
+    def to_snake_case(name: str) -> DerivationRef:
+        """`v0.069`: `"HTTPServer"` -> `"http_server"`, `"some kebab"` ->
+        `"some_kebab"` (words joined with `_`, lowercased)."""
+        return DerivationRef(kind="to_snake_case", names=(name,))
+
+    @staticmethod
+    def to_camel_case(name: str) -> DerivationRef:
+        """`v0.069`: `"hello_world"` -> `"helloWorld"`, `"HTTP server"` ->
+        `"httpServer"`."""
+        return DerivationRef(kind="to_camel_case", names=(name,))
+
+    @staticmethod
+    def to_kebab_case(name: str) -> DerivationRef:
+        """`v0.069`: `"HelloWorld"` -> `"hello-world"`."""
+        return DerivationRef(kind="to_kebab_case", names=(name,))
+
+    @staticmethod
+    def to_title_case(name: str) -> DerivationRef:
+        """`v0.069`: `"hello_WORLD"` -> `"Hello World"`. Unlike `title_case`,
+        this lowercases the rest of every word."""
+        return DerivationRef(kind="to_title_case", names=(name,))
+
 
 # ---------------------------------------------------------------------------
 # `vdom-5` (REFACTOR-INDEX.md row 13): watch effects.

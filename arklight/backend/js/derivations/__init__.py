@@ -87,6 +87,14 @@ from arklight.backend.js.derivations import (
     truncate_number,
     uppercase,
     value_or,
+    # `v0.069`: JS vocabulary addendum stage 9/10.
+    humanize_bytes,
+    humanize_duration,
+    to_camel_case,
+    to_kebab_case,
+    to_ordinal,
+    to_snake_case,
+    to_title_case,
 )
 
 DERIVATION_MODULES = {
@@ -168,6 +176,15 @@ DERIVATION_MODULES = {
     saturating_subtract.NAME: saturating_subtract,
     value_or.NAME: value_or,
     first_present.NAME: first_present,
+    # `v0.069` (docs/version history/v0.069.md): JS vocabulary addendum
+    # stage 9/10 -- cross-language formatting/case batteries.
+    to_ordinal.NAME: to_ordinal,
+    humanize_bytes.NAME: humanize_bytes,
+    humanize_duration.NAME: humanize_duration,
+    to_snake_case.NAME: to_snake_case,
+    to_camel_case.NAME: to_camel_case,
+    to_kebab_case.NAME: to_kebab_case,
+    to_title_case.NAME: to_title_case,
 }
 
 DERIVATION_FRAGMENTS: dict[str, str] = {

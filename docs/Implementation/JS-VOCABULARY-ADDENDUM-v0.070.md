@@ -1,7 +1,7 @@
 # JS Vocabulary Addendum: Staged Order, v0.061 -> v0.070
 
-**Status:** IN PROGRESS -- stages 1-8/10 (`v0.061`-`v0.068`) have
-shipped; stages 9-10 remain PLANNED. This file turns
+**Status:** IN PROGRESS -- stages 1-9/10 (`v0.061`-`v0.069`) have
+shipped; stage 10 remains PLANNED. This file turns
 the accepted, philosophy-compliant part of
 [`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](../Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md)
 into a trackable, ten-rung landing order, the same role
@@ -193,7 +193,7 @@ needing sign-off before they ship as written:
 | v0.066 | Predicates catalog | SHIPPED (as `0.06517`) |
 | v0.067 | List-scalar derivations catalog | SHIPPED (as `0.06612`) |
 | v0.068 | Cross-language numeric batteries | SHIPPED (as `0.068`) |
-| v0.069 | Cross-language formatting/case batteries | PLANNED |
+| v0.069 | Cross-language formatting/case batteries | SHIPPED (as `0.06615`) |
 | v0.070 | Capstone: `pluralize` + `random_int` | PLANNED |
 
 See `docs/version history/v0.061.md` through `v0.070.md` for each
