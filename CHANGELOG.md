@@ -136,6 +136,21 @@ recomputes. No new IR node, no parser, nothing that touches
 `tests/test_js_vocabulary_v0068.py` added; full suite 2834 passed.
 `0.067` -> `0.068`.
 
+## [0.069] -- Milestone closed: `v0.069` slot
+
+Both pieces of the `v0.069` slot are DONE, so the package version rolls up
+from the `0.0661x` increments to `0.069`:
+
+- JS vocabulary addendum, stage 9/10: cross-language formatting/case
+  batteries (`Derive.to_ordinal`, `humanize_bytes`, `humanize_duration`,
+  `to_snake_case`, `to_camel_case`, `to_kebab_case`, `to_title_case`),
+  shipped as `0.06615`.
+- `Provider`, stage 5/6: `arklight search` integration, shipped as `0.06614`.
+
+`docs/version history/v0.069.md`. `pyproject.toml` `0.068` -> `0.069`.
+JS vocabulary stage 10/10 (`pluralize`, `random_int`) and `Provider` stage
+6/6 (capability enum finalization) remain PLANNED for `v0.070`.
+
 ## [0.06615] -- Capability fix: JS vocabulary addendum, stage 9/10: cross-language formatting/case batteries (the `v0.069` slot's first piece)
 
 - 7 new `Derive.*` kinds, each one name, no literal arguments:
