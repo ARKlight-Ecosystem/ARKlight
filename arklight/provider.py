@@ -1,5 +1,6 @@
 """
-`Provider`, stage 1 of 6 (`v0.065`): the contract itself.
+`Provider`. Stage 1 of 6 (`v0.065`) laid down the contract itself;
+stage 6 of 6 (`v0.070`, see below) finalizes its capability vocabulary.
 
 Accepted from `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`; the per-version
 preview is in `docs/version history/v0.065.md`. A `Provider` is how a
@@ -26,24 +27,94 @@ ARKlight *does* own is the part the compiler can decide ahead of time:
 whether the declaration is well-formed, and that using it is flagged
 (`arklight.experimental.FEATURES["provider-integration"]`).
 
-**Provisional vocabulary.** `PROVIDER_CAPABILITIES` is a closed set on
-purpose, the same discipline `Action.*`/`Derive.*` use, so a typo fails
-the build instead of silently declaring nothing (proposal, section 7,
-question 2). It is *provisional*: the ladder finalizes the vocabulary in
-its last stage, so a name may still be added, renamed or removed until
-then.
+**Finalized vocabulary (`Provider` stage 6 of 6, `v0.070`).** Section
+7.2 asked whether `capabilities` would stay free-form or become a
+closed, finalized set. Five stages of real usage inside this repo (IR
+threading, JS emission, script loading, `arklight search`) never
+needed a fifth well-known name, so `PROVIDER_CAPABILITIES` -- the four
+the proposal itself listed -- is locked in: nothing is added, renamed
+or removed here again, and the word "provisional" is retired from
+this module, `arklight/ir/validate.py` and `arklight/experimental.py`.
+
+That finalizes the *known* vocabulary, not the *only* vocabulary a
+Provider can ever declare. Re-reading section 2's own framing --
+a Provider exists so a site can point at *any* external service, the
+same way a user-defined component covers markup ARKlight doesn't ship
+a name for -- a hard four-name ceiling would contradict that: a site
+whose service genuinely needs a fifth kind of capability would have no
+way to say so short of misusing one of the four. So stage 6 also opens
+a namespaced escape hatch, `CUSTOM_CAPABILITY_PREFIX` (`"custom:"`):
+`Provider.declare(capabilities=["auth", "custom:inventory-sync"])`
+names a capability the four well-known ones don't cover, without
+touching `PROVIDER_CAPABILITIES` or waiting on a new ARKlight release.
+This mirrors two established precedents for extending a small closed
+protocol without renegotiating it: the Language Server Protocol's
+`experimental`/vendor-namespaced capability keys (closed core, an
+explicitly separate namespace for anything a client or server adds on
+its own), and OAuth's `custom:`-prefixed scope convention (a reserved
+prefix that opts a string out of the registered-scope vocabulary
+instead of colliding with it). An unprefixed name is still checked
+against the closed four -- `"raed"` still fails as an unknown
+capability, not a new custom one -- so the typo discipline the
+original closed set existed for is unchanged; only a name that opts in
+with the prefix gets the open, SDK-flexible treatment.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-# The capabilities a Provider declaration may name. The four the
-# proposal itself lists (section 7, question 2); provisional until the
-# ladder's last stage finalizes the vocabulary. Declaring a capability
-# says only "this site uses this kind of thing from the service" -- it
-# does not say how, and ARKlight never implements any of them.
+# The capabilities a Provider declaration may name without the
+# `custom:` prefix below. The four the proposal itself lists (section
+# 7, question 2); finalized as of stage 6 (`v0.070`) -- see this
+# module's docstring. Declaring a capability says only "this site uses
+# this kind of thing from the service" -- it does not say how, and
+# ARKlight never implements any of them.
 PROVIDER_CAPABILITIES: tuple[str, ...] = ("auth", "read", "write", "subscribe")
+
+# The escape hatch stage 6 adds: a capability name prefixed this way
+# is never checked against `PROVIDER_CAPABILITIES` -- it is the site's
+# own vocabulary word for something the four well-known names don't
+# cover, the same way a user-defined component's name is never checked
+# against a fixed list of markup tags. See this module's docstring for
+# the LSP/OAuth precedents this convention follows.
+CUSTOM_CAPABILITY_PREFIX = "custom:"
+
+def _is_valid_custom_label(label: str) -> bool:
+    """Whether `label` (the part after `custom:`) looks like a name:
+    lowercase, starting with a letter, with digits/`-`/`_` allowed
+    after the first character for multi-word labels
+    (`inventory-sync`) but never doubled or trailing (`--`, `-`-at
+    either end). No `re` import here on purpose -- see
+    `test_the_provider_module_holds_no_network_or_vendor_code`, which
+    checks this module imports nothing beyond the standard library
+    pieces it already needs; plain string/character checks cover this
+    without adding one."""
+    if not label or not label[0].isalpha() or not label.islower():
+        return False
+    if label[-1] in "-_" or "--" in label or "__" in label or "-_" in label or "_-" in label:
+        return False
+    return all(ch.isdigit() or ch in "-_" or (ch.isalpha() and ch.islower()) for ch in label)
+
+
+def is_custom_capability(cap: str) -> bool:
+    """Whether `cap` is a well-formed `custom:`-prefixed capability --
+    the prefix present *and* a valid label after it. A string that
+    merely starts with the prefix but has a malformed or empty label
+    (`"custom:"`, `"custom:Auth"`, `"custom:-x"`) is not: it falls
+    through to the unknown-capability error instead of being accepted
+    as some new, oddly-named custom capability."""
+    if not cap.startswith(CUSTOM_CAPABILITY_PREFIX):
+        return False
+    label = cap[len(CUSTOM_CAPABILITY_PREFIX):]
+    return _is_valid_custom_label(label)
+
+
+def is_known_capability(cap: str) -> bool:
+    """Whether `cap` is accepted by a `Provider.declare(capabilities=...)`
+    call: one of the four finalized well-known names, or a well-formed
+    `custom:`-prefixed name (stage 6, `v0.070`)."""
+    return cap in PROVIDER_CAPABILITIES or is_custom_capability(cap)
 
 
 @dataclass(frozen=True)
@@ -90,12 +161,29 @@ class ProviderDeclaration:
                 f"Provider.declare(capabilities=...) entries must be strings, "
                 f"got {not_strings!r}."
             )
-        unknown = [cap for cap in caps if cap not in PROVIDER_CAPABILITIES]
+        reused_well_known = [
+            cap
+            for cap in caps
+            if cap.startswith(CUSTOM_CAPABILITY_PREFIX)
+            and cap[len(CUSTOM_CAPABILITY_PREFIX):] in PROVIDER_CAPABILITIES
+        ]
+        if reused_well_known:
+            raise ValueError(
+                f"Provider.declare(capabilities=...) prefixes "
+                f"{reused_well_known!r} with {CUSTOM_CAPABILITY_PREFIX!r}, but "
+                f"{[cap[len(CUSTOM_CAPABILITY_PREFIX):] for cap in reused_well_known]!r} "
+                f"{'is' if len(reused_well_known) == 1 else 'are'} already a "
+                f"well-known capability -- declare it without the prefix instead."
+            )
+        unknown = [cap for cap in caps if not is_known_capability(cap)]
         if unknown:
             raise ValueError(
                 f"Provider.declare(capabilities=...) names unknown "
                 f"capabilit{'y' if len(unknown) == 1 else 'ies'} {unknown!r}. "
-                f"Known capabilities are: {', '.join(PROVIDER_CAPABILITIES)}."
+                f"Known capabilities are: {', '.join(PROVIDER_CAPABILITIES)}. For "
+                f"a capability of your own that these four don't cover, prefix "
+                f"it instead, e.g. {CUSTOM_CAPABILITY_PREFIX}inventory-sync -- "
+                f"see arklight/provider.py."
             )
         duplicated = sorted({cap for cap in caps if caps.count(cap) > 1})
         if duplicated:
