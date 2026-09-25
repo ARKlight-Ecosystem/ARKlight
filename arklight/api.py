@@ -1442,6 +1442,62 @@ class Derive:
         done"."""
         return DerivationRef(kind="list_all", names=(name,), args={"op": op, "value": value})
 
+    # ------------------------------------------------------------------
+    # `v0.068` (docs/version history/v0.068.md): JS vocabulary addendum
+    # stage 8/10 -- cross-language numeric batteries: things Python's/
+    # Rust's/C++'s standard libraries offer that JS's own `Math` has no
+    # built-in for at all.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def lerp(a: str, b: str, t: str) -> DerivationRef:
+        """`v0.068`: linear interpolation (C++20 `std::lerp`) --
+        `a + t * (b - a)`, with `t == 0` returning exactly `a` and
+        `t == 1` returning exactly `b`. Common for progress-bar/slider/
+        drag-to-scale UI."""
+        return DerivationRef(kind="lerp", names=(a, b, t))
+
+    @staticmethod
+    def midpoint(a: str, b: str) -> DerivationRef:
+        """`v0.068`: `a + (b - a) / 2` (C++20 `std::midpoint`) --
+        overflow-safe average of two values."""
+        return DerivationRef(kind="midpoint", names=(a, b))
+
+    @staticmethod
+    def saturating_add(a: str, b: str, *, min: int, max: int) -> DerivationRef:  # noqa: A002
+        """`v0.068`: `a + b`, clamped to `[min, max]` instead of running
+        past it (Rust `saturating_add`) -- e.g. a quantity stepper that
+        should stop at a ceiling rather than keep climbing. `min` must
+        not be above `max`."""
+        return DerivationRef(kind="saturating_add", names=(a, b), args={"min": min, "max": max})
+
+    @staticmethod
+    def saturating_subtract(a: str, b: str, *, min: int, max: int) -> DerivationRef:  # noqa: A002
+        """`v0.068`: `a - b`, clamped to `[min, max]` instead of running
+        past it (Rust `saturating_sub`) -- e.g. a quantity stepper that
+        should stop at zero rather than go negative. `min` must not be
+        above `max`."""
+        return DerivationRef(
+            kind="saturating_subtract", names=(a, b), args={"min": min, "max": max}
+        )
+
+    @staticmethod
+    def value_or(name: str, fallback: Any) -> DerivationRef:
+        """`v0.068`: the named value, or `fallback` if it's
+        `null`/`undefined`/an empty string (Rust `Option::unwrap_or`) --
+        `Derive.value_or("nickname", "Guest")`. `fallback` is a literal
+        str, bool, `None`, or finite number."""
+        return DerivationRef(kind="value_or", names=(name,), args={"fallback": fallback})
+
+    @staticmethod
+    def first_present(*names: str) -> DerivationRef:
+        """`v0.068`: the first of two or more named values that isn't
+        `null`/`undefined`/an empty string, in order (Rust `Option::or`
+        chains / SQL `COALESCE`) -- generalizes `Derive.value_or` to
+        more than one fallback. If every one is empty, returns the last
+        name's (still-empty) value."""
+        return DerivationRef(kind="first_present", names=tuple(names))
+
 
 # ---------------------------------------------------------------------------
 # `vdom-5` (REFACTOR-INDEX.md row 13): watch effects.

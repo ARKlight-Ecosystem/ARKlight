@@ -33,6 +33,7 @@ from arklight.backend.js.derivations import (
     divide,
     ends_with,
     exp,
+    first_present,
     floor,
     format,
     gcd,
@@ -41,6 +42,7 @@ from arklight.backend.js.derivations import (
     is_empty,
     join,
     lcm,
+    lerp,
     list_all,
     list_any,
     list_average,
@@ -55,6 +57,7 @@ from arklight.backend.js.derivations import (
     log2,
     max as max_,
     median,
+    midpoint,
     min as min_,
     multiply,
     pad_end,
@@ -65,6 +68,8 @@ from arklight.backend.js.derivations import (
     replace_all,
     replace_first,
     reverse_string,
+    saturating_add,
+    saturating_subtract,
     sign,
     slice_string,
     split_count,
@@ -81,6 +86,7 @@ from arklight.backend.js.derivations import (
     trim_start,
     truncate_number,
     uppercase,
+    value_or,
 )
 
 DERIVATION_MODULES = {
@@ -153,6 +159,15 @@ DERIVATION_MODULES = {
     list_includes.NAME: list_includes,
     list_any.NAME: list_any,
     list_all.NAME: list_all,
+    # `v0.068` (docs/version history/v0.068.md): JS vocabulary addendum
+    # stage 8/10 -- cross-language numeric batteries (things JS's own
+    # `Math` has no built-in for at all).
+    lerp.NAME: lerp,
+    midpoint.NAME: midpoint,
+    saturating_add.NAME: saturating_add,
+    saturating_subtract.NAME: saturating_subtract,
+    value_or.NAME: value_or,
+    first_present.NAME: first_present,
 }
 
 DERIVATION_FRAGMENTS: dict[str, str] = {

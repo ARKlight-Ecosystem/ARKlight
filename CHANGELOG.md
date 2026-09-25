@@ -94,6 +94,48 @@ Landed without a version bump or a confirmed slot -- same treatment as
 `0.06504`; a maintainer should confirm the slot (or confirm it stays
 unslotted).
 
+## [0.068] -- JS vocabulary addendum, stage 8/10: cross-language numeric batteries (closes the `v0.068` slot)
+
+`v0.068`'s slot has two independent pieces (`docs/version history/v0.068.md`);
+`Provider` stage 4/6 shipped out-of-band as `0.06613`. This ships the other
+one, closing the slot -- same "both pieces done -> roll the version up"
+precedent `v0.067` set (`0.06612`/`0.06518` -> `0.067`), so the package
+version rolls up from `0.06613` to `0.068` rather than continuing the
+`0.0661x` scheme.
+
+Six new `Derive.*(...)` kinds -- the first rung past JS's own `Math`
+built-ins, adapted from what Python/Rust/C++ standard libraries offer
+that JS has no equivalent for at all (`docs/Implementation/
+JS-VOCABULARY-ADDENDUM-v0.070.md`'s `v0.068` rung):
+
+- `Derive.lerp(a, b, t)` (C++20 `std::lerp`) -- `a + t * (b - a)`, with
+  `t == 0`/`t == 1` returning exactly `a`/`b`.
+- `Derive.midpoint(a, b)` (C++20 `std::midpoint`) -- overflow-safe
+  `a + (b - a) / 2`.
+- `Derive.saturating_add(a, b, min=, max=)` / `Derive.saturating_subtract(a,
+  b, min=, max=)` (Rust `saturating_add`/`saturating_sub`) -- clamped to a
+  literal `[min, max]` instead of running past it; `min` above `max` is a
+  build error (`arklight.ir.validate`).
+- `Derive.value_or(name, fallback)` (Rust `Option::unwrap_or`) -- the
+  named value, or a literal `fallback` if it's `null`/`undefined`/an
+  empty string.
+- `Derive.first_present(*names)` (Rust `Option::or` chains / SQL
+  `COALESCE`) -- first non-empty value across 2+ named states, in order.
+
+Each kind is a pure registry-fragment addition, the same shape every
+earlier rung in this ladder used: one new
+`arklight/backend/js/derivations/*.py` file (`NAME` + `JS_FRAGMENT`),
+one `arklight.ir.schema.DERIVATION_REGISTRY` entry, and a build-time
+Python mirror in `arklight/ir/build.py`'s `_evaluate_derivation` (via
+two new `arklight/ir/js_numeric.py` helpers, `js_lerp`/`js_midpoint`,
+for the two kinds with a non-obvious edge case) so a page's
+server-rendered `Bind(...)` text never disagrees with what the client
+recomputes. No new IR node, no parser, nothing that touches
+`eval`/`new Function`.
+
+`tests/test_js_vocabulary_v0068.py` added; full suite 2834 passed.
+`0.067` -> `0.068`.
+
 ## [0.06613] -- Capability fix: `Provider`, stage 4/6: external script loading (the `v0.068` slot's first-shipped piece)
 
 Numbered by the same out-of-band increment scheme as `[0.06601]`-`[0.06612]`.
