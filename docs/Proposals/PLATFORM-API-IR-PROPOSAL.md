@@ -470,8 +470,8 @@ APIs shipped before their backend is mature enough to support them.
 ## 25. Relationship to `Provider`
 
 Platform API interfaces and ARKlight `Provider`s
-(`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`, accepted, staged
-`v0.065`-`v0.070`) remain separate concepts:
+(`docs/Foundational/PROVIDER-SDK.md`, accepted, six-rung ladder now
+fully shipped) remain separate concepts:
 
 **`Provider`** represents an external service or external application
 dependency -- Firebase, Flask, a remote service, other network-backed

@@ -357,8 +357,8 @@ For evaluation purposes, the important question is therefore not simply whether 
   `DERIVATION_REGISTRY` directly) that rules out a whole class of
   common beginner projects (weather apps, anything API-driven) until
   or unless a sanctioned, closed-vocabulary way to fetch data is
-  designed. `Provider` (`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`,
-  accepted, staged `v0.065`-`v0.070`) is the accepted answer for
+  designed. `Provider` (`docs/Foundational/PROVIDER-SDK.md`, six-rung
+  `v0.065`-`v0.070` ladder fully shipped) is the accepted answer for
   *external services*; a Platform APIs layer
   (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`, accepted and staged
   in `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md` -- stage 1 of

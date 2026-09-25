@@ -15,8 +15,9 @@ range rather than getting their own:** `v0.064` also carries
 `arklight search --retrieve-doc` (see
 [`docs/Foundational/DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md#design-record-search-retrieve-doc-mode-v0064),
 shipped -- see `docs/version history/v0.064.md`),
-and `v0.065`-`v0.070` also carry `Provider`'s six-rung ladder (see
-[`PROVIDER-SDK-ADDENDUM.md`](PROVIDER-SDK-ADDENDUM.md)). Neither
+and `v0.065`-`v0.070` also carried `Provider`'s six-rung ladder (see
+[`../Foundational/PROVIDER-SDK.md`](../Foundational/PROVIDER-SDK.md),
+now fully SHIPPED). Neither
 changes this ladder's own scope or ordering below -- they're
 unrelated work that happens to land in the same milestone slots, the
 same precedent `v0.041` already set.

@@ -2469,7 +2469,8 @@ piece of work, alongside JS vocabulary addendum stage 5 and
 **A version-number note, kept for history:** at filing time, `v0.065`
 was already the shared slot for two accepted, staged pieces of work
 (JS vocabulary addendum stage 5 and `Provider` stage 1 of 6 -- see
-`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`). A maintainer chose to
+`docs/Foundational/PROVIDER-SDK.md`, the settled design record its
+now-retired proposal graduated into). A maintainer chose to
 interleave this proposal into `v0.065` as a third piece rather than
 push every later reserved slot down by one. This is the same
 precedent `v0.041` set (CLI/pipeline hardening + two JS vocabulary
@@ -3046,3 +3047,38 @@ both directions, `**kwargs` and defaulted extras still accepted, a
 `TypeError` raised in the function body left alone, `mode="registry"`
 components, and a backend override whose signature disagrees with its
 component's `props=`.
+
+
+### Design record: Provider SDK (v0.065-v0.070)
+
+*Graduated from `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`, retired
+alongside `docs/Implementation/PROVIDER-SDK-ADDENDUM.md` in the commit
+that shipped stage 6 of 6; recoverable with
+`git show HEAD~1:docs/Proposals/PROVIDER-SDK-PROPOSAL.md` from this
+commit's parent.*
+
+#### Status at graduation
+
+**Accepted -- staged as a six-rung ladder, `v0.065`-`v0.070`, one stage
+per version. All six stages now SHIPPED**, closing the ladder:
+`0.06514` (stage 1, the contract), `0.06516` (stage 2, IR threading +
+validation), `0.06518` (stage 3, `window.ARKLIGHT_PROVIDER`),
+`0.06613` (stage 4, `Page(scripts=[...])`), `0.06614` (stage 5,
+`arklight search` integration), `0.06616` (stage 6, capability
+vocabulary finalized + the `custom:` escape hatch). Unlike the shorter
+entries elsewhere in this section, `Provider`'s content did not move
+into this file directly -- it graduated into its own standalone
+settled design record, the same pattern `PLATFORM-APIS.md` and
+`ACC-CAPABILITIES.md` already use for a substantial enough surface:
+
+**[`docs/Foundational/PROVIDER-SDK.md`](./PROVIDER-SDK.md)** -- the
+full contract, the finalized capability vocabulary and its `custom:`
+escape hatch, external script loading, experimental gating, everything
+explicitly out of scope, and why a live network call to a third-party
+service falls outside "Compiler First" the same way any other runtime
+delegation boundary does.
+
+This entry exists so `grep -rn PROVIDER-SDK-PROPOSAL .` and
+`grep -rn PROVIDER-SDK-ADDENDUM .` both still land here, and so the
+graduation itself -- not just the design -- has a recorded trail, per
+this section's own header note above.

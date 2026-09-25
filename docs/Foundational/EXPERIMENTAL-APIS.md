@@ -79,16 +79,24 @@ experimental API.** That currently means:
   ARKlight ships no vendor SDK, makes no network calls, has no opinion
   about auth, and does not implement, audit, or guarantee the service; the
   concrete implementation is the site author's own code. `capabilities`
-  is checked against a closed vocabulary (`auth`, `read`, `write`,
-  `subscribe`), which is **provisional** until the last stage of the
-  Provider ladder finalizes it. At this stage a declared Provider adds no
-  markup, config or script of its own (see `arklight/provider.py`); like
-  every gated feature it appears in the devtools console reminder in
-  `arklight.js` and in `sbom.txt`. Excluded from the heavy-reliance nudge
-  (`upstream_candidate=False`): a Provider is a deliberate boundary, not a
-  missing feature. Design record: `docs/Proposals/PROVIDER-SDK-PROPOSAL.md`.
+  is checked against a **finalized** closed vocabulary (`auth`, `read`,
+  `write`, `subscribe`) plus a `custom:`-prefixed escape hatch
+  (`Provider.declare(capabilities=["auth", "custom:inventory-sync"])`)
+  for anything a site's own service needs beyond those four -- an
+  unprefixed name is still checked strictly against the closed four, so
+  a typo still fails loudly rather than being accepted as a new word. A
+  declared Provider adds no markup of its own but does ship one
+  read-only config object in `arklight.js`,
+  `window.ARKLIGHT_PROVIDER = Object.freeze({name, capabilities})`, for
+  the site author's own script to read (see `arklight/provider.py`);
+  like every gated feature it also appears in the devtools console
+  reminder and in `sbom.txt`, and is discoverable via
+  `arklight search <provider-name>`. Excluded from the heavy-reliance
+  nudge (`upstream_candidate=False`): a Provider is a deliberate
+  boundary, not a missing feature. Design record:
+  `docs/Foundational/PROVIDER-SDK.md`.
 - `provider-scripts` -- `Page(scripts=[{"src": "...", ...}])`, `Provider`
-  stage 4 of 6 (v0.068, `docs/Implementation/PROVIDER-SDK-ADDENDUM.md`):
+  stage 4 of 6 (v0.068, `docs/Foundational/PROVIDER-SDK.md`):
   an authored way to add an external `<script src>` to a page's `<head>`,
   so a declared Provider's real vendor SDK (the actual Firebase JS SDK,
   say) can actually be loaded. Gated separately from `provider-integration`

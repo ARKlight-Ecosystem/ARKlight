@@ -220,7 +220,7 @@ FEATURES: dict[str, ExperimentalFeature] = {
         detail_lines=[
             "Page(scripts=[...]) adds an external <script src=\"...\"> to this",
             "page's <head> -- the small primitive Provider, stage 4 of 6",
-            "(docs/Implementation/PROVIDER-SDK-ADDENDUM.md), adds so a real",
+            "(docs/Foundational/PROVIDER-SDK.md), adds so a real",
             "vendor SDK (the actual Firebase JS SDK, say) can be loaded at",
             "all. The referenced file is fetched and run at request time,",
             "from whatever the URL resolves to then -- unlike everything",

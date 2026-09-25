@@ -178,7 +178,8 @@ Named individually, not left to be inferred from Section 3's silence:
   these unstable and opt-in by design; a feature that prints its own
   "you are stepping outside the philosophy" warning on every use
   cannot simultaneously be part of a "just works, reliably" claim.
-- **`Provider`** (`docs/Proposals/PROVIDER-SDK-PROPOSAL.md`), **Rei**
+- **`Provider`** (`docs/Foundational/PROVIDER-SDK.md`, ladder fully
+  shipped but the surface itself stays experimental), **Rei**
   the compiler narrator (`docs/Foundational/DESIGN-NOTES.md`,
   shipped as `0.06510`), **the Rei language** -- a `.rei` native
   source frontend added *beside* Python authoring, not a replacement
