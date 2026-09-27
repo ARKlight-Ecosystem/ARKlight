@@ -100,6 +100,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06616 | Capability fix: `Provider`, stage 6 of 6 (capstone) -- capability vocabulary finalized. Resolves proposal open question §7.2: `PROVIDER_CAPABILITIES` (`auth`, `read`, `write`, `subscribe`) is locked in as-is (audited stages 2-5's own usage; none needed a fifth well-known name), and the word "provisional" is retired from `arklight/provider.py`, `arklight/ir/validate.py` and `arklight/experimental.py`. Also opens a namespaced escape hatch the proposal's four-name ceiling didn't otherwise allow for: a `custom:`-prefixed capability (`Provider.declare(capabilities=["auth", "custom:inventory-sync"])`) names something a site's own service needs that the four well-known names don't cover, the same way a user-defined component covers markup ARKlight has no built-in name for. Researched against two precedents before landing on this shape: LSP's `experimental`/vendor-namespaced capability keys, and OAuth's `custom:`-prefixed scope convention (both: closed core, explicit separate namespace for anything added on top). An unprefixed name is still checked strictly against the closed four -- `"raed"` still fails as unknown, not silently accepted as a new custom word -- so the typo discipline the original closed set existed for is unchanged; `custom:read` (reusing a well-known name under the prefix) gets its own error pointing at the unprefixed form. `arklight/provider.py` (`CUSTOM_CAPABILITY_PREFIX`, `is_custom_capability`, `is_known_capability`), `arklight/ir/validate.py` (`validate_provider` re-check updated), `arklight/api.py` (`Provider.declare` docstring), `arklight/experimental.py` (`provider-integration` wording), `arklight/cli/search.py` (`_format_provider_spec` now tags `(custom)` capabilities). New, dedicated `tests/test_provider_custom_capability.py` (45 tests) covers the finalized vocabulary and the `custom:` path end to end; full suite 2959 passed, no regressions (the 1 failure on this checkout, `test_doc_citations.py::test_live_docs_citations_resolve` on the pre-existing `SEARCH-RETRIEVE-DOC-ADDENDUM.md` citation, is pre-existing, confirmed unchanged against a clean-checkout baseline of 2914 passed/1 failed -- this pass's own doc-citation fallout, elsewhere, is fixed rather than left as new instances of that same failure). Closes the six-rung `Provider` ladder: its accepted proposal and implementation addendum are retired from `docs/Proposals/`/`docs/Implementation/` and graduated into the settled design record `docs/Foundational/PROVIDER-SDK.md`; `docs/version history/v0.070.md` rewritten to the shipped-`Provider`/PLANNED-JS-vocabulary split (same precedent as `v0.064.md`), and index rows updated in `docs/README.md`/`docs/Foundational/README.md`/`docs/Implementation/README.md`/`docs/Proposals/README.md`. `0.069` -> `0.06616`; out-of-band, no roadmap row of its own, roadmap `v0.070` untouched (JS vocabulary stage 10/10 remains PLANNED) | DONE |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
+| (version scheme) | Version scheme migrated to `0.MMM.PP` (major pinned at `0`, minor zero-padded to 3 digits, patch as many digits as needed), syncing `alpha`'s numbering with `main`. Fixes the sharper half of a PEP 440 hazard `arklight.__version__` was exposed to: `pyproject.toml`'s `"0.070"`/`"0.06616"`-style decimal-fraction scheme normalizes (leading zeros within a segment dropped) to `"0.70"`/`"0.6616"` once installed-package metadata is read back -- the granular case mashes two different numbers together into one misleading string, not just a missing zero. Three explicit dot-segments stop that mashing even though each segment can still lose its own leading zero (`0.070.0` still normalizes to `0.70.0` -- expected, not a bug, see `arklight/cli/whats_new.py`'s `read_version()` docstring for the same caveat already documented there for one code path). `pyproject.toml`: `0.070` -> `0.070.0`. `docs/Foundational/AUTHORING-GUIDE.md`'s provenance note updated to match. Full suite (3076/3076) and `tests/test_version.py`/`tests/test_upgrade.py` still pass; no other hardcoded copy of the old string existed. Out-of-band, no roadmap slot | DONE |
 | (docs audit, part 5) | Docs-only: `AUTHORING-GUIDE.md`'s top-of-file provenance note pointed at commit `027bd88`, which doesn't exist on `alpha` (or anywhere in the repo) -- a stale placeholder left over from when the note was first added. Repointed to `96ada2c`, the commit that actually last touched the file. No code changed; out-of-band, no roadmap slot | DONE |
 | (docs audit, part 4) | Docs-only: de-duplicated `AUTHORING-GUIDE.md`'s `Provider` section against the settled design record it restated -- the capability vocabulary, the `custom:` escape hatch, the `window.ARKLIGHT_PROVIDER` shape, and the experimental gating all already live in `PROVIDER-SDK.md`; trimmed to a three-line pointer instead. No code changed; out-of-band, no roadmap slot | DONE |
 | (docs audit, part 3) | Docs-only: full drift re-audit -- checked `EXPERIMENTAL-APIS.md`/`DEPLOYMENT-CLI.md`/`PLATFORM-APIS.md`/`ARCHITECTURE.md` against their code/PROGRESS.md sources of truth (all clean); found and fixed one self-inflicted regression from the previous pass -- `docs/Foundational/README.md`'s index row for `AUTHORING-GUIDE.md` hadn't been updated to mention the new `Provider` section. No code changed; out-of-band, no roadmap slot | DONE |
@@ -138,6 +139,62 @@ go-ahead before implementation starts on any of these:
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
+
+## Version scheme migrated to `0.MMM.PP` (DONE)
+
+`pyproject.toml`'s `version` had drifted back to the two/three-digit
+"milestone number as a decimal fraction" scheme (`0.061`, `0.0650`,
+`0.06616`, `0.070`, ...) that the `0.42.0` release moved away from
+(see that entry in `CHANGELOG.md`), specifically because it's a
+PEP 440 hazard. `importlib.metadata.version("arklight")` -- and
+therefore `arklight.__version__`, and therefore every `arklight
+<command>`'s printed output -- reads back the *normalized* string,
+which parses each dot-separated segment as an integer and drops
+leading zeros. Confirmed live on this checkout before the fix:
+`version = "0.070"` in `pyproject.toml` reported `arklight --version`
+as `0.70`. The more granular stage versions are the sharper case --
+`0.06616` normalizes to `0.6616`, not just missing a zero but a
+different-looking number that silently destroys the "which milestone
++ which stage" meaning the leading zeros were encoding.
+`tests/test_version.py` didn't catch this because both sides of its
+assertion go through the same normalization. `arklight/cli/whats_new.py`'s
+`read_version()` already documented this exact hazard in its own
+docstring and worked around it for one code path (release-note lookup)
+by reading the raw, un-normalized string straight from
+`pyproject.toml`; every other version-printing call site in
+`arklight/cli/main.py` was still exposed.
+
+New scheme, agreed with `main`: `MAJOR.MINOR.PATCH`, major pinned at
+`0`, minor zero-padded to 3 digits, patch as many digits as needed, no
+padding. `0.070` (no stage suffix) becomes `0.070.0`; a stage version
+like `0.06616` would become `0.066.16`. This doesn't fully eliminate
+the PEP 440 hazard -- `Version("0.070.0")` still normalizes to
+`0.70.0`, since a segment's own leading zeros are stripped regardless
+of how many digits precede them -- but it fixes the worse half:
+keeping major/minor/patch as separate dot-segments means normalization
+can no longer mash two different numbers into one ambiguous string the
+way `0.06616` -> `0.6616` did. The 3-digit-padded minor is a
+human/doc-facing convention (matches `docs/version history/vX.Y.md`
+filenames and `CHANGELOG.md` headers going forward), not something
+`arklight.__version__`/`pip show` will ever display literally --
+`arklight --version` prints `0.70.0`, not `0.070.0`, and readers should
+cross-check the padded form against `pyproject.toml` directly when it
+matters, same caveat `whats_new.py` already documents for its own
+lookup.
+
+`main`'s own numbering already made this exact leading-zero-loss
+mistake once, silently: an internal milestone tracked as `v0.054`
+shipped there as `0.54.0`, not the `0.054.0` this convention would
+produce now -- noted, not fixed retroactively, since that release is
+already out. Going forward both branches use the same `0.MMM.PP`
+shape so their numbering stays comparable.
+
+No hardcoded literal copy of the old `"0.070"` string existed anywhere
+else in `arklight/`/`tests/`, so nothing else needed to change for
+this checkout to be internally consistent. Historical `CHANGELOG.md`/
+`PROGRESS.md` entries and `docs/version history/*.md` filenames are
+left as-is -- they're a record of what shipped under the old scheme at
+the time, not something to rewrite in place.
 
 ## Docs audit, part 5 -- dead commit hash in `AUTHORING-GUIDE.md`'s provenance note (DONE)
 
