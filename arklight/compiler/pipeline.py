@@ -32,6 +32,7 @@ see `_copy_assets` below.
 
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 from dataclasses import dataclass
@@ -39,6 +40,7 @@ from pathlib import Path
 from typing import Callable
 
 from arklight import __version__, experimental
+from arklight.api import _check_css_var_value
 from arklight.backend.base import Backend
 from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
@@ -118,6 +120,32 @@ def _record_validation_feedback_best_effort(message: str) -> None:
         record_validation_feedback(message, default_engine())
     except Exception:  # noqa: BLE001 -- best-effort only, must never affect the build
         pass
+
+
+_UNDEFINED_NAME_RE = re.compile(r"name '(?P<name>[A-Z][A-Za-z0-9_]*)' is not defined")
+
+
+def _name_error_hint(message: str) -> str:
+    """
+    ". Did you mean: Heading?" for a misspelled component call, else "".
+
+    A typo'd component (`Headingg(...)`) is a plain Python `NameError`
+    raised from inside a site's own module/page-function code, and
+    before this it surfaced as just "name 'Headingg' is not defined"
+    even though `arklight search Headingg` already knew the answer.
+    Only names starting with an uppercase letter are considered --
+    components do, so a misspelled local variable (`titel`) is never
+    offered an unrelated component suggestion. Best-effort: any failure
+    here must never change how the real error is reported.
+    """
+    match = _UNDEFINED_NAME_RE.search(message)
+    if match is None:
+        return ""
+    try:
+        names = [r.name for r in default_engine().search(match.group("name"), limit=3)]
+    except Exception:  # noqa: BLE001 -- a hint must never break error reporting
+        return ""
+    return f". Did you mean: {', '.join(names)}?" if names else ""
 
 
 def _record_name_error_feedback_best_effort(message: str) -> None:
@@ -214,13 +242,15 @@ def compile_site_file(
     try:
         site, _discovered = load_site(entry_path, on_notice=log)
     except SiteLoadError as exc:
-        raise CompileError(str(exc)) from exc
+        raise CompileError(f"{exc}{_name_error_hint(str(exc))}") from exc
 
     try:
         ark_ast = site.build_ark_ast()
     except NameError as exc:
         _record_name_error_feedback_best_effort(str(exc))
-        raise CompileError(f"Error while building page(s): {exc}") from exc
+        raise CompileError(
+            f"Error while building page(s): {exc}{_name_error_hint(str(exc))}"
+        ) from exc
     except Exception as exc:  # noqa: BLE001 -- surface page-function errors clearly
         raise CompileError(f"Error while building page(s): {exc}") from exc
 
@@ -278,6 +308,15 @@ def compile_site_file(
     merged_css_var_overrides = dict(site.css_var_overrides)
     if css_var_overrides:
         merged_css_var_overrides.update(css_var_overrides)
+    # `Site(max_width=...)` etc. already validate themselves (see
+    # `Site._set_css_var_override`); this catches the other way a value
+    # reaches here -- the CLI's --max-width/--bg/--font-family/
+    # --button-text flags, which never pass through that constructor.
+    for _var_name, _var_value in merged_css_var_overrides.items():
+        try:
+            _check_css_var_value(_var_name, _var_value)
+        except ValueError as exc:
+            raise CompileError(f"Invalid design-token override: {exc}") from exc
 
     return build_website_ir(
         site.name,

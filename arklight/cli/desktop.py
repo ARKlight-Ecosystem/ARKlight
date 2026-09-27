@@ -60,7 +60,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from arklight.backend.desktop import runtime
-from arklight.config import ConfigError, load_config, section
+from arklight.config import ConfigError, emit_config_warnings, load_config, section
 
 # Defaults for every key `arklight.config.py`'s `"desktop"` section may
 # set. A project with no `arklight.config.py` at all (or one with no
@@ -239,6 +239,7 @@ def scaffold_project(
         config = load_config(build_dir.parent)
     except ConfigError as exc:
         raise DesktopError(str(exc)) from exc
+    emit_config_warnings(config, build_dir.parent)
     desktop_cfg = section(config, "desktop", _DEFAULTS)
 
     app_name = desktop_cfg["app_name"]

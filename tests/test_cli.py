@@ -441,3 +441,119 @@ def test_cli_help_flag_lists_every_subcommand(capsys):
     captured = capsys.readouterr()
     for subcommand in ("build", "pack", "unpack", "pwa", "new", "search"):
         assert subcommand in captured.out
+
+
+# --- design-token overrides can't break out of their declaration ------------
+
+
+def _tiny_site(tmp_path, site_kwargs=""):
+    path = tmp_path / "site.py"
+    path.write_text(
+        "# include <stdlib.ARKlight>\n"
+        f"site = Site({site_kwargs})\n"
+        '@site.page("/")\n'
+        "def home():\n"
+        '    return Page(Heading("x"))\n'
+    )
+    return path
+
+
+@pytest.mark.parametrize("flag", ["--max-width", "--bg", "--font-family", "--button-text"])
+def test_cli_style_flag_with_css_breakout_is_refused(tmp_path, capsys, flag):
+    site = _tiny_site(tmp_path)
+    code = main(
+        [
+            "build",
+            str(site),
+            "-o",
+            str(tmp_path / "ARK"),
+            "--no-open",
+            flag,
+            "red; } body{display:none",
+        ]
+    )
+    assert code == 1
+    assert "Invalid design-token override" in capsys.readouterr().err
+    assert not (tmp_path / "ARK" / "styles.css").exists()
+
+
+def test_cli_style_flag_with_a_normal_value_still_builds(tmp_path):
+    site = _tiny_site(tmp_path)
+    code = main(["build", str(site), "-o", str(tmp_path / "ARK"), "--no-open", "--max-width", "90rem"])
+    assert code == 0
+    assert "--ark-max-width: 90rem;" in (tmp_path / "ARK" / "styles.css").read_text()
+
+
+def test_site_kwarg_with_css_breakout_is_refused():
+    from arklight import Site
+
+    with pytest.raises(ValueError, match="break out of its declaration"):
+        Site(max_width="red; } body{display:none")
+    with pytest.raises(ValueError, match="break out of its declaration"):
+        Site(bg="red\nbody{display:none}")
+
+
+# --- a misspelled component gets a "Did you mean" ----------------------------
+
+
+def _build_source(tmp_path, source):
+    from arklight.compiler.pipeline import CompileError
+
+    path = tmp_path / "site.py"
+    path.write_text(source)
+    with pytest.raises(CompileError) as excinfo:
+        build(path, tmp_path / "ARK")
+    return str(excinfo.value)
+
+
+_PAGE_TAIL = '@site.page("/")\ndef home():\n    return Page({body})\n'
+
+
+def test_misspelled_component_in_a_page_function_suggests_the_real_one(tmp_path):
+    message = _build_source(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nsite = Site()\n" + _PAGE_TAIL.format(body='Headingg("Hi")'),
+    )
+    assert "name 'Headingg' is not defined" in message
+    assert "Did you mean:" in message
+    assert "Heading" in message
+
+
+def test_misspelled_component_at_module_level_suggests_the_real_one(tmp_path):
+    message = _build_source(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nButon('x')\nsite = Site()\n"
+        + _PAGE_TAIL.format(body='Heading("x")'),
+    )
+    assert "name 'Buton' is not defined" in message
+    assert "Did you mean:" in message
+    assert "Button" in message
+
+
+def test_misspelled_lowercase_variable_gets_no_component_suggestion(tmp_path):
+    message = _build_source(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nsite = Site()\n" + _PAGE_TAIL.format(body="Text(titel)"),
+    )
+    assert "name 'titel' is not defined" in message
+    assert "Did you mean" not in message
+
+
+# --- `arklight deploy site.py` gets a real fix, not "invalid choice" --------
+
+
+def test_deploy_site_file_without_a_provider_gets_the_fix_named(tmp_path, capsys):
+    site = _tiny_site(tmp_path)
+    with pytest.raises(SystemExit) as excinfo:
+        main(["deploy", str(site)])
+    assert excinfo.value.code == 2
+    err = capsys.readouterr().err
+    assert "looks like a site file, not a provider" in err
+    assert f"arklight deploy cloudflare {site}" in err
+
+
+def test_deploy_rejects_a_truly_unknown_provider(tmp_path, capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        main(["deploy", "netlify"])
+    assert excinfo.value.code == 2
+    assert "cloudflare" in capsys.readouterr().err

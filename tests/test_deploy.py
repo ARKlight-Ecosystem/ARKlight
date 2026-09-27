@@ -603,12 +603,23 @@ def test_unknown_provider_is_rejected_by_argparse(project, fake_wrangler, capsys
 
 
 def test_a_site_file_needs_the_provider_named_first(project, fake_wrangler, capsys):
-    # `arklight deploy site.py` is refused rather than guessed at; the
-    # error names the one valid provider so the fix is obvious.
+    # `arklight deploy site.py` is refused rather than guessed at (see
+    # DEPLOYMENT-CLI.md, "Command shape"), but the error now says what
+    # to type instead of a bare "invalid choice".
     with pytest.raises(SystemExit) as excinfo:
         main(["deploy", "site.py"])
     assert excinfo.value.code == 2
-    assert "invalid choice" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "looks like a site file, not a provider" in err
+    assert "arklight deploy cloudflare site.py" in err
+    assert fake_wrangler() == []
+
+
+def test_a_path_shaped_provider_gets_the_same_hint(project, fake_wrangler, capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        main(["deploy", "sites/my_site.py"])
+    assert excinfo.value.code == 2
+    assert "arklight deploy cloudflare sites/my_site.py" in capsys.readouterr().err
     assert fake_wrangler() == []
 
 

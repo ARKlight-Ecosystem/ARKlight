@@ -45,7 +45,13 @@ from arklight.cli.templates import TEMPLATES
 from arklight.cli.upgrade import upgrade_to_alpha
 from arklight.compiler import rei
 from arklight.compiler.pipeline import BuildResult, CompileError, build
-from arklight.config import ConfigError, load_config, overdrive_enabled, section
+from arklight.config import (
+    ConfigError,
+    emit_config_warnings,
+    load_config,
+    overdrive_enabled,
+    section,
+)
 from arklight.ir import binary as binary_ir
 from arklight.ir.validate import ValidationError
 from arklight.packer.bundle import PackError, pack, unpack
@@ -291,6 +297,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
     except ConfigError as exc:
         print(f"ARKlight build failed: {exc}", file=sys.stderr)
         return 1
+    emit_config_warnings(project_config, Path(args.entry).resolve().parent)
     experimental_cfg = section(
         project_config,
         "experimental",
@@ -743,6 +750,23 @@ def _cmd_desktop_build(args: argparse.Namespace) -> int:
     print("  arklight android scaffold <build-dir> -o <project-dir>")
 
     return 0
+
+
+def _deploy_provider(value: str) -> str:
+    """`argparse` `type=` for `arklight deploy`'s provider positional:
+    a value that looks like a site file (the first thing a beginner
+    types -- `arklight deploy site.py`) gets a message naming the fix,
+    not just "invalid choice". Anything else passes through unchanged
+    to `choices=`, which still rejects it exactly as before."""
+    if value not in deploy.PROVIDERS and (
+        value.endswith(".py") or "/" in value or os.sep in value
+    ):
+        raise argparse.ArgumentTypeError(
+            f"{value!r} looks like a site file, not a provider. Name the provider "
+            f"first: `arklight deploy {deploy.DEFAULT_PROVIDER} {value}` "
+            f"(providers: {', '.join(deploy.PROVIDERS)})."
+        )
+    return value
 
 
 def _cmd_deploy(args: argparse.Namespace) -> int:
@@ -1328,9 +1352,17 @@ def main(argv: list[str] | None = None) -> int:
         "cloudflare`. Name the provider before the site file: `arklight deploy "
         "cloudflare my_site.py`.",
     )
+    # The provider is deliberately named *before* the site file, so
+    # `arklight deploy site.py` stays an error rather than a guess
+    # (docs/Foundational/DEPLOYMENT-CLI.md, "Command shape"). It is
+    # also the first thing a beginner types, though -- `_deploy_provider`
+    # (the `type=` hook) turns argparse's bare "invalid choice" into the
+    # actual fix for that specific case. Every other unknown provider
+    # is still rejected by `choices=` exactly as before.
     deploy_parser.add_argument(
         "provider",
         nargs="?",
+        type=_deploy_provider,
         choices=deploy.PROVIDERS,
         default=deploy.DEFAULT_PROVIDER,
         help="Where to deploy (default: %(default)s, the only provider so far).",
