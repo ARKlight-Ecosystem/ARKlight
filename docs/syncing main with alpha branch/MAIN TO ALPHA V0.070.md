@@ -136,7 +136,7 @@ introduced. No new forward-references found.
 *Risk:* low. Confirmed no cross-dependency on Stage 4/5's still-missing
 modules beyond what Stage 1 already flagged.
 
-## Stage 3 — JS vocabulary expansion ladder, all 10 rungs (`v0.061`-`v0.070`)
+## Stage 3 — JS vocabulary expansion ladder, all 10 rungs (`v0.061`-`v0.070`) ✅ ported
 
 The largest stage by file count: 68 new one-file-per-derivation modules
 under `arklight/backend/js/derivations/`, plus
@@ -157,9 +157,20 @@ Test files: `test_js_vocabulary_v0061.py` through `v0070.py` (10
 files), plus expansions to `test_stateful_js_vocabulary_addendum.py`
 and `test_vocabulary_addendum_2.py`.
 
+Landed as one patch, not rung-by-rung: checked every new file's own
+imports first -- the four new `ir/js_*.py` mirrors only reference each
+other plus `ir/build.py`'s `_coerce_number` (already in `main` via
+Stage 1), and every derivation module resolves against
+`derivations/__init__.py`'s own registry, so there was no real
+inter-rung ordering risk to preserve by splitting the diff. Verified
+with `ast.parse` across all 81 new/modified files, and re-ran
+`python3 -c "import arklight"` afterward: it still fails, but for the
+exact same single reason as after Stage 2 (`arklight.ir.platform_api`,
+Stage 5) -- this stage introduced no new forward-references.
+
 *Risk:* low per rung, since each is an additive registry-fragment
-pattern with no cross-rung dependency -- but port rung-by-rung anyway
-so a regression traces to one specific version doc.
+pattern with no cross-rung dependency -- confirmed by the import check
+above rather than assumed.
 
 ## Stage 4 — `Provider` SDK, all 6 stages (`v0.065`-`v0.070`)
 
