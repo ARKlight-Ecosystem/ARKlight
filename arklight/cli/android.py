@@ -1,8 +1,13 @@
 """
 `arklight android scaffold` -- Stage 1 of
-docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md.
+docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md. Also `arklight android
+sync`, a separate, much smaller command that re-syncs an already-
+scaffolded project's `app/src/main/assets/` with a fresh build output
+after a site-content change, without regenerating (or otherwise
+touching) the rest of the project -- see `sync_assets`'s docstring.
 
     arklight android scaffold <build-dir> -o <project-dir>
+    arklight android sync <build-dir> -o <project-dir>
 
 Templating only, no toolchain required -- see that file's staged-order
 table and docs/Foundational/DESIGN-NOTES.md's "v0.0438: Android
@@ -64,6 +69,7 @@ only place it's been told it may write).
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 import shutil
@@ -211,6 +217,25 @@ class ScaffoldResult:
     # True when the package id was set in `arklight.config.py` (so the
     # CLI's "choose your own id" reminder is unnecessary).
     package_id_configured: bool = False
+
+
+@dataclass
+class SyncResult:
+    project_dir: Path
+    build_dir: Path
+    assets_dir: Path
+    # Every file `_copy_tree` wrote on this run (the *entire* new
+    # `assets/` tree, since a sync is wholesale -- not just the ones
+    # that actually differ from before; see `patch_text` for that).
+    written_paths: list[Path] = field(default_factory=list)
+    # Files that existed under `assets/` before this sync and don't
+    # exist after it (dropped from the build output, or renamed).
+    removed_paths: list[Path] = field(default_factory=list)
+    patch_path: Path | None = None
+    # Unified-diff text of exactly what changed under `assets/`,
+    # regardless of whether `project_dir` is a git repo -- see
+    # `_diff_snapshots`. Empty string if the sync changed nothing.
+    patch_text: str = ""
 
 
 def _find_enclosing_git_root(project_dir: Path) -> Path | None:
@@ -961,4 +986,142 @@ def scaffold_project(
         system_bar_source=system_bars.source,
         system_bar_note=system_bars.note,
         package_id_configured=android_cfg["package_id"] is not None,
+    )
+
+
+# --------------------------------------------------------------------
+# `arklight android sync` -- re-sync an already-scaffolded project's
+# assets/ with a fresh build output, without touching the rest of the
+# project (Gradle files, manifest, res/, debug keystore, .github/).
+# --------------------------------------------------------------------
+
+
+def _snapshot(root: Path) -> dict[str, bytes]:
+    """Every file under `root`, by POSIX path relative to it, to its raw bytes."""
+    return {
+        item.relative_to(root).as_posix(): item.read_bytes()
+        for item in sorted(root.rglob("*"))
+        if item.is_file()
+    }
+
+
+def _diff_snapshots(before: dict[str, bytes], after: dict[str, bytes]) -> str:
+    """
+    Unified-diff `before` -> `after` (both `_snapshot`s of the same
+    directory, taken either side of a wholesale `_copy_tree`) -- one
+    `git diff --git`-style section per added/removed/changed file,
+    independent of whether the project itself is a git repo (a
+    freshly-`scaffold`ed one usually isn't, so there's nothing to
+    `git diff` against). Unchanged files are skipped entirely. Binary
+    files (images, fonts, ...) are reported as changed/added/removed
+    without their content, matching `git diff`'s own "Binary files
+    ... differ" -- a byte-level diff of e.g. a PNG isn't readable
+    anyway. Returns "" if nothing changed.
+    """
+    chunks: list[str] = []
+    for rel_path in sorted(set(before) | set(after)):
+        old_bytes = before.get(rel_path)
+        new_bytes = after.get(rel_path)
+        if old_bytes == new_bytes:
+            continue
+
+        a_path = f"a/{rel_path}" if old_bytes is not None else "/dev/null"
+        b_path = f"b/{rel_path}" if new_bytes is not None else "/dev/null"
+        chunks.append(f"diff --git a/{rel_path} b/{rel_path}")
+        if old_bytes is None:
+            chunks.append("new file mode 100644")
+        elif new_bytes is None:
+            chunks.append("deleted file mode 100644")
+
+        try:
+            old_text = old_bytes.decode("utf-8") if old_bytes is not None else ""
+            new_text = new_bytes.decode("utf-8") if new_bytes is not None else ""
+        except UnicodeDecodeError:
+            chunks.append(f"Binary files {a_path} and {b_path} differ")
+            continue
+
+        diff_lines = difflib.unified_diff(
+            old_text.splitlines(keepends=True),
+            new_text.splitlines(keepends=True),
+            fromfile=a_path,
+            tofile=b_path,
+        )
+        chunks.extend(line.rstrip("\n") for line in diff_lines)
+
+    return "\n".join(chunks) + ("\n" if chunks else "")
+
+
+def sync_assets(
+    build_dir: str | Path,
+    *,
+    output_dir: str | Path,
+    patch_path: str | Path | None = None,
+) -> SyncResult:
+    """
+    Re-sync an already-`scaffold`ed Android project's
+    `app/src/main/assets/` with a fresh `arklight build` output
+    directory (`build_dir`) -- wholesale: every file under `assets/`
+    is replaced with what's in `build_dir` (the same PWA-file
+    exclusion + injected-markup stripping `scaffold_project`'s
+    `_copy_tree` already does), nothing merged file-by-file. Unlike
+    `scaffold_project`, this only ever touches `assets/` -- the rest
+    of the project (Gradle files, manifest, res/, debug keystore,
+    `.github/`) is left exactly as `scaffold` (or a later hand edit)
+    left it, so re-running this after every site-content change
+    doesn't clobber project setup that has nothing to do with the
+    site itself.
+
+    A wholesale replace otherwise leaves no record of what actually
+    moved, so `assets/`'s contents are snapshotted before the copy
+    and diffed against its contents after -- see `_diff_snapshots`.
+    That unified diff is written to `patch_path` (default:
+    `<project_dir>/sync.patch`, overwritten on every run) and also
+    returned as `SyncResult.patch_text`, so a sync that changed
+    nothing is easy to tell apart from one that did without having to
+    inspect `assets/` by hand.
+
+    Raises AndroidError for a missing/malformed build directory, or a
+    `project_dir` that doesn't look like it was ever `scaffold`ed
+    (no `app/src/main/assets/`).
+    """
+    build_dir = Path(build_dir)
+    if not build_dir.is_dir():
+        raise AndroidError(f"Build directory not found: {build_dir}")
+    if not (build_dir / "index.html").is_file():
+        raise AndroidError(
+            f"{build_dir} has no index.html at its root -- run `arklight build` "
+            f"first, then sync its output directory into an Android project."
+        )
+
+    project_dir = Path(output_dir)
+    assets_dir = project_dir / "app/src/main/assets"
+    if not assets_dir.is_dir():
+        raise AndroidError(
+            f"{assets_dir} not found -- {project_dir} doesn't look like an "
+            f"`arklight android scaffold`-ed project. Run `arklight android "
+            f"scaffold {build_dir} -o {project_dir}` first, then sync into it."
+        )
+
+    before = _snapshot(assets_dir)
+
+    shutil.rmtree(assets_dir)
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    written = _copy_tree(build_dir, assets_dir)
+
+    after = _snapshot(assets_dir)
+    removed = sorted(set(before) - set(after))
+    patch_text = _diff_snapshots(before, after)
+
+    resolved_patch_path = Path(patch_path) if patch_path is not None else project_dir / "sync.patch"
+    resolved_patch_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_patch_path.write_text(patch_text, encoding="utf-8")
+
+    return SyncResult(
+        project_dir=project_dir,
+        build_dir=build_dir,
+        assets_dir=assets_dir,
+        written_paths=sorted(written),
+        removed_paths=[assets_dir / rel for rel in removed],
+        patch_path=resolved_patch_path,
+        patch_text=patch_text,
     )
