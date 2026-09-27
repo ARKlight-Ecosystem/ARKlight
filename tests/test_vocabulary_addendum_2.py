@@ -338,6 +338,13 @@ def test_map_and_area_render():
     html = output["index.html"]
     assert '<map name="rooms">' in html
     assert 'shape="rect"' in html and 'coords="0,0,100,100"' in html
+    # Bugfix regression check: `usemap` is the <img> side of this pairing --
+    # without it actually rendering, `<map name="rooms">` has nothing
+    # pointing at it and the image map does nothing in a real browser.
+    # Previously compiled to `data-usemap` instead (an unknown-prop
+    # fallback, silent because nothing asserted on it here).
+    assert 'usemap="#rooms"' in html
+    assert "data-usemap" not in html
 
 
 def test_map_requires_name():

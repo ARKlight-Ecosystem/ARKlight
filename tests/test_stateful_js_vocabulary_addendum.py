@@ -10,7 +10,7 @@ ACTION_REGISTRY entry, a new JS fragment module, nothing else in the
 compiler pipeline changes. Everything else identified as a candidate
 (list append/remove, derived/computed state, debounced actions,
 input-bound `set`) is deliberately left for a future version -- see
-docs/DESIGN-NOTES.md.
+docs/Foundational/DESIGN-NOTES.md.
 """
 
 import pytest
@@ -115,7 +115,7 @@ def test_js_backend_reset_reads_from_stores_own_initial_snapshot():
 def test_js_backend_ships_no_action_fragments_for_pure_display_state():
     pages = {"/": Page(State("count", 0), Text(Bind("count")))}
     js = JSBackend().render(_ir(pages))["arklight.js"]
-    # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): the `actions`
+    # htmx-5 (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 10): the `actions`
     # object (and the click interceptor it's paired with) now only
     # ships when a page actually uses an Action.*(...) or a named
     # behavior -- see arklight/backend/js/render.py's
