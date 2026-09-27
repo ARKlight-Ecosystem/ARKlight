@@ -205,3 +205,211 @@ def test_backend_render_on_empty_site_still_returns_files():
     out = backend.render(ir)
     assert cctv._CLIENT_JS_PATH.lstrip("/") in out
     assert '"route": null' in out["__cctv_schema__.json"]
+
+
+# --- cross-origin writes (review finding: dev channel had no Origin check) ---
+
+import http.client as _http_client  # noqa: E402
+import json as _json  # noqa: E402
+import threading as _threading  # noqa: E402
+
+from arklight.cli import cctv as _cctv  # noqa: E402
+
+
+def _serve(bind_host="127.0.0.1", initial=None):
+    state = _cctv._State(initial if initial is not None else {"minutes": 25})
+    hub = _cctv._SSEHub()
+    handler = _cctv._make_handler(state, hub, bind_host=bind_host)
+    server = _cctv._CCTVHTTPServer(("127.0.0.1", 0), handler)
+    thread = _threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, state
+
+
+def _request(server, method, path, body=None, headers=None):
+    conn = _http_client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+    try:
+        conn.request(method, path, body=body, headers=headers or {})
+        resp = conn.getresponse()
+        raw = resp.read()
+        return resp.status, (_json.loads(raw) if raw else None)
+    finally:
+        conn.close()
+
+
+def test_cross_origin_text_plain_post_is_refused_and_changes_nothing():
+    """The review's reproduction: the no-preflight request shape a
+    browser sends from another origin used to set minutes = 1."""
+    server, state = _serve()
+    try:
+        status, payload = _request(
+            server,
+            "POST",
+            "/state",
+            body=_json.dumps({"minutes": 1}),
+            headers={"Origin": "http://evil.example", "Content-Type": "text/plain"},
+        )
+        assert status == 403
+        assert "cross-origin" in payload["error"]
+        assert state.snapshot() == {"minutes": 25}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_cross_origin_bump_is_refused_too():
+    server, state = _serve()
+    try:
+        status, _ = _request(
+            server,
+            "POST",
+            "/state/bump",
+            body=_json.dumps({"field": "minutes", "by": 5}),
+            headers={"Origin": "http://evil.example", "Content-Type": "text/plain"},
+        )
+        assert status == 403
+        assert state.snapshot() == {"minutes": 25}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_another_localhost_port_is_a_different_origin_and_is_refused():
+    server, state = _serve()
+    try:
+        status, _ = _request(
+            server,
+            "POST",
+            "/state",
+            body=_json.dumps({"minutes": 1}),
+            headers={"Origin": "http://127.0.0.1:8347", "Content-Type": "text/plain"},
+        )
+        assert status == 403
+        assert state.snapshot() == {"minutes": 25}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_the_opaque_null_origin_is_refused():
+    server, state = _serve()
+    try:
+        status, _ = _request(
+            server, "POST", "/state", body=_json.dumps({"minutes": 1}), headers={"Origin": "null"}
+        )
+        assert status == 403
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_a_request_with_no_origin_header_still_works_like_curl():
+    server, state = _serve()
+    try:
+        status, payload = _request(
+            server,
+            "POST",
+            "/state",
+            body=_json.dumps({"minutes": 50}),
+            headers={"Content-Type": "application/json"},
+        )
+        assert status == 200 and payload == {"changed": {"minutes": 50}}
+        status, payload = _request(
+            server, "POST", "/state/bump", body=_json.dumps({"field": "minutes", "by": 5})
+        )
+        assert status == 200
+        assert state.snapshot() == {"minutes": 55}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_a_same_origin_page_can_still_write():
+    server, state = _serve()
+    try:
+        port = server.server_address[1]
+        status, _ = _request(
+            server,
+            "POST",
+            "/state",
+            body=_json.dumps({"minutes": 40}),
+            headers={"Origin": f"http://127.0.0.1:{port}", "Content-Type": "text/plain"},
+        )
+        assert status == 200
+        assert state.snapshot() == {"minutes": 40}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_reads_still_work():
+    server, _ = _serve()
+    try:
+        status, payload = _request(server, "GET", "/state")
+        assert status == 200 and payload == {"minutes": 25}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_dns_rebinding_host_header_is_refused_when_bound_to_loopback():
+    """An attacker hostname resolved to 127.0.0.1 is same-origin *to the
+    browser*, so Origin alone can't stop it -- the Host header can."""
+    server, state = _serve()
+    try:
+        for method, path, body in (
+            ("GET", "/state", None),
+            ("POST", "/state", _json.dumps({"minutes": 1})),
+        ):
+            headers = {"Host": "attacker.example:2172"}
+            if method == "POST":
+                headers["Origin"] = "http://attacker.example:2172"
+            status, payload = _request(server, method, path, body=body, headers=headers)
+            assert status == 403, (method, path)
+            assert "Host" in payload["error"]
+        assert state.snapshot() == {"minutes": 25}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_loopback_host_spellings_are_all_accepted():
+    server, _ = _serve()
+    try:
+        port = server.server_address[1]
+        for host in (f"localhost:{port}", f"127.0.0.1:{port}", f"[::1]:{port}", "localhost"):
+            status, _ = _request(server, "GET", "/state", headers={"Host": host})
+            assert status == 200, host
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_host_check_is_skipped_when_deliberately_bound_to_a_lan_address():
+    """`--host 0.0.0.0`/a LAN IP is an explicit choice to be reachable,
+    and the Host header is then that address -- don't break it. The
+    Origin check still applies."""
+    server, state = _serve(bind_host="192.168.1.20")
+    try:
+        status, _ = _request(server, "GET", "/state", headers={"Host": "192.168.1.20:2172"})
+        assert status == 200
+        status, _ = _request(
+            server,
+            "POST",
+            "/state",
+            body=_json.dumps({"minutes": 1}),
+            headers={"Host": "192.168.1.20:2172", "Origin": "http://evil.example"},
+        )
+        assert status == 403
+        assert state.snapshot() == {"minutes": 25}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_host_of_parses_every_header_shape():
+    assert _cctv._host_of("127.0.0.1:2172") == "127.0.0.1"
+    assert _cctv._host_of("localhost") == "localhost"
+    assert _cctv._host_of("[::1]:2172") == "::1"
+    assert _cctv._host_of("LocalHost:9") == "localhost"
+    assert _cctv._host_of(None) == ""

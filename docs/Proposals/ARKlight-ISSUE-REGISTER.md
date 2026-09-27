@@ -43,6 +43,7 @@ runtime, and deliberate escape-hatch boundaries.
 - [T. Repeat scalability / correctness edge cases](#t-repeat-scalability--correctness-edge-cases)
 - [U. Product-positioning / maturity issues](#u-product-positioning--maturity-issues)
 - [V. Agent/AI-specific issues](#v-agentai-specific-issues)
+- [W. External-review fixes (config, CSS, CCTV, path handling, scaffold)](#w-external-review-fixes-config-css-cctv-path-handling-scaffold)
 - [The short version](#the-short-version)
 
 ---
@@ -930,7 +931,162 @@ encyclopedic funeral procession for every imperfect semicolon:
 
 ---
 
-**The single most important distinction, repeated:** most of these are not
+## W. External-review fixes (config, CSS, CCTV, path handling, scaffold)
+
+An outside hands-on review of the alpha surfaced a further batch of
+issues, all fixed in the same pass (see CHANGELOG.md, "External review
+fixes"). Grouped here rather than distributed across the lettered
+sections above since they share one origin and one fix pass.
+
+### 67. Config typos build silently as if nothing were wrong
+
+A misspelled section name (`"live_streamin"`) or key
+(`"prot"`/`"app_nmae"`) built with exit 0 and behaved exactly as if the
+setting were absent -- e.g. the dev server stayed on the default port.
+Forward compatibility (an unrecognized name from a newer ARKlight still
+working on an older one) is a deliberate design choice and stays that
+way; the gap was that a genuine typo looked identical to it, with
+nothing to tell them apart.
+
+**Status:** fixed. `arklight.config.config_warnings` compares every
+top-level section name and every key inside a known section
+(`live_streaming`, `csp`, `rei`, `experimental`, `android`, `desktop`)
+against what that section's own reader actually consumes, and prints
+an `ARKlight warning: ... Did you mean '...'?` line for anything that
+doesn't match -- nothing is rejected, so the pass-through behavior
+`section()` already provided is unchanged. A `config.js` /
+`arklight.config.json` / etc. found next to `site.py` with no real
+`arklight.config.py` present gets the same treatment. Wired into
+`build`, `live-streaming`, `android`, and `desktop`.
+`tests/test_config.py` pins the known-key table against each reader's
+own `_DEFAULTS` so it can't silently drift out of sync again.
+
+### 68. A bad `live_streaming` config value crashed with a raw Python exception
+
+`"port": "9001"` (a string) crashed with a bare `TypeError`; `"port":
+99999` (out of range) crashed with a bare `OverflowError`. Both
+surfaced to the user as ARKlight's generic "unexpected error ...
+outside its known, handled failure modes" banner rather than a
+specific config problem.
+
+**Status:** fixed. `arklight.config.validate_live_streaming` checks
+`host`, `port`, and `poll_interval` against their real constraints
+before use and raises `ConfigError` naming the offending key and the
+expected shape.
+
+### 69. A design-token override could break out of its CSS declaration
+
+`Site(max_width=...)` and the CLI's `--max-width`/`--bg`/
+`--font-family`/`--button-text` flags were written into the generated
+stylesheet's `:root { ... }` block with no validation, unlike every
+other CSS-value site in `arklight/api.py` (named CSS classes via
+`style()`, font families, URLs, media queries). `--max-width 'red; }
+body{display:none'` built successfully and the closing brace and
+injected rule landed straight in `styles.css`. Not an attacker path (the
+value comes from whoever runs the build), but a plain typo produced
+broken CSS with no error.
+
+**Status:** fixed. `arklight.api._check_css_var_value` applies the
+same injection-character check (`{`, `}`, `;`, newline) the other
+CSS-value sites already use, called from both `Site._set_css_var_override`
+and the CLI-flag merge point in `arklight.compiler.pipeline`.
+
+### 70. A misspelled component got no "did you mean" suggestion
+
+`Headingg("Hi")` failed the build with only `name 'Headingg' is not
+defined`, even though `arklight search Headingg` already knew to
+suggest `Heading`/`Header` -- the two code paths weren't connected.
+
+**Status:** fixed. `arklight.compiler.pipeline._name_error_hint`
+recognizes a capitalized undefined name in the `NameError`/
+`SiteLoadError` message, queries the same search engine
+`arklight search` uses, and appends `. Did you mean: Heading, Header?`
+to the build error. Restricted to names starting with an uppercase
+letter (components do) so a misspelled lowercase local variable never
+gets an unrelated component suggested at it. Best-effort: any failure
+in the lookup itself falls back to the plain, unchanged error.
+
+### 71. `arklight deploy site.py` failed with a bare "invalid choice"
+
+The provider is deliberately required before the site file (see
+`docs/Foundational/DEPLOYMENT-CLI.md`, "Command shape") so the tool
+never has to guess which one you meant -- but `arklight deploy site.py`
+is the first thing a beginner types, and argparse's own error
+(`invalid choice: 'site.py'`) doesn't say what to type instead.
+
+**Status:** fixed. A `type=` hook on the `provider` argument
+(`arklight.cli.main._deploy_provider`) recognizes a path-shaped value
+before argparse's `choices=` check runs and raises a message naming the
+fix directly: `'site.py' looks like a site file, not a provider. Name
+the provider first: \`arklight deploy cloudflare site.py\``. Every
+other unknown provider still goes through `choices=` exactly as
+before.
+
+### 72. The CCTV dev channel accepted cross-origin writes
+
+`arklight live-streaming --channel PORT` exposes a page's live
+`State(...)` over HTTP for local development. The channel sends no CORS
+headers, so a browser already can't let a foreign page *read* a
+response -- but a `text/plain` `POST` needs no CORS preflight (a
+"simple request"), so a page at another origin could still *write* new
+state with no visible confirmation. Reproduced exactly as an external
+review described it: a `POST` to `/state` carrying `Origin:
+http://evil.example` and `Content-Type: text/plain` changed live state.
+Impact was limited (the channel is opt-in, dev-only, and
+localhost-bound by default -- someone's dev preview, not a production
+site) but real.
+
+**Status:** fixed. `arklight.cli.cctv._make_handler`'s new `_guard`
+method checks, on every write, that a present `Origin` header matches
+the channel's own `Host`; a request with no `Origin` (curl, or a page
+the channel itself served) is unaffected. When bound to a loopback
+address (the default), the `Host` header itself must also name a
+loopback host, which closes a related DNS-rebinding gap the same fix
+would otherwise leave open (an attacker-controlled hostname resolved to
+127.0.0.1 is same-origin *to the browser*, so `Origin` alone can't
+catch it).
+
+### 73. `/` and `/index.html` were treated as two different pages
+
+`persist=True` keys `localStorage` by `location.pathname`, and the
+compiler rewrites internal nav links to end in `index.html` -- so a
+value persisted while viewing the bare site root (`/`) and the same
+page reached via `/index.html` lived under two different keys, and a
+page-load at one wouldn't see state saved from the other. Separately,
+the nav-highlight script compared full URLs, so the "Home" link was
+never marked active at the bare root, only at `/index.html`.
+
+**Status:** fixed. Both `arklight/backend/js/runtime/state.py`'s
+persistence key and `arklight/backend/js/runtime/nav.py`'s
+highlighting now normalize a trailing `/index.html` away before
+comparing/keying. A value saved under the old, un-normalized key before
+this fix is still read as a fallback, so nobody's existing persisted
+state is orphaned by the change.
+
+### 74. The `production` scaffold didn't fully follow its own architecture guide
+
+`arklight new --template production` already had the right directory
+shape (`site.py` + `components/` + `pages/` + `content/` + `assets/`),
+but didn't demonstrate the guide's own advice to mix a plain-function
+component with a registered `@component` (`arklight new
+--explain-architecture` names this explicitly), had no favicon or
+description wired into the generated pages, and the generated
+`arklight.config.py` only showed the `live_streaming` section, leaving
+the other five undiscoverable from the scaffold itself, and pointed at
+a "Configuration section of the ARKlight README" that doesn't exist.
+
+**Status:** fixed. `components/nav.py` is now a registered
+`@component(...)` with a checked `active` prop; `components/footer.py`
+stays a plain function, demonstrating both approaches side by side.
+Pages carry a favicon and description; `assets/icon.svg` is both that
+favicon and what `arklight pwa --icon assets/icon.svg:any` wants, so
+the scaffolded site is installable with no extra files. A
+`tests/test_site.py` build smoke test and `.gitignore` are now
+scaffolded alongside `README.md`. The generated config template lists
+all six known sections (commented out) and points at
+`arklight/config.py` instead of the nonexistent README section.
+
+ most of these are not
 evidence that ARKlight's central idea is wrong. The genuinely dangerous
 ones are the places where the implementation violates its own existing
 contract — especially hydration, CSP integration, reproducibility, and

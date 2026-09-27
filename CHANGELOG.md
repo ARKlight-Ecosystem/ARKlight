@@ -5,6 +5,80 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- External review fixes: PWA-adjacent config/CSS/CCTV/path bugs, `production` scaffold architecture
+
+A batch of fixes triggered by an outside hands-on review of the alpha
+(`docs/Proposals/ARKlight-ISSUE-REGISTER.md` already tracked several of
+these as PK items). Two of the review's core findings -- register #2
+(`@component` breaking rebuilds) and the PWA inline-script/CSP mismatch
+-- were already fixed independently in earlier commits on this branch;
+this entry covers what was still open, plus the `production` scaffold
+following the project's own `--explain-architecture` guide.
+
+- **Config typos no longer build silently.** A misspelled section
+  (`"live_streamin"`) or key (`"prot"`, `"app_nmae"`) now prints an
+  `ARKlight warning: ... Did you mean '...'?` line at build time, and a
+  `config.js`/`arklight.config.json`/etc. found next to `site.py` with
+  no real `arklight.config.py` gets one too. Nothing is rejected --
+  forward compatibility (`section()`'s pass-through of unknown
+  names) is unchanged; this only makes a typo visible.
+  `arklight.config.config_warnings`/`emit_config_warnings`, wired into
+  `build`, `live-streaming`, `android`, `desktop`.
+- **`live_streaming` config values are validated.** A string port
+  (`"9001"`) used to crash with a raw `TypeError`, an out-of-range one
+  with an `OverflowError`; both now raise a clear `ConfigError` naming
+  the offending key. `arklight.config.validate_live_streaming`.
+- **Design-token overrides can't break out of their CSS declaration.**
+  `Site(max_width=...)` and the CLI's `--max-width`/`--bg`/
+  `--font-family`/`--button-text` now reject a value containing `{`,
+  `}`, `;`, or a newline (e.g. `--max-width 'red; } body{display:none'`
+  used to write straight into the stylesheet and inject a rule after
+  it). Same character set the existing `style()`/font-family/URL
+  checks already use. `arklight.api._check_css_var_value`.
+- **A misspelled component now gets a suggestion.** `Headingg("Hi")`
+  used to fail with only `name 'Headingg' is not defined`, even though
+  `arklight search Headingg` already knew to suggest `Heading`. The
+  build error now appends `. Did you mean: Heading, Header?` --
+  best-effort, and only for capitalized names, so an unrelated
+  misspelled local variable never gets a bogus component suggestion.
+- **`arklight deploy site.py` names the fix, not just "invalid
+  choice".** The provider is still required before the site file (see
+  DEPLOYMENT-CLI.md, "Command shape") -- but the error now reads
+  `'site.py' looks like a site file, not a provider. Name the provider
+  first: \`arklight deploy cloudflare site.py\`` instead of argparse's
+  bare `invalid choice: 'site.py'`.
+- **The CCTV dev channel no longer accepts cross-origin writes.** A
+  same-origin-policy gap let a `text/plain` `POST` from another origin
+  (no CORS preflight required) change a dev preview's live state with
+  no visible response -- confirmed with the review's own repro
+  (`Origin: http://evil.example`). Also closes a DNS-rebinding gap when
+  bound to loopback (an attacker hostname resolved to 127.0.0.1 is
+  same-origin to the browser, so `Origin` alone can't catch it -- the
+  `Host` header can). Dev-only, opt-in, and localhost-bound by default,
+  so impact was limited to someone's own dev preview.
+- **`/` and `/index.html` are now treated as the same page.**
+  `persist=True` keyed `localStorage` by `location.pathname`, and
+  nothing normalized the compiler's own `index.html`-rewritten nav
+  links -- so a persisted value at `/` and at `/index.html` lived in
+  two different stores, and the nav-highlight script never marked
+  "Home" active at the bare site root. Both now normalize a trailing
+  `/index.html` to `/`; a value saved before this fix is still read as
+  a fallback.
+- **The `production` scaffold (`arklight new --template production`)
+  now follows the project's own `--explain-architecture` guide in
+  full**, not just the directory shape: `components/nav.py` is a
+  registered `@component` with a checked `active` prop,
+  `components/footer.py` stays a plain function (demonstrating the
+  guide's "mix freely" point), pages carry a favicon and description,
+  `assets/icon.svg` doubles as the icon `arklight pwa
+  --icon assets/icon.svg:any` wants, and a `tests/test_site.py` build
+  smoke test plus `.gitignore` are scaffolded alongside `README.md`.
+- **The scaffolded `arklight.config.py` now lists all six known
+  sections** (`live_streaming`, `csp`, `rei`, `experimental`,
+  `android`, `desktop`), all commented out, and points at
+  `arklight/config.py` instead of a "Configuration" README section
+  that doesn't exist.
+
 ## [0.06616] -- Capability fix: `Provider`, stage 6/6 (capstone): capability vocabulary finalized + `custom:` escape hatch
 
 Resolves the accepted proposal's own open question §7.2 -- whether

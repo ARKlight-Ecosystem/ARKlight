@@ -34,8 +34,11 @@ missing key as "use the built-in default."
 
 from __future__ import annotations
 
+import difflib
+import math
+import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, TextIO
 
 CONFIG_FILENAME = "arklight.config.py"
 
@@ -108,6 +111,53 @@ CONFIG_FILENAME = "arklight.config.py"
 # "passed through unverified" report. Everything provably broken stays
 # fatal. Default `False`. See `arklight/compiler/overdrive.py`.
 _KNOWN_SECTIONS = {"live_streaming", "android", "desktop", "experimental", "csp", "rei"}
+
+# Top-level keys that are not sections (a dict of their own) but are
+# still legitimate at the top of CONFIG -- currently just the one bare
+# flag. `config_warnings` must not flag these as "unknown sections".
+_KNOWN_TOP_LEVEL_FLAGS = {"overdrive"}
+
+# Every key each known section actually reads. Used only to *warn* about
+# a name that matches nothing (a misspelled `"port"`, `"app_nmae"`, or
+# a whole misspelled section name used to build with exit 0 and
+# silently do nothing) -- never to reject: `section()`'s own
+# forward-compatibility contract above is unchanged, so a config
+# written for a newer ARKlight still loads on an older one.
+# tests/test_config.py pins this table against the readers' own
+# `_DEFAULTS` so it can't drift out from under them.
+_KNOWN_KEYS: dict[str, frozenset[str]] = {
+    "live_streaming": frozenset({"host", "port", "poll_interval"}),
+    "csp": frozenset({"strict_csp"}),
+    "rei": frozenset({"default_mode"}),
+    "experimental": frozenset({"heavy_reliance_nudge", "devtools_console_reminder"}),
+    "android": frozenset(
+        {
+            "app_name",
+            "package_id",
+            "status_bar_color",
+            "version_name",
+            "version_code",
+            "icon",
+            "splash",
+            "orientation",
+            "edge_to_edge",
+            "allow_navigation",
+        }
+    ),
+    "desktop": frozenset({"app_name", "app_id", "window_title", "width", "height", "resizable"}),
+}
+
+# Config files a developer coming from the JS world would reasonably
+# create next to site.py, expecting ARKlight to read one of them. It
+# reads exactly one file, `arklight.config.py` -- see `find_config`.
+_FOREIGN_CONFIG_NAMES = (
+    "arklight.config.json",
+    "arklight.config.js",
+    "arklight.config.ts",
+    "arklight.config.toml",
+    "config.js",
+    "config.ts",
+)
 
 
 def overdrive_enabled(config: dict[str, Any]) -> bool:
@@ -205,3 +255,107 @@ def section(config: dict[str, Any], name: str, defaults: dict[str, Any]) -> dict
     merged = dict(defaults)
     merged.update(project_section)
     return merged
+
+
+def config_warnings(config: dict[str, Any], start_dir: str | Path) -> list[str]:
+    """
+    Non-fatal problems with a *loaded* config: names that match nothing.
+
+    Nothing here changes behavior -- unknown sections and keys are still
+    passed through untouched by `section()` (forward compatibility);
+    this only makes a typo visible instead of silently doing nothing.
+    Returns human-readable messages, one per problem:
+
+    - an unknown top-level entry (`"live_streamin"`), with a "did you
+      mean" suggestion when one is close -- `"overdrive"` (the one
+      top-level flag, not a section) is not flagged;
+    - an unknown key inside a known section (`"prot"`, `"app_nmae"`),
+      likewise;
+    - when there is *no* `arklight.config.py` at all, a `config.js` /
+      `arklight.config.json` / ... found next to the site file, since
+      the likeliest reason for one is an author expecting ARKlight to
+      read it, and nothing else would ever tell them it doesn't.
+    """
+    warnings: list[str] = []
+
+    if find_config(start_dir) is None:
+        for name in _FOREIGN_CONFIG_NAMES:
+            if (Path(start_dir) / name).is_file():
+                warnings.append(
+                    f"found {name} next to your site file, but ARKlight only reads "
+                    f"{CONFIG_FILENAME} (a Python file defining CONFIG = {{...}}) -- "
+                    f"{name} is ignored."
+                )
+        return warnings
+
+    for name, value in config.items():
+        if name in _KNOWN_TOP_LEVEL_FLAGS:
+            continue
+        if name not in _KNOWN_SECTIONS:
+            warnings.append(
+                f"{CONFIG_FILENAME}: unknown section {name!r} is ignored."
+                f"{_did_you_mean(name, _KNOWN_SECTIONS | _KNOWN_TOP_LEVEL_FLAGS)}"
+            )
+            continue
+        known_keys = _KNOWN_KEYS.get(name)
+        if known_keys is None or not isinstance(value, dict):
+            continue
+        for key in value:
+            if key not in known_keys:
+                warnings.append(
+                    f"{CONFIG_FILENAME}: unknown key {key!r} in section {name!r} "
+                    f"is ignored.{_did_you_mean(str(key), known_keys)}"
+                )
+    return warnings
+
+
+def emit_config_warnings(
+    config: dict[str, Any], start_dir: str | Path, *, file: TextIO | None = None
+) -> list[str]:
+    """Print `config_warnings(...)` to stderr (or `file`), one line
+    each, and return them. Called by every command that loads a
+    project config, right after it loads successfully."""
+    warnings = config_warnings(config, start_dir)
+    out = file if file is not None else sys.stderr
+    for message in warnings:
+        print(f"ARKlight warning: {message}", file=out)
+    return warnings
+
+
+def _did_you_mean(name: str, candidates: Iterable[str]) -> str:
+    close = difflib.get_close_matches(str(name), sorted(candidates), n=1, cutoff=0.6)
+    return f" Did you mean {close[0]!r}?" if close else ""
+
+
+def validate_live_streaming(cfg: dict[str, Any]) -> None:
+    """
+    Check the merged `live_streaming` section's values, raising
+    `ConfigError` with the offending key and value.
+
+    Before this, a string port crashed with a raw `TypeError` and an
+    out-of-range one with an `OverflowError`, both surfacing to the
+    user as an "unexpected error ... outside its known, handled
+    failure modes" rather than a clear config problem.
+    """
+    host = cfg.get("host")
+    if not isinstance(host, str) or not host.strip():
+        raise ConfigError(
+            f"`CONFIG['live_streaming']['host']` must be a non-empty string, got {host!r}."
+        )
+    port = cfg.get("port")
+    if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+        raise ConfigError(
+            f"`CONFIG['live_streaming']['port']` must be an integer from 1 to 65535, "
+            f"got {port!r}."
+        )
+    interval = cfg.get("poll_interval")
+    if (
+        isinstance(interval, bool)
+        or not isinstance(interval, (int, float))
+        or not math.isfinite(interval)
+        or interval <= 0
+    ):
+        raise ConfigError(
+            "`CONFIG['live_streaming']['poll_interval']` must be a positive number "
+            f"of seconds, got {interval!r}."
+        )

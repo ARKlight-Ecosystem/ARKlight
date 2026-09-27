@@ -94,7 +94,10 @@ persist" rather than the page-wide "state couldn't be loaded" failure
 the outer `try`/`catch` below produces.
 
 1. *Read*, before `createState` is called: for each persisted key,
-   look up `localStorage["ark:<location.pathname>:<key>"]` and, if
+   look up `localStorage["ark:<location.pathname>:<key>"]` (with a
+   trailing `/index.html` normalized to `/`, so the site root has one
+   store rather than two -- see the normalization note by the read
+   step itself) and, if
    present and JSON-parseable, use it to override that key's
    server-rendered initial value -- so a value survives a reload.
    `location.pathname` (not `page.route` from the build) is
@@ -289,9 +292,24 @@ INIT_STATE_JS = """  function initState() {
       var media = rawMedia ? JSON.parse(rawMedia) : [];
       var query = rawQuery ? JSON.parse(rawQuery) : [];
       var initial = JSON.parse(raw);
+      // `/` and `/index.html` are the same page but different
+      // `location.pathname` values (and the build rewrites nav links
+      // to `index.html`), so before this they were two separate
+      // persisted stores for one page. Normalize the trailing
+      // "index.html" away so both resolve to the same key; a value
+      // saved before this fix (under the raw, un-normalized pathname)
+      // is tried second as a fallback.
+      var persistPath = location.pathname.replace(/\\/index\\.html$/, "/");
       persist.forEach(function (key) {
         try {
-          var saved = localStorage.getItem("ark:" + location.pathname + ":" + key);
+          var candidates = ["ark:" + persistPath + ":" + key];
+          if (persistPath !== location.pathname) {
+            candidates.push("ark:" + location.pathname + ":" + key);
+          }
+          var saved = null;
+          for (var i = 0; saved === null && i < candidates.length; i++) {
+            saved = localStorage.getItem(candidates[i]);
+          }
           if (saved !== null) { initial[key] = JSON.parse(saved); }
         } catch (err) {
           // Private browsing, quota, or a hand-edited non-JSON value:
@@ -352,7 +370,7 @@ INIT_STATE_JS = """  function initState() {
         store.subscribe(function () {
           persist.forEach(function (key) {
             try {
-              localStorage.setItem("ark:" + location.pathname + ":" + key, JSON.stringify(store.get(key)));
+              localStorage.setItem("ark:" + persistPath + ":" + key, JSON.stringify(store.get(key)));
             } catch (err) {
               // Private browsing or quota exceeded: this key just
               // doesn't persist, same degrade-quietly discipline as

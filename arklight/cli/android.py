@@ -73,7 +73,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from arklight.backend.android import runtime
-from arklight.config import ConfigError, load_config, section
+from arklight.config import ConfigError, emit_config_warnings, load_config, section
 
 # Defaults for every key `arklight.config.py`'s `"android"` section
 # may set -- see docs/Foundational/DESIGN-NOTES.md's "App identity
@@ -809,6 +809,7 @@ def scaffold_project(
         config = load_config(build_dir.parent)
     except ConfigError as exc:
         raise AndroidError(str(exc)) from exc
+    emit_config_warnings(config, build_dir.parent)
     android_cfg = section(config, "android", _DEFAULTS)
 
     head = _scan_head(build_dir)

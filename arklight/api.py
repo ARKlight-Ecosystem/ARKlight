@@ -105,6 +105,31 @@ ALLOWED_PSEUDO_CLASSES = frozenset(
 _CSS_VALUE_INJECTION_CHARS = frozenset("{};\n")
 
 
+def _check_css_var_value(var_name: str, value: object) -> str:
+    """
+    Return `value` if it is safe to write as `var_name: value;` inside
+    the generated stylesheet's `:root { ... }` block, else raise
+    `ValueError`. Same character set every other CSS-value site in this
+    module (`style()` rules, font families, URLs, media queries) already
+    rejects, for the same reason.
+
+    The design-token overrides (`Site(max_width=...)`, and the CLI's
+    `--max-width`/`--bg`/`--font-family`/`--button-text`) are written
+    into the stylesheet's `:root` block verbatim. Before this, a value
+    like `'red; } body{display:none'` closed the rule early and
+    injected arbitrary CSS after it, with no error.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{var_name} needs a non-empty CSS value string, got {value!r}.")
+    if any(ch in value for ch in _CSS_VALUE_INJECTION_CHARS):
+        raise ValueError(
+            f"{var_name} value {value!r} contains '{{', '}}', ';' or a newline -- that "
+            f"would break out of its declaration. Give a single CSS value "
+            f"(e.g. '90rem', '#0f0f1a')."
+        )
+    return value
+
+
 # Recognized `@page` pseudo-classes for `Site.page_rule(..., pseudo=...)`
 # -- same fixed-set discipline as `ALLOWED_PSEUDO_CLASSES` above.
 ALLOWED_PAGE_PSEUDOS = frozenset({"first", "left", "right", "blank"})
@@ -2303,6 +2328,7 @@ class Site:
                 f"Site({kwarg_name}=...) needs a non-empty CSS value string, "
                 f"got {value!r}."
             )
+        _check_css_var_value(f"Site({kwarg_name}=...)", value)
         self.css_var_overrides[var_name] = value
 
     def style(self, name: str, rules: dict[str, str], *, allow_redefine: bool = False) -> None:
