@@ -5,6 +5,7 @@ import pytest
 from arklight.cli.android import AndroidError, scaffold_project
 from arklight.cli.main import main
 from arklight.compiler.pipeline import build
+from arklight.pwa import enable_pwa
 
 SIMPLE_SITE = """
 from arklight import *
@@ -638,6 +639,56 @@ def test_cli_no_debug_keystore_warning_when_flag_given(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "WARNING: no --debug-keystore given" not in out
     assert "Debug builds are signed with your pinned app/debug.keystore" in out
+
+
+def test_scaffold_excludes_pwa_artifacts_from_assets(tmp_path):
+    """
+    `arklight pwa` + `arklight android scaffold` on the same build-dir
+    must not ship `manifest.json`/`sw.js`/`ark-pwa.js` into
+    `app/src/main/assets/` -- see the PWA/Android interaction bug: a
+    service worker's own fetches run underneath `WebViewAssetLoader`,
+    not through it, so a cache miss falls through to a real network
+    request against the synthetic `appassets.androidplatform.net`
+    origin, which has no real backing and is guaranteed to fail.
+    """
+    out_dir = build_dir(tmp_path)
+    enable_pwa(out_dir, name="Test App")
+    project_dir = tmp_path / "android-project"
+
+    scaffold_project(out_dir, output_dir=project_dir)
+
+    assets_dir = project_dir / "app/src/main/assets"
+    assert not (assets_dir / "manifest.json").exists()
+    assert not (assets_dir / "sw.js").exists()
+    assert not (assets_dir / "ark-pwa.js").exists()
+    # The rest of the build still made it in.
+    assert (assets_dir / "index.html").exists()
+    assert (assets_dir / "about.html").exists()
+
+
+def test_scaffold_strips_injected_pwa_markup_from_html(tmp_path):
+    """
+    Every page `arklight pwa` touched has the manifest `<link>`, the
+    service-worker-registration `<script>`, and (if used) the install
+    button stripped back out on the way into `assets/` -- otherwise a
+    page baked into the Android app would still try to load
+    `ark-pwa.js`/register `sw.js` even though neither file is there.
+    """
+    out_dir = build_dir(tmp_path)
+    enable_pwa(out_dir, name="Test App", install_button=True)
+    project_dir = tmp_path / "android-project"
+
+    scaffold_project(out_dir, output_dir=project_dir)
+
+    copied_index = (project_dir / "app/src/main/assets/index.html").read_text()
+    assert "manifest.json" not in copied_index
+    assert "ark-pwa.js" not in copied_index
+    assert "serviceWorker" not in copied_index
+    assert "ark-pwa-install" not in copied_index
+    assert "arklight:pwa" not in copied_index
+
+    # The un-touched, pre-PWA content is still intact.
+    assert "Hello from ARKlight." in copied_index
 
 
 def test_cli_debug_keystore_missing_file_reports_android_error(tmp_path, capsys):
