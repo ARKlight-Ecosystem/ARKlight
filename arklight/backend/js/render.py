@@ -285,6 +285,24 @@ this site references a capability the "web" backend (this module,
 implement -- currently only relevant for a future `android`/`desktop`
 backend, since "web" implements every capability the compiler-owned
 registry currently knows about.
+
+**HTMX failure handling / `app_shell` `file://` warning.** Closes a
+gap `htmx-4` left open: HTMX's own request/swap failures (a broken
+boosted link, a 5xx, an offline visitor) previously went nowhere --
+HTMX dispatches its own error-shaped events but never shows the
+visitor anything. `needs_notify` now also covers `needs_htmx` (not
+just `needs_click_interceptor`/`has_state`), so `wireHtmxErrorHandling`
+(`runtime/notify.py`) ships and is registered once, alongside
+`wireErrorBoundary`, wherever HTMX itself does -- which already
+includes every `Site(app_shell=True)` site, even a plain nav-only one
+with no state or behaviors. `app_shell` sites also ship
+`warnIfAppShellServedFromFileProtocol`, called once at ready time: a
+boosted swap is an `XMLHttpRequest`, which browsers refuse against a
+page opened directly from disk (`file://.../index.html`) rather than
+served over http(s) -- and some browsers never even dispatch HTMX's
+own failure events for a blocked `file://` request, so this one
+failure mode is checked directly instead of relying solely on
+`wireHtmxErrorHandling` to catch it after the fact.
 """
 
 from __future__ import annotations
@@ -303,8 +321,10 @@ from arklight.experimental import FEATURES
 from arklight.ir.platform_api import check_backend_support
 from arklight.backend.js.runtime import CLICK_INTERCEPTOR_JS as _CLICK_INTERCEPTOR_JS
 from arklight.backend.js.runtime import NAV_HIGHLIGHT_JS as _NAV_HIGHLIGHT_JS
+from arklight.backend.js.runtime import APP_SHELL_FILE_PROTOCOL_CHECK_JS as _APP_SHELL_FILE_PROTOCOL_CHECK_JS
 from arklight.backend.js.runtime import ERROR_BOUNDARY_JS as _ERROR_BOUNDARY_JS
 from arklight.backend.js.runtime import ERROR_REPORT_JS as _ERROR_REPORT_JS
+from arklight.backend.js.runtime import HTMX_ERROR_HANDLING_JS as _HTMX_ERROR_HANDLING_JS
 from arklight.backend.js.runtime import NOTIFY_JS as _NOTIFY_JS
 from arklight.backend.js.runtime import RENDER_MODEL_BINDINGS_JS as _RENDER_MODEL_BINDINGS_JS
 from arklight.backend.js.runtime import RENDER_REPEAT_JS as _RENDER_REPEAT_JS
@@ -924,18 +944,40 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     if provider_config:
         parts.append(provider_config)
 
-    needs_notify = needs_click_interceptor or has_state
+    # `needs_htmx` (defined above) now also pulls in the notify
+    # machinery: an `app_shell` site with no state and no behaviors
+    # (a plain nav-only page) previously shipped HTMX itself but none
+    # of arkNotify/arkReportError -- leaving `wireHtmxErrorHandling`/
+    # `warnIfAppShellServedFromFileProtocol` below with nothing to call
+    # into. See `notify.py`'s module docstring for both.
+    needs_notify = needs_click_interceptor or has_state or needs_htmx
     if needs_notify:
         parts.append(_NOTIFY_JS)
         parts.append("")
         # `0.06505` (RUNTIME-ERROR-HANDLING-PROPOSAL.md): the shared
         # error funnel and the page-level boundary ship wherever
-        # `arkNotify` does -- a page with no State(...) and no click
-        # interceptor ships neither, unchanged from before.
+        # `arkNotify` does -- a page with no State(...), no click
+        # interceptor, and no HTMX ships none of this, unchanged from
+        # before.
         parts.append(_ERROR_REPORT_JS)
         parts.append("")
         parts.append(_ERROR_BOUNDARY_JS)
         parts.append("")
+        if needs_htmx:
+            # HTMX's own request/swap failures (a broken link, an
+            # offline visitor, a 5xx from wherever the shell is
+            # hosted) otherwise fail silently -- HTMX never surfaces
+            # anything to the visitor on its own. See notify.py's
+            # module docstring.
+            parts.append(_HTMX_ERROR_HANDLING_JS)
+            parts.append("")
+        if ir.app_shell:
+            # `file://`-opened app-shell pages are a failure mode
+            # `wireHtmxErrorHandling` above can't reliably catch after
+            # the fact -- checked once, directly, instead. See
+            # notify.py's module docstring.
+            parts.append(_APP_SHELL_FILE_PROTOCOL_CHECK_JS)
+            parts.append("")
 
     if has_state:
         parts.append(SNABBDOM_CORE_JS)
@@ -1055,6 +1097,18 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # is never replaced by an hx-boost swap, so a second registration
         # would double-report every error.
         ready_calls.append("    wireErrorBoundary();")
+    if needs_htmx:
+        # Same "register exactly once, document.body is never replaced
+        # by hx-boost" contract as wireErrorBoundary() above.
+        ready_calls.append("    wireHtmxErrorHandling();")
+    if ir.app_shell:
+        # A one-shot check, not a listener -- safe to call from here
+        # even though, unlike the two calls above, nothing would break
+        # if it ran again after a boosted swap (the protocol can't
+        # change mid-session). Kept alongside the others rather than
+        # in arkInitPage() so it isn't repeated on every swap for no
+        # reason.
+        ready_calls.append("    warnIfAppShellServedFromFileProtocol();")
     if needs_click_interceptor:
         # Registered exactly once, here -- never from inside
         # arkInitPage() itself, and never again on a later boosted
