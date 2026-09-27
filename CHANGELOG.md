@@ -5,6 +5,36 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: drift audit, round 3 -- `docs/Foundational/README.md` index row missing `Provider`
+
+Follow-up audit after the `AUTHORING-GUIDE.md` rewrite. Checked
+everything the existing automated drift-checks don't cover:
+`EXPERIMENTAL-APIS.md`'s feature list against `arklight/experimental.py`'s
+`FEATURES` dict (all 7 present: `css-media-queries`,
+`experimental-install-pwa`, `css-import`, `raw-postprocess`,
+`script-extension`, `provider-integration`, `provider-scripts`),
+`DEPLOYMENT-CLI.md`'s provider list against `arklight/cli/deploy.py`'s
+`PROVIDERS` (Cloudflare only, matches), `PLATFORM-APIS.md`'s capability
+list against `arklight/api.py`'s `PlatformAPI` (`notify`/
+`clipboard_write`, matches), `ARCHITECTURE.md`'s Milestones table
+against `PROGRESS.md`'s Snapshot table (consistent), and
+`V1-DEFINITION.md`/`WHAT-ARKLIGHT-IS.md`'s `Provider` mentions
+(already current, no fix needed there).
+
+Found one real regression, self-inflicted by the previous pass: adding
+a `Provider` section to `AUTHORING-GUIDE.md` didn't update
+`docs/Foundational/README.md`'s own index-table description of that
+file, which still only listed "the component vocabulary, the ARK
+Bundle format" -- exactly the kind of drift a docs-lifecycle change is
+supposed to close in the same commit. Fixed.
+
+- **`docs/Foundational/README.md`** -- added `` `Provider` ``
+  (external-service declarations) to the `AUTHORING-GUIDE.md` index
+  row's description, matching that file's own updated intro paragraph.
+
+No code changed. `tests/test_doc_links.py`/`test_doc_citations.py`/
+`test_link_check.py`/`test_doc_retrieval.py` (43/43) still pass.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: `AUTHORING-GUIDE.md` rewritten as a user-facing reference (component vocabulary table + missing `Provider` section)
 
 Follow-up to the earlier docs-drift audit this session. Two things
