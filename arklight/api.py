@@ -2784,8 +2784,14 @@ class Site:
         through into what looks like a single, fully custom class.
         Re-registering the exact same selector text a second time is
         guarded the same way, for the same "no accidental silent
-        replace" reason `style()` and `register_component(...)` are.
-        Pass `allow_redefine=True` for any of these when the collision
+        replace" reason `style()` and `register_component(...)` are --
+        including a repeat `&`-nested registration (e.g. calling
+        `style_selector(".panel", {"&:hover": {...}})` twice): what's
+        actually checked is the fully-resolved selector each call is
+        about to add (`.panel:hover` in that example), not just the
+        base selector text passed in, since a call whose `rules` is
+        entirely `&`-nested never registers the base selector on its
+        own. Pass `allow_redefine=True` for any of these when the collision
         or the re-registration is deliberate -- e.g. genuinely meaning
         to override ARKlight's own `.card` rules, or intentionally
         layering a second, deliberately-narrower rule set onto a
@@ -2887,6 +2893,61 @@ class Site:
                     )
 
         expanded = self._expand_style_selector_rules(canonical_selector, selector_ast, rules)
+
+        if not allow_redefine:
+            # The check above only catches a repeat of `canonical_selector`
+            # itself -- but when `rules` is entirely `&`-nested (no plain
+            # top-level properties), `canonical_selector` is never what
+            # ends up in `self.selector_rules`; only the desugared nested
+            # selector(s) `_expand_style_selector_rules` just resolved are.
+            # Without this second pass, a first call like
+            # `style_selector(".panel", {"&:hover": {...}})` stores only
+            # ".panel:hover", so the check above -- which only ever looks
+            # for ".panel" -- can never find it, and a second, colliding
+            # `style_selector(".panel", {"&:hover": {...}})` call sails
+            # through uncaught, silently appending a second, cascading
+            # ".panel:hover { }" block. Checking every selector this call
+            # is actually about to add against what's already stored closes
+            # that gap for every `&`-nesting shape (`&:hover`, `&.active`,
+            # `& .child`, `& > .child`, etc.), including multi-level
+            # nesting, while leaving the plain-selector case above alone
+            # (it already raises before execution ever reaches here).
+            existing_selectors = {sel for sel, _rules in self.selector_rules}
+            for resolved_selector, _resolved_rules in expanded:
+                if resolved_selector not in existing_selectors:
+                    continue
+                if resolved_selector == canonical_selector:
+                    # Same message/shape as the pre-expansion check above --
+                    # reachable here only if a future change to this method
+                    # lets execution get this far without raising earlier.
+                    raise DuplicateStyleNameError(
+                        f"site.style_selector({canonical_selector!r}, ...) "
+                        "is already registered. Registering it again would "
+                        "add a second, silently-cascading rule block for "
+                        "the same selector -- if that's deliberate, pass "
+                        f"allow_redefine=True: site.style_selector("
+                        f"{canonical_selector!r}, rules, "
+                        "allow_redefine=True). Otherwise two different "
+                        f"calls are colliding on the same selector; pick a "
+                        "different selector for one of them."
+                    )
+                raise DuplicateStyleNameError(
+                    f"site.style_selector({canonical_selector!r}, ...) "
+                    f"resolves (via '&'-nesting) to {resolved_selector!r}, "
+                    f"which is already registered -- either from an "
+                    f"earlier '&'-nested call on this same base selector, "
+                    f"or a direct site.style_selector({resolved_selector!r}, "
+                    f"...) call. Registering it again would add a second, "
+                    f"silently-cascading rule block for "
+                    f"{resolved_selector!r} -- if that's deliberate, pass "
+                    f"allow_redefine=True: site.style_selector("
+                    f"{canonical_selector!r}, rules, allow_redefine=True). "
+                    f"Otherwise two different calls are colliding on the "
+                    f"resolved selector {resolved_selector!r}; pick a "
+                    f"different '&'-nested key, or a different base "
+                    f"selector, for one of them."
+                )
+
         self.selector_rules.extend((sel, dict(r)) for sel, r in expanded)
 
     def keyframes(
