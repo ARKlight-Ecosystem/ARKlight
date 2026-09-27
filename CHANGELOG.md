@@ -5,6 +5,15 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: dead commit hash in `AUTHORING-GUIDE.md`'s provenance note
+
+Informal fix: the note at the top of `AUTHORING-GUIDE.md` ("Accurate
+as of package version `v0.070`, commit `027bd88` on `alpha`") pointed
+at a commit that doesn't exist on `alpha`, or anywhere in this
+repository -- confirmed with `git cat-file -e` and a full
+`git log --all` grep. Repointed to `96ada2c`, the commit that actually
+last touched the file. No code changed.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: de-duplicate `AUTHORING-GUIDE.md`'s `Provider` section against `PROVIDER-SDK.md`
 
 Correction to the previous pass: adding a full "External services"
