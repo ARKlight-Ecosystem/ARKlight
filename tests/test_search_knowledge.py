@@ -1,11 +1,64 @@
-from arklight.ir.schema import SCHEMA
-from arklight.search.knowledge import SymbolFact, build_knowledge_base
+from arklight.ir.platform_api import PLATFORM_API_REGISTRY
+from arklight.ir.schema import (
+    ACTION_REGISTRY,
+    BEHAVIOR_REGISTRY,
+    DERIVATION_REGISTRY,
+    MODIFIER_REGISTRY,
+    PREDICATE_REGISTRY,
+    REVEAL_REGISTRY,
+    SCHEMA,
+)
+from arklight.search.knowledge import (
+    STATE_KEYWORDS,
+    SymbolFact,
+    build_knowledge_base,
+)
 from arklight.search._tokenize import tokenize
 
 
-def test_knowledge_base_has_one_fact_per_schema_entry():
+def test_knowledge_base_contains_every_schema_entry():
+    # Was equality before the search-knowledge-state-and-keywords
+    # capability fix folded STATE_KEYWORDS and the closed registries
+    # in too -- the kb is now a strict superset of SCHEMA, not equal
+    # to it.
     kb = build_knowledge_base()
-    assert set(kb) == set(SCHEMA)
+    assert set(SCHEMA) <= set(kb)
+
+
+def test_knowledge_base_includes_state_keywords():
+    kb = build_knowledge_base()
+    for name, required_props in STATE_KEYWORDS.items():
+        assert name in kb
+        fact = kb[name]
+        assert fact.required_props == required_props
+        assert fact.allow_children is False
+        assert fact.text_only_children is False
+
+
+def test_knowledge_base_includes_every_closed_registry():
+    kb = build_knowledge_base()
+    for registry in (
+        BEHAVIOR_REGISTRY,
+        REVEAL_REGISTRY,
+        ACTION_REGISTRY,
+        MODIFIER_REGISTRY,
+        DERIVATION_REGISTRY,
+        PREDICATE_REGISTRY,
+        PLATFORM_API_REGISTRY,
+    ):
+        for name in registry:
+            assert name in kb, f"{name!r} missing from knowledge base"
+            assert kb[name].tokens == tuple(tokenize(name))
+
+
+def test_knowledge_base_state_keywords_do_not_shadow_schema():
+    # No real collision exists (SCHEMA is PascalCase node names,
+    # STATE_KEYWORDS happens to also be PascalCase -- "State" isn't a
+    # SCHEMA entry) but the precedence rule should hold regardless.
+    kb = build_knowledge_base()
+    for name in STATE_KEYWORDS:
+        if name in SCHEMA:
+            assert kb[name].required_props == SCHEMA[name].required_props
 
 
 def test_knowledge_base_facts_mirror_schema_fields():
