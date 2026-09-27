@@ -35,6 +35,39 @@ every call into it is inside its own `try`/`catch` so a broken override
 can never become a second, worse failure. Messages passed to it are
 fixed, compiler-chosen strings -- no site-authored text reaches
 `arkNotify`.
+
+Two more siblings close a gap specific to `Site(app_shell=True)`
+(htmx-4): HTMX's own request/swap lifecycle can fail -- a broken link,
+an offline visitor, a 500 from wherever the shell is hosted -- and
+until now nothing on the page ever surfaced that to the visitor. HTMX
+dispatches its own `htmx:*Error`-shaped events when this happens (see
+`fe()`, "trigger error event", in `arklight/backend/js/htmx.py`'s
+vendored source) but never shows anything on its own; a boosted link
+that fails just... does nothing.
+
+- `wireHtmxErrorHandling()` -- the HTMX-specific counterpart to
+  `wireErrorBoundary()` above: one delegated listener per failure-
+  shaped HTMX event (`htmx:responseError`/`htmx:sendError`/
+  `htmx:timeout`/`htmx:swapError`/`htmx:targetError`/
+  `htmx:invalidPath`), registered once on `document.body` (never
+  replaced by a boosted swap), each funnelling into `arkReportError` so
+  a failed request gets the same console-log + on-page-notice +
+  optional-hook treatment every other runtime failure already does.
+  Shipped and wired wherever HTMX itself is (`needs_htmx` in
+  `arklight/backend/js/render.py`), which already covers every
+  `app_shell` site -- see that module's `needs_htmx` docstring.
+- `warnIfAppShellServedFromFileProtocol()` -- one specific failure mode
+  `wireHtmxErrorHandling()` can't reliably catch after the fact:
+  opening an `app_shell` page directly from disk (`file://.../index.
+  html`) instead of serving it over http(s). Boosted navigation issues
+  its swaps via `XMLHttpRequest`, which browsers refuse outright
+  against a `file://` URL (there is no origin to authorize the request
+  against) -- and in that case some browsers never even dispatch
+  HTMX's own error events, so the visitor would otherwise get no
+  notice that every link on the page is now silently inert. Checked
+  once, directly, via `window.location.protocol`, and shipped only for
+  `app_shell` sites -- a plain site never boosts navigation, so
+  `file://` is a perfectly normal way to open one.
 """
 
 from __future__ import annotations
@@ -109,4 +142,57 @@ ERROR_BOUNDARY_JS = """  function wireErrorBoundary() {
         arkReportError(boundaryMessage, event && event.reason);
       } catch (boundaryErr) { /* the boundary itself must never throw */ }
     });
+  }"""
+
+HTMX_ERROR_HANDLING_JS = """  function wireHtmxErrorHandling() {
+    // HTMX-specific counterpart to wireErrorBoundary() above: HTMX
+    // dispatches its own error-shaped events on every failed request
+    // or swap (see `fe()`, "trigger error event", in vendored
+    // htmx.js) but never shows the visitor anything on its own -- a
+    // failed boosted link just does nothing. Funnelling each one
+    // through arkReportError gives it the same console-log +
+    // on-page-notice + optional ARKLIGHT_ON_ERROR() hook treatment
+    // every other runtime failure already gets. Registered exactly
+    // once, on document.body (an hx-boost swap never replaces it),
+    // same lifetime contract as wireErrorBoundary().
+    var message = "A page request failed -- some content may not have loaded.";
+    var failureEvents = [
+      "htmx:responseError",
+      "htmx:sendError",
+      "htmx:timeout",
+      "htmx:swapError",
+      "htmx:targetError",
+      "htmx:invalidPath"
+    ];
+    failureEvents.forEach(function (eventName) {
+      document.body.addEventListener(eventName, function (event) {
+        try {
+          arkReportError(message, event && event.detail && event.detail.error);
+        } catch (handlerErr) {
+          /* the handler itself must never throw */
+        }
+      });
+    });
+  }"""
+
+APP_SHELL_FILE_PROTOCOL_CHECK_JS = """  function warnIfAppShellServedFromFileProtocol() {
+    // Site(app_shell=True) boosts every same-origin link into an
+    // in-place XMLHttpRequest-driven swap (htmx-4) instead of a real
+    // document navigation. Browsers refuse to issue that request at
+    // all against a page opened directly from disk (file://...) --
+    // there is no origin to authorize an XHR against -- and some
+    // browsers never even dispatch HTMX's own failure events for a
+    // blocked file:// request, so wireHtmxErrorHandling() above can't
+    // be relied on to catch this one. Checked once, directly, instead.
+    try {
+      if (window.location.protocol === "file:") {
+        arkNotify(
+          "This page was opened directly from a file (file://) -- " +
+          "app-shell navigation needs it to be served over http(s), " +
+          "so links here will not work."
+        );
+      }
+    } catch (checkErr) {
+      /* best-effort, same as arkNotify itself */
+    }
   }"""
