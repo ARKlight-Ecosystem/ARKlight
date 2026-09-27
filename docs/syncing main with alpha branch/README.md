@@ -38,7 +38,7 @@ note.
 | 3 | JS vocabulary ladder, 10 rungs (`v0.061`-`v0.070`) | Not started |
 | 4 | `Provider` SDK, 6 stages (`v0.065`-`v0.070`) | Ported -- `import arklight` still fails, but now for exactly the single remaining reason predicted (Stage 5's `arklight.ir.platform_api`), confirming no new import gaps introduced |
 | 5 | Platform API IR | Ported -- resolves the `arklight.ir.platform_api` gap Stage 1 predicted. `import arklight` still fails, but for a gap this plan hadn't documented: `ir/__init__.py` (Stage 1) unconditionally imports `arklight.ir.binary` (Stage 9, not yet landed). Not a Stage 5 defect -- pre-existing in the Stage 1 port, just unmasked now that Stage 5's own gap is closed. Flagging here rather than pulling Stage 9 forward. |
-| 6 | Rei compiler narrator | Not started |
+| 6 | Rei compiler narrator | Ported -- self-contained, no existing code references `arklight.compiler.rei` yet, so this introduces no new import coupling. `import arklight` still blocked only by the pre-existing Stage 9 `ir.binary` gap noted at Stage 5. `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` deliberately left out (Proposals dir is out of scope). |
 | 7 | Search/knowledge-state additions + doc tooling | Not started |
 | 8 | URL state, class binding, action-arg runtime | Not started |
 | 9 | Compiler hardening & supply-chain tooling | Not started |
