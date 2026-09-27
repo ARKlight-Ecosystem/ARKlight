@@ -11,6 +11,38 @@ Custom CSS class authoring and an `arklight --search <name>` schema
 lookup are sketched but not yet scheduled to a version -- see
 "Planned, not yet scheduled" in [`PROGRESS.md`](./PROGRESS.md).
 
+## [0.070.0] -- Docs-only: alpha catch-up (user-defined components, JS vocabulary ladder, `Provider`, Platform API IR, preamble system, Rei narrator, ACC hook)
+
+`docs/Foundational/` brought up to parity with `alpha`'s `0.070.0`
+copy in full (6 files updated in place, 10 net new, one renamed:
+`user-defined-components.md` -> `USER-DEFINED-COMPONENTS.md`).
+`docs/version history/` gains one bundled entry, `v0.070.0.md`, per
+`main`'s own one-file-per-release convention (`alpha` ships one file
+per rung; `main` does not mirror that granularity -- see `docs/version
+history/README.md`). **No code changed in this release** -- the
+underlying features (user-defined components, the 10-rung JS
+vocabulary ladder, `Provider`, Platform API IR stage 1, the preamble
+system, the Rei compiler narrator, the ACC capability hook) still need
+their own separate code-sync pass; see `docs/syncing main with alpha
+branch/MAIN TO ALPHA V0.070.0.md` for that plan. Android, Desktop, and
+`arklight deploy` are explicitly excluded from both the docs claim and
+any future code sync -- `docs/Foundational/CLI-REFERENCE.md` and
+`DEPLOYMENT-CLI.md` already flag all three "alpha-only so far -- not
+yet on `main`" in their own text, carried over unedited.
+
+Every link inside the carried-over Foundational docs that would point
+at a folder `main` doesn't have (`docs/Backends/`, `docs/Proposals/`,
+`docs/Implementation/`, `docs/Far Future Concern/`, `docs/reference/`)
+was rewritten from a relative path to a full
+`https://github.com/ARKlight-Ecosystem/ARKlight/blob/alpha/...` URL --
+9 links across `AUTHORING-GUIDE.md`, `CLI-REFERENCE.md`,
+`DESIGN-NOTES.md`, and `PLATFORM-APIS.md`. Root `README.md`'s internal
+links were also converted from relative (`./docs/...`) to full
+`.../blob/main/...` GitHub URLs, since the same README is what PyPI
+renders as the project description page, and a relative link there
+has nothing to resolve against -- it just points at
+`pypi.org/docs/...`, which doesn't exist.
+
 ## [0.54.0] -- Alpha catch-up: CSS media queries, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV
 
 Bulk catch-up release, porting `alpha`'s Stages 1-7 onto `main` per
