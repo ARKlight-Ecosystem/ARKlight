@@ -7,6 +7,11 @@ Ties every stage together, matching the architecture doc exactly:
         -> Python AST         (arklight.parser.discover, static analysis)
         -> ARK AST            (arklight.parser.loader executes the module;
                                  Site.build_ark_ast() calls each page fn)
+        -> Component expansion (arklight.ir.components, v0.060 Stage 0 --
+                                 user-defined component markers are
+                                 spliced out here, before Normalization
+                                 ever sees them; a no-op for a site that
+                                 never registers one)
         -> Normalization      (arklight.ir.normalize)
         -> Validation         (arklight.ir.validate)
         -> Website IR         (arklight.ir.build)
@@ -16,8 +21,8 @@ Ties every stage together, matching the architecture doc exactly:
 
 As of v0.002, `build()` runs *multiple* backends over the same Website
 IR by default (HTML and CSS) and merges their output files -- this is
-exactly the "Backend Interface" fan-out the architecture doc describes
-under "Future: CSS, JavaScript, Vue, Svelte": each backend consumes the
+exactly the fan-out the architecture doc describes under "Backend
+Interface": each backend consumes the
 same IR and contributes its own output files.
 
 `build()` also copies a top-level `assets/` folder (next to the site's
@@ -27,19 +32,33 @@ see `_copy_assets` below.
 
 from __future__ import annotations
 
+import re
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from arklight import experimental
+from arklight import __version__, experimental
+from arklight.api import _check_css_var_value
 from arklight.backend.base import Backend
 from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
+from arklight.config import ConfigError, load_config, overdrive_enabled
+from arklight.compiler.asset_check import (
+    check_required_assets,
+    collect_required_assets,
+    format_report,
+)
+from arklight.compiler.link_check import check_links, format_report as format_link_report
+from arklight.compiler.overdrive import ASSET_WAIVABLE, LINK_WAIVABLE, format_notice
+from arklight.compiler.sbom import build_sbom_text
+from arklight.ir import binary as binary_ir
 from arklight.ir.build import WebsiteIR, build_website_ir
+from arklight.ir.components import ComponentError, collect_default_styles, expand_ark_ast
 from arklight.ir.normalize import normalize_ark_ast
-from arklight.ir.validate import ValidationError, validate_ark_ast
+from arklight.ir.validate import ValidationError, validate_ark_ast, validate_provider
 from arklight.parser.loader import SiteLoadError, load_site
 from arklight.search.engine import default_engine
 from arklight.search.feedback import record_name_error_feedback, record_validation_feedback
@@ -58,6 +77,30 @@ StageLogger = Callable[[str], None]
 
 def _noop_stage_logger(_message: str) -> None:
     return None
+
+
+def _looks_like_arklight_file(entry_path: str | Path) -> bool:
+    """
+    True if `entry_path` is a `.arklight` binary IR snapshot
+    (`arklight.ir.binary`) rather than a Python site file -- checked
+    by extension first (cheap, covers the ordinary `--emit-arklight`
+    default filename and anything a person names `something.arklight`
+    themselves), falling back to sniffing the file's first 4 bytes
+    against `binary_ir.MAGIC` for a differently-extensioned file (e.g.
+    `--emit-arklight=build/site` with no extension at all). Never
+    raises for a missing/unreadable path -- `build` surfaces that as
+    its own `CompileError` a few lines later regardless of which
+    branch it took, the same as it always has for a missing Python
+    site file.
+    """
+    path = Path(entry_path)
+    if path.suffix == ".arklight":
+        return True
+    try:
+        with open(path, "rb") as f:
+            return f.read(len(binary_ir.MAGIC)) == binary_ir.MAGIC
+    except OSError:
+        return False
 
 
 def _record_validation_feedback_best_effort(message: str) -> None:
@@ -79,6 +122,32 @@ def _record_validation_feedback_best_effort(message: str) -> None:
         pass
 
 
+_UNDEFINED_NAME_RE = re.compile(r"name '(?P<name>[A-Z][A-Za-z0-9_]*)' is not defined")
+
+
+def _name_error_hint(message: str) -> str:
+    """
+    ". Did you mean: Heading?" for a misspelled component call, else "".
+
+    A typo'd component (`Headingg(...)`) is a plain Python `NameError`
+    raised from inside a site's own module/page-function code, and
+    before this it surfaced as just "name 'Headingg' is not defined"
+    even though `arklight search Headingg` already knew the answer.
+    Only names starting with an uppercase letter are considered --
+    components do, so a misspelled local variable (`titel`) is never
+    offered an unrelated component suggestion. Best-effort: any failure
+    here must never change how the real error is reported.
+    """
+    match = _UNDEFINED_NAME_RE.search(message)
+    if match is None:
+        return ""
+    try:
+        names = [r.name for r in default_engine().search(match.group("name"), limit=3)]
+    except Exception:  # noqa: BLE001 -- a hint must never break error reporting
+        return ""
+    return f". Did you mean: {', '.join(names)}?" if names else ""
+
+
 def _record_name_error_feedback_best_effort(message: str) -> None:
     """The actual live counterpart to the hook above. Every component
     (`Heading`, `Image`, ...) is a real Python function/name, so a
@@ -98,7 +167,7 @@ def _record_name_error_feedback_best_effort(message: str) -> None:
 
 # Name of the top-level, next-to-`site.py` folder ARKlight auto-copies
 # into the output directory (verbatim, recursively) if it exists. Fixes
-# the "404 images" gotcha documented in docs/DESIGN-NOTES.md: previously
+# the "404 images" gotcha documented in docs/Foundational/DESIGN-NOTES.md: previously
 # a site's `assets/` (images, fonts, favicons, ...) had to be copied by
 # hand with `cp -r assets ARK/assets` after every build.
 ASSETS_DIR_NAME = "assets"
@@ -126,6 +195,8 @@ def compile_site_file(
     on_stage: StageLogger | None = None,
     css_var_overrides: dict[str, str] | None = None,
     lang: str | None = None,
+    strict_csp_override: bool | None = None,
+    devtools_console_reminder: bool = True,
 ) -> WebsiteIR:
     """
     Run every stage up to (and including) Website IR construction, but
@@ -146,22 +217,61 @@ def compile_site_file(
 
     `lang`, if given, overrides the site file's own `Site(lang=...)`
     (or its "en" default) the same way -- for the CLI's `--lang` flag.
+
+    `strict_csp_override`, if not `None`, wins over whatever the site
+    file itself set via `Site(strict_csp=...)` -- an outer override,
+    same shape as `css_var_overrides`/`lang` above, for the CLI's
+    `arklight.config.py` (`CONFIG = {"csp": {"strict_csp": ...}}`)
+    project-wide policy knob (see `arklight.config`'s "csp" section
+    comment). `None` (the default) means "no override, defer entirely
+    to the site file's own `Site(strict_csp=...)` value" -- it is *not*
+    the same as passing `False`, which would force the policy off for
+    every site regardless of what the site file asked for.
+
+    `devtools_console_reminder` is `arklight.config.py`'s
+    `CONFIG = {"experimental": {"devtools_console_reminder": ...}}`
+    passthrough (see `WebsiteIR.devtools_console_reminder`'s comment in
+    `arklight/ir/build.py`) -- unlike `strict_csp_override` this has no
+    `Site(...)` kwarg to defer to, so it's a plain bool, not a
+    three-state override: `True` (the default) unless the project's
+    config file turns it off.
     """
     log = on_stage or _noop_stage_logger
 
     log("Discovering site and compiling AST trees...")
     try:
-        site, _discovered = load_site(entry_path)
+        site, _discovered = load_site(entry_path, on_notice=log)
     except SiteLoadError as exc:
-        raise CompileError(str(exc)) from exc
+        raise CompileError(f"{exc}{_name_error_hint(str(exc))}") from exc
 
     try:
         ark_ast = site.build_ark_ast()
     except NameError as exc:
         _record_name_error_feedback_best_effort(str(exc))
-        raise CompileError(f"Error while building page(s): {exc}") from exc
+        raise CompileError(
+            f"Error while building page(s): {exc}{_name_error_hint(str(exc))}"
+        ) from exc
     except Exception as exc:  # noqa: BLE001 -- surface page-function errors clearly
         raise CompileError(f"Error while building page(s): {exc}") from exc
+
+    log("Expanding user-defined components...")
+    used_components: set[str] = set()
+    try:
+        ark_ast = expand_ark_ast(ark_ast, used=used_components)
+    except ComponentError as exc:
+        raise CompileError(str(exc)) from exc
+
+    # v0.060, Stage 2 ("Default styling hook"): only components this
+    # build actually expanded get their `default_style` folded into
+    # the stylesheet -- see `collect_default_styles`'s own docstring
+    # for why that's keyed on usage rather than on the whole (process-
+    # global) `COMPONENT_REGISTRY`. An explicit `site.style(name, ...)`
+    # registration for the same name wins over a component's own
+    # default (the merge below, keyed by `site.custom_styles` applied
+    # last) -- same "the more specific/explicit thing wins" cascade
+    # reasoning every other CSS-generating layer in this pipeline
+    # already follows.
+    component_default_styles = collect_default_styles(used_components)
 
     log("Normalizing AST...")
     try:
@@ -172,11 +282,17 @@ def compile_site_file(
     log("Running validation...")
     try:
         validate_ark_ast(normalized)
+        # `Provider` stage 2 of 6 (`v0.066`): `Site(provider=...)` isn't
+        # a node in `normalized`, so it isn't covered by the tree walk
+        # above -- checked here, in the same stage, so a bad
+        # declaration fails the build the same way a bad node does
+        # (see `arklight.ir.validate.validate_provider`'s docstring).
+        validate_provider(site.provider)
     except ValidationError as exc:
         _record_validation_feedback_best_effort(str(exc))
         raise CompileError(str(exc)) from exc
 
-    # Experimental API warnings (docs/EXPERIMENTAL-APIS.md): every
+    # Experimental API warnings (docs/Foundational/EXPERIMENTAL-APIS.md): every
     # opt-in call the site made (currently just `site.media_query(...)`)
     # was already recorded on `site.experimental_usages` at call time --
     # print the inline "[EXPERIMENTAL FEATURE ACTIVE]" banner for each
@@ -192,11 +308,20 @@ def compile_site_file(
     merged_css_var_overrides = dict(site.css_var_overrides)
     if css_var_overrides:
         merged_css_var_overrides.update(css_var_overrides)
+    # `Site(max_width=...)` etc. already validate themselves (see
+    # `Site._set_css_var_override`); this catches the other way a value
+    # reaches here -- the CLI's --max-width/--bg/--font-family/
+    # --button-text flags, which never pass through that constructor.
+    for _var_name, _var_value in merged_css_var_overrides.items():
+        try:
+            _check_css_var_value(_var_name, _var_value)
+        except ValueError as exc:
+            raise CompileError(f"Invalid design-token override: {exc}") from exc
 
     return build_website_ir(
         site.name,
         normalized,
-        custom_styles=site.custom_styles,
+        custom_styles={**component_default_styles, **site.custom_styles},
         media_queries=site.custom_media_queries,
         experimental_usages=site.experimental_usages,
         css_var_overrides=merged_css_var_overrides,
@@ -208,7 +333,7 @@ def compile_site_file(
         # the loop just above. This is that feature's own inline
         # "[EXPERIMENTAL FEATURE ACTIVE]" detection point.
         on_warning=log,
-        # Structural addendum (docs/DESIGN-NOTES.md "CSS selector
+        # Structural addendum (docs/Foundational/DESIGN-NOTES.md "CSS selector
         # algebra + at-rule vocabulary"): straight passthroughs, same
         # as `custom_styles`/`media_queries` above.
         selector_rules=site.selector_rules,
@@ -218,18 +343,105 @@ def compile_site_file(
         supports_rules=site.supports_rules,
         page_rules=site.page_rules,
         style_imports=site.style_imports,
-        # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9): straight
+        # htmx-4 (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 9): straight
         # passthrough, same shape as the CSS addendum fields above --
         # no CLI flag equivalent (unlike `lang`/`css_var_overrides`),
         # since app-shell navigation is a whole-site authoring
         # decision the site file itself makes, not a per-build override.
         app_shell=site.app_shell,
-        # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): straight passthrough,
+        # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md): straight passthrough,
         # same shape as the CSS addendum fields above -- `build()` below
         # is what actually runs these, after every backend's own
         # render()+postprocess() pass.
         raw_postprocessors=site.raw_postprocessors,
+        # Runtime policy enforcement (arklight/backend/html/csp.py):
+        # straight passthrough, same shape as `app_shell` above -- no
+        # CLI flag equivalent, for the same reason `app_shell` has none:
+        # this is a whole-site authoring decision, not a per-build
+        # override a CI invocation would plausibly want to flip.
+        # `strict_csp_override` (`arklight.config.py`'s "csp" section)
+        # wins over the site file's own `Site(strict_csp=...)` when the
+        # project's config explicitly set one -- `None` means the
+        # config had nothing to say, so the site file's own value
+        # passes through unchanged, same "outer override, absent by
+        # default" shape as `css_var_overrides`/`lang` above.
+        strict_csp=site.strict_csp if strict_csp_override is None else strict_csp_override,
+        trusted_script_origins=site.trusted_script_origins,
+        devtools_console_reminder=devtools_console_reminder,
+        # `Provider` stage 2 of 6 (`v0.066`): straight passthrough, same
+        # shape as `app_shell`/`raw_postprocessors` above -- already
+        # validated by `validate_provider` a few lines up, in this same
+        # `build` call, before this IR-build stage runs.
+        provider=site.provider,
     )
+
+
+def compile_arklight_file(
+    entry_path: str | Path,
+    *,
+    on_stage: StageLogger | None = None,
+    css_var_overrides: dict[str, str] | None = None,
+    lang: str | None = None,
+    strict_csp_override: bool | None = None,
+    devtools_console_reminder: bool = True,
+) -> WebsiteIR:
+    """
+    The `.arklight`-file counterpart to `compile_site_file` above --
+    closes the "uncharted territory" `arklight.ir.binary`'s module
+    docstring calls out: `encode_arklight`/`decode_arklight` already
+    existed on both sides of this round trip, but nothing in
+    ARKlight-py ever ran the decode side to actually rebuild something
+    a backend could render. This does: reads a previously-`--emit-
+    arklight`'d snapshot straight off disk and hands back the same
+    `WebsiteIR` `compile_site_file` would have built from the original
+    Python source -- none of the Python-source stages (discovery, AST,
+    component expansion, normalization, validation) run at all, which
+    is the entire point of the format (see `arklight.ir.binary`'s
+    module docstring: "doesn't require re-running the Python compiler
+    pipeline to read back").
+
+    `on_stage`, if given, narrates the two stages this path actually
+    has (read+decode, then rebuild) -- `--verbose` parity with
+    `compile_site_file`'s own stage narration, even though there's
+    much less work happening here.
+
+    `css_var_overrides`/`lang`/`strict_csp_override`/
+    `devtools_console_reminder` are the exact same outer overrides
+    `compile_site_file` accepts (see its docstring) -- applied
+    directly to the rebuilt `WebsiteIR` here rather than to a `Site(
+    ...)` object, since a `.arklight` snapshot has no live `Site(...)`
+    to defer to; a rebuilt site's `strict_csp`/every other field
+    `encode_arklight` doesn't carry already starts at `WebsiteIR`'s
+    own stock default (see `decoded_site_to_website_ir`'s docstring),
+    so `strict_csp_override=None` here means "leave that default
+    alone", same as it meaning "defer to `Site(strict_csp=...)`" on
+    the Python-source path.
+    """
+    log = on_stage or _noop_stage_logger
+    path = Path(entry_path)
+
+    log(f"Reading .arklight snapshot from {path}...")
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise CompileError(f"Could not read .arklight file {path}: {exc}") from exc
+
+    try:
+        decoded = binary_ir.decode_arklight(data)
+    except binary_ir.ArklightFormatError as exc:
+        raise CompileError(f"{path} is not a valid .arklight file: {exc}") from exc
+
+    log(f"Rebuilding Website IR from {len(decoded.pages)} page(s)...")
+    ir = binary_ir.decoded_site_to_website_ir(decoded)
+
+    if css_var_overrides:
+        ir.css_var_overrides = {**ir.css_var_overrides, **css_var_overrides}
+    if lang is not None:
+        ir.lang = lang
+    if strict_csp_override is not None:
+        ir.strict_csp = strict_csp_override
+    ir.devtools_console_reminder = devtools_console_reminder
+    return ir
 
 
 def build(
@@ -240,6 +452,9 @@ def build(
     on_stage: StageLogger | None = None,
     css_var_overrides: dict[str, str] | None = None,
     lang: str | None = None,
+    strict_csp_override: bool | None = None,
+    devtools_console_reminder: bool = True,
+    overdrive: bool | None = None,
 ) -> BuildResult:
     """
     Full pipeline: Python source file -> rendered files written to `output_dir`.
@@ -256,13 +471,58 @@ def build(
     `compile_site_file` (see there) -- this is how the CLI's
     `--max-width`/`--bg`/`--font-family`/`--lang` flags reach the
     design tokens and `<html lang>` without requiring a site-file edit.
+
+    `strict_csp_override`/`devtools_console_reminder` are also
+    forwarded to `compile_site_file` (see there) -- the CLI's
+    `arklight.config.py` `"csp"`/`"experimental"` sections reach the
+    generated CSP meta tag and the devtools console reminder the same
+    way, without requiring a site-file edit either.
+
+    `entry_path` may be a `.arklight` binary IR snapshot instead of a
+    Python site file (`_looks_like_arklight_file` detects which) -- in
+    that case `compile_arklight_file` runs instead of
+    `compile_site_file`, skipping the Python-source stages entirely;
+    every other argument here means the same thing either way (see
+    `compile_arklight_file`'s docstring for how the overrides apply
+    without a `Site(...)` to defer to).
+
+    `overdrive`, if `None` (the default), is read from the project's
+    `arklight.config.py` (`CONFIG = {"overdrive": True}`, next to the
+    entry file) -- read here rather than only in the CLI so every caller
+    agrees. `True`/`False` overrides the config. See
+    `arklight.compiler.overdrive` for exactly what it waives.
+
+    Also always writes `sbom.txt` -- a per-build manifest of what this
+    specific compile actually contains (see `arklight.compiler.sbom`
+    for the format and what it deliberately does/doesn't claim).
     """
     log = on_stage or _noop_stage_logger
     backends = backends if backends is not None else default_backends()
 
-    ir = compile_site_file(
-        entry_path, on_stage=log, css_var_overrides=css_var_overrides, lang=lang
-    )
+    if overdrive is None:
+        try:
+            overdrive = overdrive_enabled(load_config(Path(entry_path).resolve().parent))
+        except ConfigError as exc:
+            raise CompileError(str(exc)) from exc
+
+    if _looks_like_arklight_file(entry_path):
+        ir = compile_arklight_file(
+            entry_path,
+            on_stage=log,
+            css_var_overrides=css_var_overrides,
+            lang=lang,
+            strict_csp_override=strict_csp_override,
+            devtools_console_reminder=devtools_console_reminder,
+        )
+    else:
+        ir = compile_site_file(
+            entry_path,
+            on_stage=log,
+            css_var_overrides=css_var_overrides,
+            lang=lang,
+            strict_csp_override=strict_csp_override,
+            devtools_console_reminder=devtools_console_reminder,
+        )
 
     output_files: dict[str, str] = {}
     for backend in backends:
@@ -284,29 +544,98 @@ def build(
         except Exception as exc:  # noqa: BLE001 -- surface backend errors clearly
             raise CompileError(f"Backend {backend.name!r} failed to postprocess: {exc}") from exc
 
-    # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): `site.raw_postprocess(...)`
-    # functions get the exact same second pass every `Backend.postprocess()`
-    # just got above, run last and in registration order, over the fully
-    # combined output of every backend. Each already recorded its own
-    # `ExperimentalUsage` at *registration* time (see `Site.raw_postprocess`),
-    # printed by the inline-banner loop in `compile_site_file` above -- this
-    # is just where the function itself actually runs. A no-op loop (as
-    # before) for sites that never called `site.raw_postprocess(...)`.
+    # `site.raw_postprocessors` -- functions registered here get the
+    # exact same second pass every `Backend.postprocess()` just got
+    # above, run last and in registration order, over the fully
+    # combined output of every backend. This list is no longer
+    # user-facing: `Site.raw_postprocess(fn)` is deprecated and never
+    # appends to it anymore (see `arklight/experimental.py`'s
+    # `raw-postprocess` entry) -- the only thing that populates it now
+    # is `arklight.backend.script_extension.register()`, via
+    # `site.register_script_extension(...)`. A no-op loop (as before)
+    # for sites that never call it.
     for i, raw_fn in enumerate(ir.raw_postprocessors, start=1):
         log(f"Running raw postprocess function {i}/{len(ir.raw_postprocessors)}...")
         try:
             result = raw_fn(output_files)
         except Exception as exc:  # noqa: BLE001 -- surface user code errors clearly
             raise CompileError(
-                f"site.raw_postprocess(...) function #{i} raised an error: {exc}"
+                f"raw postprocess function #{i} raised an error: {exc}"
             ) from exc
         if not isinstance(result, dict):
             raise CompileError(
-                f"site.raw_postprocess(...) function #{i} must return a "
+                f"raw postprocess function #{i} must return a "
                 f"dict[str, str] of {{relative_path: contents}}, got "
                 f"{type(result).__name__!r}."
             )
         output_files = result
+
+    # Asset gate -- runs after every backend/postprocess has produced the
+    # final file set and *before* anything touches disk, so a failure
+    # leaves no half-written output. The report goes straight to stderr
+    # (not through `log`, the narrator, or `warnings`) and there is no
+    # flag to silence it. See `arklight.compiler.asset_check`.
+    log("Checking required assets...")
+    required_assets = collect_required_assets(ir)
+    assets_src = Path(entry_path).resolve().parent / ASSETS_DIR_NAME
+    asset_problems = check_required_assets(
+        required_assets,
+        assets_src=assets_src,
+        generated=set(output_files),
+        assets_dir_name=ASSETS_DIR_NAME,
+    )
+    link_total, link_problems = check_links(ir, generated=set(output_files))
+    asset_waived: list = []
+    if overdrive:
+        # Only the *unverifiable* findings are waived (see overdrive.py);
+        # each one is still printed, every build, on stderr.
+        asset_waived = [p for p in asset_problems if p.kind in ASSET_WAIVABLE]
+        link_waived = [p for p in link_problems if p.kind in LINK_WAIVABLE]
+        asset_problems = [p for p in asset_problems if p.kind not in ASSET_WAIVABLE]
+        link_problems = [p for p in link_problems if p.kind not in LINK_WAIVABLE]
+        if asset_waived or link_waived:
+            print(
+                format_notice(asset_waived, link_waived, entry_path=Path(entry_path).resolve()),
+                file=sys.stderr,
+                flush=True,
+            )
+    if asset_problems or link_problems:
+        failures = []
+        if asset_problems:
+            print(
+                format_report(
+                    asset_problems,
+                    total_required=len(required_assets),
+                    entry_path=Path(entry_path).resolve(),
+                    assets_src=assets_src,
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+            failures.append(
+                f"Asset check failed: {len(asset_problems)} of {len(required_assets)} "
+                f"required asset(s) missing or not an exact name match"
+            )
+        if link_problems:
+            print(
+                format_link_report(
+                    link_problems,
+                    total_checked=link_total,
+                    entry_path=Path(entry_path).resolve(),
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+            failures.append(
+                f"Link check failed: {len(link_problems)} internal link(s) don't resolve"
+            )
+        raise CompileError("; ".join(failures) + " (full report above). Nothing was written.")
+    verified_assets = len(required_assets) - (len(asset_waived) if overdrive else 0)
+    log(f"Asset check passed: {verified_assets} required asset(s), all present.")
+    log(f"Link check passed: {link_total} internal link(s), all resolve.")
+
+    log("Generating build manifest (sbom.txt)...")
+    output_files["sbom.txt"] = build_sbom_text(ir, version=__version__)
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -351,7 +680,7 @@ def _copy_assets(entry_path: str | Path, out_dir: Path) -> list[Path]:
 
     This was previously a manual, easy-to-forget step (`cp -r assets
     ARK/assets`) -- a real gap, not a template-only concern, per
-    docs/DESIGN-NOTES.md. No-op (returns an empty list) when there's no
+    docs/Foundational/DESIGN-NOTES.md. No-op (returns an empty list) when there's no
     `assets/` folder to copy.
     """
     assets_src = Path(entry_path).resolve().parent / ASSETS_DIR_NAME

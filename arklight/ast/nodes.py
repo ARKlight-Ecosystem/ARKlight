@@ -26,6 +26,35 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 
+# `Action.*(...)` arg values that read live state: the wire-level shape
+# of "the value `State`/`Computed` `name` holds at the moment this action
+# runs" is the plain JSON object `{"__state__": "<name>"}`. A plain
+# dict -- not a dataclass -- on purpose: it must survive the
+# `.arklight` binary round trip (`dataclasses.asdict` flattens a
+# dataclass nested inside `ActionRef.args`, losing its type tag; see
+# `ItemIndexRef`'s known gap in `arklight/ir/binary.py`), pass straight
+# through `json.dumps` in every place an `ActionRef`'s args are
+# serialized (HTML attrs, `IRPage.watch`, Repeat template specs), and
+# be recognized by the JS runtime with no per-backend translation.
+# Authors never write this by hand: `Action.append("tasks", Bind("draft"))`
+# builds it (`arklight.api`), `arklight.ir.validate` checks it,
+# `arklight/backend/js/runtime/action_args.py` resolves it.
+STATE_REF_KEY = "__state__"
+
+
+def state_ref(name: str) -> dict[str, str]:
+    """Build the `{"__state__": name}` marker (see `STATE_REF_KEY`)."""
+    return {STATE_REF_KEY: name}
+
+
+def is_state_ref(value: Any) -> bool:
+    """True for any dict carrying the reserved `__state__` key --
+    well-formed or not, so validation can reject a malformed one
+    (extra keys, non-string name) instead of letting it through as a
+    literal dict the runtime would then misread."""
+    return isinstance(value, dict) and STATE_REF_KEY in value
+
+
 @dataclass(frozen=True)
 class ClassBindSpec:
     """
@@ -38,11 +67,35 @@ class ClassBindSpec:
     string, validated against the page's declared `State(...)` names at
     compile time (an unknown `state` target fails the build) and never
     a class-name string built by concatenation at runtime. See
-    docs/DESIGN-NOTES.md ("Reactive-core vdom staging", Stage 2).
+    docs/Foundational/DESIGN-NOTES.md ("Reactive-core vdom staging", Stage 2).
     """
 
     state: str
     class_name: str
+
+
+@dataclass(frozen=True)
+class ModelBindSpec:
+    """
+    `v0.063` (JS vocabulary addendum, stage 3/10 -- see
+    `docs/version history/v0.063.md`): a reference to a two-way input
+    binding with a debounce/throttle modifier attached -- e.g.
+    `Bind.model("query", debounce=300)`. Used as a `bind_value=` prop
+    value, same slot a plain state-name string already fills.
+
+    `Bind.model(...)` only returns this structured form when a
+    modifier is actually requested; with neither `debounce=` nor
+    `throttle=` given it keeps returning a plain string, so every
+    existing `bind_value=Bind.model("query")` call site is unaffected.
+    `modifiers` reuses `arklight.ir.schema.MODIFIER_REGISTRY`'s
+    existing `debounce:<ms>`/`throttle:<ms>` tokens -- the same ones
+    `Action.*(...).debounce(...)`/`.throttle(...)` already validate --
+    rather than inventing a second modifier vocabulary for input
+    binding.
+    """
+
+    state: str
+    modifiers: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -57,14 +110,14 @@ class ActionRef:
     validated against `arklight.ir.schema.ACTION_REGISTRY` at compile
     time (unknown action name, or a `state` target that isn't declared
     on the page, both fail the build) and never becomes a JS/Python
-    string that gets executed. See docs/DESIGN-NOTES.md ("v0.0035:
+    string that gets executed. See docs/Foundational/DESIGN-NOTES.md ("v0.0035:
     stateful JS -- capability, not vocabulary").
     """
 
     action: str
     state: str
     args: dict[str, Any] = field(default_factory=dict)
-    # Stage 3 ("Reactive-core vdom staging", see docs/DESIGN-NOTES.md):
+    # Stage 3 ("Reactive-core vdom staging", see docs/Foundational/DESIGN-NOTES.md):
     # event modifiers -- `prevent`/`stop`/`once` stored verbatim, and
     # `debounce`/`throttle` stored as `"debounce:<ms>"`/`"throttle:<ms>"`
     # tokens. Deliberately a tuple of plain strings (not a nested
@@ -95,11 +148,42 @@ class ActionRef:
 
 
 @dataclass(frozen=True)
+class PlatformAPIRef:
+    """
+    A reference to a Platform API interface call (`v0.065`, accepted
+    from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) -- e.g.
+    `PlatformAPI.notify("Saved", body="Your changes were saved.")`.
+    Used as an `on_click=` value, alongside a named behavior string and
+    `ActionRef`.
+
+    Deliberately its own type, not another `ActionRef` variant: an
+    `ActionRef` always targets a declared `State(...)` name (it's
+    fundamentally a state mutation -- see `ActionRef`'s own docstring).
+    A Platform API call isn't one -- `notify`/`clipboard_write` neither
+    read nor write any `State(...)`, they ask the *execution platform*
+    to do something. `capability` is validated against
+    `arklight.ir.platform_api.PLATFORM_API_REGISTRY` (unknown
+    capability, or an unexpected keyword argument, both fail the
+    build at Validation) and, separately, per selected backend against
+    `arklight.ir.platform_api.BACKEND_PLATFORM_API_SUPPORT` (a
+    capability the selected backend doesn't yet implement fails the
+    build with a named diagnostic -- see
+    `arklight.ir.platform_api.check_backend_support`). Never a
+    JS/Kotlin/C string built and executed at runtime, same closed-
+    vocabulary discipline `ActionRef`/`DerivationRef`/`PredicateRef`
+    already hold.
+    """
+
+    capability: str
+    args: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class DerivationRef:
     """
     A reference to a closed-vocabulary derivation -- e.g.
     `Derive.multiply("price", "qty")`. Used as a `Computed(...)`'s
-    `derive=` value (`vdom-4`, see docs/Backends/REFACTOR-INDEX.md row
+    `derive=` value (`vdom-4`, see REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row
     12 / docs/Foundational/DESIGN-NOTES.md "Computed/derived state").
 
     Mirrors `ActionRef`'s shape and reasoning: a small structured
@@ -133,7 +217,7 @@ class PredicateRef:
     """
     A reference to a closed-vocabulary predicate -- e.g.
     `Predicate.truthy("flag")`. Used as a `Show(...)`'s first
-    (positional) argument (`vdom-7`, see docs/Backends/REFACTOR-INDEX.md
+    (positional) argument (`vdom-7`, see REFACTOR-INDEX.md
     row 15).
 
     Mirrors `DerivationRef`'s shape and reasoning: a small structured

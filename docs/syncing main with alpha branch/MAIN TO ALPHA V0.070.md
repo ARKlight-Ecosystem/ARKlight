@@ -72,16 +72,43 @@ section untouched. Retire `MAIN TO ALPHA V0.54.md` from this folder
 
 *Risk:* low. Documentation-only.
 
-## Stage 1 — Shared plumbing
+## Stage 1 — Shared plumbing ✅ ported (not yet import-clean -- see note)
 
 Files modified on both branches that later stages build on:
 `arklight/__init__.py`, `api.py`, `ast/nodes.py`, `backend/base.py`,
 `config.py`, `experimental.py`, `packer/bundle.py`, `pwa.py`,
 `parser/loader.py`, `compiler/pipeline.py`, `ir/__init__.py`,
-`ir/build.py`, `ir/schema.py`, `ir/validate.py`.
+`ir/build.py`, `ir/schema.py`, `ir/validate.py`. `config.py` ports with
+its `android`/`desktop` `_KNOWN_SECTIONS`/`_KNOWN_KEYS` entries left
+out, per Stages 11-12's standing exclusions.
 
-*Risk:* low-medium. Touches shared import surface; port first so later
-stages apply cleanly.
+**Discovered cross-stage coupling (not anticipated when this plan was
+first written):** on `alpha`, these 14 files are no longer
+self-contained -- porting them verbatim pulls in five imports this
+plan had scoped to later stages:
+
+- `arklight/__init__.py`, `api.py`, `compiler/pipeline.py`,
+  `ir/build.py` → `arklight.ir.components` (Stage 2)
+- `api.py`, `ir/build.py`, `ir/validate.py` → `arklight.provider`
+  (Stage 4)
+- `ir/validate.py` → `arklight.ir.platform_api` (Stage 5)
+- `config.py`, `parser/loader.py` → `arklight.parser.indentation`,
+  `arklight.parser.preamble` (Stage 2)
+
+So this patch, on its own, leaves `main` **not import-clean** --
+`import arklight` will raise `ModuleNotFoundError` until Stage 2's
+`ir/components.py` + `parser/indentation.py` + `parser/preamble.py`,
+Stage 4's `provider.py`, and Stage 5's `ir/platform_api.py` land
+alongside it. Each of those five files is still reviewed and landed as
+part of its own stage below, not folded into this one -- this is a
+sequencing note, not a scope change. All 14 files here do parse as
+valid Python in isolation (verified), so the patch itself is reviewable
+on its own merits even though the tree it produces won't run tests
+green until Stages 2/4/5 join it. See the revised "Sequencing notes"
+at the end of this document.
+
+*Risk:* low-medium on the diff content itself; the real risk this stage
+surfaced is the import coupling above, not the line-level changes.
 
 ## Stage 2 — User-defined, reusable components (`v0.060`)
 
@@ -301,7 +328,14 @@ apt-repo.yml`** -- it is `main`-only, per the ground-truth note above.
 
 ## Sequencing notes
 
-- Stage 1 must land before every other stage.
+- Stage 1 must land before every other stage -- but, per the coupling
+  note in Stage 1 above, it is **not sufficient on its own**:
+  `main` will not import successfully until Stage 2's
+  `ir/components.py`/`parser/indentation.py`/`parser/preamble.py`,
+  Stage 4's `provider.py`, and Stage 5's `ir/platform_api.py` land
+  alongside it. Treat Stage 1 plus those five specific files as one
+  land-together unit for merge/CI purposes even though they're
+  reviewed as separate patches above.
 - Stages 2, 5, 6, 7, 9, 10 have no cross-dependencies on each other and
   could run in parallel once Stage 1 is in.
 - Stage 3 has no hard dependency beyond Stage 1, but its 10 rungs are
