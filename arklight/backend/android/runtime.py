@@ -843,7 +843,13 @@ import androidx.webkit.WebViewAssetLoader
  *   restored across activity recreation. In-page JavaScript state is
  *   not part of that -- only `State(persist=True)` survives a reload.
  * - Load errors: a failed main-frame load shows a plain built-in page
- *   instead of Chromium's own error page.
+ *   instead of Chromium's own error page. A failed `Site(app_shell=
+ *   True)`-boosted navigation (an HTMX same-origin link click, sent as
+ *   an `XMLHttpRequest` -- never `isForMainFrame`, so it would
+ *   otherwise reach neither this nor Chromium's own error page) is
+ *   re-issued as one real navigation instead, landing back on the
+ *   same built-in page if it still fails. Harmless, and never
+ *   triggered, on a site that doesn't use `app_shell`.
  * - WebView remote debugging (chrome://inspect) is on in debuggable
  *   builds only.
  *
@@ -907,6 +913,22 @@ class MainActivity : AppCompatActivity() {{
                     view.loadDataWithBaseURL(
                         null, LOAD_ERROR_HTML, "text/html", "UTF-8", request.url.toString()
                     )
+                }} else if (isBoostedNavigationRequest(request)) {{
+                    // `hx-boost` drives same-origin navigation through
+                    // an XMLHttpRequest, so `isForMainFrame` is always
+                    // false here -- the branch above never runs for
+                    // it, and the visitor would otherwise get nothing
+                    // beyond the small in-page notice the compiled
+                    // runtime shows on its own (wireHtmxErrorHandling,
+                    // arklight/backend/js/runtime/notify.py), with no
+                    // native sign the page failed to change at all.
+                    // Re-issuing the same URL as a real navigation
+                    // gives a transient failure one more real chance
+                    // to succeed, and if it still fails, this request
+                    // now has isForMainFrame == true and lands back on
+                    // the branch above -- the same LOAD_ERROR_HTML
+                    // every other failed load already gets.
+                    view.loadUrl(request.url.toString())
                 }}
             }}
 
@@ -945,6 +967,26 @@ class MainActivity : AppCompatActivity() {{
             // Nothing on this device handles that link; stay on the page.
         }}
         return true
+    }}
+
+    /**
+     * True for a same-origin GET that `Site(app_shell=True)`'s
+     * `hx-boost` issued as an `XMLHttpRequest` rather than a real
+     * navigation -- identified by the `HX-Request` header the
+     * vendored HTMX runtime always sets on one (`arklight/backend/js/
+     * htmx.py`'s `mn()`). Header names are matched case-insensitively
+     * since `WebResourceRequest.requestHeaders` is not guaranteed to
+     * preserve HTMX's own casing on every WebView version. Never true
+     * for an ordinary sub-resource load (an image, the runtime
+     * script, a stylesheet) -- only HTMX's own AJAX calls carry this
+     * header -- and never true on a site that doesn't use
+     * `app_shell`, since nothing there ever sends it.
+     */
+    private fun isBoostedNavigationRequest(request: WebResourceRequest): Boolean {{
+        if (!request.method.equals("GET", ignoreCase = true)) return false
+        return request.requestHeaders.entries.any {{ (name, value) ->
+            name.equals("HX-Request", ignoreCase = true) && value.equals("true", ignoreCase = true)
+        }}
     }}
 
     /** This app's own origin, or an https host `allow_navigation` names. */
