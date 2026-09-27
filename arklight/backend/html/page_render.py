@@ -546,6 +546,24 @@ def _render_page(
     # site that opts out gets exactly today's tag set back, byte for
     # byte.
     csp_meta = _render_csp_meta_tag(trusted_script_origins) if strict_csp else ""
+    # `app_shell`'s hx-boost swaps `<body>`'s *innerHTML* on every
+    # navigation (see the docstring above) -- and this runtime
+    # `<script>` tag lives inside that innerHTML. Without `hx-preserve`,
+    # htmx's own script-tag-re-execution handling (`allowScriptTags`,
+    # on by default) treats the incoming copy of this same tag as new
+    # content and re-runs it on every boosted navigation: the runtime's
+    # `Wn()` (indicator-style injection, `arklight/backend/js/htmx.py`)
+    # fires again before that re-run reaches the line disabling it, and
+    # `head.insertAdjacentHTML(...)` is exactly the sink CSP's
+    # `require-trusted-types-for 'script'` (`csp.py`) blocks -- throwing
+    # partway through htmx's own re-init and aborting the rest of it
+    # (the new page's hx-* attributes never get processed). `id` +
+    # `hx-preserve="true"` -- the same mechanism `shell_persistent`
+    # already compiles to elsewhere in this file -- keeps the original
+    # script node in place across the swap instead of it being reparsed
+    # and re-executed, so it runs exactly once per page load, same as a
+    # non-app_shell site.
+    script_preserve_attrs = ' id="ark-runtime" hx-preserve="true"' if app_shell else ""
     return (
         "<!DOCTYPE html>\n"
         f'<html lang="{escape(str(lang), quote=True)}">\n'
@@ -558,7 +576,7 @@ def _render_page(
         f"{head_meta}"
         "</head>\n"
         f"<body{body_attrs}>\n{state_marker}{body_inner}\n"
-        f'<script src="{escape(script_src, quote=True)}" defer></script>\n'
+        f'<script src="{escape(script_src, quote=True)}"{script_preserve_attrs} defer></script>\n'
         "</body>\n"
         "</html>\n"
     )
