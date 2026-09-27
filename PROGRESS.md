@@ -100,6 +100,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06616 | Capability fix: `Provider`, stage 6 of 6 (capstone) -- capability vocabulary finalized. Resolves proposal open question §7.2: `PROVIDER_CAPABILITIES` (`auth`, `read`, `write`, `subscribe`) is locked in as-is (audited stages 2-5's own usage; none needed a fifth well-known name), and the word "provisional" is retired from `arklight/provider.py`, `arklight/ir/validate.py` and `arklight/experimental.py`. Also opens a namespaced escape hatch the proposal's four-name ceiling didn't otherwise allow for: a `custom:`-prefixed capability (`Provider.declare(capabilities=["auth", "custom:inventory-sync"])`) names something a site's own service needs that the four well-known names don't cover, the same way a user-defined component covers markup ARKlight has no built-in name for. Researched against two precedents before landing on this shape: LSP's `experimental`/vendor-namespaced capability keys, and OAuth's `custom:`-prefixed scope convention (both: closed core, explicit separate namespace for anything added on top). An unprefixed name is still checked strictly against the closed four -- `"raed"` still fails as unknown, not silently accepted as a new custom word -- so the typo discipline the original closed set existed for is unchanged; `custom:read` (reusing a well-known name under the prefix) gets its own error pointing at the unprefixed form. `arklight/provider.py` (`CUSTOM_CAPABILITY_PREFIX`, `is_custom_capability`, `is_known_capability`), `arklight/ir/validate.py` (`validate_provider` re-check updated), `arklight/api.py` (`Provider.declare` docstring), `arklight/experimental.py` (`provider-integration` wording), `arklight/cli/search.py` (`_format_provider_spec` now tags `(custom)` capabilities). New, dedicated `tests/test_provider_custom_capability.py` (45 tests) covers the finalized vocabulary and the `custom:` path end to end; full suite 2959 passed, no regressions (the 1 failure on this checkout, `test_doc_citations.py::test_live_docs_citations_resolve` on the pre-existing `SEARCH-RETRIEVE-DOC-ADDENDUM.md` citation, is pre-existing, confirmed unchanged against a clean-checkout baseline of 2914 passed/1 failed -- this pass's own doc-citation fallout, elsewhere, is fixed rather than left as new instances of that same failure). Closes the six-rung `Provider` ladder: its accepted proposal and implementation addendum are retired from `docs/Proposals/`/`docs/Implementation/` and graduated into the settled design record `docs/Foundational/PROVIDER-SDK.md`; `docs/version history/v0.070.md` rewritten to the shipped-`Provider`/PLANNED-JS-vocabulary split (same precedent as `v0.064.md`), and index rows updated in `docs/README.md`/`docs/Foundational/README.md`/`docs/Implementation/README.md`/`docs/Proposals/README.md`. `0.069` -> `0.06616`; out-of-band, no roadmap row of its own, roadmap `v0.070` untouched (JS vocabulary stage 10/10 remains PLANNED) | DONE |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
+| (docs audit, part 2) | Docs-only: `docs/Foundational/AUTHORING-GUIDE.md` rewritten -- component-vocabulary section redone as a flat, function-grouped, user-facing reference (not a shipping-history lesson), a missing `Provider` section added, and a top-of-file version/commit provenance note added. No code changed; out-of-band, no roadmap slot | DONE |
 | (docs audit) | Docs-only: repository-layout drift fix -- `arklight/provider.py` added to `docs/Foundational/GETTING-STARTED.md`'s repository-layout tree (was missing despite `Provider`'s six-rung ladder being fully SHIPPED as of `v0.070`); everything else audited (doc-link/citation tests, CLI-REFERENCE vs. `--help`, full test suite, version-history PLANNED markers, `pyproject.toml` vs. `CHANGELOG.md`) came back clean. No code changed; out-of-band, no roadmap slot | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
@@ -134,6 +135,37 @@ go-ahead before implementation starts on any of these:
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
+
+## Docs audit, part 2 -- `AUTHORING-GUIDE.md` rewrite for the actual reader (DONE)
+
+Feedback on the previous docs-audit pass: `AUTHORING-GUIDE.md` is read
+by people *authoring ARKlight sites*, not by maintainers -- they don't
+care which addendum shipped a component or what `SCHEMA` is called
+internally, they want "what components exist and what are the rules."
+The "Public API (v0.003)" section had drifted into exactly the wrong
+kind of doc: a shipping-history narrative wearing a reference table's
+clothes.
+
+Rewrote it as one flat table of all 90 components, grouped by function
+(structure/layout, text, links/media, lists, forms, tables,
+interactive, reactive) instead of by which `v0.00x` addendum introduced
+them. Every row was generated against `arklight.ir.schema.SCHEMA`
+directly (rendered tag, required props, text-only/no-children flags)
+and then cross-checked programmatically against the live schema --
+all 90 names present, no invented ones, every `required_props`/
+`text_only_children`/`allow_children` claim verified against `SCHEMA`
+itself rather than hand-copied from the old prose.
+
+Also added the `Provider` section the previous pass should have caught
+sooner: `Site(provider=...)` is a fully-shipped, real public API with
+no home anywhere in the guide despite the guide's own opening line
+claiming full API coverage. And added a top-of-file "accurate as of
+`v0.070`, commit `027bd88`" provenance note, per this session's
+earlier request.
+
+`tests/test_doc_links.py`/`test_doc_citations.py`/`test_link_check.py`/
+`test_doc_retrieval.py` (43/43) and the full suite (3076/3076) still
+pass. No code changed.
 
 ## Docs audit -- repository-layout drift fix (DONE)
 

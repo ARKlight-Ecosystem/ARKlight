@@ -1,10 +1,19 @@
 # Authoring Guide
 
+> Accurate as of package version **`v0.070`**, commit
+> [`027bd88`](https://github.com/ARKlight-Ecosystem/ARKlight/commit/027bd88b2526fcf73dd5bfe5bde1eef635d88232)
+> on `alpha`. This is a settled-record doc (`docs/Foundational/`,
+> updated in place, never removed) -- if you're reading this from a
+> later checkout, cross-check anything version-sensitive against
+> `CHANGELOG.md` and `pyproject.toml`'s `[project] version` before
+> relying on a specific number quoted here.
+
 The full public component/behavior/state API reference: routing, head
-metadata, layout, styling, behaviors, the component vocabulary, the
-ARK Bundle format, and `arklight.config.py`. The root
-[`README.md`](../../README.md) keeps only the quickstart example and
-points here, via its Documentation section, for everything else.
+metadata, layout, styling, behaviors, the component vocabulary,
+`Provider` (external-service declarations), the ARK Bundle format, and
+`arklight.config.py`. The root [`README.md`](../../README.md) keeps
+only the quickstart example and points here, via its Documentation
+section, for everything else.
 
 ## Preamble directives (`# include`, `# define`)
 
@@ -497,56 +506,149 @@ ARKlight's own fixed strings. The hook also sees every uncaught error on
 the page, including from your own scripts. Design record:
 [`../Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md`](../Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md).
 
-## Public API (v0.003)
+## Component vocabulary (90 components)
 
-Components -- every one of these is a plain Python function that
-returns an `ARKNode`:
+Every entry below is a plain Python function that returns an
+`ARKNode` -- this is the full list of what you can call. Positional
+arguments are children; keyword arguments are props. "Text-only" means
+a component may only contain plain strings, not other components
+(enforced at build time). Two components (`Show`, `Repeat`) are
+reactive rather than static -- see "Passing live state to an action"
+above for how those two are actually used.
 
-| Component   | Notes                                              |
-|-------------|-----------------------------------------------------|
-| `Page`      | Root node every page function must return           |
-| `Container` | Generic grouping element (renders as `<div>`)        |
-| `Heading`   | Text-only. `level=1..6` prop controls `<h1>`-`<h6>`  |
-| `Text`      | Text-only. Renders as `<p>`                          |
-| `Button`    | Text-only. Renders as `<button>`                     |
-| `Link`      | Text-only. Requires `href` prop. Renders as `<a>`    |
-| `Image`     | No children allowed. Requires `src` prop             |
-| `List`      | Renders as `<ul>`                                    |
-| `Item`      | Text-only. Renders as `<li>`                         |
+**Structure & layout**
 
-"Text-only" components may only contain plain strings, not other
-components -- this is enforced by the Validation stage.
+| Component | Renders as | Notes |
+|---|---|---|
+| `Page` | -- | Root node every page function must return |
+| `Container` | `<div>` | Generic grouping element |
+| `Header` | `<header>` | |
+| `Footer` | `<footer>` | |
+| `Main` | `<main>` | |
+| `Nav` | `<nav>` | Its `<a>` children get an automatic `is-active` class on the current page, no props needed |
+| `Section` | `<section>` | |
+| `Article` | `<article>` | |
+| `Aside` | `<aside>` | |
+| `Figure` | `<figure>` | |
+| `FigCaption` | `<figcaption>` | Text-only |
+| `Details` | `<details>` | |
+| `Summary` | `<summary>` | Text-only |
+| `Dialog` | `<dialog>` | Zero-JS |
 
-The table above is the original v0.001 core. Two vocabulary
-addenda (still v0.003, no new pipeline stage -- see CHANGELOG.md) add
-~79 more components on top of it, purely as data in
-`arklight.ir.schema.SCHEMA` (the single source of truth every stage
-reads from):
+**Text & typography**
 
-- **First addendum:** semantic layout (`Header`, `Footer`, `Main`,
-  `Nav`, `Section`, `Article`, `Aside`, `Figure`/`FigCaption`,
-  `Details`/`Summary`), text-level semantics (`Strong`, `Em`, `Small`,
-  `Mark`, `Code`, `Cite`, `Abbr`, `Sub`, `Sup`, `Span`, `Time`,
-  `HorizontalRule`, `LineBreak`, `Pre`, `Blockquote`), forms (`Form`,
-  `Input`, `Textarea`, `Select`, `Option`, `OptGroup`, `Label`,
-  `FieldSet`, `Legend`), tables (`Table`, `TableHead`, `TableBody`,
-  `TableFoot`, `TableRow`, `TableHeaderCell`, `TableCell`, `Caption`),
-  and media (`Video`, `Audio`, `Source`).
-- **Second addendum ("even more vocabulary"):** numbered/description
-  lists (`OrderedList`, `DescriptionList`/`DescriptionTerm`/
-  `DescriptionDetails`), art-directed responsive images (`Picture`/
-  `PictureSource`, plus `loading`/`decoding` attributes), native
-  widgets (`Progress`, `Meter`, `Datalist`, `Output`), a zero-JS
-  `Dialog`, more text semantics including bidi and ruby (`Kbd`,
-  `Samp`, `Var`, `Data`, `Ins`, `Del`, `Q`, `Dfn`, `Address`, `Wbr`,
-  `Bdi`, `Bdo`, `Ruby`, `Rt`, `Rp`), table column grouping
-  (`ColGroup`, `Col`), video/audio captions (`Track`), image maps
-  (`Map`, `Area`), `IFrame` embeds, and a `NoScript` fallback.
+| Component | Renders as | Notes |
+|---|---|---|
+| `Heading` | `<h1>`-`<h6>` | Text-only. `level=1..6` prop picks the tag |
+| `Text` | `<p>` | Text-only |
+| `Strong` | `<strong>` | Text-only |
+| `Em` | `<em>` | Text-only |
+| `Small` | `<small>` | Text-only |
+| `Mark` | `<mark>` | Text-only |
+| `Code` | `<code>` | Text-only |
+| `Cite` | `<cite>` | Text-only |
+| `Abbr` | `<abbr>` | Text-only |
+| `Dfn` | `<dfn>` | Text-only |
+| `Sub` | `<sub>` | Text-only |
+| `Sup` | `<sup>` | Text-only |
+| `Span` | `<span>` | Text-only |
+| `Time` | `<time>` | Text-only |
+| `HorizontalRule` | `<hr>` | No children |
+| `LineBreak` | `<br>` | No children |
+| `Pre` | `<pre>` | |
+| `Blockquote` | `<blockquote>` | |
+| `Kbd` | `<kbd>` | Text-only |
+| `Samp` | `<samp>` | Text-only |
+| `Var` | `<var>` | Text-only |
+| `Data` | `<data>` | Text-only. Requires `value` prop |
+| `Ins` | `<ins>` | |
+| `Del` | `<del>` | |
+| `Q` | `<q>` | Text-only |
+| `Address` | `<address>` | |
+| `Wbr` | `<wbr>` | No children |
+| `Bdi` | `<bdi>` | Text-only |
+| `Bdo` | `<bdo>` | Text-only |
+| `Ruby` | `<ruby>` | |
+| `Rt` | `<rt>` | Text-only |
+| `Rp` | `<rp>` | Text-only |
 
-See [`CHANGELOG.md`](../../CHANGELOG.md) for the rationale behind each
-group and `arklight.ir.schema.SCHEMA` for the authoritative list of
-every component's required props, text-only-children rule, and
-whether it allows children at all.
+**Links & media**
+
+| Component | Renders as | Notes |
+|---|---|---|
+| `Link` | `<a>` | Text-only. Requires `href` -- internal routes are checked at build time (see "Internal links" above) |
+| `Image` | `<img>` | No children. Requires `src` -- checked against `assets/` at build time |
+| `Video` | `<video>` | |
+| `Audio` | `<audio>` | |
+| `Source` | `<source>` | No children. Requires `src` |
+| `Picture` | `<picture>` | Art-directed responsive images |
+| `PictureSource` | `<source>` (inside `Picture`) | No children. Requires `srcset` |
+| `Track` | `<track>` | No children. Requires `src`. Video/audio captions |
+| `Map` | `<map>` | Requires `name` |
+| `Area` | `<area>` | No children. Image-map hotspot |
+| `IFrame` | `<iframe>` | No children. Requires `src` |
+
+**Lists**
+
+| Component | Renders as | Notes |
+|---|---|---|
+| `List` | `<ul>` | |
+| `OrderedList` | `<ol>` | |
+| `Item` | `<li>` | Text-only |
+| `DescriptionList` | `<dl>` | |
+| `DescriptionTerm` | `<dt>` | Text-only |
+| `DescriptionDetails` | `<dd>` | |
+
+**Forms**
+
+| Component | Renders as | Notes |
+|---|---|---|
+| `Form` | `<form>` | |
+| `Input` | `<input>` | No children. Two-way binding: see `bind_value=Bind.model(...)` above |
+| `Textarea` | `<textarea>` | Text-only |
+| `Select` | `<select>` | |
+| `Option` | `<option>` | Text-only |
+| `OptGroup` | `<optgroup>` | |
+| `Label` | `<label>` | Text-only |
+| `FieldSet` | `<fieldset>` | |
+| `Legend` | `<legend>` | Text-only |
+| `Datalist` | `<datalist>` | |
+| `Output` | `<output>` | Text-only |
+| `Progress` | `<progress>` | Text-only |
+| `Meter` | `<meter>` | Text-only |
+
+**Tables**
+
+| Component | Renders as | Notes |
+|---|---|---|
+| `Table` | `<table>` | |
+| `Caption` | `<caption>` | Text-only |
+| `ColGroup` | `<colgroup>` | |
+| `Col` | `<col>` | No children |
+| `TableHead` | `<thead>` | |
+| `TableBody` | `<tbody>` | |
+| `TableFoot` | `<tfoot>` | |
+| `TableRow` | `<tr>` | |
+| `TableHeaderCell` | `<th>` | |
+| `TableCell` | `<td>` | |
+
+**Interactive & misc**
+
+| Component | Renders as | Notes |
+|---|---|---|
+| `Button` | `<button>` | Text-only. Add `on_click=...` for a built-in behavior (see "Behaviors" above) |
+| `NoScript` | `<noscript>` | Fallback content for when JS doesn't run |
+
+**Reactive (state-driven, not static markup)**
+
+| Component | Notes |
+|---|---|
+| `Show` | Requires `predicate`. Conditionally shows/hides its children -- see "Passing live state to an action" above |
+| `Repeat` | Requires `name`. Renders one instance of `template=` per item in a `State(...)` list -- see "Passing live state to an action" above |
+
+Any keyword prop passed to a component that isn't recognized (e.g.
+`id`, `class`, `href`, `src`, `style`, ...) is emitted as a `data-*`
+HTML attribute, so nothing you write is silently dropped.
 
 `Site`:
 
@@ -561,6 +663,46 @@ def page_fn():
 Any keyword prop passed to a component that isn't recognized (e.g.
 `id`, `class`, `href`, `src`, `style`, ...) is emitted as a `data-*`
 HTML attribute, so nothing you write is silently dropped.
+
+## External services (`Site(provider=...)`) -- EXPERIMENTAL, `v0.065`-`v0.070`
+
+`Provider` is how a site *declares* that it talks to an external
+service at runtime (a hosted database, an auth service, a hand-rolled
+API) -- a contract only, not an integration:
+
+```python
+site = Site(
+    provider=Provider.declare(name="firebase", capabilities=["auth", "read"]),
+)
+```
+
+- `name` is a free label, not a fixed vendor list.
+- `capabilities` draws from four finalized well-known names
+  (`arklight.provider.PROVIDER_CAPABILITIES`: `auth`, `read`, `write`,
+  `subscribe`) -- a typo still fails the build -- plus an open
+  `custom:`-prefixed escape hatch for something your service needs
+  that those four don't cover (`capabilities=["auth",
+  "custom:inventory-sync"]`).
+- ARKlight ships no vendor SDK, makes no network calls, and does not
+  implement, audit, or guarantee the service the declaration points
+  at -- the concrete integration is your own code.
+- The one thing a declared `Provider` adds to the build: a small,
+  read-only, deep-frozen config object in `arklight.js`,
+  `window.ARKLIGHT_PROVIDER` (`{name, capabilities}`), for your own
+  script to read. Nothing else about the generated pages or
+  stylesheet changes.
+- **EXPERIMENTAL.** Passing a `Provider` to `Site(...)` flags the build
+  the same way every other opt-in feature in
+  [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md) does -- an inline
+  banner, an end-of-build summary block, and an entry in `sbom.txt`.
+- Discoverable via `arklight search <provider-name>` once your `Site`
+  has constructed it (exact, case-insensitive match; no typo
+  suggestions, since a provider name is a free string, not a closed
+  vocabulary word).
+
+The six-rung implementation ladder (`v0.065` contract through `v0.070`
+capability-vocabulary finalization) is fully shipped. Settled design
+record: [`PROVIDER-SDK.md`](PROVIDER-SDK.md).
 
 ## ARK Bundle (`.ark`) -- v0.037 (sealed by default, implemented)
 

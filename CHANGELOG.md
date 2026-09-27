@@ -5,6 +5,41 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: `AUTHORING-GUIDE.md` rewritten as a user-facing reference (component vocabulary table + missing `Provider` section)
+
+Follow-up to the earlier docs-drift audit this session. Two things
+fixed in `docs/Foundational/AUTHORING-GUIDE.md`:
+
+- **The component-vocabulary section was written for a maintainer, not
+  a site author.** It framed every component by which `v0.00x`
+  addendum introduced it (`v0.001` core / "still v0.003" / addendum
+  I vs. II) instead of just listing what's callable today. Replaced
+  with one flat, grouped (by function -- layout, text, forms, tables,
+  media, lists, reactive -- not by shipping history) reference table
+  covering all 90 components in `arklight.ir.schema.SCHEMA`, each row
+  generated against the live schema (rendered tag, required props,
+  text-only/no-children rules) rather than hand-copied prose, so the
+  table can be spot-checked against `SCHEMA` directly rather than
+  trusted on the strength of a version number.
+- **`Provider` (`Site(provider=...)`) was undocumented anywhere in the
+  guide**, despite being a fully-shipped (`v0.065`-`v0.070`) public API
+  and the guide's own opening line claiming to be "the full public
+  component/behavior/state API reference." Added an "External
+  services" section covering `Provider.declare(...)`, the four
+  well-known capabilities plus the `custom:` escape hatch, the
+  `window.ARKLIGHT_PROVIDER` runtime output, and its EXPERIMENTAL
+  gating -- pointing at the settled design record
+  (`docs/Foundational/PROVIDER-SDK.md`) for the full ladder history.
+- Added a top-of-file note pinning the doc to package version `v0.070`
+  and the commit it was last checked against, per
+  `docs/Foundational/GETTING-STARTED.md`-style provenance, with a
+  pointer to `CHANGELOG.md`/`pyproject.toml` for anyone reading a later
+  checkout.
+
+No code changed. `tests/test_doc_links.py`/`test_doc_citations.py`/
+`test_link_check.py`/`test_doc_retrieval.py` (43/43) and the full suite
+(3076/3076) still pass.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: repository-layout drift fix (`provider.py` missing from `GETTING-STARTED.md`)
 
 A documentation drift audit against the current `alpha` checkout found
