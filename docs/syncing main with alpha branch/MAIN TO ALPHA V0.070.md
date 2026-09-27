@@ -110,7 +110,7 @@ at the end of this document.
 *Risk:* low-medium on the diff content itself; the real risk this stage
 surfaced is the import coupling above, not the line-level changes.
 
-## Stage 2 — User-defined, reusable components (`v0.060`)
+## Stage 2 — User-defined, reusable components (`v0.060`) ✅ ported
 
 New: `arklight/ir/component_dispatch.py`, `components.py`,
 `arklight/parser/indentation.py`, `preamble.py`. Test files:
@@ -118,9 +118,23 @@ New: `arklight/ir/component_dispatch.py`, `components.py`,
 `test_indentation.py`, `test_preamble.py`, `test_preamble_define.py`,
 `test_preamble_scope.py`, `test_component_call_diagnostics.py`.
 
-*Risk:* medium. Five internal sub-stages on `alpha`
-(stage0-stage4) -- port in that order rather than as one diff, per the
-same rationale Stage 4 of the v0.054 plan used for `vdom-*`/`htmx-*`.
+Ported as one patch rather than five internal sub-stages: checked each
+new file's own imports first (`component_dispatch.py`/`components.py`
+resolve to `ast/nodes.py`, `ir/build.py`, `ir/schema.py`, `ir/normalize.py`
+-- all already in `main` via Stage 1 or earlier; `preamble.py` resolves
+to `components.py` and `indentation.py`, both landing in this same
+stage) -- no internal ordering conflict surfaced, so a single diff was
+lower-risk than four artificial splits. Verified with `ast.parse` on
+all four files.
+
+Confirms the Stage 1 coupling note: `python3 -c "import arklight"`
+still fails after this stage, but now for exactly the two reasons that
+note predicted -- `arklight.ir.platform_api` (Stage 5) and, once that's
+resolved, `arklight.provider` (Stage 4) -- not for anything Stage 2
+introduced. No new forward-references found.
+
+*Risk:* low. Confirmed no cross-dependency on Stage 4/5's still-missing
+modules beyond what Stage 1 already flagged.
 
 ## Stage 3 — JS vocabulary expansion ladder, all 10 rungs (`v0.061`-`v0.070`)
 
