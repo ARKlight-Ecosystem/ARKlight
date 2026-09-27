@@ -26,7 +26,8 @@ for the architecture-level roadmap table, see
 | v0.037   | Sealed ARK Bundles (encrypted by default, `arklight unpack`) | DONE    |
 | v0.041   | CLI/pipeline/JS runtime hardening + stateful JS addenda I/II | DONE    |
 | 0.54.0   | Alpha catch-up: CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV -- see below | DONE |
-| v0.010   | User-defined components                                     | PLANNED |
+| 0.070.0  | Alpha catch-up, **docs only**: user-defined components, JS vocabulary ladder, `Provider`, Platform API IR, preamble system, Rei narrator, ACC hook -- see `docs/version history/v0.070.0.md` | DOCS DONE, CODE PLANNED |
+| --       | Android/Desktop packaging backends, `arklight deploy` (shipped on `alpha`, not ported here) | NOT SCHEDULED (needs more time) |
 | v0.100   | Alternate backends (Vue, Svelte)                             | PLANNED |
 | v1.0     | Stable compiler                                              | PLANNED |
 

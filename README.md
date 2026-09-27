@@ -71,20 +71,20 @@ real [PEP 440](https://peps.python.org/pep-0440/) hazard (`0.100`
 normalizes to `0.1`, sorting *below* `0.048`'s `0.48`) and PyPI's own
 version-comparison rules made the old milestone bookkeeping
 unworkable going forward. Full detail in
-[`CHANGELOG.md`](./CHANGELOG.md); narrative/decision log in
-[`PROGRESS.md`](./PROGRESS.md).
+[`CHANGELOG.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/CHANGELOG.md); narrative/decision log in
+[`PROGRESS.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/PROGRESS.md).
 
 **Already shipped:** custom CSS class authoring (`Site.style(...)`)
 and `arklight search <name>` schema lookup landed as v0.042 -- see
-[`docs/version history/v0.042.md`](./docs/version%20history/v0.042.md).
+[`docs/version history/v0.042.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/version%20history/v0.042.md).
 **Next up:** see the milestone table in
-[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md)
+[`docs/Foundational/ARCHITECTURE.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/Foundational/ARCHITECTURE.md)
 for what's still queued.
 
-See [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the full
+See [`docs/Foundational/ARCHITECTURE.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/Foundational/ARCHITECTURE.md) for the full
 milestone roadmap.
 
-Refer to [`docs/Foundational/EXPERIMENTAL-APIS.md`](./docs/Foundational/EXPERIMENTAL-APIS.md) if you wished to use escape hatches. But Also check the alpha branch for features that isn't in main or pypi version.
+Refer to [`docs/Foundational/EXPERIMENTAL-APIS.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/Foundational/EXPERIMENTAL-APIS.md) if you wished to use escape hatches. But Also check the alpha branch for features that isn't in main or pypi version.
 
 ## Install
 
@@ -293,7 +293,7 @@ of the intrinsic defaults above -- not a replacement for them:
 `Site.media_query(condition, class_name, rules)` (experimental, gated
 under `css-media-queries` in `docs/Foundational/EXPERIMENTAL-APIS.md`) renders a
 real `@media (condition) { .class_name { ... } } ` block. See
-[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
+[`docs/Foundational/DESIGN-NOTES.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/Foundational/DESIGN-NOTES.md)
 ("v0.048: CSS media queries + `<head>` extension") for the full design.
 
 ### Behaviors (client-side interactivity, no JS written by hand)
@@ -322,7 +322,7 @@ Validation stage -- an unknown behavior name (or a missing
 `behavior_target`) fails the build with a clear message rather than
 silently doing nothing in the browser. There is deliberately no way to
 pass arbitrary JavaScript: see
-[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) for why that boundary
+[`docs/Foundational/DESIGN-NOTES.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/Foundational/DESIGN-NOTES.md) for why that boundary
 is a design choice, not a gap.
 
 The current page's nav link is also highlighted automatically (an
@@ -375,7 +375,7 @@ reads from):
   (`ColGroup`, `Col`), video/audio captions (`Track`), image maps
   (`Map`, `Area`), `IFrame` embeds, and a `NoScript` fallback.
 
-See [`CHANGELOG.md`](./CHANGELOG.md) for the rationale behind each
+See [`CHANGELOG.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/CHANGELOG.md) for the rationale behind each
 group and `arklight.ir.schema.SCHEMA` for the authoritative list of
 every component's required props, text-only-children rule, and
 whether it allows children at all.
@@ -436,7 +436,7 @@ packages that output as a single `.ark` file:
   currently looking at was never in scope to hide. Sealing protects the
   *other* pages/assets bundled alongside it, not the one on screen.
 
-See [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.036: ARK
+See [`docs/Foundational/DESIGN-NOTES.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/Foundational/DESIGN-NOTES.md) ("v0.036: ARK
 Bundle spec v1" and "v0.037: sealed bundles") for the full byte layout,
 packing algorithm, cipher construction, and known caveats.
 
@@ -492,10 +492,10 @@ pytest
 ## Roadmap
 
 Full milestone table (with status) lives in
-[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) -- kept as the single
+[`docs/Foundational/ARCHITECTURE.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/Foundational/ARCHITECTURE.md) -- kept as the single
 canonical copy rather than duplicated here, in
-[`PROGRESS.md`](./PROGRESS.md), and in
-[`CHANGELOG.md`](./CHANGELOG.md). Short version: v0.001 through
+[`PROGRESS.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/PROGRESS.md), and in
+[`CHANGELOG.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/CHANGELOG.md). Short version: v0.001 through
 0.54.0 are done, which folds in the v0.042, v0.043, and v0.048
 milestones (see `docs/version history/` for each); v0.060
 (user-defined components) and v0.080 (Android backend, in progress)

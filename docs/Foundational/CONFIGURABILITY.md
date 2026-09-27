@@ -1,9 +1,13 @@
 # Configurability: the reachability rule
 
+_Current as of **v0.063** (latest shipped milestone) — see
+[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table if a referenced
+capability's status might have moved since this was last updated._
+
 **Not to be confused with `arklight.config.py`** -- the optional
-project-level settings file (`live-streaming` host/port today, more
-sections planned), documented in the main
-[`README.md`](../../README.md#configuration-arklightconfigpy) and
+project-level settings file (six sections today: `live_streaming`,
+`android`, `desktop`, `experimental`, `csp`, `rei`), documented in
+[`AUTHORING-GUIDE.md`](AUTHORING-GUIDE.md#configuration-arklightconfigpy) and
 implemented in `arklight/config.py`. This doc is about a different
 kind of configurability: which fixed values inside the compiler
 *should* grow into a `Site(...)`/`Page(...)` kwarg (or CLI flag) with
@@ -17,10 +21,12 @@ most haven't, and shouldn't. This doc names the rule that already
 governs which is which -- used ad hoc in `arklight/api.py`'s and
 `arklight/backend/css/design_tokens.py`'s own comments ("reachability
 rule", "unreachable-value bug class") and worked out the hard way
-across three real bugs (`docs/CONTAINER-WIDTH-BUG.md`) -- so future
-work applies it up front instead of re-deriving it per change. The
-first deliberate application of it is the planned HTML backend
-refactor, `docs/HTML-BACKEND-REFACTOR.md`.
+across three real bugs (`docs/CONTAINER-WIDTH-BUG.md`, no longer in the
+tree -- see `CHANGELOG.md`) -- so future work applies it up front
+instead of re-deriving it per change. The first deliberate application
+of it was the HTML backend refactor (all six stages shipped; its
+staging doc, `docs/Backends/HTML-BACKEND-REFACTOR.md`, was removed once
+it finished -- see `CHANGELOG.md` for the per-stage record).
 
 ## The rule
 
@@ -144,6 +150,8 @@ style choice."
 
 ## Applying this
 
-`docs/HTML-BACKEND-REFACTOR.md` is the first place this rule gets run
-deliberately against a whole file, before any module split happens --
-worth reading alongside this doc rather than as a separate exercise.
+The HTML backend refactor (`HTML-BACKEND-REFACTOR.md`, removed once its
+six stages shipped) was the first place this rule got run deliberately
+against a whole file, before any module split happened -- its
+per-stage record in `CHANGELOG.md` is the worked example to read
+alongside this doc.

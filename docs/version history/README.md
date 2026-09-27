@@ -38,6 +38,7 @@ table itself, independent of what's landed so far), see
 | [`v0.042.md`](./v0.042.md) | Extra CSS features -- `Site.style(...)` custom classes, `arklight search`, `arklight --help`. |
 | [`v0.043.md`](./v0.043.md) | Optional `<head>` metadata props on `Page(...)` + `Backend.postprocess(...)` hook. |
 | [`v0.54.0.md`](./v0.54.0.md) | Alpha catch-up -- CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV. First release on the new `MAJOR.MINOR.PATCH` version format. |
+| [`v0.070.0.md`](./v0.070.0.md) | Alpha catch-up, **docs-only** -- user-defined components, the 10-rung JS vocabulary ladder, `Provider`, Platform API IR stage 1, the preamble system, the Rei narrator, and the ACC capability hook. Android, Desktop, and `deploy` explicitly excluded (need more time; documented as alpha-only, not shipped). |
 
 ## Adding a new version
 

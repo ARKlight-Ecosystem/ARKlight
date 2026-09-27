@@ -1,9 +1,13 @@
 # Experimental APIs
 
+_Current as of **v0.063** (latest shipped milestone) — see
+[`PROGRESS.md`](../../PROGRESS.md)'s Snapshot table if a referenced
+capability's status might have moved since this was last updated._
+
 ## What counts as "experimental"
 
 ARKlight's default surface is built entirely on the intrinsic layout
-model described in `docs/DESIGN-NOTES.md`: flexbox/grid sizing
+model described in `DESIGN-NOTES.md`: flexbox/grid sizing
 keywords (`minmax()`, `auto-fit`, `clamp()`, `flex-wrap`) and the
 `.stack`/`.cluster`/`.switcher`/`.grid`/`.sidebar` utility classes
 built on top of them. Nothing in that model is keyed to a specific
@@ -18,7 +22,7 @@ experimental API.** That currently means:
   below), and, as of v0.048 Stage B, a per-node `responsive_style=
   {"(max-width: 600px)": {...}}` prop any component may carry. Both
   compile to the same kind of viewport-keyed `@media` block and share
-  this one gate -- see `docs/DESIGN-NOTES.md` ("v0.048: CSS media
+  this one gate -- see `DESIGN-NOTES.md` ("v0.048: CSS media
   queries + `<head>` extension") for `responsive_style`'s design.
 - `experimental-install-pwa` -- a native browser install-prompt button
   (`arklight pwa ... --install-button`), which depends entirely on
@@ -31,21 +35,79 @@ experimental API.** That currently means:
   Model until it resolves. Prefer `Page(links=[{"rel": "stylesheet",
   "href": ...}])` where possible; reach for `import_style` only when a
   stylesheet truly isn't reachable that way.
-- `raw-postprocess` -- `Site.raw_postprocess(fn)`, the widest escape
-  hatch in the project: `fn` is handed the *entire* combined
-  `{relative_path: contents}` output dict, after every backend's own
-  `render()`/`postprocess()` pass (see
-  `arklight.backend.base.Backend.postprocess`), and whatever it
-  returns is written to disk verbatim -- nothing about it is
-  validated, normalized, or checked the way every other generated
-  file is. It's the user-facing equivalent of a `Backend.postprocess()`
-  override, offered directly on `Site` for one-off transformations
-  that don't warrant a whole `Backend` subclass. Flagged loudly (both
-  the inline banner and the end-of-build summary spell out the "million
-  different ways to shoot yourself in the foot" warning) because unlike
-  every other experimental feature above, this one isn't scoped to CSS
-  at all -- it's arbitrary user code with unchecked write access to
-  every output file the build produces.
+- `raw-postprocess` -- **officially deprecated and removed.**
+  `Site.raw_postprocess(fn)` no longer registers or runs `fn` at all;
+  calling it only prints a log pointing at its replacement. It used to
+  be the widest escape hatch in the project: `fn` was handed the
+  *entire* combined `{relative_path: contents}` output dict, after
+  every backend's own `render()`/`postprocess()` pass, with whatever
+  it returned written to disk verbatim -- nothing about it validated,
+  normalized, or checked the way every other generated file is. That
+  surface is gone. Its `FEATURES` entry (`arklight/experimental.py`)
+  stays registered only so `experimental.emit("raw-postprocess")`
+  keeps working for historical/documentation purposes -- nothing in
+  `Site` emits it anymore. If you needed hand-written JS alongside
+  `arklight.js`, use `script-extension` below, its replacement. If you
+  needed something else `raw_postprocess` used to do (rewriting an
+  arbitrary output file), reach for a real `Backend` subclass
+  overriding `postprocess()` (`arklight.backend.base.Backend`)
+  instead.
+- `script-extension` -- `arklight.backend.script_extension.ScriptExtension`,
+  registered via `site.register_script_extension(...)`. The (sole
+  surviving) class-based successor to `raw-postprocess`, covering the
+  one job most `raw_postprocess` uses were actually for: adding
+  hand-written JS alongside `arklight.js`. Deliberately different in
+  *kind*, not just degree, from ARKlight's normal declarative/
+  functional API -- you subclass `ScriptExtension` (plain Python
+  inheritance, the "oops way"), and its `script` is restricted to the
+  `<script>` portion of Svelte single-file-component syntax
+  (`<template>`/`<style>` are refused outright, not just warned).
+  ARKlight lowers only that block to plain JS text and appends it to
+  `arklight.js` -- never an arbitrary output file the way
+  `raw_postprocess` used to. Still gated: the JS itself is unchecked
+  (no `eval`, no `new Function`, but also no guarantee it's
+  syntactically valid). Usage is expected to carry a
+  `#include <expapilib.ARKlight>` marker comment in the subclass's own
+  source file -- its absence doesn't block anything, it just adds one
+  more warning on top of the normal experimental banner.
+- `provider-integration` -- `Site(provider=Provider.declare(name=...,
+  capabilities=[...]))`, a site declaring that it talks to an external
+  service at runtime (a hosted database, an auth service, its own API).
+  Unlike the features above this isn't a layout or output escape hatch:
+  it's flagged because the service on the other end is entirely outside
+  anything ARKlight can validate. The contract is only an interface --
+  ARKlight ships no vendor SDK, makes no network calls, has no opinion
+  about auth, and does not implement, audit, or guarantee the service; the
+  concrete implementation is the site author's own code. `capabilities`
+  is checked against a **finalized** closed vocabulary (`auth`, `read`,
+  `write`, `subscribe`) plus a `custom:`-prefixed escape hatch
+  (`Provider.declare(capabilities=["auth", "custom:inventory-sync"])`)
+  for anything a site's own service needs beyond those four -- an
+  unprefixed name is still checked strictly against the closed four, so
+  a typo still fails loudly rather than being accepted as a new word. A
+  declared Provider adds no markup of its own but does ship one
+  read-only config object in `arklight.js`,
+  `window.ARKLIGHT_PROVIDER = Object.freeze({name, capabilities})`, for
+  the site author's own script to read (see `arklight/provider.py`);
+  like every gated feature it also appears in the devtools console
+  reminder and in `sbom.txt`, and is discoverable via
+  `arklight search <provider-name>`. Excluded from the heavy-reliance
+  nudge (`upstream_candidate=False`): a Provider is a deliberate
+  boundary, not a missing feature. Design record:
+  `docs/Foundational/PROVIDER-SDK.md`.
+- `provider-scripts` -- `Page(scripts=[{"src": "...", ...}])`, `Provider`
+  stage 4 of 6 (v0.068, `docs/Foundational/PROVIDER-SDK.md`):
+  an authored way to add an external `<script src>` to a page's `<head>`,
+  so a declared Provider's real vendor SDK (the actual Firebase JS SDK,
+  say) can actually be loaded. Gated separately from `provider-integration`
+  -- a page can use either without the other. Flagged for the same reason
+  `css-import` is: the referenced file is fetched and run at request
+  time, so its contents can't be validated by ARKlight the way everything
+  else it generates is. Also needs its origin added to
+  `Site(trusted_script_origins=[...])` (`arklight/backend/html/csp.py`)
+  to actually load -- the default `script-src 'self'` CSP this project
+  ships doesn't trust it automatically. Excluded from the heavy-reliance
+  nudge (`upstream_candidate=False`), same reasoning as `provider-integration`.
 
 This list grows as new escape hatches are added. **There is no
 "experimental by convention" bucket** -- if a feature isn't in
@@ -105,6 +167,64 @@ stage narration, an experimental-API warning is not "nice to have with
 more output," it's the entire point of gating the feature in the first
 place, so it always prints.
 
+### Heavy-reliance nudge
+
+A third, optional line prints after the end-of-run summary if a
+build's experimental-API usage looks less like "one escape hatch, used
+once" and more like "this project actually needs a feature ARKlight
+doesn't have yet":
+
+```
+[Rei] Hey, just a heads up -- if you're relying on experimental APIs a lot
+[Rei] (3 experimental-API uses this build, across: css-import, raw-postprocess)
+[Rei] Might be a good idea to open a pull request for your missing feature
+[Rei] In either the ARKlight or ARKlight-Component-Collections GitHub repo
+```
+
+`arklight.experimental.heavy_reliance_nudge` fires once per build when
+the count of uses of *upstream-candidate* features (see
+`ExperimentalFeature.upstream_candidate` below) reaches
+`HEAVY_RELIANCE_THRESHOLD` (currently 3), counted across every use in
+that build -- not deduplicated by feature the way the summary block
+above is, since five uses of one escape hatch is exactly as strong a
+signal as one use each of five different ones.
+
+Not every registered feature counts toward this: `css-media-queries`
+is a deliberate, permanent design tradeoff (ARKlight chose intrinsic
+layout on purpose), not a missing feature, so it's excluded
+(`upstream_candidate=False`) -- heavy use of it alone never trips the
+nudge. Most other features default to `upstream_candidate=True`,
+since they represent gaps that a real ARKlight or ACC feature could
+eventually close.
+
+This is a single-build heuristic only -- no on-disk log, no
+across-build history yet (`.arklight/`-style persistent usage tracking
+is a plausible future extension, not implemented here). A project that
+crosses the threshold sees the nudge on every build until its usage
+drops back down, which is intentional: it reflects current reliance,
+not a one-time trip.
+
+**Turning it off.** A project that's already made a deliberate,
+informed choice to lean on an escape hatch doesn't need reminding
+every build. Silence it via `arklight.config.py` -- the same
+project-level settings file `live_streaming`/`android`/`desktop`
+already use (see `arklight/config.py`), not a CLI flag, so it's a
+one-time, versioned, per-project decision rather than something to
+remember to pass on every invocation:
+
+```python
+# arklight.config.py
+CONFIG = {
+    "experimental": {
+        "heavy_reliance_nudge": False,
+    },
+}
+```
+
+This only silences the nudge line. The per-feature warning blocks
+above it -- the actual "here's what this feature costs you" notice --
+always print regardless; there's no setting that turns those off.
+
 ## Android: why this matters more there, not less
 
 Media queries and other viewport-keyed logic are especially unreliable
@@ -148,7 +268,10 @@ the first time.
 ## Adding a new experimental feature
 
 1. Add an entry to `FEATURES` in `arklight/experimental.py` (id,
-   inline note, wrapped detail paragraph, legacy/back-compat note).
+   inline note, wrapped detail paragraph, legacy/back-compat note, and
+   `upstream_candidate` -- `False` only for a deliberate, permanent
+   design tradeoff like `css-media-queries`; leave the `True` default
+   for anything that represents an actual missing-feature gap).
 2. Call `arklight.experimental.emit(feature_id, on_warning=log, ...)`
    at the point the feature is detected (compile-time for build-time
    features, post-build for `arklight pwa`-style steps).
