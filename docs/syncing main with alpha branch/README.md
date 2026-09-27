@@ -2,38 +2,49 @@
 
 ## Overview
 
-Working area for the effort to bring `main` in line with `alpha`'s
-v0.054-equivalent state, excluding the Android backend/CLI entirely.
-Each stage is generated as a standalone, reviewable patch rather than
-applied directly -- see the plan doc below for the full staging
-rationale and the Android-exclusion checklist.
+Working area for the effort to bring `main` in line with `alpha`,
+excluding the Android backend/CLI entirely. Each stage is generated as
+a standalone, reviewable patch rather than applied directly -- see the
+plan doc below for the full staging rationale and the Android-exclusion
+checklist.
 
 This directory (like `docs/Backends/`, `docs/Far Future Concern/`, and
-`docs/new js backend proposal/`) is a **working reference, not
-permanent documentation** -- unlike `docs/Foundational/`, it will be
-removed once the sync is complete and `main` no longer needs a
-tracking doc for a job that's finished.
+`docs/Proposals/`) is a **working reference, not permanent
+documentation** -- unlike `docs/Foundational/`, it will be removed once
+the sync is complete and `main` no longer needs a tracking doc for a
+job that's finished.
 
 ## Index
 
 | File | Covers |
 | --- | --- |
-| [`MAIN TO ALPHA V0.54.md`](<MAIN TO ALPHA V0.54.md>) | The full staged plan: ground-truth diff stats, Stage 0-9 scope and dependency order, the Android-exclusion checklist, and what's deliberately left out (alpha's `Backends/`/`Far Future Concern/`/`new js backend proposal/` doc folders). |
+| [`MAIN TO ALPHA V0.54.md`](<MAIN TO ALPHA V0.54.md>) | **Complete.** The v0.054 catch-up: ground-truth diff stats, Stage 0-9 scope and dependency order, the Android-exclusion checklist, and what was deliberately left out. Superseded by the plan below; kept for history until this folder's next cleanup pass. |
+| [`MAIN TO ALPHA V0.070.md`](<MAIN TO ALPHA V0.070.md>) | **Current plan.** The v0.070 catch-up: ten JS-vocabulary rungs, user-defined components, the full `Provider` SDK, Platform API IR, the Rei narrator, search/knowledge additions, compiler hardening, the standing Android exclusion, and a new Desktop-backend exclusion decision. |
 
 ## Status
 
+**v0.54 plan:** all stages (0-9) done -- see that file's own status
+note.
+
+**v0.070 plan:** planning, nothing landed yet.
+
 | Stage | Scope | Status |
 | --- | --- | --- |
-| 0 | Foundational docs sync | Done |
-| 1 | Shared plumbing (18 files) + `config.py`/`experimental.py` | Done |
-| 2 | CSS backend rewrite | Done |
-| 3 | HTML backend refactor | Done |
-| 4 | JS backend: HTMX + reactive core (vdom) | Done |
-| 5 | Search engine | Done |
-| 6 | Live-streaming, CCTV, upgrade, scaffold extras | Not started |
-| 7 | Root metadata (`pyproject.toml`, `.gitignore`) | Not started |
-| 8 | Android-exclusion verification pass | Not started |
-| 9 | Full test-suite verification | Not started |
+| 0 | Foundational docs + version-history sync | Not started |
+| 1 | Shared plumbing | Not started |
+| 2 | User-defined components (`v0.060`) | Not started |
+| 3 | JS vocabulary ladder, 10 rungs (`v0.061`-`v0.070`) | Not started |
+| 4 | `Provider` SDK, 6 stages (`v0.065`-`v0.070`) | Not started |
+| 5 | Platform API IR | Not started |
+| 6 | Rei compiler narrator | Not started |
+| 7 | Search/knowledge-state additions + doc tooling | Not started |
+| 8 | URL state, class binding, action-arg runtime | Not started |
+| 9 | Compiler hardening & supply-chain tooling | Not started |
+| 10 | Live-streaming/CCTV/upgrade maintenance | Not started |
+| 11 | Android-exclusion verification pass | Not started |
+| 12 | Desktop-backend exclusion decision | Not started |
+| 13 | Root metadata (preserve `apt-repo.yml`) | Not started |
+| 14 | Full verification | Not started |
 
 **Known gap until Stage 6 lands:** with Stage 5 in, the full suite runs
 714 tests clean (0 failures) under a proper `pip install -e .`. Only 4
