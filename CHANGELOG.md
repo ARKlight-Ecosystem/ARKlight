@@ -5,6 +5,32 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: repository-layout drift fix (`provider.py` missing from `GETTING-STARTED.md`)
+
+A documentation drift audit against the current `alpha` checkout found
+one real inconsistency: `arklight/provider.py` -- the `Provider` SDK,
+whose six-rung ladder (`v0.065`-`v0.070`) is fully SHIPPED and has its
+own settled design record (`docs/Foundational/PROVIDER-SDK.md`) -- was
+missing from `docs/Foundational/GETTING-STARTED.md`'s annotated
+repository-layout tree, even though sibling top-level modules of the
+same kind (`capabilities.py`, `experimental.py`, `pwa.py`) are all
+listed there. Same class of omission `v0.0645` fixed for
+`capabilities.py`. No code changed.
+
+Everything else checked came back clean: `tests/test_doc_links.py`,
+`test_doc_citations.py`, and `test_link_check.py` all pass (43/43);
+`docs/Foundational/CLI-REFERENCE.md`'s subcommand list matches
+`arklight --help` exactly; the full suite passes (3076/3076); the
+`docs/version history/v0.071`-`v0.078` files are correctly marked
+`PLANNED -- not yet started` rather than describing unshipped work as
+done; and the package version (`0.070` in `pyproject.toml`) matches
+`CHANGELOG.md`'s last closed milestone, with everything past it
+correctly still under `Unreleased`.
+
+- **`docs/Foundational/GETTING-STARTED.md`** -- added a `provider.py`
+  row to the repository-layout listing, pointing at
+  `docs/Foundational/PROVIDER-SDK.md`.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- External review fixes: PWA-adjacent config/CSS/CCTV/path bugs, `production` scaffold architecture
 
 A batch of fixes triggered by an outside hands-on review of the alpha

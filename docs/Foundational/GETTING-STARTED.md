@@ -83,6 +83,12 @@ arklight-framework/
                         docs/Foundational/EXPERIMENTAL-APIS.md
     pwa.py             `arklight pwa` -- manifest/service-worker
                         generation for an existing build directory
+    provider.py        `Provider` -- interface-only declaration that a
+                        site talks to an external service at runtime
+                        (auth/read/write/subscribe capability
+                        vocabulary, `custom:`-prefixed escape hatch);
+                        six-rung ladder fully SHIPPED as of `v0.070` --
+                        see docs/Foundational/PROVIDER-SDK.md
     ast/               ARK AST node type (ARKNode)
     parser/            Python Source -> Python AST -> (loaded) ARK AST
     ir/                Normalization, Validation, Website IR
