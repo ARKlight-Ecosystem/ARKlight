@@ -36,7 +36,7 @@ note.
 | 3 | JS vocabulary ladder, 10 rungs (`v0.061`-`v0.070`) | Ported -- confirmed no new import gaps beyond Stage 1's note |
 | 2 | User-defined components (`v0.060`) | Not started |
 | 3 | JS vocabulary ladder, 10 rungs (`v0.061`-`v0.070`) | Not started |
-| 4 | `Provider` SDK, 6 stages (`v0.065`-`v0.070`) | Not started |
+| 4 | `Provider` SDK, 6 stages (`v0.065`-`v0.070`) | Ported -- `import arklight` still fails, but now for exactly the single remaining reason predicted (Stage 5's `arklight.ir.platform_api`), confirming no new import gaps introduced |
 | 5 | Platform API IR | Not started |
 | 6 | Rei compiler narrator | Not started |
 | 7 | Search/knowledge-state additions + doc tooling | Not started |
