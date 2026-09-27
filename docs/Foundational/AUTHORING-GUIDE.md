@@ -1,6 +1,6 @@
 # Authoring Guide
 
-> Accurate as of package version **`v0.070`**, commit
+> Accurate as of package version **`v0.070.0`**, commit
 > [`96ada2c`](https://github.com/ARKlight-Ecosystem/ARKlight/commit/96ada2c3112afe46a218503d07385f2597216be4)
 > on `alpha`. This is a settled-record doc (`docs/Foundational/`,
 > updated in place, never removed) -- if you're reading this from a

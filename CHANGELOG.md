@@ -5,6 +5,65 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Version scheme migrated to `0.MMM.PP`, syncing `alpha`'s numbering with `main`
+
+`pyproject.toml`'s `version` had drifted back to the two/three-digit
+"milestone number as a decimal fraction" scheme (`0.061`, `0.0650`,
+`0.06616`, `0.070`, ...) -- exactly the scheme the `0.42.0` release
+moved away from (see that `CHANGELOG.md` entry) specifically because
+it's a PEP 440 hazard: `importlib.metadata.version("arklight")` (and
+therefore `arklight.__version__`, and therefore every `arklight
+<command>`'s printed output) reads back the *normalized* string, which
+treats each dot-separated segment as an integer and drops leading
+zeros -- confirmed live: a checkout with `version = "0.070"` reports
+`arklight --version` as `0.70`, and the more granular `0.06616` would
+normalize to `0.6616`, a different-looking, misleading number that
+silently destroys the "which milestone + which stage" meaning the
+leading zeros were encoding. `tests/test_version.py` didn't catch this
+because both sides of its assertion go through the same normalization.
+`arklight/cli/whats_new.py`'s `read_version()` already documented this
+exact hazard in its own docstring and worked around it for one code
+path (release-note lookup) by reading the raw, un-normalized string
+straight from `pyproject.toml`; every other version-printing call site
+in `arklight/cli/main.py` was still exposed.
+
+New scheme, agreed with `main`: `MAJOR.MINOR.PATCH`, major pinned at
+`0`, minor zero-padded to 3 digits (`070`, `066`, ...), patch as many
+digits as needed, no padding. `0.070` (no stage suffix) becomes
+`0.070.0`; an interleaved stage version like `0.06616` would become
+`0.066.16`. This does **not** fully eliminate the PEP 440 hazard --
+`Version("0.070.0")` still normalizes to `0.70.0`, since leading zeros
+within a segment are stripped regardless of how many digits precede
+them -- but it does fix the worse half of the problem: keeping
+major/minor/patch as separate dot-segments means normalization can no
+longer mash two different numbers together into one ambiguous string
+the way `0.06616` -> `0.6616` did. The 3-digit-padded minor is a
+human/doc-facing convention (matches `docs/version history/vX.Y.md`
+filenames and `CHANGELOG.md` headers going forward), not something
+`arklight.__version__`/`pip show` will ever display literally --
+readers should expect `arklight --version` to print `0.70.0`, not
+`0.070.0`, and cross-check the padded form against `pyproject.toml`
+directly when it matters, the same caveat `whats_new.py` already
+documents for its own lookup.
+
+`main`'s own numbering already made this exact leading-zero-loss
+mistake once, silently: an internal milestone tracked as `v0.054`
+shipped there as `0.54.0`, not the `0.054.0` this new convention would
+produce -- a heads-up from the person driving this migration, not
+something fixed retroactively (that release is already out). Going
+forward, `alpha` adopts the same `0.MMM.PP` shape so the two branches'
+numbering stays comparable.
+
+`pyproject.toml`: `0.070` -> `0.070.0`. `docs/Foundational/AUTHORING-GUIDE.md`'s
+top-of-file provenance note updated to match (`v0.070` -> `v0.070.0`).
+Full suite (3076/3076) and `tests/test_version.py`/`tests/test_upgrade.py`
+still pass -- no hardcoded literal copies of the old `"0.070"` string
+existed anywhere else in `arklight/`/`tests/`, so nothing else needed
+to change for this checkout to be internally consistent. Historical
+`CHANGELOG.md`/`PROGRESS.md` entries and `docs/version history/*.md`
+filenames are left as-is -- they're a record of what shipped under the
+old scheme at the time, not something to rewrite in place.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: dead commit hash in `AUTHORING-GUIDE.md`'s provenance note
 
 Informal fix: the note at the top of `AUTHORING-GUIDE.md` ("Accurate
