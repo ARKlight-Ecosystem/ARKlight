@@ -130,6 +130,29 @@ def test_default_activity_handles_main_frame_load_errors(tmp_path):
     assert "<script" not in kt.split("LOAD_ERROR_HTML =", 1)[1]
 
 
+def test_default_activity_recovers_boosted_navigation_failures(tmp_path):
+    # `Site(app_shell=True)`'s hx-boost drives same-origin navigation
+    # through an XMLHttpRequest, so `isForMainFrame` is always false
+    # for it -- the plain-main-frame branch above never runs, and a
+    # failed boosted link would otherwise reach no native handling at
+    # all (see ANDROID-BACKEND-HARDENING-PROPOSAL.md). Detected via
+    # the `HX-Request` header HTMX always sets, and given one real
+    # chance to load as an ordinary navigation, which lands back on
+    # the isForMainFrame branch (and LOAD_ERROR_HTML) if it still
+    # fails. Present and harmless whether or not this particular site
+    # actually uses app_shell -- see module docstring.
+    kt = _main_activity(_scaffold(tmp_path))
+
+    assert "fun isBoostedNavigationRequest(request: WebResourceRequest): Boolean" in kt
+    assert '"HX-Request"' in kt
+    assert "} else if (isBoostedNavigationRequest(request)) {" in kt
+    assert "view.loadUrl(request.url.toString())" in kt
+    # Only a GET can plausibly be a boosted <a> click (hx-boost forms
+    # can POST, but re-issuing a POST as a GET navigation would be
+    # wrong) -- the method check comes before the header check.
+    assert 'request.method.equals("GET", ignoreCase = true)' in kt
+
+
 def test_web_contents_debugging_follows_the_build_type(tmp_path):
     kt = _main_activity(_scaffold(tmp_path))
 
