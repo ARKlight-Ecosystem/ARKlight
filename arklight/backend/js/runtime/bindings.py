@@ -13,11 +13,18 @@ from __future__ import annotations
 
 RENDER_BINDINGS_JS = """  function renderBindings(store) {
     document.querySelectorAll("[data-ark-bind]").forEach(function (el) {
-      var key = el.getAttribute("data-ark-bind");
-      var text = String(store.get(key));
-      var next = snabbdom.h(arkSelectorFor(el), {}, text);
-      arkPatch(el.__arkVnode || el, next);
-      el.__arkVnode = next;
+      // 0.06505: per-element guard (RUNTIME-ERROR-HANDLING-PROPOSAL.md,
+      // 3a) -- one bad binding must not stop the rest of this pass, or
+      // the render passes after it in the store.subscribe callback.
+      try {
+        var key = el.getAttribute("data-ark-bind");
+        var text = String(store.get(key));
+        var next = snabbdom.h(arkSelectorFor(el), {}, text);
+        arkPatch(el.__arkVnode || el, next);
+        el.__arkVnode = next;
+      } catch (err) {
+        arkReportError("A displayed value couldn't be updated -- part of this page may be out of date.", err);
+      }
     });
   }
 
@@ -32,9 +39,14 @@ RENDER_CLASS_BINDINGS_JS = """  function renderClassBindings(store) {
     // and remount the element, dropping any listeners already wired to
     // it. A one-line classList.toggle has none of that risk.
     document.querySelectorAll("[data-ark-bind-class]").forEach(function (el) {
-      var className = el.getAttribute("data-ark-bind-class");
-      var key = el.getAttribute("data-ark-bind-class-state");
-      el.classList.toggle(className, !!store.get(key));
+      // 0.06505: per-element guard, same reasoning as renderBindings.
+      try {
+        var className = el.getAttribute("data-ark-bind-class");
+        var key = el.getAttribute("data-ark-bind-class-state");
+        el.classList.toggle(className, !!store.get(key));
+      } catch (err) {
+        arkReportError("A displayed value couldn't be updated -- part of this page may be out of date.", err);
+      }
     });
   }
 

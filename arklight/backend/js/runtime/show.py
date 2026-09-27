@@ -1,8 +1,8 @@
 """
-`renderShow`: `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15) --
+`renderShow`: `vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15) --
 the runtime half of `Show(predicate, ...)` (`arklight.api.Show`).
 
-`docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.3 proposes
+`ARCHITECTURE-VDOM.md` [retired -- see CHANGELOG.md] SS6.3 proposes
 `Show`/conditional rendering as a vnode swap between the real subtree
 and a comment-node placeholder, through the vendored `patch()`
 (`arklight/backend/js/vdom.py`) -- the same mechanism `vdom-7` gives
@@ -55,14 +55,39 @@ it's present to a visitor -- so nothing here touches `arkPatch`.
 from __future__ import annotations
 
 RENDER_SHOW_JS = """  function arkEvalPredicate(store, spec) {
-    var value = store.get(spec.names[0]);
+    var names = spec.names;
+    if (spec.kind === "equals") return store.get(names[0]) === store.get(names[1]);
+    if (spec.kind === "gt") return store.get(names[0]) > store.get(names[1]);
+    if (spec.kind === "lt") return store.get(names[0]) < store.get(names[1]);
+    // 0.06517 (v0.066): the predicates catalog. Twins of
+    // arklight/ir/js_predicate.py -- keep the two in step.
+    if (spec.kind === "and") return names.every(function (n) { return !!store.get(n); });
+    if (spec.kind === "or") return names.some(function (n) { return !!store.get(n); });
+    if (spec.kind === "not") return !store.get(names[0]);
+    if (spec.kind === "in_range") {
+      var x = Number(store.get(names[0])) || 0;
+      return (Number(store.get(names[1])) || 0) <= x && x <= (Number(store.get(names[2])) || 0);
+    }
+    if (spec.kind === "one_of") return spec.args.values.indexOf(store.get(names[0])) !== -1;
+    if (spec.kind === "is_null") return store.get(names[0]) == null;
+    if (spec.kind === "is_empty" || spec.kind === "is_not_empty") {
+      var v = store.get(names[0]);
+      var empty = v == null || ((typeof v === "string" || Array.isArray(v)) && v.length === 0);
+      return spec.kind === "is_empty" ? empty : !empty;
+    }
+    var value = store.get(names[0]);
     return spec.kind === "falsy" ? !value : !!value;
   }
 
   function renderShow(store) {
     document.querySelectorAll("[data-ark-show]").forEach(function (el) {
-      var spec = JSON.parse(el.getAttribute("data-ark-show"));
-      el.hidden = !arkEvalPredicate(store, spec);
+      // 0.06505: per-element guard (RUNTIME-ERROR-HANDLING-PROPOSAL.md, 3a).
+      try {
+        var spec = JSON.parse(el.getAttribute("data-ark-show"));
+        el.hidden = !arkEvalPredicate(store, spec);
+      } catch (err) {
+        arkReportError("A conditional section on this page couldn't be updated -- it may be showing stale content.", err);
+      }
     });
   }
 

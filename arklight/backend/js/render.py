@@ -37,7 +37,7 @@ and an action dispatcher) plus only the `Action.*` fragments
 (`arklight/backend/js/actions/`) that page's `on_click=` values
 actually reference. Pages with no `State(...)` get none of this --
 same "only ship what's used" discipline v0.0035 also brought to the
-named-behavior runtime below. See docs/DESIGN-NOTES.md ("v0.0035:
+named-behavior runtime below. See docs/Foundational/DESIGN-NOTES.md ("v0.0035:
 stateful JS -- capability, not vocabulary") for the full design.
 
 Every behavior/action fragment here is a small, statically-readable JS
@@ -87,8 +87,8 @@ behaviors (`on_click="toggle"`, etc.) have no modifier-attaching API
 yet -- deliberately left for a future addendum rather than
 speculatively wired up now.
 
-`htmx-1` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 1 --
-Behaviors" / `docs/Backends/REFACTOR-INDEX.md` row 4) replaces the
+`htmx-1` (see `HTMX-INTEGRATION.md` [retired -- see CHANGELOG.md] "Stage 1 --
+Behaviors" / `REFACTOR-INDEX.md` row 4) replaces the
 named-behavior wiring pass with HTMX. `wireBehaviors()` and its
 `_behaviors_block` are gone -- there is no more `DOMContentLoaded`
 query/`addEventListener` loop over `[data-ark-on-click]` elements,
@@ -117,13 +117,13 @@ declares state -- see `_build_runtime_js`'s `needs_htmx`. State-only
 pages don't yet emit any `hx-*` attribute (that's `htmx-2`/`htmx-3`
 territory: modifiers and `Action.*` dispatch still go through
 `data-ark-modifiers`/`wireActions()` unchanged by this stage), but
-`docs/Backends/REFACTOR-INDEX.md` row 4 scopes HTMX's inclusion to
+`REFACTOR-INDEX.md` row 4 scopes HTMX's inclusion to
 "behaviors or state" rather than "behaviors only" so that landing
 `htmx-2`/`htmx-3` later doesn't also have to touch this
 already-shipped condition.
 
-`htmx-2` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 2 --
-Modifiers" / `docs/Backends/REFACTOR-INDEX.md` row 5) removes
+`htmx-2` (see `HTMX-INTEGRATION.md` "Stage 2 --
+Modifiers" / `REFACTOR-INDEX.md` row 5) removes
 `arkApplyModifiers` entirely -- `arklight/backend/html/attrs.py` now
 compiles an `ActionRef`'s modifier tokens into an `hx-trigger`
 attribute at build time instead of the `data-ark-modifiers` attribute
@@ -141,8 +141,8 @@ despite the design doc's original expectation that it would; see
 `runtime/dispatch.py`'s module docstring, "Bug fix (post-`htmx-5`...)"
 section, for where and how that gap was finally closed.
 
-`htmx-3` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 3 -- Replace
-`wireActions()` wiring loop" / `docs/Backends/REFACTOR-INDEX.md` row 6)
+`htmx-3` (see `HTMX-INTEGRATION.md` "Stage 3 -- Replace
+`wireActions()` wiring loop" / `REFACTOR-INDEX.md` row 6)
 deletes `wireActions`'s `querySelectorAll('[data-ark-on-click^=
 "action:"]')`/`forEach`/per-element-`addEventListener` loop entirely.
 In its place, `runtime/dispatch.py`'s `ACTION_INTERCEPTOR_JS` registers
@@ -164,9 +164,8 @@ unmodified action button's click handling. `data-ark-on-click="action:
 untouched; only the `DOMContentLoaded` call site's `wireActions(store)`
 becomes `wireActionInterceptor(store)` below.
 
-`htmx-4` (see `docs/Backends/JS-BACKEND-REFACTOR-PLAN.md` "The
-app-illusion problem, stated precisely" / `docs/Backends/
-REFACTOR-INDEX.md` row 9) is app-shell navigation:
+`htmx-4` (see `JS-BACKEND-REFACTOR-PLAN.md` "The
+app-illusion problem, stated precisely" / `REFACTOR-INDEX.md` row 9) is app-shell navigation:
 `Site(app_shell=True)` (see `arklight/backend/html/page_render.py`)
 emits `hx-boost="true"` on `<body>`, so same-origin link clicks become
 an in-place AJAX swap instead of a full document reload -- the fix for
@@ -206,9 +205,8 @@ docstring for a third gap this stage fixes on the HTML side: why a
 state page's `data-ark-state` blob moves off `<body>` (whose own
 attributes a boosted swap never updates) when `app_shell=True`.
 
-`htmx-5` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 4 -- Audit
-and remove remaining hand-rolled plumbing" / `docs/Backends/
-REFACTOR-INDEX.md` row 10) is this project's own "audit and remove
+`htmx-5` (see `HTMX-INTEGRATION.md` "Stage 4 -- Audit
+and remove remaining hand-rolled plumbing" / `REFACTOR-INDEX.md` row 10) is this project's own "audit and remove
 hand-rolled plumbing that HTMX already duplicates" mandate cutting the
 other way: `htmx-1`'s `hx-on:click="arkRunBehavior('<name>', this)"`
 turned out to route every named-behavior click through HTMX's own
@@ -236,7 +234,7 @@ bracket-syntax `hx-trigger` filters) that construct a function from a
 string -- paths ARKlight's compiler never emits into, but which this
 line stops relying on "never emits" alone to guarantee.
 
-`vdom-4` (see `docs/Backends/REFACTOR-INDEX.md` row 12) adds
+`vdom-4` (see `REFACTOR-INDEX.md` row 12) adds
 computed/derived state: `Computed(name, deps=(...), derive=Derive.*(...))`
 (`arklight.api`). A page that declares at least one `Computed(...)`
 gets one more closed-vocabulary object alongside `actions`/
@@ -251,7 +249,7 @@ value lives in the exact same state object a `State(...)` value does,
 so `Bind(...)`/`bind_class=` read it through the unmodified
 `renderBindings`/`renderClassBindings` passes.
 
-`vdom-5` (see `docs/Backends/REFACTOR-INDEX.md` row 13) adds watch
+`vdom-5` (see `REFACTOR-INDEX.md` row 13) adds watch
 effects: `Watch(name, then=Action.*(...))` (`arklight.api.Watch`). A
 page that declares at least one `Watch(...)` gets `wireWatchers`
 (`arklight/backend/js/runtime/watch.py`) spliced in and called once
@@ -266,24 +264,55 @@ clickable `Action.*(...)`/named behavior anywhere) ships `actions`
 without also shipping the click interceptor it would never use (see
 `needs_actions_object` vs. `needs_click_interceptor` in
 `_build_runtime_js`).
+
+`v0.065` (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) adds Platform
+APIs: `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)`
+(`arklight.api.PlatformAPI`), compiled to a `PlatformAPIRef` on
+`on_click=` the same way `Action.*(...)` compiles to an `ActionRef`.
+A page that references at least one gets one more closed-vocabulary
+object alongside `actions`/`behaviors` -- `platformApis`
+(`arklight/backend/js/platform_apis/`, only the capabilities that
+page's IR actually uses, same "only ship what's used" discipline) --
+dispatched by the same click interceptor's new `"platform:"` branch
+(`runtime/dispatch.py`). Unlike `Action.*(...)`, a Platform API call
+never targets `State(...)`, so it never touches `needs_actions_object`
+the way a `Watch(...)` does -- it only ever affects
+`needs_click_interceptor`, exactly like a named behavior. Before any
+of this runtime is assembled, `check_backend_support` (`arklight.ir.
+platform_api`) fails the build with a named-capability diagnostic if
+this site references a capability the "web" backend (this module,
+`arklight.backend.html`, `arklight.backend.css` together) doesn't yet
+implement -- currently only relevant for a future `android`/`desktop`
+backend, since "web" implements every capability the compiler-owned
+registry currently knows about.
 """
 
 from __future__ import annotations
 
-from arklight.ast.nodes import ActionRef
+import json
+from dataclasses import dataclass
+
+from arklight.ast.nodes import ActionRef, ModelBindSpec, PlatformAPIRef
 from arklight.backend.base import Backend
 from arklight.backend.js.actions import ACTION_FRAGMENTS
 from arklight.backend.js.behaviors import BEHAVIOR_FRAGMENTS
 from arklight.backend.js.derivations import DERIVATION_FRAGMENTS
 from arklight.backend.js.htmx import HTMX_JS
+from arklight.backend.js.platform_apis import PLATFORM_API_FRAGMENTS
+from arklight.experimental import FEATURES
+from arklight.ir.platform_api import check_backend_support
 from arklight.backend.js.runtime import CLICK_INTERCEPTOR_JS as _CLICK_INTERCEPTOR_JS
 from arklight.backend.js.runtime import NAV_HIGHLIGHT_JS as _NAV_HIGHLIGHT_JS
+from arklight.backend.js.runtime import ERROR_BOUNDARY_JS as _ERROR_BOUNDARY_JS
+from arklight.backend.js.runtime import ERROR_REPORT_JS as _ERROR_REPORT_JS
 from arklight.backend.js.runtime import NOTIFY_JS as _NOTIFY_JS
 from arklight.backend.js.runtime import RENDER_MODEL_BINDINGS_JS as _RENDER_MODEL_BINDINGS_JS
 from arklight.backend.js.runtime import RENDER_REPEAT_JS as _RENDER_REPEAT_JS
 from arklight.backend.js.runtime import RENDER_SHOW_JS as _RENDER_SHOW_JS
 from arklight.backend.js.runtime import STATE_CORE_JS as _STATE_CORE_JS
 from arklight.backend.js.runtime import WIRE_MODEL_BINDING_JS as _WIRE_MODEL_BINDING_JS
+from arklight.backend.js.runtime import WIRE_QUERY_SYNC_JS as _WIRE_QUERY_SYNC_JS
+from arklight.backend.js.runtime import WIRE_REVEAL_JS as _WIRE_REVEAL_JS
 from arklight.backend.js.runtime import WIRE_WATCHERS_JS as _WIRE_WATCHERS_JS
 from arklight.backend.js.vdom import SNABBDOM_CORE_JS
 from arklight.ir.build import IRNode, WebsiteIR
@@ -294,7 +323,7 @@ SCRIPT_PATH = "arklight.js"
 
 # _NOTIFY_JS / _NAV_HIGHLIGHT_JS / _STATE_CORE_JS used to be defined
 # inline here as triple-quoted string constants. `refactor-0` (see
-# docs/Backends/REFACTOR-INDEX.md) split them into
+# REFACTOR-INDEX.md) split them into
 # arklight/backend/js/runtime/{state,bindings,modifiers,dispatch,nav,
 # notify}.py, mirroring the actions/ and behaviors/ per-file pattern.
 # The values imported above are byte-for-byte identical to the old
@@ -310,7 +339,22 @@ def _walk(node: IRNode):
 
 def _collect_usage(
     ir: WebsiteIR,
-) -> tuple[set[str], set[str], set[str], bool, set[str], bool, bool, bool, bool, bool]:
+) -> tuple[
+    set[str],
+    set[str],
+    set[str],
+    bool,
+    set[str],
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+    set[str],
+    bool,
+]:
     """
     Inspect the site's IR for what the runtime actually needs to ship:
     which named behaviors are referenced, which actions are referenced
@@ -320,31 +364,94 @@ def _collect_usage(
     either `on_click=` or a `Watch(...)`'s `then=` (`used_actions`,
     `vdom-5` -- see below; this is what `_actions_object_js` reads),
     whether any page declares state at all, which derivation kinds are
-    referenced by a `Computed(...)` (`vdom-4`, docs/Backends/
-    REFACTOR-INDEX.md row 12), whether any page declares a
+    referenced by a `Computed(...)` (`vdom-4`, REFACTOR-INDEX.md row 12), whether any page declares a
     `Computed(...)` at all, whether any page declares a `Watch(...)` at
-    all (`vdom-5`, docs/Backends/REFACTOR-INDEX.md row 13), whether any
-    node anywhere uses `bind_value=` (`vdom-6`, docs/Backends/
-    REFACTOR-INDEX.md row 14), and whether any page uses `Repeat(...)`/
-    `Show(...)` at all (`vdom-7`, docs/Backends/REFACTOR-INDEX.md row
+    all (`vdom-5`, REFACTOR-INDEX.md row 13), whether any
+    node anywhere uses `bind_value=` (`vdom-6`, REFACTOR-INDEX.md row 14), and whether any page uses `Repeat(...)`/
+    `Show(...)` at all (`vdom-7`, REFACTOR-INDEX.md row
     15) -- an `on_click=Action.*(...)` nested inside a `Repeat(...)`'s
     template is still a normal `IRNode` in the tree (it's the compiled
     template `IRNode`, not a separate declaration pulled out like
     `Computed`/`Watch` are), so the `_walk` loop below already picks it
     up into `used_on_click_actions`/`used_actions` without any special
-    case.
+    case. Also returns `has_reveal` (`v0.063`) -- whether any node
+    anywhere carries `on_reveal=` -- gating `WIRE_REVEAL_JS`/
+    `wireReveal()` the same "only ship what's used" way `has_repeat`/
+    `has_show` gate their own runtime pieces, and independent of
+    `has_state`: a reveal effect never reads or writes `State(...)`.
+    Also returns `has_query` (`v0.064`) -- whether any page declares a
+    query-tracked `State(..., query=...)` -- gating `WIRE_QUERY_SYNC_JS`/
+    `wireQuerySync()` the same "only ship what's used" way. Unlike
+    `has_reveal`, this one implies `has_state` (`query=` is only ever
+    a prop on a `State(...)` node), but is still tracked separately:
+    the read/write halves of this same feature are folded
+    unconditionally into `STATE_CORE_JS` whenever `has_state` alone
+    (see `arklight/backend/js/runtime/state.py`'s module docstring),
+    while `wireQuerySync` -- the `popstate` listener -- is genuinely
+    new runtime surface only worth shipping when at least one page
+    actually uses it.
+
+    Also returns `used_platform_apis` (`v0.065`) -- the set of
+    `PlatformAPI.*(...)` capability names referenced by any
+    `on_click=` anywhere, the `PlatformAPIRef` sibling of
+    `used_on_click_actions`'s `ActionRef` handling. Folded into
+    `needs_click_interceptor` in `_build_runtime_js` exactly like
+    `used_behaviors`/`used_on_click_actions` are, since a
+    `PlatformAPIRef` click is dispatched by that same interceptor
+    (see `arklight/backend/js/runtime/dispatch.py`'s `"platform:"`
+    branch) -- never folded into `used_actions`, since a Platform API
+    call never targets `State(...)` the way `Action.*(...)`/`Watch(...)`
+    do.
+
+    Also returns `has_hx_trigger` (`htmx-6` bugfix) -- whether any
+    `on_click=Action.*(...)` anywhere carries a modifier that actually
+    compiles to an `hx-trigger` attribute (see
+    `arklight.backend.html.attrs._modifiers_to_hx_trigger`: everything
+    except a bare tuple or one containing only `"prevent"`). This is
+    the real "does this site need vendored HTMX for state" condition
+    -- see `_build_runtime_js`'s `needs_htmx`, which used to use the
+    broader (and wrong) `has_state` for this instead.
     """
+    # Deferred (function-body, not module-level) import: `attrs.py`
+    # sits under `arklight.backend.html`, whose package `__init__`
+    # imports `arklight.backend.html.render` -> `page_render.py` ->
+    # `from arklight.backend.js.render import SCRIPT_PATH` -- a
+    # straight module-level import back into *this* module would be
+    # circular. By the time `_collect_usage` actually runs, this
+    # module has always finished loading, so resolving the import here
+    # only ever touches `sys.modules`, never re-enters this file.
+    from arklight.backend.html.attrs import _modifiers_to_hx_trigger
+
     used_behaviors: set[str] = set()
     used_on_click_actions: set[str] = set()
+    used_platform_apis: set[str] = set()
     has_state = any(page.state for page in ir.pages)
+    # `htmx-6` bugfix (REFACTOR-INDEX.md): `needs_htmx`
+    # used to be `has_state or ir.app_shell`, shipping the whole ~15kB
+    # vendored HTMX bundle to *every* page that merely declares
+    # `State(...)`, regardless of whether that page ever emits an
+    # `hx-*` attribute at all. Per this module's own htmx-1 docstring
+    # paragraph, state only actually needs HTMX for the `hx-trigger`
+    # `Action.*(...)` event modifiers compile to (htmx-2) -- and per
+    # `_modifiers_to_hx_trigger` (`arklight/backend/html/attrs.py`),
+    # that's only true for `once`/`debounce`/`throttle`/`stop`; a bare
+    # `on_click=Action.increment("count")` with no modifiers, or one
+    # with only `"prevent"`, compiles to no `hx-trigger` attribute at
+    # all and so never touches HTMX. `has_hx_trigger` tracks the real
+    # condition directly, so a stateful page that never uses a
+    # trigger-changing modifier now ships no HTMX -- same "only ship
+    # what's used" discipline as every other flag in this function.
+    has_hx_trigger = False
     used_derivations: set[str] = {
         spec["kind"] for page in ir.pages for _name, spec in page.computed
     }
     has_computed = any(page.computed for page in ir.pages)
     has_watch = any(page.watch for page in ir.pages)
+    has_query = any(page.query for page in ir.pages)
     has_model_binding = False
     has_repeat = False
     has_show = False
+    has_reveal = False
 
     for page in ir.pages:
         for node in _walk(page.root):
@@ -353,12 +460,20 @@ def _collect_usage(
                 used_behaviors.add(on_click)
             elif isinstance(on_click, ActionRef):
                 used_on_click_actions.add(on_click.action)
+                if _modifiers_to_hx_trigger(on_click.modifiers) is not None:
+                    has_hx_trigger = True
+            elif isinstance(on_click, PlatformAPIRef):
+                used_platform_apis.add(on_click.capability)
             if isinstance(node.props.get("bind_value"), str) and node.props.get("bind_value"):
+                has_model_binding = True
+            elif isinstance(node.props.get("bind_value"), ModelBindSpec):
                 has_model_binding = True
             if node.type == "Repeat":
                 has_repeat = True
             elif node.type == "Show":
                 has_show = True
+            if node.props.get("on_reveal"):
+                has_reveal = True
 
     # vdom-5: a Watch(...)'s `then=` reuses the exact same
     # ACTION_REGISTRY dispatcher an on_click=Action.*(...) does (see
@@ -384,11 +499,63 @@ def _collect_usage(
         has_model_binding,
         has_repeat,
         has_show,
+        has_reveal,
+        has_query,
+        used_platform_apis,
+        has_hx_trigger,
+    )
+
+
+@dataclass(frozen=True)
+class RuntimeUsage:
+    """Manifest-friendly summary of which named JS runtime pieces a
+    site's IR actually references -- just the sets a build-manifest/
+    SBOM consumer (arklight/compiler/sbom.py) needs, none of the
+    JS-codegen-only booleans (`has_state`, `has_computed`, ...)
+    `_collect_usage` also returns, which no consumer outside this
+    module has a reason to see."""
+
+    used_behaviors: frozenset[str]
+    used_actions: frozenset[str]
+    used_derivations: frozenset[str]
+    used_platform_apis: frozenset[str]
+
+
+def collect_used_runtime_features(ir: WebsiteIR) -> RuntimeUsage:
+    """
+    Public, backend-agnostic-facing wrapper around `_collect_usage` --
+    "what named runtime pieces does this specific site actually use",
+    without the private tuple shape or the JS-codegen-only flags mixed
+    in. Safe to call independent of whether the JS backend actually
+    ran in a given `build()` call: this only inspects the IR, it
+    doesn't touch anything the JS backend itself renders.
+    """
+    (
+        used_behaviors,
+        _used_on_click_actions,
+        used_actions,
+        _has_state,
+        used_derivations,
+        _has_computed,
+        _has_watch,
+        _has_model_binding,
+        _has_repeat,
+        _has_show,
+        _has_reveal,
+        _has_query,
+        used_platform_apis,
+        _has_hx_trigger,
+    ) = _collect_usage(ir)
+    return RuntimeUsage(
+        used_behaviors=frozenset(used_behaviors),
+        used_actions=frozenset(used_actions),
+        used_derivations=frozenset(used_derivations),
+        used_platform_apis=frozenset(used_platform_apis),
     )
 
 
 def _behaviors_object_js(used_behaviors: set[str]) -> str:
-    # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10; see
+    # htmx-5 (REFACTOR-INDEX.md row 10; see
     # arklight/backend/js/runtime/dispatch.py's module docstring for
     # the full audit finding): this used to build `arkBehaviors` +
     # `arkRunBehavior`, both attached to `window` so vendored HTMX's
@@ -437,8 +604,27 @@ def _actions_object_js(used_actions: set[str]) -> str:
     return "  var actions = {\n" + entries + "\n  };\n"
 
 
+def _platform_apis_object_js(used_platform_apis: set[str]) -> str:
+    # `v0.065`: mirrors `_behaviors_object_js` exactly -- only the
+    # `PlatformAPI.*(...)` capabilities this site's IR actually
+    # references, assembled as a plain local `var` `wireClickInterceptor`
+    # (`runtime/dispatch.py`'s `"platform:"` branch) reads by closure.
+    # `check_backend_support` (called from `_build_runtime_js`) is
+    # what actually enforces that every capability here is one the
+    # "web" backend implements -- this function only ever emits
+    # fragments for capabilities `PLATFORM_API_FRAGMENTS` has, same
+    # "only ship what's used" discipline as its siblings.
+    fragments = [
+        PLATFORM_API_FRAGMENTS[name] for name in sorted(used_platform_apis) if name in PLATFORM_API_FRAGMENTS
+    ]
+    if not fragments:
+        return "  var platformApis = {};\n"
+    entries = ",\n".join(fragments)
+    return "  var platformApis = {\n" + entries + "\n  };\n"
+
+
 def _derivations_object_js(used_derivations: set[str]) -> str:
-    # vdom-4 (docs/Backends/REFACTOR-INDEX.md row 12): mirrors
+    # vdom-4 (REFACTOR-INDEX.md row 12): mirrors
     # `_actions_object_js`/`_behaviors_object_js` exactly -- only the
     # `Derive.*` kinds this site's IR actually references, assembled
     # as a plain local `var`, read by `createState`'s `recomputeAll()`
@@ -458,6 +644,114 @@ def _derivations_object_js(used_derivations: set[str]) -> str:
     return "  var derivations = {\n" + entries + "\n  };\n"
 
 
+def _experimental_console_reminder_js(experimental_usages: list) -> str:
+    """
+    Devtools mirror of the compile-time "[EXPERIMENTAL FEATURE ACTIVE]"
+    banner (`arklight.experimental.format_inline_banner`/
+    `print_summary`) -- a `console.warn(...)` block naming every
+    *distinct* experimental feature this build actually used, so
+    whoever's looking at the shipped page's devtools console (not just
+    whoever ran `arklight build`) sees the same reminder. Deduplicated
+    by `feature_id`, first-seen order -- same rule `print_summary`
+    already follows, for the same reason: a feature used on five
+    different pages/components should print once, not five times.
+
+    Returns `""` (nothing to ship) for an empty `experimental_usages`
+    list, same "only ship what's used" discipline every other function
+    in this module already follows -- a site that never touches an
+    experimental feature gets zero extra bytes here, not an empty
+    no-op console call.
+
+    Static strings only, pulled straight from the same
+    `arklight.experimental.FEATURES` registry the compile-time banner
+    reads -- `json.dumps(...)` is used purely to produce a safely-
+    escaped JS string literal (registry text can contain a `'`/`"`),
+    never to construct or execute code: this stays a flat list of
+    `console.warn("...")` calls, nothing ever passed through `eval`/
+    `new Function`, same invariant as every other fragment this backend
+    generates.
+    """
+    seen: list[str] = []
+    for usage in experimental_usages:
+        if usage.feature_id not in seen:
+            seen.append(usage.feature_id)
+    if not seen:
+        return ""
+
+    lines = [
+        "  if (typeof console !== \"undefined\" && console.warn) {",
+        "    if (console.groupCollapsed) {",
+        "      console.groupCollapsed("
+        + json.dumps("%c\u26a0 ARKlight: experimental API(s) active in this build")
+        + ", "
+        + json.dumps("color: #b45309; font-weight: bold;")
+        + ");",
+        "    }",
+    ]
+    for feature_id in seen:
+        feature = FEATURES[feature_id]
+        lines.append(
+            "    console.warn("
+            + json.dumps(f"[{feature.id}] {feature.inline_note}")
+            + ");"
+        )
+    lines.append(
+        "    console.warn("
+        + json.dumps(
+            "These are also reported at build time -- see docs/Foundational/EXPERIMENTAL-APIS.md."
+        )
+        + ");"
+    )
+    lines.append("    if (console.groupEnd) { console.groupEnd(); }")
+    lines.append("  }")
+    return "\n".join(lines) + "\n"
+
+
+def _provider_config_js(provider) -> str:
+    """
+    `Provider` stage 3 of 6 (`v0.067` -- see `docs/version history/
+    v0.067.md` and `arklight/provider.py`): the fixed config blob a
+    declared `Site(provider=...)` needs at runtime, exposed to the site
+    author's own code as `window.ARKLIGHT_PROVIDER` -- the same
+    all-caps-window-global convention `window.ARKLIGHT_ON_ERROR` already
+    sets for the other direction (author hook -> runtime).
+
+    The blob is exactly what a validated declaration holds, and nothing
+    else: `{"name": ..., "capabilities": [...]}`, both deep-frozen so
+    the author's script can read it but not rewrite what the compiler
+    decided. It is site-wide (one provider per `Site`), not per page.
+    Nothing here calls the network, loads a vendor SDK, or reads
+    `State(...)`; the concrete implementation stays the author's own
+    code, reading this global to learn what the site declared.
+
+    Returns `""` (nothing to ship) when the site declares no provider,
+    same "only ship what's used" discipline as every function here.
+
+    `json.dumps(...)` (default `ensure_ascii=True`) produces safely
+    escaped JS string literals -- quotes, backslashes, control
+    characters and non-ASCII (so no raw U+2028/U+2029) -- and is never
+    used to build or run code; nothing is passed through `eval`/
+    `new Function`.
+
+    Deliberately *not* included, because nothing at this stage can
+    author them: DOM hooks or `State(...)` keys a capability is wired
+    to (the proposal's section 3 mentions both). No authoring surface
+    for wiring a capability exists yet, so inventing blob fields ahead
+    of it would be guessing at a contract; the object only ever gains
+    fields.
+    """
+    if provider is None:
+        return ""
+    name = json.dumps(provider.name)
+    capabilities = ", ".join(json.dumps(cap) for cap in provider.capabilities)
+    return (
+        "  window.ARKLIGHT_PROVIDER = Object.freeze({\n"
+        f"    name: {name},\n"
+        f"    capabilities: Object.freeze([{capabilities}])\n"
+        "  });\n"
+    )
+
+
 def _build_runtime_js(ir: WebsiteIR) -> str:
     (
         used_behaviors,
@@ -470,9 +764,27 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         has_model_binding,
         has_repeat,
         has_show,
+        has_reveal,
+        has_query,
+        used_platform_apis,
+        has_hx_trigger,
     ) = _collect_usage(ir)
 
-    # htmx-5 (docs/Backends/REFACTOR-INDEX.md row 10): the click
+    # `v0.065`: every `PlatformAPI.*(...)` capability this site's IR
+    # references must be one the "web" backend (this JS backend, plus
+    # its HTML/CSS siblings -- see `arklight.ir.platform_api`'s module
+    # docstring for that naming) actually implements. Raises
+    # `PlatformAPIError` -- a `CompileError`-wrapping failure, per
+    # `arklight.compiler.pipeline.build` -- naming every unsupported
+    # capability at once rather than silently dropping the request or
+    # deferring the failure to runtime (Section 11 of the proposal).
+    # Deliberately run unconditionally, even when `used_platform_apis`
+    # is empty: `check_backend_support` is a no-op in that case, so
+    # this costs nothing on the common site that uses no Platform API
+    # at all.
+    check_backend_support(used_platform_apis, backend_name="web")
+
+    # htmx-5 (REFACTOR-INDEX.md row 10): the click
     # interceptor now dispatches both actions and behaviors, and needs
     # shipping whenever either is used -- independent of has_state
     # (a behavior-only page has no State(...) at all; see
@@ -482,7 +794,12 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # Action.*(...)`/named behavior anywhere needs the `actions`
     # object (see `needs_actions_object` below) but never the click
     # interceptor itself, since a watch effect never involves a click.
-    needs_click_interceptor = bool(used_behaviors) or bool(used_on_click_actions)
+    # `v0.065`: `used_platform_apis` joins `used_behaviors`/
+    # `used_on_click_actions` here -- a `PlatformAPI.*(...)` click is
+    # dispatched by this same interceptor's `"platform:"` branch (see
+    # `runtime/dispatch.py`), never involves `State(...)`, and so
+    # never needs `needs_actions_object` the way a `Watch(...)` does.
+    needs_click_interceptor = bool(used_behaviors) or bool(used_on_click_actions) or bool(used_platform_apis)
 
     # vdom-5: `actions` is needed whenever the click interceptor is
     # (unchanged) *or* whenever any page declares a `Watch(...)` --
@@ -493,7 +810,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # shipping the click interceptor it would never use.
     needs_actions_object = needs_click_interceptor or has_watch
 
-    # htmx-1 (docs/Backends/REFACTOR-INDEX.md row 4) originally shipped
+    # htmx-1 (REFACTOR-INDEX.md row 4) originally shipped
     # vendored HTMX whenever a page used a named behavior or declared
     # state, because named behaviors wired through HTMX's own
     # hx-on:click attribute processing. htmx-5 removes that wiring
@@ -502,14 +819,29 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # project's own "no eval, no new Function" invariant doesn't
     # permit) -- named behaviors no longer touch any hx-* attribute at
     # all, so they're dropped from this condition. What's left: state
-    # (hx-trigger on Action.* modifiers, htmx-2) and ir.app_shell alone
-    # (hx-boost/hx-preserve, htmx-4 -- see this module's docstring,
-    # htmx-4 paragraph, point 1, for why a plain nav-only page in an
-    # app_shell site still needs HTMX loaded even with no
-    # behaviors/state used anywhere). A behavior-only page -- the
-    # common "toggle a menu, nothing else" case -- now ships no HTMX at
-    # all.
-    needs_htmx = has_state or ir.app_shell
+    # that actually emits hx-trigger (Action.* modifiers, htmx-2) and
+    # ir.app_shell alone (hx-boost/hx-preserve, htmx-4 -- see this
+    # module's docstring, htmx-4 paragraph, point 1, for why a plain
+    # nav-only page in an app_shell site still needs HTMX loaded even
+    # with no behaviors/state used anywhere). A behavior-only page --
+    # the common "toggle a menu, nothing else" case -- now ships no
+    # HTMX at all.
+    #
+    # htmx-6 (bugfix): the state half of this used to be the broader
+    # `has_state` -- true for *any* page that merely declares
+    # `State(...)`, even one whose every `Action.*(...)` on_click has
+    # no modifiers (or only `"prevent"`) and so compiles to no
+    # `hx-trigger` attribute at all. That shipped the full vendored
+    # HTMX bundle "for free" on the common plain-counter shape (see
+    # tests/test_js_backend.py's `test_js_runtime_includes_state_core_
+    # and_used_actions_only`), with nothing on the page for it to do.
+    # `has_hx_trigger` (`_collect_usage`) tracks the real condition --
+    # whether any `on_click=Action.*(...)` modifier actually compiles
+    # to `hx-trigger` -- so a stateful page that never uses
+    # once/debounce/throttle/stop now ships no HTMX either, matching
+    # the "only ship what's used" discipline every other flag here
+    # already follows.
+    needs_htmx = has_hx_trigger or ir.app_shell
 
     parts: list[str] = [
         "// Generated by ARKlight -- v0.0035 runtime + Stage 1-2 of the",
@@ -550,15 +882,59 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # ever executed as code" invariant even for optional vendored-
         # dependency features ARKlight doesn't use.
         parts.append("htmx.config.allowEval = false;")
+        # Runtime policy enforcement (arklight/backend/html/csp.py):
+        # vendored HTMX's core swap path already avoids Trusted-Types-
+        # gated sinks (it parses via DOMParser, not `innerHTML=`), with
+        # one exception -- `Wn()`'s indicator-style injection calls
+        # `head.insertAdjacentHTML(...)`, which `require-trusted-types-
+        # for 'script'` (the CSP directive `csp.py` always sets) would
+        # otherwise block outright. ARKlight already ships its own
+        # generated stylesheet (`STYLESHEET_PATH`) that this feature's
+        # indicator CSS is redundant with, so disabling it here removes
+        # the one remaining incompatible sink instead of registering a
+        # Trusted Types policy to permit it -- same "close the path
+        # instead of trusting it" choice `allowEval = false` above
+        # already made for htmx's other optional features.
+        parts.append("htmx.config.includeIndicatorStyles = false;")
 
     parts.append("")
     parts.append("(function () {")
     parts.append('  "use strict";')
     parts.append("")
 
+    if ir.devtools_console_reminder:
+        # Devtools mirror of the compile-time experimental-feature
+        # banner (see `_experimental_console_reminder_js`'s docstring).
+        # Placed first inside the IIFE, unconditionally of
+        # htmx/state/behaviors -- it needs nothing from the rest of
+        # this runtime and should run (or no-op, for a site with no
+        # experimental usage) before anything else does.
+        console_reminder = _experimental_console_reminder_js(ir.experimental_usages)
+        if console_reminder:
+            parts.append(console_reminder)
+
+    # `Provider` stage 3 of 6 (`v0.067`): the declared provider's config
+    # blob, unconditionally of htmx/state/behaviors -- like the console
+    # reminder above it needs nothing from the rest of this runtime, and
+    # it's set before any author code appended after the IIFE (a
+    # `ScriptExtension`) can read it. Its own gate is `ir.provider`, not
+    # `devtools_console_reminder`: turning the reminder off must not
+    # silently hide the config a site's own code depends on.
+    provider_config = _provider_config_js(ir.provider)
+    if provider_config:
+        parts.append(provider_config)
+
     needs_notify = needs_click_interceptor or has_state
     if needs_notify:
         parts.append(_NOTIFY_JS)
+        parts.append("")
+        # `0.06505` (RUNTIME-ERROR-HANDLING-PROPOSAL.md): the shared
+        # error funnel and the page-level boundary ship wherever
+        # `arkNotify` does -- a page with no State(...) and no click
+        # interceptor ships neither, unchanged from before.
+        parts.append(_ERROR_REPORT_JS)
+        parts.append("")
+        parts.append(_ERROR_BOUNDARY_JS)
         parts.append("")
 
     if has_state:
@@ -597,6 +973,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         parts.append(_actions_object_js(used_actions))
     if needs_click_interceptor:
         parts.append(_behaviors_object_js(used_behaviors))
+        parts.append(_platform_apis_object_js(used_platform_apis))
         parts.append(_CLICK_INTERCEPTOR_JS)
         parts.append("")
     if has_watch:
@@ -609,6 +986,20 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # for why), rather than a per-element wiring pass.
         parts.append(_WIRE_MODEL_BINDING_JS)
         parts.append("")
+
+    if has_reveal:
+        # `v0.063`: independent of `has_state` -- a reveal effect
+        # never reads or writes `State(...)`, it just needs
+        # `wireReveal()` itself declared before `arkInitPage()` calls
+        # it below.
+        parts.append(_WIRE_REVEAL_JS)
+
+    if has_query:
+        # `v0.064`: `wireQuerySync` needs declaring before
+        # `DOMContentLoaded` registers it below (see `ready_calls`) --
+        # same "declare, then register once" shape `has_model_binding`
+        # above already follows.
+        parts.append(_WIRE_QUERY_SYNC_JS)
 
     parts.append(_NAV_HIGHLIGHT_JS)
     parts.append("")
@@ -625,6 +1016,14 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         parts.append("")
 
     init_body = ["    highlightActiveNavLink();"]
+    if has_reveal:
+        # `v0.063`: called every time `arkInitPage()` runs -- first
+        # load and, on an app_shell site, every boosted swap after
+        # that -- so an element newly brought in by a boosted
+        # navigation still gets observed. See `wireReveal`'s own
+        # docstring for why re-observing an already-observed element
+        # on a later call is safe.
+        init_body.append("    wireReveal();")
     if has_state:
         init_body.append("    arkStore = initState();")
         render_calls = "renderBindings(arkStore); renderClassBindings(arkStore);"
@@ -651,6 +1050,11 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     getter = "function () { return arkStore; }" if has_state else "function () { return null; }"
 
     ready_calls = ["    arkInitPage();"]
+    if needs_notify:
+        # Registered exactly once here, never from arkInitPage(): window
+        # is never replaced by an hx-boost swap, so a second registration
+        # would double-report every error.
+        ready_calls.append("    wireErrorBoundary();")
     if needs_click_interceptor:
         # Registered exactly once, here -- never from inside
         # arkInitPage() itself, and never again on a later boosted
@@ -675,6 +1079,18 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # variant in practice, but shares the same expression either
         # way for consistency.
         ready_calls.append(f"    wireModelBinding({getter});")
+    if has_query:
+        # Same "register exactly once, getter closure" contract as
+        # wireClickInterceptor/wireModelBinding above -- has_query
+        # implies has_state (query= is only ever a prop on a
+        # State(...) node), so this getter is never the always-null
+        # variant in practice either. `wireQuerySync` (`arklight/
+        # backend/js/runtime/query.py`) re-reads the current page's
+        # own data-ark-query/data-ark-state attributes fresh on every
+        # popstate event rather than closing over them at registration
+        # -- the getter closure alone is enough for it to stay correct
+        # across an app_shell boosted swap to a different page.
+        ready_calls.append(f"    wireQuerySync({getter});")
 
     parts.append('  document.addEventListener("DOMContentLoaded", function () {')
     parts.extend(ready_calls)
