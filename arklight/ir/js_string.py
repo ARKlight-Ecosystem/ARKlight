@@ -324,3 +324,78 @@ def js_to_camel_case(text: str) -> str:
 
 def js_to_title_case(text: str) -> str:
     return " ".join(_capitalize_word(word.lower()) for word in js_split_words(text))
+
+
+# ---------------------------------------------------------------------------
+# `v0.070` (JS vocabulary addendum stage 10/10, the capstone): `pluralize`.
+# One of the two entries the addendum's "Scope filter" flagged as needing an
+# explicit design exception before it could ship -- English pluralization
+# has enough irregular forms (`person` -> `people`, `octopus` -> `octopi`)
+# that a suffix rule alone would be wrong often enough to matter. This ships
+# with a small, closed irregular-noun table plus a documented regular-plural-
+# only fallback (`+s`/`+es`/`y` -> `ies`), not a claim of exhaustive English
+# pluralization -- an unlisted irregular noun (e.g. "sheep", "cactus" ...
+# wait, "cactus" *is* listed) falls through to the regular rule and comes out
+# wrong, same as every other pluralization library's documented limitation.
+# Exact-string lookup only (no case-folding): `"Person"` doesn't match the
+# `"person"` table entry and falls through to the regular rule, mirroring
+# the JS fragment's own plain object lookup (`irregular[word]`), which is
+# case-sensitive by construction.
+# ---------------------------------------------------------------------------
+
+_IRREGULAR_PLURALS: dict[str, str] = {
+    "person": "people",
+    "child": "children",
+    "man": "men",
+    "woman": "women",
+    "tooth": "teeth",
+    "foot": "feet",
+    "mouse": "mice",
+    "goose": "geese",
+    "ox": "oxen",
+    "octopus": "octopi",
+    "cactus": "cacti",
+    "index": "indices",
+    "matrix": "matrices",
+    "vertex": "vertices",
+    "criterion": "criteria",
+    "phenomenon": "phenomena",
+    "die": "dice",
+    "leaf": "leaves",
+    "life": "lives",
+    "knife": "knives",
+    "wife": "wives",
+    "half": "halves",
+    "loaf": "loaves",
+    "shelf": "shelves",
+    "wolf": "wolves",
+    "elf": "elves",
+    "calf": "calves",
+    "self": "selves",
+}
+
+# Mirrors the JS fragment's own `/[sxz]$/`/`/[cs]h$/`/`/[^aeiou]y$/` tests
+# exactly -- lowercase-only character classes, no `i` flag, so this is not
+# a Unicode-aware or case-insensitive rule, same limitation the fragment
+# itself carries.
+_ENDS_SXZ_OR_CH_SH = re.compile(r"[sxz]$|[cs]h$")
+_ENDS_CONSONANT_Y = re.compile(r"[^aeiou]y$")
+
+
+def js_pluralize(word: str, count: float) -> str:
+    """`word`, pluralized for `count` -- `count == 1` (exactly, after the
+    caller's `Number(x) || 0` coercion) returns `word` unchanged; every
+    other count (0, negative, fractional, `NaN`-coerced-to-0, ...) returns
+    the plural form: an exact `_IRREGULAR_PLURALS` hit, else `+es` for a
+    word ending `s`/`x`/`z`/`ch`/`sh`, else `y` -> `ies` after a consonant,
+    else a plain `+s`."""
+    if count == 1:
+        return word
+    irregular = _IRREGULAR_PLURALS.get(word)
+    if irregular is not None:
+        return irregular
+    if _ENDS_SXZ_OR_CH_SH.search(word):
+        return word + "es"
+    if _ENDS_CONSONANT_Y.search(word):
+        return word[:-1] + "ies"
+    return word + "s"

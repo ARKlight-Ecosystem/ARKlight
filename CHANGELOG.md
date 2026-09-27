@@ -79,6 +79,49 @@ following the project's own `--explain-architecture` guide.
   `arklight/config.py` instead of a "Configuration" README section
   that doesn't exist.
 
+## [0.070] -- Milestone closed: JS vocabulary addendum stage 10/10 (capstone) + `Provider` stage 6/6
+
+Milestone closed -- both pieces of the `v0.070` slot are DONE, so the
+package version rolls up from the `0.06616` increment to `0.070`.
+
+### Added
+
+- **JS vocabulary addendum, stage 10 of 10 (the capstone).** Closes
+  the ten-rung ladder staged in
+  [`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md)
+  with the two entries that needed an explicit design exception before
+  they could ship as written:
+  - `Derive.pluralize(word, count)` -- pluralizes `word` for `count`
+    (`count == 1` returns it unchanged). Ships with a small
+    irregular-noun table (`person` -> `people`, `octopus` ->
+    `octopi`, ...) plus a documented regular-plural-only fallback
+    (`+s`/`+es`/consonant-`y` -> `ies`), not exhaustive English
+    pluralization. `arklight/backend/js/derivations/pluralize.py`,
+    mirrored at build time by `arklight/ir/js_string.py`'s new
+    `js_pluralize`.
+  - `Derive.random_int(min=..., max=...)` -- a whole number chosen
+    uniformly at random from `[min, max]`. The only `Derive.*` kind
+    that reads zero state names; the owning `Computed(...)`'s
+    `deps=(...)` names whatever should trigger a re-roll instead.
+    Documented design exception: not a pure function of its inputs,
+    so it's excluded from build-time pre-rendering entirely
+    (`arklight.ir.build._evaluate_derivation` pre-fills `min` as a
+    placeholder) and always resolves client-side only --
+    `recomputeAll()` overwrites the placeholder with a real roll
+    immediately at construction, before the first paint.
+    `arklight/backend/js/derivations/random_int.py`.
+  - `tests/test_js_vocabulary_v0070.py` (31 new tests, incl. a Node
+    parity sweep for `pluralize`); full suite passing, no
+    regressions. `docs/version history/v0.070.md` updated to reflect
+    both pieces of this slot as shipped.
+- **`Provider`, stage 6 of 6 (capstone), pulled forward from
+  `0.06616`** -- capability vocabulary finalized
+  (`PROVIDER_CAPABILITIES`: `auth`, `read`, `write`, `subscribe`) plus
+  a namespaced `custom:` escape hatch for anything outside that closed
+  four. See the `[0.06616]` entry directly below for the full detail;
+  closes the six-rung `Provider` ladder, now a settled design record
+  at `docs/Foundational/PROVIDER-SDK.md`.
+
 ## [0.06616] -- Capability fix: `Provider`, stage 6/6 (capstone): capability vocabulary finalized + `custom:` escape hatch
 
 Resolves the accepted proposal's own open question §7.2 -- whether

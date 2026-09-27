@@ -696,6 +696,19 @@ def _evaluate_derivation(spec: dict[str, Any], *, get: Callable[[str], Any]) -> 
         return js_numeric.js_humanize_bytes(_coerce_number(get(names[0])))
     if kind == "humanize_duration":
         return js_numeric.js_humanize_duration(_coerce_number(get(names[0])))
+    # `v0.070` (docs/version history/v0.070.md): JS vocabulary addendum
+    # stage 10/10, the capstone.
+    if kind == "pluralize":
+        word = js_string.js_to_string(get(names[0]))
+        count = _coerce_number(get(names[1]))
+        return js_string.js_pluralize(word, count)
+    if kind == "random_int":
+        # Excluded from build-time pre-rendering by design -- see
+        # `arklight/backend/js/derivations/random_int.py`. `min` is a
+        # deterministic placeholder only; `recomputeAll()` overwrites it
+        # with a real `Math.random()`-derived roll immediately at
+        # construction, before the first paint.
+        return args["min"]
     return None  # unreachable once Validation has run
 
 

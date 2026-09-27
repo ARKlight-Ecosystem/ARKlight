@@ -1,7 +1,8 @@
 # JS Vocabulary Addendum: Staged Order, v0.061 -> v0.070
 
-**Status:** IN PROGRESS -- stages 1-9/10 (`v0.061`-`v0.069`) have
-shipped; stage 10 remains PLANNED. This file turns
+**Status: DONE.** All ten stages (`v0.061`-`v0.070`) have shipped.
+Stage 10 -- the capstone, `pluralize` + `random_int` -- landed as
+`v0.070`. This file turns
 the accepted, philosophy-compliant part of
 [`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](../Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md)
 into a trackable, ten-rung landing order, the same role
@@ -174,13 +175,26 @@ needing sign-off before they ship as written:
 
 - **`pluralize`** -- ships with a small irregular-noun table plus a
   documented regular-plural-only fallback (`+s`/`+es`), not a claim
-  of exhaustive English pluralization.
+  of exhaustive English pluralization. Reads an ordered pair (word,
+  count); `count == 1` returns the word unchanged, everything else
+  pluralizes it. `arklight/backend/js/derivations/pluralize.py`,
+  mirrored at build time by `arklight/ir/js_string.py`'s
+  `js_pluralize`.
 - **`random_int`** -- ships with an explicit written exception to the
   "server-rendered `Bind` text agrees with the client recompute"
   contract: excluded from build-time pre-rendering entirely, always
   resolved client-side only, documented in the fragment's own
   docstring so a future contributor doesn't assume it follows
-  `sum.py`'s usual dual-implementation shape.
+  `sum.py`'s usual dual-implementation shape. It's also the one
+  `kind` in the whole catalog that reads zero state names -- the
+  owning `Computed(...)`'s `deps=(...)` (still required non-empty)
+  names whatever should trigger a re-roll, entirely independent of
+  what the derivation itself reads. Build time pre-fills `min` as a
+  placeholder; `recomputeAll()` overwrites it with a real roll at
+  construction, before the first paint.
+  `arklight/backend/js/derivations/random_int.py`.
+
+Both shipped together as `v0.070`, closing this ladder.
 
 ## Status tracking
 
@@ -195,7 +209,7 @@ needing sign-off before they ship as written:
 | v0.067 | List-scalar derivations catalog | SHIPPED (as `0.06612`) |
 | v0.068 | Cross-language numeric batteries | SHIPPED (as `0.068`) |
 | v0.069 | Cross-language formatting/case batteries | SHIPPED (as `0.06615`) |
-| v0.070 | Capstone: `pluralize` + `random_int` | PLANNED |
+| v0.070 | Capstone: `pluralize` + `random_int` | SHIPPED |
 
 See `docs/version history/v0.061.md` through `v0.070.md` for each
 stage's forward-looking, user-facing summary (updated to reflect

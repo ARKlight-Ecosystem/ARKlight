@@ -862,7 +862,7 @@ def _validate_derive_ref(
                 f"fallback={fallback!r}, which isn't a str, bool, None, "
                 f"finite number, or integer within +/-2**53."
             )
-    if derive.kind in ("saturating_add", "saturating_subtract"):
+    if derive.kind in ("saturating_add", "saturating_subtract", "random_int"):
         low, high = derive.args.get("min"), derive.args.get("max")
         if isinstance(low, int) and isinstance(high, int) and low > high:
             raise ValidationError(

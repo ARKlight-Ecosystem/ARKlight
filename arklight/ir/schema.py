@@ -581,6 +581,15 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     "to_camel_case": DerivationSpec(min_names=1, max_names=1),
     "to_kebab_case": DerivationSpec(min_names=1, max_names=1),
     "to_title_case": DerivationSpec(min_names=1, max_names=1),
+    # `v0.070` (docs/version history/v0.070.md): JS vocabulary addendum
+    # stage 10/10, the capstone -- the two entries the addendum's "Scope
+    # filter" flagged as needing an explicit design exception before they
+    # could ship as written. `pluralize` reads an ordered pair (word,
+    # count); `random_int` is the one `kind` in the whole catalog that
+    # reads zero names at all -- see `arklight/backend/js/derivations/
+    # random_int.py` for why that's still a valid `Computed(...)`.
+    "pluralize": DerivationSpec(min_names=2, max_names=2),
+    "random_int": DerivationSpec(min_names=0, max_names=0, extra_args=("min", "max")),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
@@ -672,6 +681,16 @@ LITERAL_ARG_RULES: dict[str, dict[str, LiteralArgRule]] = {
 _SATURATING_BOUND = LiteralArgRule("int", -(2**53), 2**53)
 LITERAL_ARG_RULES["saturating_add"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
 LITERAL_ARG_RULES["saturating_subtract"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
+
+# `v0.070`: `Derive.random_int(...)`'s `min`/`max` -- literal integer
+# bounds, same shape and same +/-2**53 ceiling as `saturating_add`/
+# `saturating_subtract`'s bounds just above (a wider float bound isn't
+# meaningfully different for a dice-roll-shaped UI, and staying integer-
+# only keeps reusing this table's existing `LiteralArgRule` shape).
+# `min > max` is checked separately in `arklight.ir.validate`, alongside
+# `saturating_add`/`saturating_subtract`'s own check -- not expressible
+# as a single-argument `LiteralArgRule`.
+LITERAL_ARG_RULES["random_int"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
 
 
 # `vdom-7` (REFACTOR-INDEX.md row 15): `Show(...)`'s

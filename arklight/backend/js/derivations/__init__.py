@@ -95,6 +95,9 @@ from arklight.backend.js.derivations import (
     to_ordinal,
     to_snake_case,
     to_title_case,
+    # `v0.070`: JS vocabulary addendum stage 10/10, the capstone.
+    pluralize,
+    random_int,
 )
 
 DERIVATION_MODULES = {
@@ -185,6 +188,12 @@ DERIVATION_MODULES = {
     to_camel_case.NAME: to_camel_case,
     to_kebab_case.NAME: to_kebab_case,
     to_title_case.NAME: to_title_case,
+    # `v0.070` (docs/version history/v0.070.md): JS vocabulary addendum
+    # stage 10/10, the capstone -- the two entries the addendum's
+    # "Scope filter" flagged as needing an explicit design exception
+    # before they could ship as written.
+    pluralize.NAME: pluralize,
+    random_int.NAME: random_int,
 }
 
 DERIVATION_FRAGMENTS: dict[str, str] = {
