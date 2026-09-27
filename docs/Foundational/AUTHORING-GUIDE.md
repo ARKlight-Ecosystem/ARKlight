@@ -664,45 +664,13 @@ Any keyword prop passed to a component that isn't recognized (e.g.
 `id`, `class`, `href`, `src`, `style`, ...) is emitted as a `data-*`
 HTML attribute, so nothing you write is silently dropped.
 
-## External services (`Site(provider=...)`) -- EXPERIMENTAL, `v0.065`-`v0.070`
+## External services (`Site(provider=...)`)
 
-`Provider` is how a site *declares* that it talks to an external
-service at runtime (a hosted database, an auth service, a hand-rolled
-API) -- a contract only, not an integration:
-
-```python
-site = Site(
-    provider=Provider.declare(name="firebase", capabilities=["auth", "read"]),
-)
-```
-
-- `name` is a free label, not a fixed vendor list.
-- `capabilities` draws from four finalized well-known names
-  (`arklight.provider.PROVIDER_CAPABILITIES`: `auth`, `read`, `write`,
-  `subscribe`) -- a typo still fails the build -- plus an open
-  `custom:`-prefixed escape hatch for something your service needs
-  that those four don't cover (`capabilities=["auth",
-  "custom:inventory-sync"]`).
-- ARKlight ships no vendor SDK, makes no network calls, and does not
-  implement, audit, or guarantee the service the declaration points
-  at -- the concrete integration is your own code.
-- The one thing a declared `Provider` adds to the build: a small,
-  read-only, deep-frozen config object in `arklight.js`,
-  `window.ARKLIGHT_PROVIDER` (`{name, capabilities}`), for your own
-  script to read. Nothing else about the generated pages or
-  stylesheet changes.
-- **EXPERIMENTAL.** Passing a `Provider` to `Site(...)` flags the build
-  the same way every other opt-in feature in
-  [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md) does -- an inline
-  banner, an end-of-build summary block, and an entry in `sbom.txt`.
-- Discoverable via `arklight search <provider-name>` once your `Site`
-  has constructed it (exact, case-insensitive match; no typo
-  suggestions, since a provider name is a free string, not a closed
-  vocabulary word).
-
-The six-rung implementation ladder (`v0.065` contract through `v0.070`
-capability-vocabulary finalization) is fully shipped. Settled design
-record: [`PROVIDER-SDK.md`](PROVIDER-SDK.md).
+`Provider` is how a site declares that it talks to an external
+service at runtime. It's EXPERIMENTAL and already has its own settled
+design record -- full API shape, the capability vocabulary, the
+`custom:` escape hatch, and the rationale for all of it live in
+[`PROVIDER-SDK.md`](PROVIDER-SDK.md), not here.
 
 ## ARK Bundle (`.ark`) -- v0.037 (sealed by default, implemented)
 
@@ -796,4 +764,3 @@ CONFIG = {
 See `arklight/config.py` for the loader itself and each section's
 own reading code (`arklight.cli.android`, `arklight.cli.desktop`,
 `arklight.cli.main`) for how it's used.
-
