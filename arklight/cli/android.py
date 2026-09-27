@@ -72,8 +72,27 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
 
+from arklight import pwa
 from arklight.backend.android import runtime
 from arklight.config import ConfigError, emit_config_warnings, load_config, section
+
+# Filenames `arklight pwa` generates (see arklight.pwa's MANIFEST_NAME/
+# SERVICE_WORKER_NAME/PWA_RUNTIME_NAME) that must never be copied into
+# an Android build's `app/src/main/assets/`. The Android backend
+# already provides, natively, the two things a PWA typically exists to
+# offer -- an installable app icon and offline-capable local assets --
+# so shipping these alongside it doesn't add anything and actively
+# breaks internal navigation: a service worker's own `fetch` handler
+# runs underneath `WebViewAssetLoader`, not through it, so once it
+# takes control of a page its cache-miss fallback (`fetch(event.request)`)
+# issues a real network request against the synthetic
+# `https://appassets.androidplatform.net` origin `WebViewAssetLoader`
+# serves from -- a host with no real backing, guaranteed to fail.
+# External links are unaffected (they never touch the WebView or the
+# service worker at all -- see MainActivity.kt's `routeNavigation`),
+# which is why this bug presents as "external links work, internal
+# navigation doesn't."
+_PWA_ASSET_NAMES = frozenset({pwa.MANIFEST_NAME, pwa.SERVICE_WORKER_NAME, pwa.PWA_RUNTIME_NAME})
 
 # Defaults for every key `arklight.config.py`'s `"android"` section
 # may set -- see docs/Foundational/DESIGN-NOTES.md's "App identity
@@ -727,16 +746,41 @@ def _resolve_asset(build_dir: Path, rel_path: object, key: str) -> Path:
 
 
 def _copy_tree(src: Path, dst: Path) -> list[Path]:
-    """Copy every file under `src` into `dst`, preserving relative
-    structure. Returns the list of files written."""
+    """
+    Copy every file under `src` into `dst`, preserving relative
+    structure -- except `arklight pwa`'s generated files
+    (`manifest.json`, `sw.js`, `ark-pwa.js`; see `_PWA_ASSET_NAMES`),
+    which are never copied into an Android build's assets, and with
+    any `arklight pwa`-injected markup (the manifest `<link>`/
+    theme-color `<meta>`, the service-worker-registration `<script>`,
+    and the optional install button) stripped back out of every
+    `.html` file as it's copied, using the same marker comments
+    `arklight.pwa.enable_pwa()` looks for to replace its own prior
+    injection on a re-run. Without this, a page baked into an Android
+    build would keep loading `ark-pwa.js` and registering `sw.js` even
+    though neither file made it into `assets/` -- and, worse, a page
+    whose service worker registration *did* somehow still resolve
+    would have that worker's `fetch` handler intercepting the page's
+    own navigation against a synthetic origin with no real backing.
+    See `_PWA_ASSET_NAMES`. Returns the list of files written.
+    """
     written: list[Path] = []
     for item in sorted(src.rglob("*")):
+        if item.is_file() and item.name in _PWA_ASSET_NAMES:
+            continue
         target = dst / item.relative_to(src)
         if item.is_dir():
             target.mkdir(parents=True, exist_ok=True)
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(item, target)
+            if item.suffix.lower() == ".html":
+                html = item.read_text(encoding="utf-8")
+                html = pwa._HEAD_BLOCK_RE.sub("", html)
+                html = pwa._SW_BLOCK_RE.sub("", html)
+                html = pwa._INSTALL_BLOCK_RE.sub("", html)
+                target.write_text(html, encoding="utf-8")
+            else:
+                shutil.copyfile(item, target)
             written.append(target)
     return written
 
