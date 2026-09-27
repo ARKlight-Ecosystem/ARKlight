@@ -50,6 +50,29 @@ RESERVED_UTILITY_CLASSES = frozenset(
     re.findall(r"(?m)^\.([a-zA-Z][a-zA-Z0-9_-]*)\s*\{", BASE_CSS_BODY)
 )
 
+
+def _bare_class_names(selector_ast) -> set[str]:
+    """
+    Names of every branch in a parsed `parse_selector_list(...)` result
+    that is nothing but a single, bare `.name` class selector --
+    `.card`, or each side of a grouped `.card, .nav` -- as opposed to
+    `.card > img`, `.card.featured`, or `.card:hover`, which are a
+    different, non-colliding selector even though `.card` appears in
+    them. This is exactly the selector shape `Site.style(name, ...)`
+    itself is capable of emitting (a lone `.name { }` block), so it's
+    the shape that can actually collide with a `site.style(...)`
+    registration or a built-in utility class of the same name --
+    see `style_selector`'s docstring.
+    """
+    names: set[str] = set()
+    for complex_selector in selector_ast:
+        if len(complex_selector) != 1:
+            continue
+        _combinator, compound = complex_selector[0]
+        if len(compound) == 1 and compound[0][0] == "class":
+            names.add(compound[0][1])
+    return names
+
 # v0.042: custom CSS class names must look like a real, single CSS class
 # identifier -- letters/digits/hyphens/underscores, not starting with a
 # digit. Deliberately conservative (no escaped Unicode class names,
@@ -2691,7 +2714,9 @@ class Site:
             f"'& > .child' / '& + .child' / '& ~ .child' (combinator)."
         )
 
-    def style_selector(self, selector: str, rules: dict) -> None:
+    def style_selector(
+        self, selector: str, rules: dict, *, allow_redefine: bool = False
+    ) -> None:
         """
         Register CSS rules against an arbitrary *structural* selector --
         combinators (`.a > .b`), grouped selectors (`h1, h2`), a bare
@@ -2703,6 +2728,32 @@ class Site:
         can't reach. See docs/Foundational/DESIGN-NOTES.md ("CSS selector algebra +
         at-rule vocabulary") for why this is a separate method rather
         than widening `style()` itself.
+
+        Any branch of `selector` that is nothing but a single, bare
+        `.name` class -- `style_selector(".card", ...)`, or each side
+        of a grouped `style_selector(".card, .nav", ...)` -- gets the
+        same `DuplicateStyleNameError` protection `site.style(name,
+        ...)` has, and for the same reason: that shape emits exactly
+        the `.name { }` block `style()` itself would, so it can
+        silently collide with a `site.style(name, ...)` registration
+        or one of the default stylesheet's built-in utility classes
+        (`RESERVED_UTILITY_CLASSES`). Because both rules would land at
+        equal CSS specificity, the collision doesn't fail loudly on its
+        own -- the cascade lets the later rules win property-by-
+        property, so any property only the earlier rule set leaks
+        through into what looks like a single, fully custom class.
+        Re-registering the exact same selector text a second time is
+        guarded the same way, for the same "no accidental silent
+        replace" reason `style()` and `register_component(...)` are.
+        Pass `allow_redefine=True` for any of these when the collision
+        or the re-registration is deliberate -- e.g. genuinely meaning
+        to override ARKlight's own `.card` rules, or intentionally
+        layering a second, deliberately-narrower rule set onto a
+        selector already registered earlier in the same site. A
+        selector that isn't a bare single class (`.card > img`,
+        `.card:hover`, a bare tag) is never checked against
+        `RESERVED_UTILITY_CLASSES`/`custom_styles` -- only an exact
+        bare-class match collides with what `style()` can emit.
 
         `selector` is parsed by `arklight.backend.css.selectors
         .parse_selector_list` -- a closed grammar, not a raw CSS
@@ -2729,7 +2780,7 @@ class Site:
 
         Example:
 
-            site.style_selector(".card", {
+            site.style_selector(".panel", {
                 "padding": "1rem",
                 "&:hover": {"box-shadow": "0 2px 8px rgba(0,0,0,.15)"},
                 "& > img": {"border-radius": "8px 8px 0 0"},
@@ -2748,6 +2799,52 @@ class Site:
         except css_selectors.CSSSelectorSyntaxError as exc:
             raise CSSSyntaxError(str(exc)) from exc
         canonical_selector = css_selectors.render_selector_list(selector_ast)
+
+        if not allow_redefine:
+            if canonical_selector in {sel for sel, _rules in self.selector_rules}:
+                raise DuplicateStyleNameError(
+                    f"site.style_selector({canonical_selector!r}, ...) is "
+                    "already registered. Registering it again would add a "
+                    "second, silently-cascading rule block for the same "
+                    "selector -- if that's deliberate, pass "
+                    f"allow_redefine=True: site.style_selector("
+                    f"{canonical_selector!r}, rules, allow_redefine=True). "
+                    "Otherwise two different calls are colliding on the "
+                    f"same selector; pick a different selector for one of "
+                    "them."
+                )
+            for name in _bare_class_names(selector_ast):
+                if name in RESERVED_UTILITY_CLASSES:
+                    raise DuplicateStyleNameError(
+                        f"site.style_selector({canonical_selector!r}, ...) "
+                        f"collides with a built-in utility class of the "
+                        f"same name that ARKlight's default stylesheet "
+                        f"already ships. Registering it anyway would "
+                        f"silently merge with the built-in '.{name}' rule "
+                        f"instead of replacing it -- both end up at equal "
+                        f"CSS specificity, so your rules only win property-"
+                        f"by-property, and any built-in property you "
+                        f"didn't set leaks through uninvited. Pick a "
+                        f"different name, or pass allow_redefine=True: "
+                        f"site.style_selector({canonical_selector!r}, "
+                        f"rules, allow_redefine=True) if you specifically "
+                        f"mean to override ARKlight's own '.{name}' rules."
+                    )
+                if name in self.custom_styles:
+                    raise DuplicateStyleNameError(
+                        f"site.style_selector({canonical_selector!r}, ...) "
+                        f"collides with an existing site.style({name!r}, "
+                        f"...) registration. Registering it anyway would "
+                        f"silently merge with those rules instead of "
+                        f"replacing them -- both end up at equal CSS "
+                        f"specificity, so your rules only win property-by-"
+                        f"property, and any property only the earlier "
+                        f"registration set leaks through uninvited. Pick a "
+                        f"different name, or pass allow_redefine=True: "
+                        f"site.style_selector({canonical_selector!r}, "
+                        f"rules, allow_redefine=True) if you specifically "
+                        f"mean to layer on top of that registration."
+                    )
 
         expanded = self._expand_style_selector_rules(canonical_selector, selector_ast, rules)
         self.selector_rules.extend((sel, dict(r)) for sel, r in expanded)
