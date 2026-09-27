@@ -62,6 +62,23 @@ def test_open_in_browser_swallows_launch_errors(tmp_path):
     assert opened is False
 
 
+def test_open_in_browser_returns_false_when_launch_fails_without_raising(tmp_path):
+    # The common headless-environment case: webbrowser.open() couldn't
+    # find a working browser (e.g. no DISPLAY, xdg-open has "no method
+    # available"), and signals that by returning False -- it does not
+    # raise. open_in_browser() must reflect that, not report success
+    # just because no exception happened to fire.
+    site_path = write_site(tmp_path)
+    out_dir = tmp_path / "dist"
+    result = build(site_path, out_dir)
+
+    with patch("arklight.cli.main.webbrowser.open", return_value=False) as mock_open:
+        opened = open_in_browser(result, out_dir)
+
+    assert opened is False
+    mock_open.assert_called_once()
+
+
 def test_cli_build_blocked_without_license_acceptance(tmp_path, monkeypatch):
     site_path = write_site(tmp_path)
     monkeypatch.delenv("ARKLIGHT_ACCEPT_LICENSE", raising=False)
