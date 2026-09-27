@@ -2,9 +2,14 @@
 
 _A grounding document for `docs/Foundational/`. Written from the
 project's own source, its own design docs, and hands-on verification --
-not from the pitch alone. Current as of **v0.0644** (latest shipped
-milestone on `alpha`); cross-check `PROGRESS.md`'s Snapshot table
-before treating any version-specific claim here as still accurate._
+not from the pitch alone. Current as of **v0.070** (latest closed
+milestone on `alpha`; `v0.080`/`v0.100` -- the Android and Linux desktop
+native backends -- are IN PROGRESS, and `v0.071`-`v0.079`, Project
+Knowledge and the `arklight assistant` MVP, are PLANNED). Cross-check
+`PROGRESS.md`'s Snapshot table before treating any version-specific
+claim here as still accurate -- this document is a snapshot, not a
+live view, and it has gone stale before (this revision replaces one
+pinned to `v0.0644`, six milestones behind)._
 
 ## The Goal
 
@@ -214,6 +219,72 @@ exact file bytes, nothing invented or summarized -- the same primitive
 `arklight assistant`'s planned Miko MVP (`v0.079`) is designed to wrap
 rather than reimplement.
 
+**Everything shipped between `v0.0644` and `v0.070`** (the gap this
+revision closes -- see `PROGRESS.md`'s Snapshot table for the
+version-by-version breakdown):
+
+- **Preamble directives** (`v0.0650`-`v0.06502`): `# include
+  <stdlib.ARKlight>` / `# include <acc.<dotted.module.path>>` and
+  `# define <name> -> <text>`, reserved-shape comments ARKlight's own
+  loader parses and resolves itself, replacing `from arklight import
+  *` (retired, still works, now logs a build-time notice) as the way a
+  site file's vocabulary gets bound. Two includes disagreeing on a
+  name raises `PreambleCollisionError` rather than Python's star-import
+  silently keeping whichever ran last. Full detail in
+  `docs/Foundational/AUTHORING-GUIDE.md`.
+- **`Provider`, all six stages** (`v0.06514`-`v0.06616`, spanning
+  `v0.065`-`v0.070`): `Provider.declare(name=..., capabilities=[...])`
+  and `Site(provider=...)` went from a bare, gated declaration to a
+  fully wired, discoverable contract -- IR/validation integration, a
+  read-only `window.ARKLIGHT_PROVIDER` runtime object, external
+  script loading (`Page(scripts=[...])`), `arklight search
+  <provider-name>` integration, and a finalized capability vocabulary
+  (`auth`, `read`, `write`, `subscribe`, plus a namespaced `custom:`
+  escape hatch). Settled design record:
+  `docs/Foundational/PROVIDER-SDK.md`.
+- **Platform API IR, stage 1 of 2** (interleaved into `v0.065`):
+  `PlatformAPI.notify(...)` / `PlatformAPI.clipboard_write(...)` on
+  `on_click=`, backed by a compiler-owned interface registry
+  (`arklight.ir.platform_api`) with the Web reference implementation
+  shipped end-to-end. Stage 2 (native Android/Desktop
+  implementations) stays unscheduled, gated on each backend's own
+  maturity.
+- **The closed reactive vocabulary grew substantially**: the ~90-entry
+  `Derive.*`/`Predicate.*` catalog referenced in `docs/Implementation/
+  JS-VOCABULARY-ADDENDUM-v0.070.md` is now fully shipped end to end
+  (math, string, list-scalar, cross-language-numeric, formatting/case,
+  and predicate kinds), not just the handful that existed at
+  `v0.0644`. Every kind still has a build-time Python mirror alongside
+  its JS fragment, so server-rendered `Bind(...)` text and the client
+  recompute agree -- the "no `eval`, closed vocabulary" property in
+  Section 1 hasn't loosened as the catalog grew.
+- **Rei, the compiler narrator** (`v0.06510`): `arklight build
+  --narrate` narrates the compiler pipeline's own stages as
+  deterministic `[Rei] ...` sentences, sibling to `--verbose`/
+  `--debug`.
+- **`arklight deploy`** (`v0.06515`): builds, then shells out to a
+  locally-installed `wrangler` for a one-command Cloudflare Workers
+  deploy. Never installs Wrangler itself, never touches credentials.
+- **ACC capability discovery** (`arklight/capabilities.py`, documented
+  at `v0.0645`): the one piece of **ARKlight Component Collections**
+  (a separate repository,
+  [`Rae-ARK/ARKlight-Component-Collections`](https://github.com/Rae-ARK/ARKlight-Component-Collections))
+  that has to live in `alpha` itself, since it's the compiler's own
+  side of discovering capabilities an installed ACC package
+  advertises, without the compiler depending on ACC to exist. See
+  `docs/Foundational/ACC-CAPABILITIES.md`.
+- **Bracket-nesting indentation is now a checked compiler diagnostic**
+  (`v0.06603`-`v0.06611`): a continuation line inside an open bracket
+  must indent further than its opener, a closing-only line must sit
+  flush with it, and nesting past 8 levels fails the build --
+  `BracketIndentationError` (see `docs/Foundational/
+  AUTHORING-GUIDE.md`).
+- **Android native-shell hardening, first slice** (`v0.06507`):
+  external links routed to the device instead of loading inside the
+  app's own WebView, an `android.allow_navigation` allow-list,
+  predictive-back support, and WebView state restoration across
+  rotation.
+
 ## 4. What ARKlight deliberately is not
 
 Stated as plainly as the project states it about itself -- and, as of
@@ -370,11 +441,17 @@ For evaluation purposes, the important question is therefore not simply whether 
   `Card(Text("content"))` forwarding `"content"` into `Card`'s render
   function the way React/Vue `children`/`<slot>` works does not exist
   yet.
-- **`main`/PyPI lag `alpha` by a full generation.** The published
-  package (`0.42.2` as of this writing) predates the entire reactive
-  core, the component system, and both native backends. Nothing
-  described in Section 3 is currently reachable via `pip install
-  arklight`.
+- **`main`/PyPI still lag `alpha` significantly, though the gap is
+  narrower than it once was.** The published package (`0.54.1` as of
+  this check against PyPI, not the `0.42.2` an earlier revision of
+  this document reported) does now carry a real reactive core (`State`,
+  a smaller `Action.*`/`Derive.*` vocabulary, named click behaviors)
+  and the `.ark` bundle packager. It still has, confirmed directly
+  against `main`'s own source: no `@component` user-defined-component
+  system, no `Provider`, no preamble directives, no Rei narrator, and
+  no native backends (Android/Desktop). Nothing in Section 3 beyond
+  the reactive core basics and bundling is currently reachable via
+  `pip install arklight`.
 - **Zero independent adoption signal.** No stars, forks, or community
   discussion found under the project's own name at any point this was
   checked.
