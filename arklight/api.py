@@ -1575,6 +1575,43 @@ class Derive:
         this lowercases the rest of every word."""
         return DerivationRef(kind="to_title_case", names=(name,))
 
+    # ------------------------------------------------------------------
+    # `v0.070` (docs/version history/v0.070.md): JS vocabulary addendum
+    # stage 10/10, the capstone -- the two entries the addendum's "Scope
+    # filter" flagged as needing an explicit design exception before they
+    # could ship as written.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def pluralize(word: str, count: str) -> DerivationRef:
+        """`v0.070`: `word`, pluralized for the value held by `count` --
+        `Derive.pluralize("noun", "qty")` with `noun="item"`, `qty=3` ->
+        `"items"`; `qty=1` -> `"item"` unchanged. Ships with a small
+        irregular-noun table (`person` -> `people`, `octopus` ->
+        `octopi`, ...) plus a documented regular-plural-only fallback
+        (`+s`/`+es`/consonant-`y` -> `ies`) -- not exhaustive English
+        pluralization; an irregular noun outside the table falls
+        through to the regular rule."""
+        return DerivationRef(kind="pluralize", names=(word, count))
+
+    @staticmethod
+    def random_int(*, min: int, max: int) -> DerivationRef:  # noqa: A002
+        """`v0.070`: a whole number chosen uniformly at random from
+        `[min, max]` inclusive (`Math.random()` composed with
+        rounding) -- `min` must not be above `max`. The only `Derive.*`
+        kind that reads no state names at all: pair it with a
+        `Computed(..., deps=(trigger,), derive=Derive.random_int(...))`
+        where `trigger` is whatever state should cause a re-roll (an
+        `Action.increment(...)` on a dedicated counter, say).
+
+        **Design exception:** unlike every other derivation, this one
+        is not a pure function of its inputs, so it never agrees with
+        a server-rendered `Bind(...)`'s pre-fill -- it's excluded from
+        build-time pre-rendering entirely and always resolves
+        client-side only, re-rolling the moment the page's JavaScript
+        runs (see `arklight/backend/js/derivations/random_int.py`)."""
+        return DerivationRef(kind="random_int", names=(), args={"min": min, "max": max})
+
 
 # ---------------------------------------------------------------------------
 # `vdom-5` (REFACTOR-INDEX.md row 13): watch effects.
