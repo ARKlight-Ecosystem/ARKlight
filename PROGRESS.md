@@ -100,6 +100,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06616 | Capability fix: `Provider`, stage 6 of 6 (capstone) -- capability vocabulary finalized. Resolves proposal open question §7.2: `PROVIDER_CAPABILITIES` (`auth`, `read`, `write`, `subscribe`) is locked in as-is (audited stages 2-5's own usage; none needed a fifth well-known name), and the word "provisional" is retired from `arklight/provider.py`, `arklight/ir/validate.py` and `arklight/experimental.py`. Also opens a namespaced escape hatch the proposal's four-name ceiling didn't otherwise allow for: a `custom:`-prefixed capability (`Provider.declare(capabilities=["auth", "custom:inventory-sync"])`) names something a site's own service needs that the four well-known names don't cover, the same way a user-defined component covers markup ARKlight has no built-in name for. Researched against two precedents before landing on this shape: LSP's `experimental`/vendor-namespaced capability keys, and OAuth's `custom:`-prefixed scope convention (both: closed core, explicit separate namespace for anything added on top). An unprefixed name is still checked strictly against the closed four -- `"raed"` still fails as unknown, not silently accepted as a new custom word -- so the typo discipline the original closed set existed for is unchanged; `custom:read` (reusing a well-known name under the prefix) gets its own error pointing at the unprefixed form. `arklight/provider.py` (`CUSTOM_CAPABILITY_PREFIX`, `is_custom_capability`, `is_known_capability`), `arklight/ir/validate.py` (`validate_provider` re-check updated), `arklight/api.py` (`Provider.declare` docstring), `arklight/experimental.py` (`provider-integration` wording), `arklight/cli/search.py` (`_format_provider_spec` now tags `(custom)` capabilities). New, dedicated `tests/test_provider_custom_capability.py` (45 tests) covers the finalized vocabulary and the `custom:` path end to end; full suite 2959 passed, no regressions (the 1 failure on this checkout, `test_doc_citations.py::test_live_docs_citations_resolve` on the pre-existing `SEARCH-RETRIEVE-DOC-ADDENDUM.md` citation, is pre-existing, confirmed unchanged against a clean-checkout baseline of 2914 passed/1 failed -- this pass's own doc-citation fallout, elsewhere, is fixed rather than left as new instances of that same failure). Closes the six-rung `Provider` ladder: its accepted proposal and implementation addendum are retired from `docs/Proposals/`/`docs/Implementation/` and graduated into the settled design record `docs/Foundational/PROVIDER-SDK.md`; `docs/version history/v0.070.md` rewritten to the shipped-`Provider`/PLANNED-JS-vocabulary split (same precedent as `v0.064.md`), and index rows updated in `docs/README.md`/`docs/Foundational/README.md`/`docs/Implementation/README.md`/`docs/Proposals/README.md`. `0.069` -> `0.06616`; out-of-band, no roadmap row of its own, roadmap `v0.070` untouched (JS vocabulary stage 10/10 remains PLANNED) | DONE |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
+| (docs audit, part 3) | Docs-only: full drift re-audit -- checked `EXPERIMENTAL-APIS.md`/`DEPLOYMENT-CLI.md`/`PLATFORM-APIS.md`/`ARCHITECTURE.md` against their code/PROGRESS.md sources of truth (all clean); found and fixed one self-inflicted regression from the previous pass -- `docs/Foundational/README.md`'s index row for `AUTHORING-GUIDE.md` hadn't been updated to mention the new `Provider` section. No code changed; out-of-band, no roadmap slot | DONE |
 | (docs audit, part 2) | Docs-only: `docs/Foundational/AUTHORING-GUIDE.md` rewritten -- component-vocabulary section redone as a flat, function-grouped, user-facing reference (not a shipping-history lesson), a missing `Provider` section added, and a top-of-file version/commit provenance note added. No code changed; out-of-band, no roadmap slot | DONE |
 | (docs audit) | Docs-only: repository-layout drift fix -- `arklight/provider.py` added to `docs/Foundational/GETTING-STARTED.md`'s repository-layout tree (was missing despite `Provider`'s six-rung ladder being fully SHIPPED as of `v0.070`); everything else audited (doc-link/citation tests, CLI-REFERENCE vs. `--help`, full test suite, version-history PLANNED markers, `pyproject.toml` vs. `CHANGELOG.md`) came back clean. No code changed; out-of-band, no roadmap slot | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
@@ -135,6 +136,36 @@ go-ahead before implementation starts on any of these:
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
+
+## Docs audit, part 3 -- full re-audit, one self-inflicted regression found (DONE)
+
+Re-ran the full docs-correctness pass this session's earlier work
+promised: `tests/test_doc_links.py`/`test_doc_citations.py`/
+`test_link_check.py`/`test_doc_retrieval.py` (43/43) and the full suite
+(3076/3076) still pass. Then checked everything those tests don't
+cover, each against its actual code source of truth rather than
+against another doc:
+
+- `EXPERIMENTAL-APIS.md`'s feature list vs. `arklight/experimental.py`'s
+  `FEATURES` dict -- all 7 present and correctly described.
+- `DEPLOYMENT-CLI.md`'s provider list vs. `arklight/cli/deploy.py`'s
+  `PROVIDERS` -- Cloudflare only, matches.
+- `PLATFORM-APIS.md`'s capability list vs. `arklight/api.py`'s
+  `PlatformAPI` -- `notify`/`clipboard_write`, matches.
+- `ARCHITECTURE.md`'s Milestones table vs. `PROGRESS.md`'s Snapshot
+  table -- consistent.
+- `V1-DEFINITION.md`/`WHAT-ARKLIGHT-IS.md`'s `Provider` mentions --
+  already current from earlier work, nothing to fix.
+
+Found one real regression, and it was self-inflicted: adding a
+`Provider` section to `AUTHORING-GUIDE.md` last pass didn't update
+`docs/Foundational/README.md`'s own index-table description of that
+file, which still read "the component vocabulary, the ARK Bundle
+format" with no mention of the section just added -- the exact class
+of drift a docs-lifecycle edit is supposed to close in the same
+change, not leave for the next audit to catch. Fixed: added `Provider`
+to that index row, matching `AUTHORING-GUIDE.md`'s own intro
+paragraph. No code changed.
 
 ## Docs audit, part 2 -- `AUTHORING-GUIDE.md` rewrite for the actual reader (DONE)
 
