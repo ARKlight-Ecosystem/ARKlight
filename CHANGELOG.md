@@ -5,6 +5,31 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: de-duplicate `AUTHORING-GUIDE.md`'s `Provider` section against `PROVIDER-SDK.md`
+
+Correction to the previous pass: adding a full "External services"
+section to `AUTHORING-GUIDE.md` restated facts `PROVIDER-SDK.md`
+already owns as the settled design record for `Provider` -- the
+capability vocabulary, the `custom:` escape hatch, the
+`window.ARKLIGHT_PROVIDER` shape, the experimental gating. That's
+exactly the anti-pattern `docs/README.md`'s own "Adding a new doc"
+section warns about ("does this fact already have a home? link to it
+rather than restating it -- copy-pasted facts drift the moment one
+copy gets updated and the other doesn't"), and it's inconsistent with
+how this same guide already treats every other feature with its own
+dedicated Foundational doc: `PlatformAPI`/`ACC-CAPABILITIES.md`
+capabilities get zero restatement in `AUTHORING-GUIDE.md` at all.
+
+Trimmed the section down to a three-line pointer -- names the
+mechanism, states it's experimental, links to `PROVIDER-SDK.md` for
+everything else -- rather than either the full duplication or
+removing it outright (the guide's own opening line still claims full
+API coverage, so a stub entry keeps `Provider` discoverable from here
+without a second copy of its mechanics to keep in sync).
+
+No code changed. `tests/test_doc_links.py`/`test_doc_citations.py`/
+`test_link_check.py`/`test_doc_retrieval.py` (43/43) still pass.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: drift audit, round 3 -- `docs/Foundational/README.md` index row missing `Provider`
 
 Follow-up audit after the `AUTHORING-GUIDE.md` rewrite. Checked
