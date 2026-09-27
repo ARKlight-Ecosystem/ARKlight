@@ -425,6 +425,7 @@ arklight live-streaming --unsubscribe
 
 ```bash
 arklight android scaffold <build-dir> -o OUTPUT_DIR [--debug-keystore PATH] [--release]
+arklight android sync <build-dir> -o OUTPUT_DIR [--patch PATH]
 arklight desktop scaffold <build-dir> -o OUTPUT_DIR [--target linux]
 arklight desktop build <project-dir> [--run]
 ```
@@ -457,6 +458,18 @@ and
   - `arklight android build`, `--install`, and local (on-this-machine)
     release builds are staged as later stages of the same ladder and
     are **not implemented yet**.
+- `arklight android sync <build-dir> -o OUTPUT_DIR` -- re-syncs an
+  already-`scaffold`ed project's `app/src/main/assets/` with a fresh
+  `arklight build` output directory, wholesale (every file replaced,
+  nothing merged). Nothing else about the project (Gradle files,
+  manifest, `res/`, debug keystore, `.github/`) is touched, so it's
+  the command to re-run after every site-content change instead of
+  re-scaffolding. Writes a unified diff of exactly what changed under
+  `assets/` to a `.patch` file (default: `<project-dir>/sync.patch`)
+  and prints it, since a wholesale replace otherwise leaves no record
+  of what moved.
+  - `--patch PATH` -- write the diff somewhere other than the default
+    `<project-dir>/sync.patch`.
 - `arklight desktop scaffold <build-dir> -o OUTPUT_DIR [--target linux]`
   -- generates a native GTK3 + WebKit2GTK host project. Templating +
   asset-embedding only -- no C toolchain required to run this command
@@ -472,6 +485,7 @@ and
 
 ```bash
 arklight android scaffold ARK -o android-project --release
+arklight android sync ARK -o android-project
 arklight desktop scaffold ARK -o desktop-project
 arklight desktop build desktop-project --run
 ```

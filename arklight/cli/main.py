@@ -685,6 +685,35 @@ def _cmd_android_scaffold(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_android_sync(args: argparse.Namespace) -> int:
+    try:
+        result = android.sync_assets(
+            args.build_dir,
+            output_dir=args.output,
+            patch_path=args.patch,
+        )
+    except AndroidError as exc:
+        print(f"ARKlight android sync failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(
+        f"ARKlight v{__version__} synced {result.build_dir}/ -> "
+        f"{result.assets_dir}/ ({len(result.written_paths)} file(s) copied, "
+        f"{len(result.removed_paths)} removed)"
+    )
+    if result.removed_paths:
+        for path in result.removed_paths:
+            print(f"  - {path}")
+    if not result.patch_text:
+        print("No content changes -- assets/ already matched this build output.")
+    else:
+        print(f"Patch written to {result.patch_path}")
+        print()
+        print(result.patch_text, end="" if result.patch_text.endswith("\n") else "\n")
+
+    return 0
+
+
 def _cmd_desktop_scaffold(args: argparse.Namespace) -> int:
     try:
         result = desktop.scaffold_project(
@@ -1292,6 +1321,34 @@ def main(argv: list[str] | None = None) -> int:
         "\"Building a release APK\" section) and is skipped on pull_request runs.",
     )
     android_scaffold_parser.set_defaults(func=_cmd_android_scaffold)
+
+    android_sync_parser = android_subparsers.add_parser(
+        "sync",
+        help="Re-sync an already-scaffolded project's app/src/main/assets/ with a "
+        "fresh build directory, wholesale -- nothing else about the project "
+        "(Gradle files, manifest, res/, debug keystore, .github/) is touched. "
+        "Writes a unified diff of exactly what changed under assets/ to a "
+        ".patch file (default: <project-dir>/sync.patch) and prints it, since a "
+        "wholesale replace otherwise leaves no record of what moved.",
+    )
+    android_sync_parser.add_argument(
+        "build_dir", help="An `arklight build` output directory (e.g. ARK)."
+    )
+    android_sync_parser.add_argument(
+        "-o",
+        "--output",
+        required=True,
+        help="Path to the Android Studio / Gradle project to sync into (previously "
+        "created with `arklight android scaffold`).",
+    )
+    android_sync_parser.add_argument(
+        "--patch",
+        default=None,
+        metavar="PATH",
+        help="Where to write the unified diff of what changed under assets/ "
+        "(default: <project-dir>/sync.patch, overwritten on every run).",
+    )
+    android_sync_parser.set_defaults(func=_cmd_android_sync)
 
     desktop_parser = subparsers.add_parser(
         "desktop",
