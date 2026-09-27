@@ -11,9 +11,8 @@ this module held through `htmx-2`; see git history / CHANGELOG.md
 vendored HTMX's own `hx-on:click="arkRunBehavior('<name>', this)"`
 attribute processing (landed at `htmx-1`).
 
-**`htmx-5`** (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 4 --
-Audit and remove remaining hand-rolled plumbing" / `docs/Backends/
-REFACTOR-INDEX.md` row 10) removes the `hx-on:click` mechanism
+**`htmx-5`** (see `HTMX-INTEGRATION.md` [retired -- see CHANGELOG.md] "Stage 4 --
+Audit and remove remaining hand-rolled plumbing" / `REFACTOR-INDEX.md` row 10) removes the `hx-on:click` mechanism
 entirely and folds behavior dispatch into this one function, renamed
 from `wireActionInterceptor` to `wireClickInterceptor` accordingly.
 
@@ -114,7 +113,7 @@ left open, not the "modifier timing" gap -- that was a documented,
 deliberate scope boundary here, later closed by the bug-fix pass
 below.
 
-**Bug fix (post-`htmx-5`, see `docs/bug_fixes.md` finding 1):** the
+**Bug fix (post-`htmx-5`, see `bug_fixes.md` finding 1):** the
 gap above was live long enough to ship -- every `Action.*` click fired
 immediately regardless of any declared modifier, because this
 listener never read `hx-trigger` at all. Fixed by having
@@ -138,7 +137,20 @@ single `try`/`catch` guard -- just now invoked either synchronously or
 from inside the debounce timer's callback, instead of always
 synchronously.
 
-`htmx-4` (docs/Backends/REFACTOR-INDEX.md row 9) changed this
+**`v0.065`** (docs/Proposals/PLATFORM-API-IR-PROPOSAL.md): adds a
+third branch, `\"platform:<capability>\"`, dispatching
+`PlatformAPI.*(...)` references the same way the `\"action:\"` branch
+above dispatches `Action.*(...)` -- reading `data-ark-platform-api-
+args` (compiled by `arklight/backend/html/attrs.py`) and calling into
+`platformApis[capability]`, the closed dispatch object
+`arklight/backend/js/render.py`'s `_platform_apis_object_js` builds
+from `arklight.backend.js.platform_apis.PLATFORM_API_FRAGMENTS` --
+mirroring `behaviors` exactly. Deliberately no modifier/`hx-trigger`
+handling for this branch yet (Section 23 of the proposal keeps
+initial scope small): every platform click runs immediately,
+unconditionally, the same as an unmodified `Action.*(...)` click.
+
+`htmx-4` (REFACTOR-INDEX.md row 9) changed this
 function's signature (then still named `wireActionInterceptor`) from
 `wireActionInterceptor(store)` to `wireActionInterceptor(getStore)`,
 taking a zero-argument getter instead of a fixed store value. This is
@@ -169,7 +181,10 @@ that always returns `null`, which the action branch's existing
 
 from __future__ import annotations
 
+from arklight.backend.js.runtime.action_args import RESOLVE_ACTION_ARGS_JS
+
 CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
+""" + RESOLVE_ACTION_ARGS_JS + """
     var debounceTimers = new WeakMap();
     var throttleLast = new WeakMap();
     var onceFired = new WeakSet();
@@ -222,9 +237,9 @@ CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
             var args = argsRaw ? JSON.parse(argsRaw) : {};
             var action = actions[actionName];
             if (!action) return;
-            action(store, stateKey, args);
+            action(store, stateKey, resolveActionArgs(store, args));
           } catch (err) {
-            arkNotify("Something went wrong updating this page -- an unsupported or unexpected case was hit.");
+            arkReportError("Something went wrong updating this page -- an unsupported or unexpected case was hit.", err);
           }
         };
         if (mods.debounce !== null) {
@@ -245,7 +260,23 @@ CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
           if (!behavior) return;
           behavior(el);
         } catch (err) {
-          arkNotify("Something went wrong running this action -- an unsupported or unexpected case was hit.");
+          arkReportError("Something went wrong running this action -- an unsupported or unexpected case was hit.", err);
+        }
+      } else if (raw.indexOf("platform:") === 0) {
+        // `v0.065`: PlatformAPI.*(...) values. No modifiers/hx-trigger
+        // support yet (see arklight/backend/html/attrs.py's own note
+        // on this), so every platform click runs immediately, same as
+        // an unmodified Action.*(...) click above.
+        event.preventDefault();
+        try {
+          var capability = raw.slice("platform:".length);
+          var platformApi = platformApis[capability];
+          if (!platformApi) return;
+          var platformArgsRaw = el.getAttribute("data-ark-platform-api-args");
+          var platformArgs = platformArgsRaw ? JSON.parse(platformArgsRaw) : {};
+          platformApi(platformArgs);
+        } catch (err) {
+          arkReportError("Something went wrong running this action -- an unsupported or unexpected case was hit.", err);
         }
       }
     });

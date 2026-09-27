@@ -1,5 +1,5 @@
 """
-`vdom-6` (docs/Backends/REFACTOR-INDEX.md row 14): two-way input
+`vdom-6` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 14): two-way input
 binding. `bind_value=Bind.model("query")` (`arklight/api.py`) compiles
 to `data-ark-model="query"` (`arklight/backend/html/attrs.py`) on an
 element -- typically an `Input`. Two small pieces, mirroring the
@@ -37,16 +37,39 @@ Only shipped on a page that actually uses `bind_value=` somewhere
 `_collect_usage`/`_build_runtime_js`) -- same "only ship what's used"
 discipline `WIRE_WATCHERS_JS`/the per-usage `actions`/`behaviors`/
 `derivations` objects already follow.
+
+`v0.063` (JS vocabulary addendum, stage 3/10 -- see `docs/version
+history/v0.063.md`): `wireModelBinding` now reads an optional
+`data-ark-model-modifiers` attribute (compiled from a `ModelBindSpec`
+-- `Bind.model("name", debounce=300)`/`.throttle(300)`, see
+`arklight/ast/nodes.py`) and, when present, delays or rate-limits the
+`store.set(...)` write-back accordingly -- the element's own `.value`
+still updates immediately on every keystroke (native input behavior,
+untouched), only *when state itself changes* is deferred. Reuses the
+exact `debounce:<ms>`/`throttle:<ms>` token shape and per-element
+`WeakMap` timer/timestamp bookkeeping `wireClickInterceptor`
+(`arklight/backend/js/runtime/dispatch.py`) already established for
+`Action.*(...).debounce(...)`/`.throttle(...)`, kept as a second,
+independent implementation here rather than shared code -- this
+listens for `input` events against `data-ark-model`, that one for
+`click` against `data-ark-on-click`; the two dispatch tables (and
+therefore their modifier-parsing attribute names) are deliberately
+separate.
 """
 
 from __future__ import annotations
 
 RENDER_MODEL_BINDINGS_JS = """  function renderModelBindings(store) {
     document.querySelectorAll("[data-ark-model]").forEach(function (el) {
-      var key = el.getAttribute("data-ark-model");
-      var value = store.get(key);
-      if (el.value !== String(value == null ? "" : value)) {
-        el.value = value == null ? "" : value;
+      // 0.06505: per-element guard (RUNTIME-ERROR-HANDLING-PROPOSAL.md, 3a).
+      try {
+        var key = el.getAttribute("data-ark-model");
+        var value = store.get(key);
+        if (el.value !== String(value == null ? "" : value)) {
+          el.value = value == null ? "" : value;
+        }
+      } catch (err) {
+        arkReportError("An input couldn't be updated to match this page's state.", err);
       }
     });
   }
@@ -54,13 +77,60 @@ RENDER_MODEL_BINDINGS_JS = """  function renderModelBindings(store) {
 """
 
 WIRE_MODEL_BINDING_JS = """  function wireModelBinding(getStore) {
+    var debounceTimers = new WeakMap();
+    var throttleLast = new WeakMap();
+
+    function parseModelModifiers(el) {
+      var mods = { debounce: null, throttle: null };
+      var raw = el.getAttribute("data-ark-model-modifiers");
+      if (!raw) return mods;
+      raw.split(",").forEach(function (token) {
+        if (token.indexOf("debounce:") === 0) {
+          mods.debounce = parseInt(token.slice("debounce:".length), 10);
+        } else if (token.indexOf("throttle:") === 0) {
+          mods.throttle = parseInt(token.slice("throttle:".length), 10);
+        }
+      });
+      return mods;
+    }
+
     document.addEventListener("input", function (event) {
       var el = event.target.closest("[data-ark-model]");
       if (!el) return;
       var store = getStore();
       if (!store) return;
       var key = el.getAttribute("data-ark-model");
-      store.set(key, el.value);
+      var mods = parseModelModifiers(el);
+      var value = el.value;
+      // 0.06505: every store.set(...) below goes through setGuarded --
+      // the same per-call try/catch wireClickInterceptor's runAction
+      // already puts around action(...) (RUNTIME-ERROR-HANDLING-
+      // PROPOSAL.md, 3a), including the deferred debounce write.
+      function setGuarded() {
+        try {
+          store.set(key, value);
+        } catch (err) {
+          arkReportError("That input couldn't be saved to this page's state -- what you typed may not have taken effect.", err);
+        }
+      }
+      if (mods.throttle !== null) {
+        var now = Date.now();
+        var lastRun = throttleLast.get(el) || 0;
+        if (now - lastRun < mods.throttle) return;
+        throttleLast.set(el, now);
+        setGuarded();
+        return;
+      }
+      if (mods.debounce !== null) {
+        var existingTimer = debounceTimers.get(el);
+        if (existingTimer) clearTimeout(existingTimer);
+        debounceTimers.set(el, setTimeout(function () {
+          debounceTimers.delete(el);
+          setGuarded();
+        }, mods.debounce));
+        return;
+      }
+      setGuarded();
     });
   }
 """

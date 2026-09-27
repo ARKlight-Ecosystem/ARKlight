@@ -5,12 +5,12 @@ Notice-parses it, and wires the store's subscribers to the render
 passes in `arklight.backend.js.runtime.bindings`).
 
 Split out of `arklight/backend/js/render.py`'s old `_STATE_CORE_JS`
-(`refactor-0`, see `docs/Backends/REFACTOR-INDEX.md`) -- pure move, no
+(`refactor-0`, see `REFACTOR-INDEX.md` [retired -- see CHANGELOG.md]) -- pure move, no
 JS output change. Mirrors the `actions/`/`behaviors/` per-file
 pattern: `arklight.backend.js.runtime` reassembles these fragments in
 the same order the monolithic string used to hold them.
 
-`htmx-4` (docs/Backends/REFACTOR-INDEX.md row 9) changes where
+`htmx-4` (REFACTOR-INDEX.md row 9) changes where
 `initState()` reads its JSON blob from. Per htmx's own docs, an
 `hx-boost`ed swap replaces `<body>`'s *innerHTML* only, never the
 `<body>` tag's own attributes -- so a `data-ark-state` attribute
@@ -24,7 +24,7 @@ and falls back to the `<body>` attribute (the non-app_shell shape,
 unchanged), so the same function handles both without needing to know
 `app_shell` was set.
 
-`vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12): `createState` gains
+`vdom-4` (REFACTOR-INDEX.md row 12): `createState` gains
 a second, optional `computed` argument -- the same dependency-ordered
 `(name, spec)` pairs `IRPage.computed` carries (see
 `arklight/ir/build.py`), JSON-round-tripped as plain 2-element arrays
@@ -53,7 +53,7 @@ is a no-op and `derivations` (whose declaration is itself gated on
 `initState()` below reads the sibling `data-ark-computed` attribute
 the same way it already reads `data-ark-state`, and passes it through.
 
-`vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13): `initState()` also
+`vdom-5` (REFACTOR-INDEX.md row 13): `initState()` also
 reads a sibling `data-ark-watch` attribute (`IRPage.watch`, the same
 marker/`<body>`-attribute duality `data-ark-state`/`data-ark-computed`
 already use) and, once the store is constructed, hands it to
@@ -69,19 +69,19 @@ a `ReferenceError` on any stateful page with no watch effects at all,
 `typeof` is the standard safe way to probe for a maybe-undeclared
 identifier without that risk.
 
-`vdom-6` (docs/Backends/REFACTOR-INDEX.md row 14): the `store.subscribe`
+`vdom-6` (REFACTOR-INDEX.md row 14): the `store.subscribe`
 callback also calls `renderModelBindings(store)`
 (`arklight/backend/js/runtime/model.py`), same `typeof`-guarded,
 only-shipped-when-used pattern as `wireWatchers` just above -- a page
 with no `bind_value=` anywhere never declares that function.
 
-`vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): the same callback
+`vdom-7` (REFACTOR-INDEX.md row 15): the same callback
 also calls `renderRepeat(store)`/`renderShow(store)`
 (`arklight/backend/js/runtime/repeat.py`/`show.py`), same
 `typeof`-guarded, only-shipped-when-used pattern again -- a page with
 no `Repeat(...)`/`Show(...)` never declares one or the other.
 
-`vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): `initState()` also
+`vdom-8` (REFACTOR-INDEX.md row 16): `initState()` also
 reads a sibling `data-ark-persist` attribute (`IRPage.persist`, the
 same marker/`<body>`-attribute duality every other `data-ark-*` piece
 of hydration state already uses) -- a plain list of `State(...)` names
@@ -94,7 +94,10 @@ persist" rather than the page-wide "state couldn't be loaded" failure
 the outer `try`/`catch` below produces.
 
 1. *Read*, before `createState` is called: for each persisted key,
-   look up `localStorage["ark:<location.pathname>:<key>"]` and, if
+   look up `localStorage["ark:<location.pathname>:<key>"]` (with a
+   trailing `/index.html` normalized to `/`, so the site root has one
+   store rather than two -- see the normalization note by the read
+   step itself) and, if
    present and JSON-parseable, use it to override that key's
    server-rendered initial value -- so a value survives a reload.
    `location.pathname` (not `page.route` from the build) is
@@ -115,6 +118,88 @@ graph, no derivation kind to look up, and no other module needs to
 read `persist` -- it's purely "override on init, write on change,"
 both of which `initState()` already touches every other piece of
 hydration state at.
+
+`v0.063` (JS vocabulary addendum, stage 3/10 -- see `docs/version
+history/v0.063.md`): `initState()` also reads a sibling
+`data-ark-media` attribute (`IRPage.media`, same marker/`<body>`-
+attribute duality again) -- a list of `[name, query]` pairs for every
+`State(..., media=...)` declared on the page. Same "override on init,
+keep writing after that" shape `persist` above already establishes,
+just sourced from `window.matchMedia` instead of `localStorage`:
+
+1. *Override*, before `createState` is called: for each `[name,
+   query]` pair, if `window.matchMedia` exists, override that key's
+   server-rendered initial value with `matchMedia(query).matches` --
+   so the very first render already reflects the *real* viewport,
+   not just whatever guess `State(..., media=...)`'s own `initial=`
+   argument server-rendered for a JS-disabled visitor.
+2. *Listen*, once the store exists: attach one `"change"` listener per
+   `MediaQueryList` (`mql.addEventListener`, falling back to the
+   older `mql.addListener` for Safari versions that predate the
+   standard event-target API) that calls `store.set(name, e.matches)`
+   whenever the query's match state flips -- the live-updating half
+   `persist` has no equivalent of (persisted state only ever changes
+   through an explicit `Action.*(...)`/user input, never on its own).
+
+Both steps are wrapped in their own `try`/`catch`, same degrade-
+quietly discipline `persist`'s `localStorage` access already holds --
+a media query the browser can't parse, or a very old browser lacking
+`matchMedia` entirely, means this key just never updates on its own,
+never a page-breaking error.
+
+`v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md, `docs/
+version history/v0.064.md`): `initState()` also reads a sibling
+`data-ark-query` attribute (`IRPage.query`, same marker/`<body>`-
+attribute duality again) -- `[name, param, type_tag, history_mode]`
+tuples for every `State(..., query=...)` declared on the page. Same
+"override on init, keep writing after that" shape `persist`/`media`
+above already establish, sourced from `URLSearchParams(location.
+search)` instead:
+
+1. *Override*, before `createState` is called: for each tuple, if the
+   URL's query string carries `param`, override that key's server-
+   rendered initial value with `coerceQueryValue(raw, type_tag)` --
+   `parseInt` for `"int"`, a `"true"`/`"false"` mapping for `"bool"`,
+   plain passthrough for `"str"`. A missing param, or one that fails
+   to coerce (a non-numeric `?page=abc` against an `"int"` tag),
+   leaves the server-rendered `initial` untouched -- same fail-open
+   discipline `persist`'s `JSON.parse` failure and `media`'s
+   `matchMedia` failure already hold, now a third confirmed instance
+   of "every external-input read in this runtime fails open to its
+   safe default" rather than a one-off.
+2. *Write*, as one more `store.subscribe` listener (registered only
+   when `query.length`, same "don't pay for an empty forEach"
+   discipline `persist`'s own write listener already holds): on every
+   change, rebuild the URL's query string with each tracked key's
+   current value (`serializeQueryValue`, the inverse of step 1's
+   coercion), preserving any *other* query parameters already present
+   (a `?utm_source=...` the page never declared as `State(...)`, say).
+   If that rebuilt string actually differs from the URL already on
+   screen, call `history.pushState(...)` if any key whose value
+   changed this round declared `history="push"`, `history.
+   replaceState(...)` otherwise (the unmarked default). The equality
+   check also means a `popstate`-driven update (`arklight/backend/js/
+   runtime/query.py`'s `wireQuerySync`, which calls `store.set(...)`
+   for each URL-carried key) never re-pushes/re-replaces the same URL
+   it just navigated *to* -- no separate "am I currently handling a
+   popstate" flag needed, the string comparison already makes the
+   round trip a no-op.
+
+Per §3.6 of the proposal this extends: deliberately never a real
+`history.pushState`-driven *navigation* (no document re-fetch, no
+`hx-boost` swap) -- `State`, `Computed`, `Derive`, and every `Action`
+in this vocabulary are synchronous, in-memory primitives with no
+network/navigation step anywhere in them, and the compiler-rendered
+document is invariant to the query string in the first place (static
+file resolution strips it before ARKlight's own output is even in the
+picture), so re-fetching it on every `?page=` change would only ever
+re-fetch a byte-identical page. `coerceQueryValue`/`serializeQueryValue`
+are declared inside `initState()` itself (not exported siblings like
+`wireWatchers`/`wireQuerySync`) since nothing outside this function
+needs either -- the same "no separate module, no separate lookup
+path" reasoning `persist`'s inline read/write steps already follow,
+just with a coercion step `persist`'s plain `JSON.parse`/`JSON.
+stringify` round trip never needed.
 """
 
 from __future__ import annotations
@@ -124,10 +209,18 @@ CREATE_STATE_JS = """  function createState(initial, computed) {
     var listeners = [];
     function recomputeAll() {
       (computed || []).forEach(function (entry) {
-        var name = entry[0];
-        var spec = entry[1];
-        var derive = derivations[spec.kind];
-        if (derive) { state[name] = derive(state, spec.names, spec.args); }
+        // 0.06505: per-entry guard -- one throwing Computed(...) must not
+        // stop every other computed value (or the set()/reset() that
+        // triggered this pass) from finishing. See RUNTIME-ERROR-HANDLING-
+        // PROPOSAL.md, 3a.
+        try {
+          var name = entry[0];
+          var spec = entry[1];
+          var derive = derivations[spec.kind];
+          if (derive) { state[name] = derive(state, spec.names, spec.args); }
+        } catch (err) {
+          arkReportError("A calculated value couldn't be updated -- some values on this page may be out of date.", err);
+        }
       });
     }
     recomputeAll();
@@ -164,14 +257,59 @@ INIT_STATE_JS = """  function initState() {
     var rawPersist = marker
       ? marker.getAttribute("data-ark-persist")
       : document.body.getAttribute("data-ark-persist");
+    var rawMedia = marker
+      ? marker.getAttribute("data-ark-media")
+      : document.body.getAttribute("data-ark-media");
+    var rawQuery = marker
+      ? marker.getAttribute("data-ark-query")
+      : document.body.getAttribute("data-ark-query");
+    // v0.064: coercion is the inverse pair `initState()`'s override
+    // step and its write-back subscriber below share -- a raw URL
+    // string in, a typed value out (coerce), or a typed value in, a
+    // URL-safe string out (serialize). Declared once, here, rather
+    // than duplicated at each call site.
+    function coerceQueryValue(rawValue, typeTag) {
+      if (typeTag === "int") {
+        var n = parseInt(rawValue, 10);
+        if (isNaN(n)) { throw new Error("not an int: " + rawValue); }
+        return n;
+      }
+      if (typeTag === "bool") {
+        if (rawValue === "true") return true;
+        if (rawValue === "false") return false;
+        throw new Error("not a bool: " + rawValue);
+      }
+      return rawValue;
+    }
+    function serializeQueryValue(value, typeTag) {
+      if (typeTag === "bool") { return value ? "true" : "false"; }
+      return String(value);
+    }
     try {
       var computed = rawComputed ? JSON.parse(rawComputed) : [];
       var watch = rawWatch ? JSON.parse(rawWatch) : [];
       var persist = rawPersist ? JSON.parse(rawPersist) : [];
+      var media = rawMedia ? JSON.parse(rawMedia) : [];
+      var query = rawQuery ? JSON.parse(rawQuery) : [];
       var initial = JSON.parse(raw);
+      // `/` and `/index.html` are the same page but different
+      // `location.pathname` values (and the build rewrites nav links
+      // to `index.html`), so before this they were two separate
+      // persisted stores for one page. Normalize the trailing
+      // "index.html" away so both resolve to the same key; a value
+      // saved before this fix (under the raw, un-normalized pathname)
+      // is tried second as a fallback.
+      var persistPath = location.pathname.replace(/\\/index\\.html$/, "/");
       persist.forEach(function (key) {
         try {
-          var saved = localStorage.getItem("ark:" + location.pathname + ":" + key);
+          var candidates = ["ark:" + persistPath + ":" + key];
+          if (persistPath !== location.pathname) {
+            candidates.push("ark:" + location.pathname + ":" + key);
+          }
+          var saved = null;
+          for (var i = 0; saved === null && i < candidates.length; i++) {
+            saved = localStorage.getItem(candidates[i]);
+          }
           if (saved !== null) { initial[key] = JSON.parse(saved); }
         } catch (err) {
           // Private browsing, quota, or a hand-edited non-JSON value:
@@ -179,7 +317,48 @@ INIT_STATE_JS = """  function initState() {
           // key alone -- never a page-wide failure.
         }
       });
+      media.forEach(function (entry) {
+        try {
+          if (typeof window !== "undefined" && window.matchMedia) {
+            initial[entry[0]] = matchMedia(entry[1]).matches;
+          }
+        } catch (err) {
+          // A media query string the browser can't parse, or no
+          // matchMedia support at all: keep the server-rendered guess
+          // for this key alone -- never a page-wide failure.
+        }
+      });
+      // v0.064: [name, param, type_tag, history_mode] -- see this
+      // file's module docstring, "v0.064" section, step 1.
+      if (typeof URLSearchParams !== "undefined") {
+        var searchParams = new URLSearchParams(location.search);
+        query.forEach(function (entry) {
+          try {
+            var rawValue = searchParams.get(entry[1]);
+            if (rawValue !== null) { initial[entry[0]] = coerceQueryValue(rawValue, entry[2]); }
+          } catch (err) {
+            // Missing or malformed query value: fall back to the
+            // server-rendered initial value for this key alone --
+            // never a page-wide failure, same discipline persist/
+            // media's own override steps already hold.
+          }
+        });
+      }
       var store = createState(initial, computed);
+      if (typeof window !== "undefined" && window.matchMedia) {
+        media.forEach(function (entry) {
+          try {
+            var name = entry[0];
+            var mql = matchMedia(entry[1]);
+            var handler = function (e) { store.set(name, e.matches); };
+            if (mql.addEventListener) { mql.addEventListener("change", handler); }
+            else if (mql.addListener) { mql.addListener(handler); }
+          } catch (err) {
+            // Same degrade-quietly discipline as the override step
+            // above -- this key just never updates live.
+          }
+        });
+      }
       store.subscribe(function () {
         renderBindings(store);
         renderClassBindings(store);
@@ -191,7 +370,7 @@ INIT_STATE_JS = """  function initState() {
         store.subscribe(function () {
           persist.forEach(function (key) {
             try {
-              localStorage.setItem("ark:" + location.pathname + ":" + key, JSON.stringify(store.get(key)));
+              localStorage.setItem("ark:" + persistPath + ":" + key, JSON.stringify(store.get(key)));
             } catch (err) {
               // Private browsing or quota exceeded: this key just
               // doesn't persist, same degrade-quietly discipline as
@@ -200,10 +379,50 @@ INIT_STATE_JS = """  function initState() {
           });
         });
       }
+      if (query.length) {
+        // v0.064: see this file's module docstring, "v0.064" section,
+        // step 2. `lastQueryValues` snapshots each tracked key's value
+        // so a notification with no actual change to any query-tracked
+        // key (e.g. an unrelated key's Action.*(...) firing) doesn't
+        // touch the URL at all, and so the eventual write knows which
+        // key(s) changed -- and therefore which history_mode applies --
+        // without re-deriving that from the URL string itself.
+        var lastQueryValues = query.map(function (entry) { return store.get(entry[0]); });
+        store.subscribe(function () {
+          var changedModes = [];
+          query.forEach(function (entry, i) {
+            var current = store.get(entry[0]);
+            if (current !== lastQueryValues[i]) {
+              changedModes.push(entry[3]);
+              lastQueryValues[i] = current;
+            }
+          });
+          if (!changedModes.length) return;
+          try {
+            var params = new URLSearchParams(location.search);
+            query.forEach(function (entry) {
+              params.set(entry[1], serializeQueryValue(store.get(entry[0]), entry[2]));
+            });
+            var newSearch = params.toString();
+            var newUrl = location.pathname + (newSearch ? "?" + newSearch : "") + location.hash;
+            var currentUrl = location.pathname + location.search + location.hash;
+            if (newUrl === currentUrl) return;
+            if (changedModes.indexOf("push") !== -1) {
+              history.pushState(null, "", newUrl);
+            } else {
+              history.replaceState(null, "", newUrl);
+            }
+          } catch (err) {
+            // URLSearchParams/history unavailable or blocked: this
+            // key just doesn't sync to the URL, same degrade-quietly
+            // discipline persist's localStorage write already holds.
+          }
+        });
+      }
       if (typeof wireWatchers === "function") { wireWatchers(store, watch); }
       return store;
     } catch (err) {
-      arkNotify("This page's saved state couldn't be loaded -- interactive features on this page may not work.");
+      arkReportError("This page's saved state couldn't be loaded -- interactive features on this page may not work.", err);
       return null;
     }
   }

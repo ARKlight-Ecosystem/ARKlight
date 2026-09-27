@@ -1,8 +1,8 @@
 """
-`renderRepeat`: `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15) --
+`renderRepeat`: `vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15) --
 the runtime half of `Repeat(name, template=...)` (`arklight.api.Repeat`).
 
-Per `docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.2, list
+Per `ARCHITECTURE-VDOM.md` [retired -- see CHANGELOG.md] SS6.2, list
 items are reconciled by *value*, not by index: each item's vnode `key`
 is `JSON.stringify(item)` itself. That's a deliberate, documented
 simplification for this stage -- it assumes no duplicate values in a
@@ -49,7 +49,7 @@ props render correctly for the items the server already produced
 through the full, unrestricted `_render_node`/`_attr_string` pipeline
 for those), but won't be reproduced for an item added purely
 client-side via `Action.append(...)`. Both are real, documented
-limitations of this stage -- see docs/Backends/REFACTOR-INDEX.md row
+limitations of this stage -- see REFACTOR-INDEX.md row
 15 for what's left for a future version.
 """
 
@@ -105,28 +105,63 @@ RENDER_REPEAT_JS = """  function arkAdoptVnode(vnode, realElm) {
 
   function renderRepeat(store) {
     document.querySelectorAll("[data-ark-repeat]").forEach(function (container) {
-      var name = container.getAttribute("data-ark-repeat");
-      var spec = JSON.parse(container.getAttribute("data-ark-repeat-template"));
-      var list = store.get(name) || [];
-      var vnodes = list.map(function (item, index) { return arkBuildRepeatVnode(spec, item, index); });
-      if (!container.__arkRepeatInit) {
-        // First call: the server already rendered exactly these items --
-        // adopt the real DOM as the baseline vnode tree instead of
-        // patching, so hydration never duplicates or discards
-        // server-rendered content. Every later call (after a real
-        // Action.append(...)/Action.remove(...)) patches for real.
-        var real = container.children;
-        for (var i = 0; i < vnodes.length && i < real.length; i++) {
-          arkAdoptVnode(vnodes[i], real[i]);
+      // 0.06505: per-container guard (RUNTIME-ERROR-HANDLING-PROPOSAL.md,
+      // 3a) -- a malformed data-ark-repeat-template on one container must
+      // not stop the other lists, or Show(...), from updating.
+      try {
+        var name = container.getAttribute("data-ark-repeat");
+        var spec = JSON.parse(container.getAttribute("data-ark-repeat-template"));
+        var list = store.get(name) || [];
+        var vnodes = list.map(function (item, index) { return arkBuildRepeatVnode(spec, item, index); });
+        if (!container.__arkRepeatInit) {
+          // First call: the server already rendered exactly these items --
+          // adopt the real DOM as the baseline vnode tree instead of
+          // patching, so hydration never duplicates or discards
+          // server-rendered content. Every later call (after a real
+          // Action.append(...)/Action.remove(...)) patches for real.
+          //
+          // That "exactly these items" assumption can be false on the
+          // very first call, though: `list`/`vnodes` come from the
+          // store's *current* value for `name`, and `State(...,
+          // persist=True)` overrides that value from localStorage
+          // before this ever runs (see runtime/state.py's
+          // `initState()`) -- so a returning visitor's stored list can
+          // be a different length than what the server just rendered
+          // for a fresh, unpersisted `initial=`. Adopting past the
+          // shorter side only was leaving the mismatch as a silent
+          // baseline: extra items the persisted list added were
+          // recorded in `__arkVnode` as already on-screen (with no
+          // real `.elm` behind them) without ever actually being
+          // added to the DOM, and an item the persisted list dropped
+          // was left rendered with nothing telling `__arkVnode` it was
+          // still there -- either way, nothing visibly changed until
+          // some later Action.*(...) triggered a real `arkPatch`
+          // against that already-wrong baseline. Adopting only the
+          // overlap, then patching for real when the lengths disagree,
+          // makes the DOM match the store on this very first render
+          // instead of waiting on a mutation that may never come.
+          var real = container.children;
+          var overlapLength = Math.min(vnodes.length, real.length);
+          for (var i = 0; i < overlapLength; i++) {
+            arkAdoptVnode(vnodes[i], real[i]);
+          }
+          var adopted = snabbdom.h(arkSelectorFor(container), {}, vnodes.slice(0, overlapLength));
+          adopted.elm = container;
+          container.__arkVnode = adopted;
+          container.__arkRepeatInit = true;
+          if (vnodes.length !== real.length) {
+            var reconciled = snabbdom.h(arkSelectorFor(container), {}, vnodes);
+            arkPatch(container.__arkVnode, reconciled);
+            container.__arkVnode = reconciled;
+          }
+          return;
         }
-        container.__arkVnode = snabbdom.h(arkSelectorFor(container), {}, vnodes);
-        container.__arkVnode.elm = container;
-        container.__arkRepeatInit = true;
-        return;
+        var next = snabbdom.h(arkSelectorFor(container), {}, vnodes);
+        arkPatch(container.__arkVnode, next);
+        container.__arkVnode = next;
+      } catch (err) {
+        arkReportError("A list on this page couldn't be updated -- it may be out of date.", err);
       }
-      var next = snabbdom.h(arkSelectorFor(container), {}, vnodes);
-      arkPatch(container.__arkVnode, next);
-      container.__arkVnode = next;
     });
   }
 
