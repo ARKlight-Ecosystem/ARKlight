@@ -2497,7 +2497,14 @@ class Site:
             self._validate_css_syntax(name, prop, value)
         self.custom_styles[name] = dict(rules)
 
-    def media_query(self, condition: str, class_name: str, rules: dict[str, str]) -> None:
+    def media_query(
+        self,
+        condition: str,
+        class_name: str,
+        rules: dict[str, str],
+        *,
+        allow_redefine: bool = False,
+    ) -> None:
         """
         EXPERIMENTAL (see `docs/Foundational/EXPERIMENTAL-APIS.md`) -- register a
         `@media` block: `.class_name { ... }` rendered inside
@@ -2523,7 +2530,15 @@ class Site:
         valid media-feature syntax is large; a malformed condition
         surfaces as broken generated CSS, the same failure mode
         hand-written `@media` would have. `class_name`/`rules` are
-        validated exactly like `style()`.
+        validated exactly like `style()` -- including the same
+        `DuplicateStyleNameError` protection: calling `media_query(...)`
+        again with the same `(condition, class_name)` pair raises
+        unless `allow_redefine=True` is passed, instead of silently
+        appending a second `@media (condition) { .class_name { ... } }`
+        block for the same pair. (Reusing `class_name` under a
+        *different* condition -- conditionally overriding a built-in
+        utility class at a breakpoint -- is unaffected; only an exact
+        `(condition, class_name)` repeat is checked.)
         """
         if not isinstance(condition, str) or not condition.strip():
             raise ValueError(
@@ -2536,6 +2551,25 @@ class Site:
                 f"class name -- letters, digits, hyphens, and underscores "
                 f"only, and it can't start with a digit."
             )
+        condition_key = condition.strip()
+        if not allow_redefine:
+            for existing_condition, existing_class_name, _existing_rules in (
+                self.custom_media_queries
+            ):
+                if existing_condition == condition_key and existing_class_name == class_name:
+                    raise DuplicateStyleNameError(
+                        f"site.media_query({condition!r}, {class_name!r}, ...) "
+                        "is already registered. Registering it again would "
+                        "add a second, silently-cascading @media block for "
+                        "the same condition and class -- if that's "
+                        "deliberate, pass allow_redefine=True: "
+                        f"site.media_query({condition!r}, {class_name!r}, "
+                        "rules, allow_redefine=True). Otherwise two "
+                        f"different calls are colliding on the same "
+                        f"(condition, class_name) pair; pick a different "
+                        f"class name, or a different condition, for one of "
+                        f"them."
+                    )
         if not isinstance(rules, dict) or not rules:
             raise ValueError(
                 f"site.media_query(..., {class_name!r}, rules) needs a "
@@ -2556,7 +2590,13 @@ class Site:
                 )
             self._validate_css_syntax(class_name, prop, value)
 
-        self.custom_media_queries.append((condition.strip(), class_name, dict(rules)))
+        if allow_redefine:
+            self.custom_media_queries = [
+                entry
+                for entry in self.custom_media_queries
+                if not (entry[0] == condition_key and entry[1] == class_name)
+            ]
+        self.custom_media_queries.append((condition_key, class_name, dict(rules)))
         self.experimental_usages.append(
             experimental.emit("css-media-queries")
         )
@@ -2849,7 +2889,9 @@ class Site:
         expanded = self._expand_style_selector_rules(canonical_selector, selector_ast, rules)
         self.selector_rules.extend((sel, dict(r)) for sel, r in expanded)
 
-    def keyframes(self, name: str, frames: dict[str, dict[str, str]]) -> None:
+    def keyframes(
+        self, name: str, frames: dict[str, dict[str, str]], *, allow_redefine: bool = False
+    ) -> None:
         """
         Register a real `@keyframes name { ... }` block -- one of the
         gaps explicitly deferred in earlier design notes ("not silently
@@ -2863,6 +2905,15 @@ class Site:
         `style={"animation": "name 2s ease infinite"}` the same way any
         other `animation-name` value would be, since inline `style=` is
         already unrestricted for property *values*.
+
+        Calling this again with a `name` that's already registered
+        raises `DuplicateStyleNameError` unless `allow_redefine=True`
+        is passed -- `custom_keyframes` used to be a plain dict, so a
+        second call silently *replaced* the first with no error, the
+        same "last call wins" failure mode already retired for
+        `style()`/`register_component()`. Pass `allow_redefine=True`
+        for the legitimate case that used to rely on that: deliberately
+        redefining a keyframe sequence as a site is built up.
 
         `frames` is `{stop: {property: value}}`, where each `stop` is
         `"from"`, `"to"`, or a percentage like `"50%"` -- structured
@@ -2883,6 +2934,16 @@ class Site:
                 f"site.keyframes({name!r}, ...) needs a valid animation "
                 f"name -- letters, digits, hyphens, and underscores only, "
                 f"and it can't start with a digit."
+            )
+        if name in self.custom_keyframes and not allow_redefine:
+            raise DuplicateStyleNameError(
+                f"site.keyframes({name!r}, ...) is already registered. "
+                "Registering it again would silently replace the earlier "
+                "keyframe sequence -- if that's deliberate, pass "
+                f"allow_redefine=True: site.keyframes({name!r}, frames, "
+                "allow_redefine=True). Otherwise two different calls are "
+                f"colliding on the animation name {name!r}; pick a "
+                "different name for one of them."
             )
         if not isinstance(frames, dict) or not frames:
             raise ValueError(
@@ -3018,7 +3079,13 @@ class Site:
         self.font_faces.append(descriptor_rules)
 
     def container_query(
-        self, condition: str, selector: str, rules: dict, *, name: str | None = None
+        self,
+        condition: str,
+        selector: str,
+        rules: dict,
+        *,
+        name: str | None = None,
+        allow_redefine: bool = False,
     ) -> None:
         """
         Register a real `@container (condition) { selector { ... } }`
@@ -3043,7 +3110,12 @@ class Site:
         (e.g. `"min-width: 400px"`), validated the same
         non-empty/no-injection-characters way `site.media_query(...)`'s
         `condition` already is. `selector`/`rules` go through the same
-        grammar/validation as `style_selector(...)`.
+        grammar/validation as `style_selector(...)` -- including the
+        same collision protection: calling `container_query(...)` again
+        with the same `(name, condition, selector)` triple raises
+        `DuplicateStyleNameError` unless `allow_redefine=True` is
+        passed, instead of silently appending a second `@container`
+        block for the same triple.
         """
         if not isinstance(condition, str) or not condition.strip():
             raise ValueError(
@@ -3068,12 +3140,48 @@ class Site:
         except css_selectors.CSSSelectorSyntaxError as exc:
             raise CSSSyntaxError(str(exc)) from exc
         canonical_selector = css_selectors.render_selector_list(selector_ast)
+        condition_key = condition.strip()
+        if not allow_redefine:
+            for existing_name, existing_condition, existing_selector, _existing_rules in (
+                self.container_queries
+            ):
+                if (
+                    existing_name == name
+                    and existing_condition == condition_key
+                    and existing_selector == canonical_selector
+                ):
+                    raise DuplicateStyleNameError(
+                        f"site.container_query({condition!r}, "
+                        f"{canonical_selector!r}, ..., name={name!r}) is "
+                        "already registered. Registering it again would "
+                        "add a second, silently-cascading @container block "
+                        "for the same name/condition/selector -- if that's "
+                        "deliberate, pass allow_redefine=True: "
+                        f"site.container_query({condition!r}, "
+                        f"{canonical_selector!r}, rules, name={name!r}, "
+                        "allow_redefine=True). Otherwise two different "
+                        f"calls are colliding on the same container query; "
+                        f"pick a different selector, condition, or "
+                        f"container name for one of them."
+                    )
         clean_rules = self._validate_plain_rules(
             f"site.container_query(..., {canonical_selector!r}, ...)", rules
         )
-        self.container_queries.append((name, condition.strip(), canonical_selector, clean_rules))
+        if allow_redefine:
+            self.container_queries = [
+                entry
+                for entry in self.container_queries
+                if not (
+                    entry[0] == name
+                    and entry[1] == condition_key
+                    and entry[2] == canonical_selector
+                )
+            ]
+        self.container_queries.append((name, condition_key, canonical_selector, clean_rules))
 
-    def supports(self, condition: str, selector: str, rules: dict) -> None:
+    def supports(
+        self, condition: str, selector: str, rules: dict, *, allow_redefine: bool = False
+    ) -> None:
         """
         Register a real `@supports (condition) { selector { ... } }`
         feature-query block -- a progressive-enhancement gate ARKlight
@@ -3088,7 +3196,11 @@ class Site:
         that; a malformed condition surfaces as broken generated CSS,
         the same failure mode hand-written `@supports` would have.
         `selector`/`rules` go through the same grammar/validation as
-        `style_selector(...)`.
+        `style_selector(...)` -- including the same collision
+        protection: calling `supports(...)` again with the same
+        `(condition, selector)` pair raises `DuplicateStyleNameError`
+        unless `allow_redefine=True` is passed, instead of silently
+        appending a second `@supports` block for the same pair.
         """
         if not isinstance(condition, str) or not condition.strip():
             raise ValueError(
@@ -3106,10 +3218,33 @@ class Site:
         except css_selectors.CSSSelectorSyntaxError as exc:
             raise CSSSyntaxError(str(exc)) from exc
         canonical_selector = css_selectors.render_selector_list(selector_ast)
+        condition_key = condition.strip()
+        if not allow_redefine:
+            for existing_condition, existing_selector, _existing_rules in self.supports_rules:
+                if existing_condition == condition_key and existing_selector == canonical_selector:
+                    raise DuplicateStyleNameError(
+                        f"site.supports({condition!r}, {canonical_selector!r}, "
+                        "...) is already registered. Registering it again "
+                        "would add a second, silently-cascading @supports "
+                        "block for the same condition and selector -- if "
+                        "that's deliberate, pass allow_redefine=True: "
+                        f"site.supports({condition!r}, {canonical_selector!r}, "
+                        "rules, allow_redefine=True). Otherwise two "
+                        f"different calls are colliding on the same "
+                        f"(condition, selector) pair; pick a different "
+                        f"selector, or a different condition, for one of "
+                        f"them."
+                    )
         clean_rules = self._validate_plain_rules(
             f"site.supports(..., {canonical_selector!r}, ...)", rules
         )
-        self.supports_rules.append((condition.strip(), canonical_selector, clean_rules))
+        if allow_redefine:
+            self.supports_rules = [
+                entry
+                for entry in self.supports_rules
+                if not (entry[0] == condition_key and entry[1] == canonical_selector)
+            ]
+        self.supports_rules.append((condition_key, canonical_selector, clean_rules))
 
     def page_rule(self, rules: dict, *, pseudo: str | None = None) -> None:
         """
