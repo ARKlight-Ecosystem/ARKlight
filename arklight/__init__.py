@@ -1,19 +1,25 @@
 """
-ARKlight -- a Python-first compiler for building static websites.
+ARKlight -- a compiler framework: author in ordinary Python, compile to
+a static site (plus optional wrapped native/PWA targets), with its own
+batteries-included developer workflow.
 
-    from arklight import *
+    # include <stdlib.ARKlight>
 
     site = Site()
 
     @site.page("/")
     def home():
         return Page(
+            State("count", 0),
             Heading("ARKlight"),
             Text("Build websites with Python."),
-            Button("Get Started"),
+            Button("Get Started", on_click=Action.increment("count")),
         )
 
-Users write Python. ARKlight compiles it to standard HTML.
+Users write Python. ARKlight compiles it to standard HTML, CSS, and
+vanilla JS. Interactivity goes through a fixed, closed vocabulary of
+primitives (`State`, `Action.*`, `Derive.*`, `Predicate.*`, `Watch`) --
+no `eval`, no `new Function`, no string ever executed as code.
 The browser never executes Python.
 """
 
@@ -78,7 +84,7 @@ from arklight.api import (
     # vocabulary") -- previously defined in arklight/api.py but missing
     # from this package's `import` list, so `from arklight import *`
     # couldn't reach them even though `from arklight.api import Picture`
-    # (etc.) worked. See docs/DESIGN-NOTES.md, "v0.004: CLI scaffolding
+    # (etc.) worked. See docs/Foundational/DESIGN-NOTES.md, "v0.004: CLI scaffolding
     # (`arklight new`)", for how this was found.
     OrderedList,
     DescriptionList,
@@ -113,12 +119,43 @@ from arklight.api import (
     Area,
     IFrame,
     NoScript,
+    component,
+    Prop,
+    ComponentState,
     State,
     Bind,
     Action,
     ActionRef,
+    PlatformAPI,
+    PlatformAPIRef,
+    Provider,
+    # `vdom-4`..`vdom-7` (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] rows 12/13/15)
+    # + v0.062: previously defined in arklight/api.py but missing from
+    # this package's own `import` list, same gap
+    # `tests/test_package_exports.py` already found and fixed once for
+    # the v0.003 second vocabulary extension addendum -- `from arklight
+    # import *` (the documented way users are told to import
+    # everything) couldn't reach these even though `from arklight.api
+    # import Computed` (etc.) worked.
+    Computed,
+    Watch,
+    Derive,
+    DerivationRef,
+    Repeat,
+    RepeatItem,
+    Show,
+    Predicate,
+    PredicateRef,
+    ItemIndexRef,
+    ClassBindSpec,
+    ModelBindSpec,
     ARKNode,
+    CSSSyntaxError,
+    DuplicateStyleNameError,
 )
+
+# What `component(...)` raises is part of its API, so it travels with it.
+from arklight.ir.components import ComponentError, DuplicateComponentError
 
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _installed_version
@@ -158,7 +195,7 @@ except PackageNotFoundError:  # pragma: no cover -- only when running from
 # checkout -- same one-line-per-branch discipline as every other
 # branch-specific constant in this file (mirrors `main`'s copy, set to
 # `"main"` there).
-CHANNEL = "main"
+CHANNEL = "alpha"
 
 __all__ = [
     "Site",
@@ -250,11 +287,35 @@ __all__ = [
     "Area",
     "IFrame",
     "NoScript",
+    "component",
+    "Prop",
+    "ComponentState",
     "State",
     "Bind",
     "Action",
     "ActionRef",
+    "PlatformAPI",
+    "PlatformAPIRef",
+    "Provider",
+    "Computed",
+    "Watch",
+    "Derive",
+    "DerivationRef",
+    "Repeat",
+    "RepeatItem",
+    "Show",
+    "Predicate",
+    "PredicateRef",
+    "ItemIndexRef",
+    "ClassBindSpec",
+    "ModelBindSpec",
     "ARKNode",
+    # Errors the names above raise -- part of the same API surface, so a
+    # file that `# include <stdlib.ARKlight>` can `except` them by name.
+    "CSSSyntaxError",
+    "DuplicateStyleNameError",
+    "ComponentError",
+    "DuplicateComponentError",
     "__version__",
     "CHANNEL",
 ]

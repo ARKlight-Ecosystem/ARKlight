@@ -40,7 +40,7 @@ SCHEMA: dict[str, NodeSpec] = {
     # driven entirely off this dict and TEXT_ONLY_TYPES below -- they
     # just give users more of standard HTML to reach for. Grouped by
     # what they're commonly used for in a real static site; see
-    # docs/DESIGN-NOTES.md for how this addresses the v0.003 ceiling.
+    # docs/Foundational/DESIGN-NOTES.md for how this addresses the v0.003 ceiling.
     # ------------------------------------------------------------------
     # Semantic page/section layout (HTML5 sectioning + grouping content).
     "Header": NodeSpec(),
@@ -111,7 +111,7 @@ SCHEMA: dict[str, NodeSpec] = {
     # native form/progress widgets, a zero-JS dialog, the rest of
     # HTML's text-level semantics (including bidi + ruby), table
     # column grouping, video captions, image maps, iframes, and a
-    # <noscript> fallback. See docs/DESIGN-NOTES.md and CHANGELOG.md
+    # <noscript> fallback. See docs/Foundational/DESIGN-NOTES.md and CHANGELOG.md
     # for the full rationale per group.
     # ------------------------------------------------------------------
     # Lists: v0.003's first pass only ever produced <ul> (via `List`).
@@ -197,7 +197,7 @@ SCHEMA: dict[str, NodeSpec] = {
     # anything gated behind a `toggle`/`copy`/`dismiss` behavior can
     # have a `NoScript` sibling explaining what's missing.
     "NoScript": NodeSpec(),
-    # vdom-7 (docs/Backends/REFACTOR-INDEX.md row 15): per-item list
+    # vdom-7 (REFACTOR-INDEX.md [retired -- see CHANGELOG.md] row 15): per-item list
     # rendering + conditional show/hide. Both are real, renderable
     # content -- unlike `State`/`Computed`/`Watch` below, which are
     # page-scoped declarations Validation/IR-build pull out of the tree
@@ -260,11 +260,49 @@ BEHAVIOR_REGISTRY: dict[str, BehaviorSpec] = {
     "scroll-to": BehaviorSpec(),
     "copy": BehaviorSpec(),
     "dismiss": BehaviorSpec(extra_props=("toggle_class",)),
+    # `v0.063` (docs/version history/v0.063.md): clipboard **paste** --
+    # mirrors `copy` almost exactly (same `behavior_target` selector,
+    # same clipboard-availability guard), just reading instead of
+    # writing: `navigator.clipboard.readText()` into `target`'s
+    # `.value` (an `Input`/`Textarea`) or `.textContent` otherwise.
+    "paste": BehaviorSpec(),
 }
 
 # Derived, not hand-maintained -- Validation's existing
 # `on_click in KNOWN_BEHAVIORS` check doesn't need to change shape.
 KNOWN_BEHAVIORS = frozenset(BEHAVIOR_REGISTRY)
+
+
+# `v0.063` (docs/version history/v0.063.md): `reveal`/`lazy` behavior
+# via `IntersectionObserver` -- deliberately its own small registry,
+# not folded into `BEHAVIOR_REGISTRY` above, because it needs its own
+# prop (`on_reveal=`, not `on_click=`): every existing named behavior
+# is click-triggered (wired through `wireClickInterceptor`'s delegated
+# `click` listener), but a reveal-on-scroll-into-view effect has no
+# click to hook -- it has to be wired from a *mount-time* pass instead
+# (`wireReveal`, `arklight/backend/js/runtime/reveal.py`), observing
+# every `data-ark-on-reveal`-carrying element once at page init (and
+# again after an app-shell boosted swap). Reusing `on_click=`'s
+# registry/prop for a mechanism that isn't click-triggered at all
+# would be a silent footgun the moment a site tried to combine the
+# two (`on_click="toggle"` + a reveal effect) on the same element --
+# same reasoning `behavior_target` vs. `target` already documents in
+# `arklight/api.py`. One kind so far: `reveal` adds `toggle_class`
+# (default `"is-visible"`, reusing the same prop/attribute name
+# `toggle`/`dismiss` already use) to the element itself, once, the
+# first time it enters the viewport, then stops observing it -- a
+# one-shot scroll-reveal, the same "lazy"/"reveal-on-scroll" pattern
+# most sites reach for hand-rolled JS for.
+@dataclass
+class RevealSpec:
+    extra_props: tuple[str, ...] = field(default_factory=tuple)
+
+
+REVEAL_REGISTRY: dict[str, RevealSpec] = {
+    "reveal": RevealSpec(extra_props=("toggle_class",)),
+}
+
+KNOWN_REVEAL_BEHAVIORS = frozenset(REVEAL_REGISTRY)
 
 
 # v0.0035: a real `State` primitive with a closed *action* vocabulary,
@@ -285,10 +323,21 @@ KNOWN_BEHAVIORS = frozenset(BEHAVIOR_REGISTRY)
 @dataclass
 class ActionSpec:
     args: tuple[str, ...] = field(default_factory=tuple)
+    # Capability fix (live-input -> action-value): the subset of `args`
+    # that may be fed from live state instead of a compile-time
+    # literal -- `Action.append("tasks", Bind("draft"))` reads
+    # `State("draft")`'s current value when the click happens. Empty
+    # by default: an action opts a given argument in explicitly, so
+    # `Bind(...)` in any other position (e.g. `increment`'s `delta`,
+    # where an input-bound *string* would silently concatenate rather
+    # than add) is a build-time error, not a runtime surprise. See
+    # `arklight.ast.nodes.STATE_REF_KEY` for the wire shape and
+    # `arklight/backend/js/runtime/action_args.py` for the resolution.
+    state_args: tuple[str, ...] = field(default_factory=tuple)
 
 
 ACTION_REGISTRY: dict[str, ActionSpec] = {
-    "set": ActionSpec(args=("value",)),
+    "set": ActionSpec(args=("value",), state_args=("value",)),
     "increment": ActionSpec(args=("delta",)),
     "toggle_bool": ActionSpec(),
     # ------------------------------------------------------------------
@@ -298,7 +347,7 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
     # as much as a `+1`; a form/counter/toggle demo needs a "put it
     # back the way it started" control), rather than every site
     # re-deriving them from `set`/`increment` by hand. Only the most
-    # commonly needed additions land here; see docs/DESIGN-NOTES.md
+    # commonly needed additions land here; see docs/Foundational/DESIGN-NOTES.md
     # ("v0.0035: stateful JS vocabulary addendum") for the rest of the
     # candidates (list append/remove, derived/computed state, debounced
     # actions, input-bound `set`) deliberately left for a future
@@ -311,16 +360,29 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
     # that assume a list-valued `State(...)` rather than a scalar one
     # -- deliberately just the two minimal list mutations (append one
     # value, remove by index), not a full list-editing vocabulary. See
-    # docs/DESIGN-NOTES.md for what's still left for a future version.
+    # docs/Foundational/DESIGN-NOTES.md for what's still left for a future version.
     # ------------------------------------------------------------------
-    "append": ActionSpec(args=("value",)),
+    "append": ActionSpec(args=("value",), state_args=("value",)),
     "remove": ActionSpec(args=("index",)),
+    # ------------------------------------------------------------------
+    # `v0.063` (docs/version history/v0.063.md): JS vocabulary addendum
+    # stage 3/10. `geolocate` is a one-shot, argument-less write --
+    # `navigator.geolocation.getCurrentPosition` writes a plain
+    # `{lat, lng}` object into the target State(...) once the browser's
+    # location prompt resolves (see
+    # arklight/backend/js/actions/geolocate.py). Async/"fire and
+    # forget", same shape a debounced action's deferred setTimeout
+    # callback already relies on -- `wireClickInterceptor` calls
+    # `action(store, key, args)` and moves on without waiting for a
+    # return value.
+    # ------------------------------------------------------------------
+    "geolocate": ActionSpec(),
 }
 
 KNOWN_ACTIONS = frozenset(ACTION_REGISTRY)
 
 
-# Stage 3 of "Reactive-core vdom staging" (see docs/DESIGN-NOTES.md):
+# Stage 3 of "Reactive-core vdom staging" (see docs/Foundational/DESIGN-NOTES.md):
 # event modifiers -- a timing/dispatch concern orthogonal to what an
 # action does, so it's solved once as a wrapper around the click
 # dispatcher rather than duplicated into every `ACTION_REGISTRY` entry.
@@ -351,7 +413,25 @@ MODIFIER_REGISTRY: dict[str, ModifierSpec] = {
 KNOWN_MODIFIERS = frozenset(MODIFIER_REGISTRY)
 
 
-# `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12; docs/Foundational/
+# `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md, `docs/
+# version history/v0.064.md`): `State(..., query=..., history=...)`'s
+# `history` prop names how a query-tracked key's writes affect the
+# browser history stack -- `"replace"` (the unmarked default, `State
+# (..., query=...)` with `history` left `None`) calls
+# `history.replaceState(...)`, `"push"` calls `history.pushState(...)`
+# instead, giving that key's changes a real back-button-worthy entry.
+# A small, closed set, same discipline `KNOWN_MODIFIERS` above holds
+# for event-modifier tokens -- but deliberately its own registry, not
+# a reuse of `MODIFIER_REGISTRY`: that one describes per-*event*
+# timing/dispatch tokens attached to an `ActionRef`
+# (`.with_modifiers(...)`/`.debounce(...)`/`.throttle(...)`), which
+# `history=` isn't -- it's a per-*State-declaration* property with no
+# event of its own, so it gets a small dedicated set instead of
+# stretching an unrelated one to fit.
+KNOWN_QUERY_HISTORY_MODES = frozenset({"replace", "push"})
+
+
+# `vdom-4` (REFACTOR-INDEX.md row 12; docs/Foundational/
 # DESIGN-NOTES.md "Computed/derived state"): closed-vocabulary derived
 # state, the same shape discipline as `ACTION_REGISTRY`/
 # `BEHAVIOR_REGISTRY` above -- a new `*Spec` dataclass, a new
@@ -386,6 +466,130 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     "count": DerivationSpec(min_names=1, max_names=1),
     "format": DerivationSpec(min_names=1, max_names=None, extra_args=("template", "names_map")),
     "compare": DerivationSpec(min_names=2, max_names=2, extra_args=("op",)),
+    # `v0.061` (docs/version history/v0.061.md): math siblings of
+    # `sum`/`multiply`. `subtract`/`divide` aren't associative, so
+    # they need at least two names (the first is the starting value,
+    # every later one applies against it in order); `min`/`max` are
+    # associative like `sum`, so one name is already meaningful.
+    "subtract": DerivationSpec(min_names=2, max_names=None),
+    "divide": DerivationSpec(min_names=2, max_names=None),
+    "min": DerivationSpec(min_names=1, max_names=None),
+    "max": DerivationSpec(min_names=1, max_names=None),
+    # `v0.062` (docs/version history/v0.062.md): JS vocabulary
+    # addendum stage 2/10 -- string-casing siblings of `join`/
+    # `format`. Both are single-value transforms, same fixed arity as
+    # `count`.
+    "uppercase": DerivationSpec(min_names=1, max_names=1),
+    "trim": DerivationSpec(min_names=1, max_names=1),
+    # `v0.064` (docs/version history/v0.064.md): JS vocabulary
+    # addendum stage 4/10 -- the math derivations catalog. Unary
+    # transforms take exactly one name; `power`/`percentage_of` are
+    # ordered pairs and `clamp` an ordered triple (value, low, high);
+    # `hypot`/`average`/`median`/`gcd`/`lcm` are variadic; `to_fixed`/
+    # `to_precision` take one name plus a literal `digits` argument
+    # (range-checked in `arklight.ir.validate`).
+    "absolute": DerivationSpec(min_names=1, max_names=1),
+    "ceiling": DerivationSpec(min_names=1, max_names=1),
+    "floor": DerivationSpec(min_names=1, max_names=1),
+    "truncate_number": DerivationSpec(min_names=1, max_names=1),
+    "sign": DerivationSpec(min_names=1, max_names=1),
+    "sqrt": DerivationSpec(min_names=1, max_names=1),
+    "cbrt": DerivationSpec(min_names=1, max_names=1),
+    "power": DerivationSpec(min_names=2, max_names=2),
+    "exp": DerivationSpec(min_names=1, max_names=1),
+    "log": DerivationSpec(min_names=1, max_names=1),
+    "log2": DerivationSpec(min_names=1, max_names=1),
+    "log10": DerivationSpec(min_names=1, max_names=1),
+    "hypot": DerivationSpec(min_names=1, max_names=None),
+    "clamp": DerivationSpec(min_names=3, max_names=3),
+    "average": DerivationSpec(min_names=1, max_names=None),
+    "median": DerivationSpec(min_names=1, max_names=None),
+    "gcd": DerivationSpec(min_names=1, max_names=None),
+    "lcm": DerivationSpec(min_names=1, max_names=None),
+    "percentage_of": DerivationSpec(min_names=2, max_names=2),
+    "to_fixed": DerivationSpec(min_names=1, max_names=1, extra_args=("digits",)),
+    "to_precision": DerivationSpec(min_names=1, max_names=1, extra_args=("digits",)),
+    # `v0.065` (docs/version history/v0.065.md): JS vocabulary addendum
+    # stage 5/10 -- the string derivations catalog. Every kind reads
+    # exactly one name, coerced the way `String(x)` coerces it; the
+    # literal parameters (`length`, `fill`, `search`, ...) ride in `args`
+    # and are checked by `LITERAL_ARG_RULES` below. `is_empty`,
+    # `includes_substring`, `starts_with` and `ends_with` return a
+    # boolean (the source proposal files them as predicates; they ship
+    # here as derivations, per the addendum's `v0.065` section, so a
+    # `Computed(...)` result can feed `Show(Predicate.truthy(...))`).
+    "capitalize": DerivationSpec(min_names=1, max_names=1),
+    "title_case": DerivationSpec(min_names=1, max_names=1),
+    "trim_start": DerivationSpec(min_names=1, max_names=1),
+    "trim_end": DerivationSpec(min_names=1, max_names=1),
+    "pad_start": DerivationSpec(min_names=1, max_names=1, extra_args=("length", "fill")),
+    "pad_end": DerivationSpec(min_names=1, max_names=1, extra_args=("length", "fill")),
+    "repeat": DerivationSpec(min_names=1, max_names=1, extra_args=("count",)),
+    "slice_string": DerivationSpec(min_names=1, max_names=1, extra_args=("start", "end")),
+    "char_at": DerivationSpec(min_names=1, max_names=1, extra_args=("index",)),
+    "replace_first": DerivationSpec(min_names=1, max_names=1, extra_args=("search", "replacement")),
+    "replace_all": DerivationSpec(min_names=1, max_names=1, extra_args=("search", "replacement")),
+    "split_count": DerivationSpec(min_names=1, max_names=1, extra_args=("sep",)),
+    "reverse_string": DerivationSpec(min_names=1, max_names=1),
+    "string_length": DerivationSpec(min_names=1, max_names=1),
+    "includes_substring": DerivationSpec(min_names=1, max_names=1, extra_args=("substring",)),
+    "starts_with": DerivationSpec(min_names=1, max_names=1, extra_args=("substring",)),
+    "ends_with": DerivationSpec(min_names=1, max_names=1, extra_args=("substring",)),
+    "is_empty": DerivationSpec(min_names=1, max_names=1),
+    # `v0.067` (docs/version history/v0.067.md): JS vocabulary addendum
+    # stage 7/10 -- the list-scalar derivations catalog. Every kind reads
+    # exactly one name, a list-valued `State(...)`/`Computed(...)`
+    # (anything that isn't a list reads as an empty one), and reduces it
+    # to one scalar. `list_includes` takes a literal `value`;
+    # `list_any`/`list_all` take one of `COMPARE_OPS` plus a literal
+    # `value` (checked in `arklight.ir.validate`, not a callback).
+    # `list_includes`, `list_any` and `list_all` return a boolean, so
+    # their result can feed `Show(Predicate.truthy(...))`.
+    "list_length": DerivationSpec(min_names=1, max_names=1),
+    "list_min": DerivationSpec(min_names=1, max_names=1),
+    "list_max": DerivationSpec(min_names=1, max_names=1),
+    "list_average": DerivationSpec(min_names=1, max_names=1),
+    "list_first": DerivationSpec(min_names=1, max_names=1),
+    "list_last": DerivationSpec(min_names=1, max_names=1),
+    "list_includes": DerivationSpec(min_names=1, max_names=1, extra_args=("value",)),
+    "list_any": DerivationSpec(min_names=1, max_names=1, extra_args=("op", "value")),
+    "list_all": DerivationSpec(min_names=1, max_names=1, extra_args=("op", "value")),
+    # `v0.068` (docs/version history/v0.068.md): JS vocabulary addendum
+    # stage 8/10 -- cross-language numeric batteries, things JS's own
+    # `Math` has no built-in for at all. `lerp` is an ordered triple
+    # (value `a`, value `b`, weight `t`), same shape as `clamp`;
+    # `midpoint` is an ordered pair. `saturating_add`/`saturating_subtract`
+    # read two state names and take their fixed clamp bounds as literal
+    # `min`/`max` args (checked in `arklight.ir.validate`, `min <= max`).
+    # `value_or` reads one name plus a literal `fallback`. `first_present`
+    # is variadic like `sum`, but needs at least two names -- one name
+    # would just be `value_or` with a fallback of `None`.
+    "lerp": DerivationSpec(min_names=3, max_names=3),
+    "midpoint": DerivationSpec(min_names=2, max_names=2),
+    "saturating_add": DerivationSpec(min_names=2, max_names=2, extra_args=("min", "max")),
+    "saturating_subtract": DerivationSpec(min_names=2, max_names=2, extra_args=("min", "max")),
+    "value_or": DerivationSpec(min_names=1, max_names=1, extra_args=("fallback",)),
+    "first_present": DerivationSpec(min_names=2, max_names=None),
+    # `v0.069` (docs/version history/v0.069.md): JS vocabulary addendum
+    # stage 9/10 -- cross-language formatting/case batteries (Rails-style
+    # inflection and human-readable byte/duration strings). Each reads one
+    # name and takes no literal arguments.
+    "to_ordinal": DerivationSpec(min_names=1, max_names=1),
+    "humanize_bytes": DerivationSpec(min_names=1, max_names=1),
+    "humanize_duration": DerivationSpec(min_names=1, max_names=1),
+    "to_snake_case": DerivationSpec(min_names=1, max_names=1),
+    "to_camel_case": DerivationSpec(min_names=1, max_names=1),
+    "to_kebab_case": DerivationSpec(min_names=1, max_names=1),
+    "to_title_case": DerivationSpec(min_names=1, max_names=1),
+    # `v0.070` (docs/version history/v0.070.md): JS vocabulary addendum
+    # stage 10/10, the capstone -- the two entries the addendum's "Scope
+    # filter" flagged as needing an explicit design exception before they
+    # could ship as written. `pluralize` reads an ordered pair (word,
+    # count); `random_int` is the one `kind` in the whole catalog that
+    # reads zero names at all -- see `arklight/backend/js/derivations/
+    # random_int.py` for why that's still a valid `Computed(...)`.
+    "pluralize": DerivationSpec(min_names=2, max_names=2),
+    "random_int": DerivationSpec(min_names=0, max_names=0, extra_args=("min", "max")),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
@@ -395,21 +599,150 @@ KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
 # `action` are closed vocabularies rather than arbitrary strings.
 COMPARE_OPS = frozenset({"eq", "ne", "gt", "lt", "gte", "lte"})
 
+# `v0.067`: `Derive.list_any(...)`/`Derive.list_all(...)` reuse
+# `COMPARE_OPS` as their whole comparison vocabulary. `eq`/`ne` compare
+# an element strictly (`===`) against any JSON scalar literal; the four
+# relational operators compare the element read as a number against a
+# *numeric* literal, so a list of strings is never ordered by JavaScript's
+# type-coercing `<`.
+LIST_COMPARE_KINDS = frozenset({"list_any", "list_all"})
+LIST_EQUALITY_OPS = frozenset({"eq", "ne"})
 
-# `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): `Show(...)`'s
+# `v0.064`: `Derive.to_fixed(...)`/`Derive.to_precision(...)`'s `digits`
+# is a literal, range-checked at build time to exactly the range
+# JavaScript's own `Number.prototype.toFixed`/`toPrecision` accept --
+# outside it the browser would throw a `RangeError` on every recompute
+# instead of the build failing once, loudly.
+DIGITS_RANGES: dict[str, tuple[int, int]] = {
+    "to_fixed": (0, 100),
+    "to_precision": (1, 100),
+}
+
+
+# `v0.065`: the string catalog's literal parameters. Each is checked once
+# at build time against a rule, so a bad one fails the build instead of
+# throwing on every client recompute (`"x".repeat(-1)` is a `RangeError`)
+# or silently doing something else (`charAt(-1)` is `""`, never a wrap).
+#
+# * `int` rules are exact-integer only (`bool` is rejected) and inclusive
+#   `low`/`high`; `nullable` additionally allows `None` (`slice_string`'s
+#   open-ended `end`).
+# * `str` rules take any string; `non_empty` rejects `""`. `search` must
+#   be non-empty because `"abc".replace("", x)` and `"abc".split("")`
+#   are per-code-unit operations nobody means by "replace this text".
+# * `repeat`/`pad_*` are capped (`STRING_SIZE_LIMIT`) so a typo can't ask
+#   the compiler, or a visitor's browser, for a gigabyte string.
+#
+# `replace_first`/`replace_all` take a *literal* `search`/`replacement`,
+# never a pattern: see `arklight/backend/js/derivations/replace_first.py`.
+STRING_SIZE_LIMIT = 1000
+STRING_INDEX_LIMIT = 2**31 - 1
+
+
+@dataclass(frozen=True)
+class LiteralArgRule:
+    kind: str  # "int" or "str"
+    low: int | None = None
+    high: int | None = None
+    nullable: bool = False
+    non_empty: bool = False
+
+
+_SIZE = LiteralArgRule("int", 0, STRING_SIZE_LIMIT)
+_SIGNED_INDEX = LiteralArgRule("int", -STRING_INDEX_LIMIT, STRING_INDEX_LIMIT)
+_ANY_STR = LiteralArgRule("str")
+_NON_EMPTY_STR = LiteralArgRule("str", non_empty=True)
+
+LITERAL_ARG_RULES: dict[str, dict[str, LiteralArgRule]] = {
+    "pad_start": {"length": _SIZE, "fill": _ANY_STR},
+    "pad_end": {"length": _SIZE, "fill": _ANY_STR},
+    "repeat": {"count": _SIZE},
+    "slice_string": {
+        "start": _SIGNED_INDEX,
+        "end": LiteralArgRule("int", -STRING_INDEX_LIMIT, STRING_INDEX_LIMIT, nullable=True),
+    },
+    "char_at": {"index": LiteralArgRule("int", 0, STRING_INDEX_LIMIT)},
+    "replace_first": {"search": _NON_EMPTY_STR, "replacement": _ANY_STR},
+    "replace_all": {"search": _NON_EMPTY_STR, "replacement": _ANY_STR},
+    "split_count": {"sep": _NON_EMPTY_STR},
+    "includes_substring": {"substring": _ANY_STR},
+    "starts_with": {"substring": _ANY_STR},
+    "ends_with": {"substring": _ANY_STR},
+}
+
+# `v0.068`: `Derive.saturating_add(...)`/`Derive.saturating_subtract(...)`'s
+# `min`/`max` -- literal integer bounds, same `+/-2**53` ceiling
+# `ONE_OF_MAX_INTEGER` gives `Predicate.one_of(...)`'s values (an
+# arbitrarily wide float bound isn't meaningfully different for a UI
+# clamp, and staying integer-only keeps this table's `LiteralArgRule`
+# shape instead of inventing a float-capable one). `min > max` is
+# checked separately in `arklight.ir.validate` -- it isn't expressible
+# as a single-argument `LiteralArgRule`.
+_SATURATING_BOUND = LiteralArgRule("int", -(2**53), 2**53)
+LITERAL_ARG_RULES["saturating_add"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
+LITERAL_ARG_RULES["saturating_subtract"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
+
+# `v0.070`: `Derive.random_int(...)`'s `min`/`max` -- literal integer
+# bounds, same shape and same +/-2**53 ceiling as `saturating_add`/
+# `saturating_subtract`'s bounds just above (a wider float bound isn't
+# meaningfully different for a dice-roll-shaped UI, and staying integer-
+# only keeps reusing this table's existing `LiteralArgRule` shape).
+# `min > max` is checked separately in `arklight.ir.validate`, alongside
+# `saturating_add`/`saturating_subtract`'s own check -- not expressible
+# as a single-argument `LiteralArgRule`.
+LITERAL_ARG_RULES["random_int"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
+
+
+# `vdom-7` (REFACTOR-INDEX.md row 15): `Show(...)`'s
 # closed-vocabulary predicate, the same shape discipline as
-# `DERIVATION_REGISTRY` above but scaled down -- both current kinds
-# take exactly one state/computed name, so a plain `names: int` arity
-# is enough (no need for `DerivationSpec`'s min/max split, since
-# nothing here is variadic yet).
+# `DERIVATION_REGISTRY` above but scaled down.
+#
+# `names` is the exact number of state/computed names a kind takes --
+# or, when `variadic` is true (`v0.066`: `and`/`or`), the *minimum*,
+# with no upper bound. `extra_args` documents the closed set of extra
+# literal data (beyond `names`) a kind's `PredicateRef.args` dict must
+# carry, the same role `DerivationSpec.extra_args` plays (`v0.066`:
+# `one_of`'s `values`).
 @dataclass
 class PredicateSpec:
     names: int = 1
+    variadic: bool = False
+    extra_args: tuple[str, ...] = field(default_factory=tuple)
 
 
 PREDICATE_REGISTRY: dict[str, PredicateSpec] = {
     "truthy": PredicateSpec(names=1),
     "falsy": PredicateSpec(names=1),
+    # `v0.062` (docs/version history/v0.062.md): JS vocabulary
+    # addendum stage 2/10 -- comparison predicates already speced
+    # alongside `Derive.compare`'s `eq/ne/gt/lt/gte/lte` op set, just
+    # never wired into this registry. Each is its own fixed-arity
+    # `kind` (mirrors `truthy`/`falsy`'s shape) rather than one
+    # `compare`-style kind plus an `op` extra arg.
+    "equals": PredicateSpec(names=2),
+    "gt": PredicateSpec(names=2),
+    "lt": PredicateSpec(names=2),
+    # `v0.066` (docs/version history/v0.066.md): JS vocabulary
+    # addendum stage 6/10 -- the predicates catalog. `and`/`or` are the
+    # only variadic kinds (2+ names); `in_range` reads three names in
+    # `Derive.clamp`'s order (value, low, high); `one_of` is the only
+    # kind with an extra arg, a literal `values` list.
+    "and": PredicateSpec(names=2, variadic=True),
+    "or": PredicateSpec(names=2, variadic=True),
+    "not": PredicateSpec(names=1),
+    "in_range": PredicateSpec(names=3),
+    "one_of": PredicateSpec(names=1, extra_args=("values",)),
+    "is_empty": PredicateSpec(names=1),
+    "is_not_empty": PredicateSpec(names=1),
+    "is_null": PredicateSpec(names=1),
 }
 
 KNOWN_PREDICATES = frozenset(PREDICATE_REGISTRY)
+
+# `v0.066`: `Predicate.one_of(...)`'s `values` is a literal list, range-
+# checked once at build time (see `arklight.ir.validate`): at most this
+# many entries, each a JSON scalar. Integers are held to +/-2**53 so the
+# build-time membership test and the browser's `indexOf` (which sees a
+# double) can never disagree about which number a literal is.
+ONE_OF_MAX_VALUES = 1000
+ONE_OF_MAX_INTEGER = 2**53

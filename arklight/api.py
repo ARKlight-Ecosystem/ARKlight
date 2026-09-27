@@ -15,6 +15,7 @@ except `Site`, which is a small registry object.
 from __future__ import annotations
 
 import re
+import sys
 from typing import Any, Callable
 
 from arklight import experimental
@@ -24,10 +25,14 @@ from arklight.ast.nodes import (
     ClassBindSpec,
     DerivationRef,
     ItemIndexRef,
+    ModelBindSpec,
+    PlatformAPIRef,
     PredicateRef,
     node,
+    state_ref,
 )
 from arklight.backend.css import selectors as css_selectors
+from arklight.provider import ProviderDeclaration, register_provider
 
 # v0.042: custom CSS class names must look like a real, single CSS class
 # identifier -- letters/digits/hyphens/underscores, not starting with a
@@ -36,7 +41,7 @@ from arklight.backend.css import selectors as css_selectors
 # selector in generated CSS with no further validation downstream.
 _CSS_CLASS_NAME_RE = re.compile(r"^-?[A-Za-z_][A-Za-z0-9_-]*$")
 
-# CSS Backend, pseudo-class shorthand (see docs/CSS-BACKEND-REFACTOR.md
+# CSS Backend, pseudo-class shorthand (see CSS-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md]
 # "Stage 2"): a `site.style(...)` rules key is either a plain property
 # ("background") or a pseudo-class-scoped property (":hover:background"),
 # letting a class express a simple interactive state without opening up
@@ -100,6 +105,31 @@ ALLOWED_PSEUDO_CLASSES = frozenset(
 _CSS_VALUE_INJECTION_CHARS = frozenset("{};\n")
 
 
+def _check_css_var_value(var_name: str, value: object) -> str:
+    """
+    Return `value` if it is safe to write as `var_name: value;` inside
+    the generated stylesheet's `:root { ... }` block, else raise
+    `ValueError`. Same character set every other CSS-value site in this
+    module (`style()` rules, font families, URLs, media queries) already
+    rejects, for the same reason.
+
+    The design-token overrides (`Site(max_width=...)`, and the CLI's
+    `--max-width`/`--bg`/`--font-family`/`--button-text`) are written
+    into the stylesheet's `:root` block verbatim. Before this, a value
+    like `'red; } body{display:none'` closed the rule early and
+    injected arbitrary CSS after it, with no error.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{var_name} needs a non-empty CSS value string, got {value!r}.")
+    if any(ch in value for ch in _CSS_VALUE_INJECTION_CHARS):
+        raise ValueError(
+            f"{var_name} value {value!r} contains '{{', '}}', ';' or a newline -- that "
+            f"would break out of its declaration. Give a single CSS value "
+            f"(e.g. '90rem', '#0f0f1a')."
+        )
+    return value
+
+
 # Recognized `@page` pseudo-classes for `Site.page_rule(..., pseudo=...)`
 # -- same fixed-set discipline as `ALLOWED_PSEUDO_CLASSES` above.
 ALLOWED_PAGE_PSEUDOS = frozenset({"first", "left", "right", "blank"})
@@ -132,6 +162,24 @@ class CSSSyntaxError(ValueError):
     name, wrong dict shape) can catch it specifically.
     """
 
+
+class DuplicateStyleNameError(ValueError):
+    """
+    Raised by `Site.style(...)` when `name` is already registered in
+    `self.custom_styles`. This used to be silent, unconditional "last
+    call wins" -- the same rule `register_component(...)` used to
+    apply -- which hid two unrelated `site.style(...)` calls
+    accidentally reusing the same class name behind whichever one
+    happened to run last, no error at either call site. Subclasses
+    `ValueError` for the same reason `CSSSyntaxError` does (existing
+    `except ValueError` handling for `Site.style(...)` keeps working),
+    while staying its own type so a caller can distinguish "this name
+    is already taken" from "the CSS in this call is malformed"
+    (`CSSSyntaxError`). Pass `allow_redefine=True` to `Site.style(...)`
+    for the one legitimate case last-call-wins used to serve:
+    deliberately redefining a class as a site file is built up.
+    """
+
 # ---------------------------------------------------------------------------
 # Built-in components
 #
@@ -158,7 +206,7 @@ Item = node("Item")
 # semantic layout, text-level semantics, forms, tables, media. See
 # arklight.ir.schema.SCHEMA for the authoritative list of what each one
 # allows (required props, text-only-children, etc.) and
-# docs/DESIGN-NOTES.md for why these specifically.
+# docs/Foundational/DESIGN-NOTES.md for why these specifically.
 # ---------------------------------------------------------------------------
 
 # Semantic page/section layout.
@@ -222,7 +270,7 @@ Source = node("Source")
 #
 # Same mechanism as everything above -- each is `node("SomeType")`. See
 # arklight.ir.schema.SCHEMA for what each one allows and CHANGELOG.md /
-# docs/DESIGN-NOTES.md for why these specifically.
+# docs/Foundational/DESIGN-NOTES.md for why these specifically.
 # ---------------------------------------------------------------------------
 
 # Lists.
@@ -281,18 +329,230 @@ IFrame = node("IFrame")
 NoScript = node("NoScript")
 
 # ---------------------------------------------------------------------------
+# v0.060, Stage 0: user-defined, reusable components.
+#
+# `component(...)` promotes a plain Python render function into a real,
+# named node type the compiler's own tooling knows about -- see
+# docs/Foundational/USER-DEFINED-COMPONENTS.md ("Option A -- macro
+# expansion") and USER-DEFINED-COMPONENTS-IMPLEMENTATION.md
+# for the staged rollout this belongs to. Re-exported here from
+# arklight.ir.components so `from arklight import *` gives users
+# `component`/`Prop` alongside every built-in component.
+# ---------------------------------------------------------------------------
+
+from arklight.ir.components import (  # noqa: E402
+    ALLOW_REDEFINE_MARKER,
+    ComponentError,
+    ComponentState,
+    Prop,
+    positional_call_message,
+    register_backend_render,
+    register_component,
+)
+
+
+def component(
+    *,
+    props: dict[str, Prop] | None = None,
+    mode: str = "macro",
+    default_style: dict[str, str] | None = None,
+    state: dict[str, Any] | None = None,
+    allow_redefine: bool = False,
+) -> Callable[[Callable[..., Any]], Callable[..., ARKNode]]:
+    """
+    Decorator that registers a render function as a named, reusable
+    component:
+
+        @component(
+            props={"active": Prop(default=None)},
+            default_style={"display": "flex", "gap": "1rem"},
+        )
+        def NavBar(active=None):
+            return Container(
+                Link("Home", href="/"),
+                Link("About", href="/about"),
+            )
+
+    The decorated name (`NavBar`) becomes callable exactly like a
+    built-in component (`NavBar(active="home")`) -- but instead of
+    building its subtree immediately, the call produces a marker
+    `ARKNode(type="NavBar", ...)` that `arklight.ir.components.
+    expand_ark_ast` splices the real, rendered subtree into, before
+    Normalization ever runs. Props are checked against `props=` at
+    expansion time -- an unknown prop or a missing required one fails
+    the build with a clear message instead of a raw Python `TypeError`
+    inside `NavBar` itself.
+
+    `mode="macro"` (the default, Option A) never has a distinct
+    rendering behavior beyond its shared `render_fn`. `mode="registry"`
+    (Option B) is EXPERIMENTAL, and is the only mode that can register
+    a per-backend override -- via `.register_backend(backend_name)` on
+    the value this decorator returns (v0.060, Stage 3; see
+    `arklight.ir.components`'s module docstring and the implementation
+    doc for the full design). A `mode="registry"` component with no
+    backend override registered behaves exactly like `mode="macro"` --
+    it always falls back to its one shared `render_fn`.
+
+    `default_style`, if given (v0.060, Stage 2), is a `{css-property:
+    value}` dict -- the same shape and syntax `Site.style(...)` accepts
+    (pseudo-class shorthand like `":hover:background"` included),
+    validated here up front so a bad rule fails at *registration* time
+    (import time), not buried inside a later build. When the build
+    actually uses this component, its rules are folded into the site's
+    stylesheet under a `.{ComponentName}` class, and that class is
+    folded onto the rendered subtree's own root `class_name`
+    automatically -- see `arklight.ir.components.
+    _apply_default_class`/`collect_default_styles`. A component that
+    never sets `default_style` behaves exactly as it did in Stage 0/1:
+    no class is added, nothing is emitted for it, `class_name=` (if the
+    render function sets one itself) is left completely alone.
+
+    `state`, if given (v0.060, Stage 4 -- see
+    `USER-DEFINED-COMPONENTS-IMPLEMENTATION.md`),
+    declares this component's own local, instance-scoped reactive
+    state: `{local_name: initial_value}` (the common case, mirroring
+    `State("name", initial)`'s own ergonomics), or
+    `{local_name: ComponentState(initial=..., persist=True)}` when an
+    instance needs `persist=True`. The render function references a
+    declared name exactly like a page-level `State(...)` -- `Bind(...)`,
+    `on_click=Action.*(...)`, `bind_class=Bind.when(...)`,
+    `bind_value=Bind.model(...)` -- and every call site gets its own
+    independent copy: two `Accordion(...)` calls on the same page never
+    share one `"open"` value. A component that never sets `state=`
+    behaves exactly as it did in Stage 0-3: it may still *consume*
+    `Bind(...)`/`ActionRef` values a caller passes in as ordinary props
+    from a page that already declares its own `State(...)`, exactly
+    like `Container`/`Button` already do -- it just can't declare new
+    state of its own. Not yet supported inside a `mode="registry"`
+    component's own per-backend override subtree (v0.060 Stage 3) --
+    see `arklight.ir.components.expand_node`'s docstring for the
+    `ComponentError` that use raises today.
+
+    `allow_redefine` (default `False`) -- decorating a name that's
+    already registered raises
+    `arklight.ir.components.DuplicateComponentError` unless this is
+    `True`. This used to be silent, unconditional "last call wins":
+    two components accidentally sharing a name would just have the
+    second one win, with nothing pointing at either `@component(...)`
+    site. Pass `allow_redefine=True` for the one legitimate case that
+    served: re-importing/reloading a components module during
+    iterative development, where redefining `NavBar` really is the
+    point. See `arklight.ir.components.register_component`.
+    """
+    def decorator(render_fn: Callable[..., Any]) -> Callable[..., ARKNode]:
+        name = render_fn.__name__
+        validated_default_style = (
+            _validate_component_default_style(name, default_style)
+            if default_style is not None
+            else None
+        )
+        validated_state = (
+            _validate_component_state(name, state) if state is not None else None
+        )
+        register_component(
+            name,
+            render_fn,
+            props=props,
+            mode=mode,
+            default_style=validated_default_style,
+            state=validated_state,
+            allow_redefine=allow_redefine,
+        )
+
+        declared_prop_names = list(props) if props else []
+
+        def marker(*args: Any, **call_props: Any) -> ARKNode:
+            # v0.06506: `*args` exists only so a positional call site
+            # reaches *this* check -- with a bare `**call_props`
+            # signature, Python itself refuses the call first, with a
+            # "takes 0 positional arguments" `TypeError` that says
+            # nothing about ARKlight's keyword-only rule or what this
+            # component actually accepts.
+            if args:
+                frame = sys._getframe(1)
+                raise ComponentError(
+                    positional_call_message(
+                        name,
+                        args,
+                        declared_prop_names,
+                        caller=f"{frame.f_code.co_filename}:{frame.f_lineno}",
+                    )
+                )
+            return ARKNode(type=name, props=call_props, children=[])
+
+        marker.__name__ = name
+        marker.__qualname__ = name
+        marker.__doc__ = render_fn.__doc__
+        # Read by the site loader's namespace-shadowing check -- see
+        # `arklight.ir.components.ALLOW_REDEFINE_MARKER`.
+        setattr(marker, ALLOW_REDEFINE_MARKER, allow_redefine)
+
+        def register_backend(
+            backend_name: str, *, allow_redefine: bool = False
+        ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            """
+            v0.060, Stage 3. Decorator factory that registers the
+            function it decorates as `name`'s render function for
+            `backend_name` (e.g. `"html"`):
+
+                @component(mode="registry")
+                def NavBar(active=None):
+                    return Container(...)  # shared default
+
+                @NavBar.register_backend("html")
+                def _(active=None):
+                    return Container(..., class_name="html-only-navbar")
+
+            Only available on a `mode="registry"` component -- see
+            `arklight.ir.components.register_backend_render`, which
+            this delegates to (and whose `ComponentError` this raises
+            unchanged for a `mode="macro"` component, matching this
+            decorator's "fail at the registration call, not three
+            stages later" contract with every other decorator here).
+            The decorated function's own name is irrelevant (`_` above
+            is conventional, not required) -- unlike `component(...)`
+            itself, nothing here derives an identity from it.
+
+            `allow_redefine` (default `False`) -- registering a second
+            override for the same `backend_name` on this component
+            raises `arklight.ir.components.DuplicateComponentError`
+            unless this is `True`; see that function's docstring for
+            why this is no longer silent last-registration-wins.
+            """
+            def decorator(backend_render_fn: Callable[..., Any]) -> Callable[..., Any]:
+                register_backend_render(
+                    name, backend_name, backend_render_fn, allow_redefine=allow_redefine
+                )
+                return backend_render_fn
+
+            return decorator
+
+        marker.register_backend = register_backend
+        return marker
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # v0.0035: stateful JS -- capability, not vocabulary.
 #
 # `State`/`Bind`/`Action` are the reactivity primitives: a page declares
 # state, components read it via `Bind`, and `on_click=` mutates it via a
 # closed, described set of `Action.*` helpers (never an arbitrary JS/Python
 # string -- see arklight.ir.schema.ACTION_REGISTRY and
-# docs/DESIGN-NOTES.md, "v0.0035: stateful JS -- capability, not
+# docs/Foundational/DESIGN-NOTES.md, "v0.0035: stateful JS -- capability, not
 # vocabulary", for the full design).
 # ---------------------------------------------------------------------------
 
 
-def State(name: str, initial: Any = None, persist: bool = False) -> ARKNode:
+def State(
+    name: str,
+    initial: Any = None,
+    persist: bool = False,
+    media: str | None = None,
+    query: str | None = None,
+    history: str | None = None,
+) -> ARKNode:
     """
     Declare page-scoped reactive state: `State("count", 0)`.
 
@@ -302,7 +562,7 @@ def State(name: str, initial: Any = None, persist: bool = False) -> ARKNode:
     itself. Validation checks every `Bind(...)`/`Action.*(...)` on the
     page references a `name` declared here.
 
-    `persist=True` (`vdom-8`, docs/Backends/REFACTOR-INDEX.md row 16)
+    `persist=True` (`vdom-8`, REFACTOR-INDEX.md row 16)
     opts this one key into `localStorage` persistence: the shipped
     runtime overrides the server-rendered initial value with whatever
     was last saved under `localStorage["ark:<page-path>:<name>"]` (if
@@ -311,8 +571,105 @@ def State(name: str, initial: Any = None, persist: bool = False) -> ARKNode:
     browsing, quota, a hand-edited non-JSON value) degrade to "this key
     just doesn't persist" -- never a page-breaking error. Off by
     default, unchanged behavior for existing `State(...)` calls.
+
+    `media="(min-width: 768px)"` (`v0.063`) opts this key into
+    `matchMedia`-driven boolean state: as soon as the shipped runtime
+    initializes, it overrides `initial` with
+    `window.matchMedia(media).matches` (the value given here is only
+    ever what a JS-disabled visitor sees -- pick a reasonable
+    server-rendered guess, e.g. `False` for a "wide viewport" query),
+    and attaches one `MediaQueryList` "change" listener per declared
+    media state that keeps writing `State(name)` as the viewport
+    crosses the query's breakpoint, exactly like a window resize
+    listener but native and debounced by the browser itself.
+
+        State("is_wide", False, media="(min-width: 768px)")
+        Show(Predicate.truthy("is_wide"), Text("Desktop layout"))
+
+    A `media=` key is still an ordinary `State(...)` in every other
+    respect -- `Bind(...)`/`bind_class=`/`Show(...)` all read it the
+    same way -- it just also has a second, non-`Action.*(...)` writer.
+    Mutually independent of `persist=True` (both may be set at once,
+    though a media-driven value re-derives itself every load, making
+    persistence for it a no-op in practice). `None` (the default)
+    means this key is plain, non-media-driven state, unchanged
+    behavior for existing `State(...)` calls.
+
+    `query="page"` (`v0.064`, `docs/Proposals/URL-STATE-AS-PRIMITIVE-
+    PROPOSAL.md`) opts this key into two-way URL query-parameter
+    syncing, the primitive this project previously had no authored
+    answer for at all:
+
+        State("page", initial=1, query="page")
+        Text(Bind("page"))
+        Button("Next", on_click=Action.increment("page", 1))
+
+    An extension of the exact same shape `persist=True` already
+    established (a value the compiler can't know at build time,
+    corrected from an external source at runtime, with the same
+    fail-open safety property), just sourced from
+    `new URLSearchParams(location.search)` instead of `localStorage`:
+
+    - *Read*, at page-init (and again on every browser back/forward
+      navigation -- `popstate`, the one genuinely new runtime surface
+      this feature adds, since ARKlight ships no SPA router and
+      nothing before this listened for that event): if the query
+      string carries this key's `query=` parameter, its value
+      overrides `initial`, coerced by `initial`'s own Python type
+      (`int` -> `parseInt`, `bool` -> a `"true"`/`"false"` mapping,
+      `str` -> passthrough -- the same type-carrying mechanism that
+      already lets `Computed(...)` be evaluated at build time). A
+      missing or malformed value silently falls back to the baked
+      `initial`, never a thrown error -- the same "every external-
+      input read in this runtime fails open" invariant `persist`
+      already holds, now a confirmed convention rather than a one-off.
+    - *Write*, on every change (through `Action.*(...)`, exactly as
+      `persist`'s `localStorage` write already does): the shipped
+      runtime calls `history.replaceState(...)` with the updated
+      search string, by default -- never a network request or page
+      navigation. `State`, `Computed`, `Derive`, and every `Action` in
+      this vocabulary are synchronous, in-memory primitives with no
+      navigation step anywhere in them; a query-tagged `State` update
+      stays that way rather than triggering a full reload or an
+      `hx-boost` swap of a document that would, by construction, be
+      byte-for-byte identical to the one already on screen (the
+      compiler never sees the query string -- static file resolution
+      strips it before ARKlight's output is even in the picture).
+
+    `query=` names exactly one flat parameter key -- no nested
+    objects, no array encodings. `None` (the default) means this key
+    is plain, non-query-tracked state, unchanged behavior for existing
+    `State(...)` calls. Mutually independent of `persist=`/`media=`
+    (any combination may be set at once).
+
+    `history="push"` (opt-in; the unmarked default is `"replace"`)
+    gives this key's changes a real, back-button-worthy history entry
+    instead of the default `history.replaceState(...)` -- for e.g. a
+    paginated list, where landing back on an earlier page via the
+    back button is expected, unlike a live-updating search box where
+    every keystroke firing `replaceState` is correct. Only meaningful
+    alongside `query=`; raises at build time if given without it. This
+    is deliberately *not* threaded through `arklight.ir.schema.
+    MODIFIER_REGISTRY` (the `prevent`/`stop`/`once`/`debounce`/
+    `throttle` tokens `.with_modifiers(...)`/`.debounce(...)` attach
+    to an `on_click=`/`bind_value=`) -- that registry describes
+    per-*event* timing/dispatch modifiers on an `ActionRef`, not a
+    per-*State-declaration* property with no event of its own to
+    attach to, so reusing it here would be forcing an unrelated shape
+    onto a different kind of knob rather than genuinely sharing one.
     """
-    return ARKNode(type="State", props={"name": name, "initial": initial, "persist": persist}, children=[])
+    return ARKNode(
+        type="State",
+        props={
+            "name": name,
+            "initial": initial,
+            "persist": persist,
+            "media": media,
+            "query": query,
+            "history": history,
+        },
+        children=[],
+    )
 
 
 def Bind(name: str) -> ARKNode:
@@ -328,7 +685,7 @@ def Bind(name: str) -> ARKNode:
 def _bind_when(state: str, class_name: str) -> ClassBindSpec:
     """
     Reactive class binding (Stage 2 of "Reactive-core vdom staging" --
-    see docs/DESIGN-NOTES.md): `bind_class=Bind.when("active", "is-active")`
+    see docs/Foundational/DESIGN-NOTES.md): `bind_class=Bind.when("active", "is-active")`
     toggles `class_name` on/off as `state`'s truthiness changes,
     without ever touching the element's other static classes. A small
     structured `ClassBindSpec`, not a string -- validated against the
@@ -344,7 +701,7 @@ def _bind_when(state: str, class_name: str) -> ClassBindSpec:
 Bind.when = _bind_when
 
 
-def _bind_model(name: str) -> str:
+def _bind_model(name: str, *, debounce: int | None = None, throttle: int | None = None) -> Any:
     """
     Two-way input binding (`vdom-6`): `bind_value=Bind.model("query")`
     keeps an `Input`'s `value` in sync with `State("query", ...)` in
@@ -362,11 +719,46 @@ def _bind_model(name: str) -> str:
     Only a `State(...)` name is a valid target (mirrors `Action.*(...)`
     's own restriction) -- a `Computed(...)` has no independent value
     of its own for user input to write back into.
+
+    `v0.063`: pass `debounce=<ms>` or `throttle=<ms>` to wait for a
+    pause in typing (or cap the write rate) before a keystroke is
+    written back into state -- reuses the same `debounce`/`throttle`
+    tokens `Action.*(...).debounce(...)`/`.throttle(...)` already
+    validate against `arklight.ir.schema.MODIFIER_REGISTRY`, wired
+    into the shipped `wireModelBinding` instead of the click
+    dispatcher. With neither given, returns the same plain string as
+    before -- only requesting a modifier changes the return type.
+
+        Input(bind_value=Bind.model("query", debounce=300))
     """
-    return name
+    if debounce is None and throttle is None:
+        return name
+    modifiers: list[str] = []
+    if debounce is not None:
+        modifiers.append(f"debounce:{debounce}")
+    if throttle is not None:
+        modifiers.append(f"throttle:{throttle}")
+    return ModelBindSpec(state=name, modifiers=tuple(modifiers))
 
 
 Bind.model = _bind_model
+
+
+def _action_arg(value: Any) -> Any:
+    """
+    A `Bind(name)` handed to an `Action.*(...)` as an argument means
+    "the value `name` holds when the action runs", not a literal --
+    the same reading `Text(Bind("count"))` already gives it wherever a
+    literal value is accepted. Converted here, at construction, to the
+    JSON-safe `{"__state__": name}` marker
+    (`arklight.ast.nodes.state_ref`) so every later stage carries it
+    like any other arg value. Anything else passes through untouched.
+    Whether a given action's argument may take one is decided in
+    Validation (`ActionSpec.state_args`), not here.
+    """
+    if isinstance(value, ARKNode) and value.type == "Bind":
+        return state_ref(value.props["name"])
+    return value
 
 
 class Action:
@@ -387,21 +779,40 @@ class Action:
     `increment`, and "put this state back the way it started" without
     hardcoding the initial value again at every call site (`reset`
     reads the store's own captured initial value). Only the most
-    commonly needed additions; see docs/DESIGN-NOTES.md for what's
+    commonly needed additions; see docs/Foundational/DESIGN-NOTES.md for what's
     deliberately left for a future version.
+
+    Capability fix (live-input -> action-value): `set`'s and
+    `append`'s `value` may be a `Bind("name")` instead of a literal --
+    "whatever `name` holds when the click happens". Paired with
+    `bind_value=Bind.model("draft")` on an `Input`, that is the
+    conventional `[type a task] [Add]` workflow:
+
+        State("draft", "")
+        State("tasks", [])
+        Input(bind_value=Bind.model("draft"))
+        Button("Add", on_click=Action.append("tasks", Bind("draft")))
+        Watch("tasks", then=Action.reset("draft"))   # clear after adding
+
+    Still closed vocabulary: the target must be a `State(...)` or
+    `Computed(...)` declared on the same page (checked at build time),
+    and it is read by name from the store -- never evaluated as an
+    expression. Other actions' arguments (`increment`'s `delta`,
+    `remove`'s `index`) reject a `Bind(...)` at build time. See
+    `docs/Foundational/DESIGN-NOTES.md`.
     """
 
     @staticmethod
     def set(name: str, value: Any) -> ActionRef:
-        return ActionRef(action="set", state=name, args={"value": value})
+        return ActionRef(action="set", state=name, args={"value": _action_arg(value)})
 
     @staticmethod
     def increment(name: str, delta: Any = 1) -> ActionRef:
-        return ActionRef(action="increment", state=name, args={"delta": delta})
+        return ActionRef(action="increment", state=name, args={"delta": _action_arg(delta)})
 
     @staticmethod
     def decrement(name: str, delta: Any = 1) -> ActionRef:
-        return ActionRef(action="decrement", state=name, args={"delta": delta})
+        return ActionRef(action="decrement", state=name, args={"delta": _action_arg(delta)})
 
     @staticmethod
     def toggle_bool(name: str) -> ActionRef:
@@ -414,16 +825,146 @@ class Action:
     @staticmethod
     def append(name: str, value: Any) -> ActionRef:
         """Appends `value` to a list-valued `State(...)`."""
-        return ActionRef(action="append", state=name, args={"value": value})
+        return ActionRef(action="append", state=name, args={"value": _action_arg(value)})
 
     @staticmethod
     def remove(name: str, index: Any) -> ActionRef:
         """Removes the element at `index` from a list-valued `State(...)`."""
-        return ActionRef(action="remove", state=name, args={"index": index})
+        return ActionRef(action="remove", state=name, args={"index": _action_arg(index)})
+
+    @staticmethod
+    def geolocate(name: str) -> ActionRef:
+        """
+        `v0.063`: on click, asks the browser for the visitor's current
+        location (`navigator.geolocation.getCurrentPosition`) and, once
+        the browser's own permission prompt resolves, writes a plain
+        `{"lat": ..., "lng": ...}` object into `State(name)`.
+
+            State("here", None)
+            Button("Find me", on_click=Action.geolocate("here"))
+            Text(Bind("here"))
+
+        Unlike every other action, this one is asynchronous: the write
+        happens some time after the click, not before this dispatch
+        returns -- see `arklight/backend/js/actions/geolocate.py` for
+        why that's safe with the existing "fire and forget" dispatcher.
+        If geolocation isn't available (unsupported browser, insecure
+        context, permission denied), `name`'s value is simply never
+        updated and a small notice is shown -- never a thrown error.
+        """
+        return ActionRef(action="geolocate", state=name, args={})
+
+
+class PlatformAPI:
+    """
+    A closed vocabulary of platform-supplied capabilities (`v0.065`,
+    accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`), for
+    `on_click=`, alongside named behaviors and `Action.*(...)`. Each
+    returns a small structured `PlatformAPIRef` -- validated against
+    `arklight.ir.platform_api.PLATFORM_API_REGISTRY` at compile time,
+    and against the selected backend's own declared support at build
+    time -- never a string of JavaScript/Kotlin/C.
+
+        Button("Notify me", on_click=PlatformAPI.notify("Saved!", body="Your changes were saved."))
+        Button("Copy link", on_click=PlatformAPI.clipboard_write("https://example.com"))
+
+    Unlike `Action.*(...)`, a `PlatformAPI.*(...)` call never targets a
+    declared `State(...)` name -- it asks the *execution platform* to
+    do something (show a notification, touch the clipboard), not the
+    page's own reactive store. See `docs/Foundational/
+    PLATFORM-APIS.md` Section 6 for where this boundary is drawn and
+    why `Action.geolocate` stayed an `Action` rather than becoming the
+    first `PlatformAPI.*(...)` entry.
+
+    Deliberately a small, closed catalogue at acceptance (Section 23
+    of the proposal, "Initial scope"): two capabilities, both
+    implemented today by the Web backend (the reference/default
+    implementation, Section 5) and by neither the Android nor the
+    Linux Desktop backend yet (Section 6/22 -- earned progressively,
+    not granted because the backend exists). Requesting either of
+    these against `android`/`desktop` fails the build with a named
+    diagnostic rather than silently doing nothing -- see
+    `arklight.ir.platform_api.check_backend_support`.
+    """
+
+    @staticmethod
+    def notify(title: str, body: str | None = None) -> PlatformAPIRef:
+        """
+        On click, asks the browser to show a user-visible notification
+        with the given `title` and optional `body` -- the Web
+        implementation of the `notify` platform API interface
+        (`arklight/backend/js/platform_apis/notify.py`), falling back
+        to ARKlight's own in-page notice (`arkNotify`) if the
+        `Notification` API isn't available, and requesting permission
+        the first time it's needed rather than assuming it's already
+        granted.
+        """
+        args: dict[str, Any] = {"title": title}
+        if body is not None:
+            args["body"] = body
+        return PlatformAPIRef(capability="notify", args=args)
+
+    @staticmethod
+    def clipboard_write(text: str) -> PlatformAPIRef:
+        """
+        On click, writes `text` to the system clipboard -- the Web
+        implementation (`arklight/backend/js/platform_apis/
+        clipboard_write.py`) uses `navigator.clipboard.writeText`,
+        showing ARKlight's own in-page notice if clipboard access
+        isn't available rather than failing silently.
+        """
+        return PlatformAPIRef(capability="clipboard_write", args={"text": text})
+
+
+class Provider:
+    """
+    EXPERIMENTAL (`docs/Foundational/EXPERIMENTAL-APIS.md`, feature
+    `provider-integration`). A way for a site to declare that it talks
+    to an external service at runtime (`v0.065`-`v0.070`, six-rung
+    ladder now fully shipped; design record
+    `docs/Foundational/PROVIDER-SDK.md`):
+
+        site = Site(
+            provider=Provider.declare(name="firebase", capabilities=["auth", "read"]),
+        )
+
+    This is a **contract only**. `name` is a free label (not a fixed list
+    of vendors); `capabilities` draws from four finalized well-known
+    names (`arklight.provider.PROVIDER_CAPABILITIES`: `auth`, `read`,
+    `write`, `subscribe`) so a typo still fails the build, plus an open
+    `custom:`-prefixed escape hatch (`v0.070`, stage 6 of 6) for a
+    capability your service needs that those four don't cover --
+    `Provider.declare(name="firebase", capabilities=["auth", "custom:inventory-sync"])`.
+    ARKlight ships no vendor SDK, makes no network calls, has no opinion
+    about auth, and does not implement, audit or guarantee the service
+    the declaration points at -- the concrete implementation is your own
+    code. A declared Provider adds nothing to the generated pages or
+    stylesheet. Its one output is a small read-only config object in
+    `arklight.js`, `window.ARKLIGHT_PROVIDER`
+    (`{name, capabilities}`, deep-frozen), for your own script to read
+    (`Provider` stage 3 of 6). Passing one to `Site(provider=...)` also
+    flags the build as experimental (an inline banner, an end-of-build
+    summary block, and the reports every experimental feature already
+    gets in `arklight.js` and `sbom.txt`).
+
+    The capability vocabulary is finalized as of stage 6 (`v0.070`) --
+    see `arklight/provider.py` for why a closed core plus a namespaced
+    custom prefix, rather than either a fully open or a fully closed
+    set.
+    """
+
+    @staticmethod
+    def declare(*, name: str, capabilities: list[str]) -> ProviderDeclaration:
+        """
+        Build a validated `ProviderDeclaration` for `Site(provider=...)`.
+        Raises `ValueError` for an empty `name`, and for `capabilities`
+        that isn't a non-empty list of known, non-repeated names.
+        """
+        return ProviderDeclaration(name=name, capabilities=capabilities)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
-# `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12): computed/derived state.
+# `vdom-4` (REFACTOR-INDEX.md row 12): computed/derived state.
 #
 # `Computed`/`Derive` close the "derived/computed state" gap named in the
 # `v0.0035` addenda -- a page-scoped value derived from other `State(...)`/
@@ -475,6 +1016,15 @@ class Derive:
                   derive=Derive.format("Hello, {n}!", n="name"))
         Computed("is_over_limit", deps=("count", "limit"),
                   derive=Derive.compare("count", "limit", "gt"))
+        Computed("shout", deps=("name",), derive=Derive.uppercase("name"))
+        Computed("clean_input", deps=("raw",), derive=Derive.trim("raw"))
+        Computed("share", deps=("done", "total"), derive=Derive.percentage_of("done", "total"))
+        Computed("price_text", deps=("price",), derive=Derive.to_fixed("price", 2))
+        Computed("slug", deps=("title",), derive=Derive.replace_all("title", " ", "-"))
+        Computed("is_blank", deps=("query",), derive=Derive.is_empty("query"))
+        Computed("todo_count", deps=("todos",), derive=Derive.list_length("todos"))
+        Computed("best", deps=("scores",), derive=Derive.list_max("scores"))
+        Computed("all_done", deps=("marks",), derive=Derive.list_all("marks", "eq", True))
     """
 
     @staticmethod
@@ -519,9 +1069,552 @@ class Derive:
         """
         return DerivationRef(kind="compare", names=(a, b), args={"op": op})
 
+    @staticmethod
+    def subtract(*names: str) -> DerivationRef:
+        """
+        `v0.061`: `names[0]` minus every later name, in declared
+        order -- `Derive.subtract("total", "discount")` reads as
+        `total - discount`. Not associative like `sum`, so needs at
+        least two names.
+        """
+        return DerivationRef(kind="subtract", names=tuple(names))
+
+    @staticmethod
+    def divide(*names: str) -> DerivationRef:
+        """
+        `v0.061`: `names[0]` divided by every later name, in declared
+        order -- `Derive.divide("total", "count")` reads as
+        `total / count`. Not associative like `sum`, so needs at
+        least two names.
+        """
+        return DerivationRef(kind="divide", names=tuple(names))
+
+    @staticmethod
+    def min(*names: str) -> DerivationRef:
+        """`v0.061`: the smallest of one or more state/computed values."""
+        return DerivationRef(kind="min", names=tuple(names))
+
+    @staticmethod
+    def max(*names: str) -> DerivationRef:
+        """`v0.061`: the largest of one or more state/computed values."""
+        return DerivationRef(kind="max", names=tuple(names))
+
+    @staticmethod
+    def uppercase(name: str) -> DerivationRef:
+        """`v0.062`: the named state/computed value, coerced to a
+        string and upper-cased -- a string-casing sibling of
+        `Derive.join`/`Derive.format`."""
+        return DerivationRef(kind="uppercase", names=(name,))
+
+    @staticmethod
+    def trim(name: str) -> DerivationRef:
+        """`v0.062`: the named state/computed value, coerced to a
+        string with leading/trailing whitespace stripped -- a sibling
+        of `Derive.join`/`Derive.format`."""
+        return DerivationRef(kind="trim", names=(name,))
+
+    # ------------------------------------------------------------------
+    # `v0.064` (docs/version history/v0.064.md): the math derivations
+    # catalog -- JS vocabulary addendum stage 4/10. Inputs are read the
+    # way `sum` reads them (`Number(x) || 0`); results follow JavaScript's
+    # `Math.*` semantics, so an out-of-domain input (`sqrt` of a negative,
+    # `log` of zero) yields `NaN`/`Infinity`, never a build or runtime
+    # error.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def absolute(name: str) -> DerivationRef:
+        """`v0.064`: `Math.abs` of the named value."""
+        return DerivationRef(kind="absolute", names=(name,))
+
+    @staticmethod
+    def ceiling(name: str) -> DerivationRef:
+        """`v0.064`: `Math.ceil` -- round up to the next whole number."""
+        return DerivationRef(kind="ceiling", names=(name,))
+
+    @staticmethod
+    def floor(name: str) -> DerivationRef:
+        """`v0.064`: `Math.floor` -- round down to the previous whole number."""
+        return DerivationRef(kind="floor", names=(name,))
+
+    @staticmethod
+    def truncate_number(name: str) -> DerivationRef:
+        """`v0.064`: `Math.trunc` -- drop the fractional part (rounds
+        toward zero, so `-2.7` becomes `-2`)."""
+        return DerivationRef(kind="truncate_number", names=(name,))
+
+    @staticmethod
+    def sign(name: str) -> DerivationRef:
+        """`v0.064`: `Math.sign` -- `-1`, `0`, or `1`."""
+        return DerivationRef(kind="sign", names=(name,))
+
+    @staticmethod
+    def sqrt(name: str) -> DerivationRef:
+        """`v0.064`: `Math.sqrt` (`NaN` for a negative input)."""
+        return DerivationRef(kind="sqrt", names=(name,))
+
+    @staticmethod
+    def cbrt(name: str) -> DerivationRef:
+        """`v0.064`: `Math.cbrt`, the cube root (defined for negatives)."""
+        return DerivationRef(kind="cbrt", names=(name,))
+
+    @staticmethod
+    def power(base: str, exponent: str) -> DerivationRef:
+        """`v0.064`: `Math.pow` -- `Derive.power("base", "exponent")`
+        reads as `base ** exponent`."""
+        return DerivationRef(kind="power", names=(base, exponent))
+
+    @staticmethod
+    def exp(name: str) -> DerivationRef:
+        """`v0.064`: `Math.exp`, `e ** x`."""
+        return DerivationRef(kind="exp", names=(name,))
+
+    @staticmethod
+    def log(name: str) -> DerivationRef:
+        """`v0.064`: `Math.log`, the natural logarithm (`-Infinity` for
+        `0`, `NaN` for a negative input)."""
+        return DerivationRef(kind="log", names=(name,))
+
+    @staticmethod
+    def log2(name: str) -> DerivationRef:
+        """`v0.064`: `Math.log2`."""
+        return DerivationRef(kind="log2", names=(name,))
+
+    @staticmethod
+    def log10(name: str) -> DerivationRef:
+        """`v0.064`: `Math.log10`."""
+        return DerivationRef(kind="log10", names=(name,))
+
+    @staticmethod
+    def hypot(*names: str) -> DerivationRef:
+        """`v0.064`: `Math.hypot` -- the Euclidean norm
+        `sqrt(a**2 + b**2 + ...)` over one or more values."""
+        return DerivationRef(kind="hypot", names=tuple(names))
+
+    @staticmethod
+    def clamp(value: str, low: str, high: str) -> DerivationRef:
+        """`v0.064`: `min(max(value, low), high)` -- `value` held within
+        `[low, high]`. If `low` is above `high` the result is `high`."""
+        return DerivationRef(kind="clamp", names=(value, low, high))
+
+    @staticmethod
+    def average(*names: str) -> DerivationRef:
+        """`v0.064`: the arithmetic mean of one or more values --
+        complements `Derive.sum`/`Derive.count`."""
+        return DerivationRef(kind="average", names=tuple(names))
+
+    @staticmethod
+    def mean(*names: str) -> DerivationRef:
+        """`v0.064`: alias for `Derive.average` (same `"average"` kind)."""
+        return DerivationRef(kind="average", names=tuple(names))
+
+    @staticmethod
+    def median(*names: str) -> DerivationRef:
+        """`v0.064`: the middle value of one or more values (the mean of
+        the two middle ones for an even count)."""
+        return DerivationRef(kind="median", names=tuple(names))
+
+    @staticmethod
+    def gcd(*names: str) -> DerivationRef:
+        """`v0.064`: greatest common divisor of one or more values,
+        each truncated to a whole number and made non-negative first."""
+        return DerivationRef(kind="gcd", names=tuple(names))
+
+    @staticmethod
+    def lcm(*names: str) -> DerivationRef:
+        """`v0.064`: least common multiple of one or more values, each
+        truncated to a whole number and made non-negative first (`0` if
+        any is `0`)."""
+        return DerivationRef(kind="lcm", names=tuple(names))
+
+    @staticmethod
+    def percentage_of(part: str, whole: str) -> DerivationRef:
+        """`v0.064`: `(part / whole) * 100` -- `Derive.percentage_of(
+        "done", "total")`. A zero `whole` follows JavaScript's float
+        division (`Infinity`/`NaN`), same as `Derive.divide`."""
+        return DerivationRef(kind="percentage_of", names=(part, whole))
+
+    @staticmethod
+    def to_fixed(name: str, digits: int) -> DerivationRef:
+        """`v0.064`: `Number.prototype.toFixed(digits)` -- the value as a
+        **string** with exactly `digits` decimals (`0`-`100`), e.g.
+        `Derive.to_fixed("price", 2)` -> `"9.50"`. For display; a string
+        isn't further arithmetic input."""
+        return DerivationRef(kind="to_fixed", names=(name,), args={"digits": digits})
+
+    @staticmethod
+    def to_precision(name: str, digits: int) -> DerivationRef:
+        """`v0.064`: `Number.prototype.toPrecision(digits)` -- the value
+        as a **string** with `digits` significant digits (`1`-`100`),
+        switching to exponent notation for very large/small values."""
+        return DerivationRef(kind="to_precision", names=(name,), args={"digits": digits})
+
+    # ------------------------------------------------------------------
+    # `v0.065` (docs/version history/v0.065.md): the string derivations
+    # catalog -- JS vocabulary addendum stage 5/10. The input is read the
+    # way `uppercase` reads it (`String(x)`), and results follow
+    # JavaScript's `String.prototype.*`: **indices and lengths count
+    # UTF-16 code units** (`"😀"` is length 2), not characters. Literal
+    # arguments (`length`, `fill`, `search`, ...) are checked at build
+    # time; `replace_*`/`split_count` take a literal substring, never a
+    # regular expression.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def capitalize(name: str) -> DerivationRef:
+        """`v0.065`: uppercase the first letter, leave the rest as it is
+        (`"hello world"` -> `"Hello world"`)."""
+        return DerivationRef(kind="capitalize", names=(name,))
+
+    @staticmethod
+    def title_case(name: str) -> DerivationRef:
+        """`v0.065`: uppercase the first letter of every
+        whitespace-separated word, leave the rest of each word as it is
+        (`"hello wORLD"` -> `"Hello WORLD"`)."""
+        return DerivationRef(kind="title_case", names=(name,))
+
+    @staticmethod
+    def trim_start(name: str) -> DerivationRef:
+        """`v0.065`: `String.prototype.trimStart` -- strip leading
+        whitespace only."""
+        return DerivationRef(kind="trim_start", names=(name,))
+
+    @staticmethod
+    def trim_end(name: str) -> DerivationRef:
+        """`v0.065`: `String.prototype.trimEnd` -- strip trailing
+        whitespace only."""
+        return DerivationRef(kind="trim_end", names=(name,))
+
+    @staticmethod
+    def pad_start(name: str, length: int, fill: str = " ") -> DerivationRef:
+        """`v0.065`: `padStart` -- left-pad to `length` code units
+        (`0`-`1000`) with `fill`, e.g. `Derive.pad_start("n", 3, "0")`
+        turns `"7"` into `"007"`. A longer string, or an empty `fill`,
+        is returned unchanged."""
+        return DerivationRef(
+            kind="pad_start", names=(name,), args={"length": length, "fill": fill}
+        )
+
+    @staticmethod
+    def pad_end(name: str, length: int, fill: str = " ") -> DerivationRef:
+        """`v0.065`: `padEnd` -- right-pad to `length` code units
+        (`0`-`1000`) with `fill`."""
+        return DerivationRef(
+            kind="pad_end", names=(name,), args={"length": length, "fill": fill}
+        )
+
+    @staticmethod
+    def repeat(name: str, count: int) -> DerivationRef:
+        """`v0.065`: `String.prototype.repeat` -- the value `count`
+        times (`0`-`1000`)."""
+        return DerivationRef(kind="repeat", names=(name,), args={"count": count})
+
+    @staticmethod
+    def slice_string(name: str, start: int = 0, end: int | None = None) -> DerivationRef:
+        """`v0.065`: `String.prototype.slice(start, end)` -- negative
+        indices count from the end, `end=None` means "to the end"."""
+        return DerivationRef(
+            kind="slice_string", names=(name,), args={"start": start, "end": end}
+        )
+
+    @staticmethod
+    def char_at(name: str, index: int) -> DerivationRef:
+        """`v0.065`: `String.prototype.charAt(index)` -- one code unit,
+        or `""` past the end. `index` is `>= 0` (`charAt` never wraps
+        around from the end; use `slice_string` for that)."""
+        return DerivationRef(kind="char_at", names=(name,), args={"index": index})
+
+    @staticmethod
+    def replace_first(name: str, search: str, replacement: str) -> DerivationRef:
+        """`v0.065`: replace the first occurrence of the **literal text**
+        `search` with the literal text `replacement`. Not a pattern:
+        `"."` matches a dot, and `$&`/`$1` in `replacement` are plain
+        characters. `search` must be non-empty."""
+        return DerivationRef(
+            kind="replace_first",
+            names=(name,),
+            args={"search": search, "replacement": replacement},
+        )
+
+    @staticmethod
+    def replace_all(name: str, search: str, replacement: str) -> DerivationRef:
+        """`v0.065`: replace every occurrence of the **literal text**
+        `search` -- see `replace_first`. `Derive.replace_all("title",
+        " ", "-")` turns `"a b c"` into `"a-b-c"`."""
+        return DerivationRef(
+            kind="replace_all",
+            names=(name,),
+            args={"search": search, "replacement": replacement},
+        )
+
+    @staticmethod
+    def split_count(name: str, sep: str) -> DerivationRef:
+        """`v0.065`: `split(sep).length` -- how many pieces the literal,
+        non-empty `sep` cuts the value into. `Derive.split_count("t", ",")`
+        over `"a,b,c"` is `3`."""
+        return DerivationRef(kind="split_count", names=(name,), args={"sep": sep})
+
+    @staticmethod
+    def reverse_string(name: str) -> DerivationRef:
+        """`v0.065`: the value reversed by code point (an emoji stays
+        intact; combining marks and joined emoji sequences do not)."""
+        return DerivationRef(kind="reverse_string", names=(name,))
+
+    @staticmethod
+    def string_length(name: str) -> DerivationRef:
+        """`v0.065`: `String.prototype.length` -- UTF-16 code units, so
+        `"😀"` is `2`. (`Derive.count` counts a list's items instead.)"""
+        return DerivationRef(kind="string_length", names=(name,))
+
+    @staticmethod
+    def includes_substring(name: str, substring: str) -> DerivationRef:
+        """`v0.065`: `includes` -- `True` when the value contains the
+        literal `substring`. Yields a boolean, so it can feed
+        `Show(Predicate.truthy(...))`."""
+        return DerivationRef(
+            kind="includes_substring", names=(name,), args={"substring": substring}
+        )
+
+    @staticmethod
+    def starts_with(name: str, substring: str) -> DerivationRef:
+        """`v0.065`: `startsWith` -- `True` when the value begins with
+        the literal `substring`."""
+        return DerivationRef(kind="starts_with", names=(name,), args={"substring": substring})
+
+    @staticmethod
+    def ends_with(name: str, substring: str) -> DerivationRef:
+        """`v0.065`: `endsWith` -- `True` when the value ends with the
+        literal `substring`."""
+        return DerivationRef(kind="ends_with", names=(name,), args={"substring": substring})
+
+    @staticmethod
+    def is_empty(name: str) -> DerivationRef:
+        """`v0.065`: `True` when the value's string form has length 0.
+        Reads the *string* form, so `0` and `False` are not empty; meant
+        for text input (show an empty-state message while a box is
+        blank)."""
+        return DerivationRef(kind="is_empty", names=(name,))
+
+    # ------------------------------------------------------------------
+    # `v0.067` (docs/version history/v0.067.md): the list-scalar
+    # derivations catalog -- JS vocabulary addendum stage 7/10. Each one
+    # reduces a list-valued `State(...)`/`Computed(...)` (such as one
+    # `Action.append(...)` grows) to a single scalar. A value that isn't
+    # a list reads as an empty list. Numeric kinds read each element as
+    # `Number(x) || 0`, and only numbers, strings and booleans are read
+    # (`null`, a nested list or an object count as `0`). Every literal
+    # argument is checked at build time, and `list_any`/`list_all` take
+    # one of the six `compare` operators, never a callback.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def list_length(name: str) -> DerivationRef:
+        """`v0.067`: how many items the list has (`0` for a value that
+        isn't a list). `Derive.count` is the sibling that also measures
+        a string or an object."""
+        return DerivationRef(kind="list_length", names=(name,))
+
+    @staticmethod
+    def list_min(name: str) -> DerivationRef:
+        """`v0.067`: the smallest item, read as a number. An empty list
+        gives `Infinity`, exactly like `Math.min()`."""
+        return DerivationRef(kind="list_min", names=(name,))
+
+    @staticmethod
+    def list_max(name: str) -> DerivationRef:
+        """`v0.067`: the largest item, read as a number. An empty list
+        gives `-Infinity`, exactly like `Math.max()`."""
+        return DerivationRef(kind="list_max", names=(name,))
+
+    @staticmethod
+    def list_average(name: str) -> DerivationRef:
+        """`v0.067`: the arithmetic mean of the items, read as numbers.
+        An empty list is `0 / 0`, so `NaN`. (`Derive.average` is the
+        sibling over several *named* states.)"""
+        return DerivationRef(kind="list_average", names=(name,))
+
+    @staticmethod
+    def list_first(name: str) -> DerivationRef:
+        """`v0.067`: the first item, as it is -- `None` (`null`) for an
+        empty list."""
+        return DerivationRef(kind="list_first", names=(name,))
+
+    @staticmethod
+    def list_last(name: str) -> DerivationRef:
+        """`v0.067`: the last item, as it is -- `None` (`null`) for an
+        empty list."""
+        return DerivationRef(kind="list_last", names=(name,))
+
+    @staticmethod
+    def list_includes(name: str, value: Any) -> DerivationRef:
+        """`v0.067`: `True` when the list holds `value` -- a literal str,
+        bool, `None` or finite number. Strict (`===`), so `1` matches
+        neither `"1"` nor `True`. Yields a boolean, so it can feed
+        `Show(Predicate.truthy(...))`."""
+        return DerivationRef(kind="list_includes", names=(name,), args={"value": value})
+
+    @staticmethod
+    def list_any(name: str, op: str, value: Any) -> DerivationRef:
+        """`v0.067`: `True` when at least one item satisfies the
+        comparison `item <op> value` (`Array.prototype.some`); `False`
+        for an empty list. `op` is one of `arklight.ir.schema.
+        COMPARE_OPS` (`"eq"`/`"ne"`/`"gt"`/`"lt"`/`"gte"`/`"lte"`).
+        `"eq"`/`"ne"` compare the item itself strictly against any
+        literal; the four relational ops compare the item read as a
+        number against a numeric `value`, e.g.
+        `Derive.list_any("scores", "gt", 90)`."""
+        return DerivationRef(kind="list_any", names=(name,), args={"op": op, "value": value})
+
+    @staticmethod
+    def list_all(name: str, op: str, value: Any) -> DerivationRef:
+        """`v0.067`: `True` when every item satisfies `item <op> value`
+        (`Array.prototype.every`) -- see `list_any` for `op`/`value`.
+        An empty list is vacuously `True`, so pair it with
+        `Derive.list_length` if "no items yet" must not count as "all
+        done"."""
+        return DerivationRef(kind="list_all", names=(name,), args={"op": op, "value": value})
+
+    # ------------------------------------------------------------------
+    # `v0.068` (docs/version history/v0.068.md): JS vocabulary addendum
+    # stage 8/10 -- cross-language numeric batteries: things Python's/
+    # Rust's/C++'s standard libraries offer that JS's own `Math` has no
+    # built-in for at all.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def lerp(a: str, b: str, t: str) -> DerivationRef:
+        """`v0.068`: linear interpolation (C++20 `std::lerp`) --
+        `a + t * (b - a)`, with `t == 0` returning exactly `a` and
+        `t == 1` returning exactly `b`. Common for progress-bar/slider/
+        drag-to-scale UI."""
+        return DerivationRef(kind="lerp", names=(a, b, t))
+
+    @staticmethod
+    def midpoint(a: str, b: str) -> DerivationRef:
+        """`v0.068`: `a + (b - a) / 2` (C++20 `std::midpoint`) --
+        overflow-safe average of two values."""
+        return DerivationRef(kind="midpoint", names=(a, b))
+
+    @staticmethod
+    def saturating_add(a: str, b: str, *, min: int, max: int) -> DerivationRef:  # noqa: A002
+        """`v0.068`: `a + b`, clamped to `[min, max]` instead of running
+        past it (Rust `saturating_add`) -- e.g. a quantity stepper that
+        should stop at a ceiling rather than keep climbing. `min` must
+        not be above `max`."""
+        return DerivationRef(kind="saturating_add", names=(a, b), args={"min": min, "max": max})
+
+    @staticmethod
+    def saturating_subtract(a: str, b: str, *, min: int, max: int) -> DerivationRef:  # noqa: A002
+        """`v0.068`: `a - b`, clamped to `[min, max]` instead of running
+        past it (Rust `saturating_sub`) -- e.g. a quantity stepper that
+        should stop at zero rather than go negative. `min` must not be
+        above `max`."""
+        return DerivationRef(
+            kind="saturating_subtract", names=(a, b), args={"min": min, "max": max}
+        )
+
+    @staticmethod
+    def value_or(name: str, fallback: Any) -> DerivationRef:
+        """`v0.068`: the named value, or `fallback` if it's
+        `null`/`undefined`/an empty string (Rust `Option::unwrap_or`) --
+        `Derive.value_or("nickname", "Guest")`. `fallback` is a literal
+        str, bool, `None`, or finite number."""
+        return DerivationRef(kind="value_or", names=(name,), args={"fallback": fallback})
+
+    @staticmethod
+    def first_present(*names: str) -> DerivationRef:
+        """`v0.068`: the first of two or more named values that isn't
+        `null`/`undefined`/an empty string, in order (Rust `Option::or`
+        chains / SQL `COALESCE`) -- generalizes `Derive.value_or` to
+        more than one fallback. If every one is empty, returns the last
+        name's (still-empty) value."""
+        return DerivationRef(kind="first_present", names=tuple(names))
+
+    # `v0.069` (docs/version history/v0.069.md): JS vocabulary addendum
+    # stage 9/10 -- cross-language formatting/case batteries.
+
+    @staticmethod
+    def to_ordinal(name: str) -> DerivationRef:
+        """`v0.069`: an ordinal suffix for a whole number -- `1` -> `"1st"`,
+        `2` -> `"2nd"`, `11` -> `"11th"`, `23` -> `"23rd"`. A non-integer
+        or non-finite value is returned as its plain string."""
+        return DerivationRef(kind="to_ordinal", names=(name,))
+
+    @staticmethod
+    def humanize_bytes(name: str) -> DerivationRef:
+        """`v0.069`: a byte count as a short, binary (1024-based) string --
+        `1536` -> `"1.5 KB"`, `512` -> `"512 B"`, capped at `PB`."""
+        return DerivationRef(kind="humanize_bytes", names=(name,))
+
+    @staticmethod
+    def humanize_duration(name: str) -> DerivationRef:
+        """`v0.069`: a duration in seconds as at most two units --
+        `45` -> `"45s"`, `90` -> `"1m 30s"`, `8100` -> `"2h 15m"`."""
+        return DerivationRef(kind="humanize_duration", names=(name,))
+
+    @staticmethod
+    def to_snake_case(name: str) -> DerivationRef:
+        """`v0.069`: `"HTTPServer"` -> `"http_server"`, `"some kebab"` ->
+        `"some_kebab"` (words joined with `_`, lowercased)."""
+        return DerivationRef(kind="to_snake_case", names=(name,))
+
+    @staticmethod
+    def to_camel_case(name: str) -> DerivationRef:
+        """`v0.069`: `"hello_world"` -> `"helloWorld"`, `"HTTP server"` ->
+        `"httpServer"`."""
+        return DerivationRef(kind="to_camel_case", names=(name,))
+
+    @staticmethod
+    def to_kebab_case(name: str) -> DerivationRef:
+        """`v0.069`: `"HelloWorld"` -> `"hello-world"`."""
+        return DerivationRef(kind="to_kebab_case", names=(name,))
+
+    @staticmethod
+    def to_title_case(name: str) -> DerivationRef:
+        """`v0.069`: `"hello_WORLD"` -> `"Hello World"`. Unlike `title_case`,
+        this lowercases the rest of every word."""
+        return DerivationRef(kind="to_title_case", names=(name,))
+
+    # ------------------------------------------------------------------
+    # `v0.070` (docs/version history/v0.070.md): JS vocabulary addendum
+    # stage 10/10, the capstone -- the two entries the addendum's "Scope
+    # filter" flagged as needing an explicit design exception before they
+    # could ship as written.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def pluralize(word: str, count: str) -> DerivationRef:
+        """`v0.070`: `word`, pluralized for the value held by `count` --
+        `Derive.pluralize("noun", "qty")` with `noun="item"`, `qty=3` ->
+        `"items"`; `qty=1` -> `"item"` unchanged. Ships with a small
+        irregular-noun table (`person` -> `people`, `octopus` ->
+        `octopi`, ...) plus a documented regular-plural-only fallback
+        (`+s`/`+es`/consonant-`y` -> `ies`) -- not exhaustive English
+        pluralization; an irregular noun outside the table falls
+        through to the regular rule."""
+        return DerivationRef(kind="pluralize", names=(word, count))
+
+    @staticmethod
+    def random_int(*, min: int, max: int) -> DerivationRef:  # noqa: A002
+        """`v0.070`: a whole number chosen uniformly at random from
+        `[min, max]` inclusive (`Math.random()` composed with
+        rounding) -- `min` must not be above `max`. The only `Derive.*`
+        kind that reads no state names at all: pair it with a
+        `Computed(..., deps=(trigger,), derive=Derive.random_int(...))`
+        where `trigger` is whatever state should cause a re-roll (an
+        `Action.increment(...)` on a dedicated counter, say).
+
+        **Design exception:** unlike every other derivation, this one
+        is not a pure function of its inputs, so it never agrees with
+        a server-rendered `Bind(...)`'s pre-fill -- it's excluded from
+        build-time pre-rendering entirely and always resolves
+        client-side only, re-rolling the moment the page's JavaScript
+        runs (see `arklight/backend/js/derivations/random_int.py`)."""
+        return DerivationRef(kind="random_int", names=(), args={"min": min, "max": max})
+
 
 # ---------------------------------------------------------------------------
-# `vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13): watch effects.
+# `vdom-5` (REFACTOR-INDEX.md row 13): watch effects.
 #
 # `Watch(...)` closes the "when X changes, also do Y" side-effect gap
 # `Computed(...)` deliberately leaves open (a `Computed(...)` only ever
@@ -561,14 +1654,14 @@ def Watch(name: str, *, then: "ActionRef") -> ARKNode:
 
 
 # ---------------------------------------------------------------------------
-# `vdom-7` (docs/Backends/REFACTOR-INDEX.md row 15): per-item list
+# `vdom-7` (REFACTOR-INDEX.md row 15): per-item list
 # rendering (`Repeat`) + conditional show/hide (`Show`).
 #
 # Both are real, renderable content (unlike `State(...)`/`Computed(...)`/
 # `Watch(...)`, which are page-scoped declarations extracted out of the
 # tree entirely) -- `Repeat(...)`/`Show(...)` appear exactly where their
 # rendered output should go, the same as `Container(...)`/`List(...)`.
-# See `docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.2-6.3 for
+# See `ARCHITECTURE-VDOM.md` [retired -- see CHANGELOG.md] SS6.2-6.3 for
 # the design this follows, and `arklight/backend/js/runtime/repeat.py`/
 # `show.py` for the client-side half.
 # ---------------------------------------------------------------------------
@@ -639,7 +1732,7 @@ def Repeat(name: str, *, template: Callable[[], ARKNode]) -> ARKNode:
     Deliberately scoped to a *single* dynamic value per item (whatever
     `name`'s list elements themselves are, typically a string/number),
     not per-field access into a list of records -- see
-    docs/Backends/REFACTOR-INDEX.md row 15 for what's left for a future
+    REFACTOR-INDEX.md row 15 for what's left for a future
     version.
     """
     return ARKNode(type="Repeat", props={"name": name}, children=[template()])
@@ -654,6 +1747,12 @@ class Predicate:
 
         Show(Predicate.truthy("is_open"), Text("Details go here"))
         Show(Predicate.falsy("is_open"), Text("Click to expand"))
+        Show(Predicate.equals("role", "admin_role"), Text("Welcome, admin"))
+        Show(Predicate.gt("score", "threshold"), Text("You passed!"))
+        Show(Predicate.and_("logged_in", "has_items"), Text("Ready to check out"))
+        Show(Predicate.in_range("age", "min_age", "max_age"), Text("Eligible"))
+        Show(Predicate.one_of("tag", ["news", "sale"]), Text("Featured"))
+        Show(Predicate.is_empty("query"), Text("Type to search"))
     """
 
     @staticmethod
@@ -663,6 +1762,88 @@ class Predicate:
     @staticmethod
     def falsy(name: str) -> PredicateRef:
         return PredicateRef(kind="falsy", names=(name,))
+
+    @staticmethod
+    def equals(a: str, b: str) -> PredicateRef:
+        """`v0.062`: true when the two named state/computed values are
+        `===` equal, mirroring `Derive.compare(a, b, "eq")`'s own
+        semantics but as a standalone predicate kind (no `op=` arg)."""
+        return PredicateRef(kind="equals", names=(a, b))
+
+    @staticmethod
+    def gt(a: str, b: str) -> PredicateRef:
+        """`v0.062`: true when `a`'s value is greater than `b`'s,
+        mirroring `Derive.compare(a, b, "gt")`."""
+        return PredicateRef(kind="gt", names=(a, b))
+
+    @staticmethod
+    def lt(a: str, b: str) -> PredicateRef:
+        """`v0.062`: true when `a`'s value is less than `b`'s,
+        mirroring `Derive.compare(a, b, "lt")`."""
+        return PredicateRef(kind="lt", names=(a, b))
+
+    # `v0.066`: the predicates catalog. Python keywords can't be method
+    # names, so `and`/`or`/`not` are spelled `and_`/`or_`/`not_` here;
+    # the registry kind is still plain `"and"`/`"or"`/`"not"`.
+
+    @staticmethod
+    def and_(*names: str) -> PredicateRef:
+        """`v0.066`: true when *every* named state/computed value is
+        truthy (JavaScript truthiness). Takes two or more names."""
+        return PredicateRef(kind="and", names=tuple(names))
+
+    @staticmethod
+    def or_(*names: str) -> PredicateRef:
+        """`v0.066`: true when *any* named state/computed value is
+        truthy. Takes two or more names."""
+        return PredicateRef(kind="or", names=tuple(names))
+
+    @staticmethod
+    def not_(name: str) -> PredicateRef:
+        """`v0.066`: logical negation of one named value (the same
+        verdict as `Predicate.falsy(name)`; kept because guards built
+        from `and_`/`or_`/`not_` read more naturally together)."""
+        return PredicateRef(kind="not", names=(name,))
+
+    @staticmethod
+    def in_range(name: str, low: str, high: str) -> PredicateRef:
+        """`v0.066`: true when `low <= name <= high`, all three named
+        state/computed values, both ends inclusive. Read as numbers the
+        way `Derive.clamp(name, low, high)` reads them. Argument order
+        matches `Derive.clamp`."""
+        return PredicateRef(kind="in_range", names=(name, low, high))
+
+    @staticmethod
+    def one_of(name: str, values: list | tuple) -> PredicateRef:
+        """`v0.066`: true when the named value is strictly equal (`===`,
+        so `1` is not `True` and `"1"` is not `1`) to one of `values`, a
+        fixed list of literals (`str`/`int`/`float`/`bool`/`None`)."""
+        if isinstance(values, (str, bytes)) or not isinstance(values, (list, tuple)):
+            # `list("abc")` would silently become three one-letter values.
+            raise TypeError(
+                f"Predicate.one_of({name!r}, values) needs values to be a list or "
+                f"tuple of literals, got {type(values).__name__}."
+            )
+        return PredicateRef(kind="one_of", names=(name,), args={"values": list(values)})
+
+    @staticmethod
+    def is_empty(name: str) -> PredicateRef:
+        """`v0.066`: true when the named value is `None`, an empty
+        string, or an empty list. Numbers, booleans and everything else
+        are never empty. Unlike `Derive.is_empty`, `None` counts as
+        empty."""
+        return PredicateRef(kind="is_empty", names=(name,))
+
+    @staticmethod
+    def is_not_empty(name: str) -> PredicateRef:
+        """`v0.066`: the negation of `Predicate.is_empty(name)`."""
+        return PredicateRef(kind="is_not_empty", names=(name,))
+
+    @staticmethod
+    def is_null(name: str) -> PredicateRef:
+        """`v0.066`: true when the named value is `None` (`null`).
+        An empty string is *not* null -- see `is_empty`."""
+        return PredicateRef(kind="is_null", names=(name,))
 
 
 def Show(predicate: PredicateRef, *children: Any) -> ARKNode:
@@ -682,7 +1863,7 @@ def Show(predicate: PredicateRef, *children: Any) -> ARKNode:
     semantic, not a style declaration -- see
     `arklight/backend/js/runtime/show.py`'s module docstring for why
     this is `Show`'s actual mechanism rather than the vnode-swap
-    `docs/new js backend proposal/ARCHITECTURE-VDOM.md` SS6.3 proposes.
+    `ARCHITECTURE-VDOM.md` SS6.3 proposes.
     """
     return ARKNode(type="Show", props={"predicate": predicate}, children=list(children))
 
@@ -781,6 +1962,123 @@ BUILTIN_COMPONENTS = {
 }
 
 
+def _check_css_syntax(context: str, prop: str, value: str) -> None:
+    """
+    Free-function core of `Site._validate_css_syntax` -- syntax-checks
+    one (property, value) pair against the same rules `site.style(...)`
+    has always enforced. `context` is the human-readable prefix an
+    error message opens with (e.g. `"site.style('nav', ...)"`); it's
+    never re-validated itself. Split out (v0.060 Stage 2) so
+    `component(..., default_style=...)` -- registered independently of
+    any `Site` instance, so it has no `self` to call a method on -- can
+    share this exact validation instead of a second, easily-drifting
+    copy of it. `Site._validate_css_syntax` is now a thin wrapper
+    around this.
+    """
+    if prop.startswith(":"):
+        match = _CSS_PSEUDO_RULE_RE.match(prop)
+        if not match:
+            raise CSSSyntaxError(
+                f"{context} has an invalid pseudo-class "
+                f"rule key {prop!r} -- expected the form "
+                f"':pseudo:property', e.g. ':hover:background'."
+            )
+        pseudo = match.group("pseudo")
+        if pseudo not in ALLOWED_PSEUDO_CLASSES:
+            raise CSSSyntaxError(
+                f"{context} uses unsupported pseudo-class "
+                f"{pseudo!r} in {prop!r}. Supported: "
+                f"{', '.join(sorted(ALLOWED_PSEUDO_CLASSES))}."
+            )
+    elif not _CSS_PROPERTY_NAME_RE.match(prop):
+        raise CSSSyntaxError(
+            f"{context} has an invalid CSS property name "
+            f"{prop!r} -- letters, digits, and hyphens only (or a "
+            f"'--custom-property'), and it can't start with a digit."
+        )
+
+    if any(ch in value for ch in _CSS_VALUE_INJECTION_CHARS):
+        raise CSSSyntaxError(
+            f"{context} property {prop!r} has a value "
+            f"{value!r} containing '{{', '}}', or a newline -- that would "
+            f"break out of its declaration. Use one property/value pair "
+            f"per key instead of a raw CSS block."
+        )
+
+
+def _validate_component_default_style(
+    component_name: str, default_style: dict[str, str]
+) -> dict[str, str]:
+    """
+    v0.060, Stage 2: validate `component(..., default_style={...})` the
+    same way `Site.style(name, rules)` validates its own `rules` --
+    same non-empty-dict/non-empty-string-value checks, same
+    `_check_css_syntax` (pseudo-class shorthand included), same
+    `CSSSyntaxError` on a bad pair. Returns a clean, plain `dict` copy
+    on success (never the caller's own dict by reference); raises
+    `ValueError`/`CSSSyntaxError` otherwise. There's no class-name
+    check here the way `Site.style(name, ...)` checks `name` -- a
+    component's name is already a valid Python identifier (it's a
+    function name), and `_CSS_CLASS_NAME_RE` accepts every valid
+    Python identifier ARKlight would ever see here.
+    """
+    if not isinstance(default_style, dict) or not default_style:
+        raise ValueError(
+            f"component {component_name!r}: default_style needs a "
+            f"non-empty dict of {{css-property: value}}, e.g. "
+            f"{{'color': 'red'}}, got {default_style!r}."
+        )
+    clean: dict[str, str] = {}
+    for prop, value in default_style.items():
+        if not isinstance(prop, str) or not prop.strip():
+            raise ValueError(
+                f"component {component_name!r}: default_style has a "
+                f"non-string or empty CSS property name: {prop!r}."
+            )
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"component {component_name!r}: default_style property "
+                f"{prop!r} needs a non-empty string value, got {value!r}."
+            )
+        _check_css_syntax(f"component {component_name!r}: default_style", prop, value)
+        clean[prop] = value
+    return clean
+
+
+def _validate_component_state(
+    component_name: str, state: dict[str, Any]
+) -> dict[str, ComponentState]:
+    """
+    v0.060, Stage 4: validate/normalize `component(..., state={...})`.
+    Each entry is either a bare initial value (`{"open": False}` -- the
+    common case, mirroring `State("open", False)`'s own two-positional-
+    arg ergonomics) or an explicit `ComponentState(initial=False,
+    persist=True)` for the less-common `persist=True` case. Returns a
+    clean `{local_name: ComponentState}` dict (never the caller's own
+    dict by reference) -- same "validate/normalize once, at
+    registration time, so a mistake here is a clear error at import
+    time rather than a ComponentError three build stages later"
+    contract `_validate_component_default_style` already established
+    for `default_style`.
+    """
+    if not isinstance(state, dict) or not state:
+        raise ValueError(
+            f"component {component_name!r}: state needs a non-empty dict of "
+            f"{{local_name: initial_value}} (or {{local_name: "
+            f"ComponentState(initial=..., persist=True)}} for persist=True), "
+            f"got {state!r}."
+        )
+    clean: dict[str, ComponentState] = {}
+    for local_name, value in state.items():
+        if not isinstance(local_name, str) or not local_name:
+            raise ValueError(
+                f"component {component_name!r}: state has a non-string or "
+                f"empty local state name: {local_name!r}."
+            )
+        clean[local_name] = value if isinstance(value, ComponentState) else ComponentState(initial=value)
+    return clean
+
+
 class Site:
     """
     The application object.
@@ -819,6 +2117,9 @@ class Site:
         center_gutter: str | None = None,
         reel_space: str | None = None,
         app_shell: bool = False,
+        strict_csp: bool = True,
+        trusted_script_origins: list[str] | None = None,
+        provider: ProviderDeclaration | None = None,
     ) -> None:
         self.name = name
         # <html lang="..."> for every page this site builds, unless a
@@ -834,7 +2135,7 @@ class Site:
         # `site.style(...)`. Structured input only -- see `style()` below
         # for why this isn't a raw CSS string.
         self.custom_styles: dict[str, dict[str, str]] = {}
-        # Experimental (docs/EXPERIMENTAL-APIS.md): (condition, class_name,
+        # Experimental (docs/Foundational/EXPERIMENTAL-APIS.md): (condition, class_name,
         # rules) triples registered via `site.media_query(...)`, kept
         # separate from `custom_styles` above rather than overloading
         # `style()`'s key syntax -- an experimental escape hatch gets its
@@ -846,7 +2147,7 @@ class Site:
         # "[EXPERIMENTAL FEATURE ACTIVE]" banner and, deduplicated, the
         # end-of-build summary block.
         self.experimental_usages: list = []
-        # EXPERIMENTAL (docs/EXPERIMENTAL-APIS.md): user-supplied
+        # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md): user-supplied
         # `(output_files: dict[str, str]) -> dict[str, str]` callables
         # registered via `site.raw_postprocess(...)`, run in
         # registration order over the *combined* output of every
@@ -858,7 +2159,7 @@ class Site:
         # `:root`-declared `--ark-*` custom properties that `CSSBackend`
         # used to bake in as constants. Both are read by `body`'s *own*
         # rule (`max-width: var(--ark-max-width)`, `background:
-        # var(--ark-bg)`) -- see docs/CONTAINER-WIDTH-BUG.md and the CSS
+        # var(--ark-bg)`) -- see CONTAINER-WIDTH-BUG.md and the CSS
         # backend architecture notes for why that specifically makes them
         # unreachable from any wrapper/descendant override: a CSS custom
         # property only cascades *downward*, and `body` resolves its own
@@ -909,7 +2210,7 @@ class Site:
             if value is not None:
                 self._set_css_var_override(kwarg_name, var_name, value)
 
-        # Structural addendum (see docs/DESIGN-NOTES.md "CSS selector
+        # Structural addendum (see docs/Foundational/DESIGN-NOTES.md "CSS selector
         # algebra + at-rule vocabulary"): storage for the new
         # `Site.style_selector`/`keyframes`/`font_face`/
         # `container_query`/`supports`/`page_rule`/`import_style`
@@ -928,8 +2229,8 @@ class Site:
         self.page_rules: list[tuple[str | None, dict[str, str]]] = []
         self.style_imports: list[str] = []
 
-        # htmx-4 (docs/Backends/REFACTOR-INDEX.md row 9 /
-        # docs/Backends/JS-BACKEND-REFACTOR-PLAN.md "The app-illusion
+        # htmx-4 (REFACTOR-INDEX.md row 9 /
+        # JS-BACKEND-REFACTOR-PLAN.md "The app-illusion
         # problem, stated precisely"): opt-in app-shell navigation for
         # sites that get wrapped in a packaging-backend shell (Android/
         # KaiOS/Desktop) where a full document reload on every internal
@@ -946,15 +2247,128 @@ class Site:
         # `Site(...)` feature flag.
         self.app_shell = bool(app_shell)
 
+        # Runtime policy enforcement (docs/Foundational/WHAT-ARKLIGHT-IS.md's
+        # "Closed-vocabulary" point + docs/Foundational/CONFIGURABILITY.md):
+        # closed-vocabulary/no-eval was already a *compile-time* guarantee
+        # (nothing ARKlight's own compiler emits ever constructs a
+        # function from a string -- see WHAT-ARKLIGHT-IS.md's "Closed-
+        # vocabulary" point). That says nothing about *runtime*: nothing
+        # stopped an injected/compromised script (a browser extension, a
+        # supply-chain-compromised CDN dependency, a future bug) from
+        # calling eval/Function/innerHTML-with-untrusted-content/
+        # document.write once the page is loaded. A strict
+        # Content-Security-Policy meta tag is the browser-enforced
+        # backstop for that gap -- see `arklight/backend/html/csp.py` for
+        # what it declares and, importantly, what it deliberately leaves
+        # alone (style-src is never touched: inline `style="..."` is a
+        # first-class, already-documented escape hatch --
+        # docs/Foundational/CONFIGURABILITY.md -- and restricting it here
+        # would be an unrelated regression, not hardening).
+        #
+        # `strict_csp` defaults to `True` (new default behavior, not
+        # gated behind an opt-in kwarg -- same precedent as htmx-5's
+        # unconditional `htmx.config.allowEval = false`, see
+        # arklight/backend/js/render.py). Per CONFIGURABILITY.md, the
+        # *disallowal* of eval/inline-script itself stays a "safety-
+        # critical, deliberately fixed" non-option -- there's no kwarg
+        # that reintroduces 'unsafe-eval' or 'unsafe-inline'. What a real
+        # site can legitimately need instead:
+        #   - `trusted_script_origins`: additive script-src origins for
+        #     a genuinely trusted external script (an analytics snippet,
+        #     a third-party embed SDK) -- reachability-rule-qualifying,
+        #     since nothing today lets a site add a CSP source at all.
+        #   - `strict_csp=False`: the escape valve for a site whose
+        #     `Site.raw_postprocess(...)` step (EXPERIMENTAL-APIS.md)
+        #     injects inline <script> content the default policy would
+        #     otherwise silently block -- see raw-postprocess's own
+        #     warning text in arklight/experimental.py for why this
+        #     can't be solved with a nonce (ARKlight ships static files;
+        #     a nonce baked into a static build is publicly readable and
+        #     provides no actual protection, unlike a real per-request
+        #     server-rendered nonce), so an explicit opt-out is the
+        #     honest mechanism here, matching how raw_postprocess itself
+        #     is already an explicit, warned, all-or-nothing escape
+        #     hatch rather than a partial one.
+        self.strict_csp = bool(strict_csp)
+        if trusted_script_origins is not None:
+            if not isinstance(trusted_script_origins, list) or not all(
+                isinstance(origin, str) and origin.strip() for origin in trusted_script_origins
+            ):
+                raise ValueError(
+                    "Site(trusted_script_origins=...) needs a list of non-empty strings "
+                    f"(script-src origins), got {trusted_script_origins!r}."
+                )
+            # Bugfix: each origin is spliced verbatim, space-separated,
+            # straight into the `script-src` directive's value
+            # (csp.py::_render_csp_meta_tag) -- so an origin containing
+            # whitespace or a `;` doesn't stay a single script-src
+            # source the way the kwarg's own docs (above) promise it
+            # will. Whitespace silently splits one entry into what
+            # *looks* like two origins; a `;` terminates the `script-src`
+            # directive early and starts an entirely new CSP directive
+            # this module never intended to emit (e.g.
+            # `["evil.example.com; frame-ancestors *"]` adds a
+            # `frame-ancestors` directive from a kwarg that is only
+            # supposed to add script-src origins). Separately, this
+            # comment block states directly that "there's no kwarg that
+            # reintroduces 'unsafe-eval' or 'unsafe-inline'" -- but
+            # nothing enforced that until now, so
+            # `trusted_script_origins=["'unsafe-inline'"]` silently did
+            # exactly that. All three are the same class of bug: a
+            # contract this docstring/comment already makes, that the
+            # code didn't actually keep. Caught here, at Site()
+            # construction (build time), per this project's
+            # fails-loudly-at-build-time-or-not-at-all rule
+            # (docs/README.md's Philosophy section) -- not deferred to
+            # a broken/weakened CSP discovered later in a real browser.
+            for origin in trusted_script_origins:
+                if any(ch.isspace() for ch in origin) or ";" in origin:
+                    raise ValueError(
+                        "Site(trusted_script_origins=...) entries must be a single "
+                        "script-src source with no whitespace or ';' -- "
+                        f"{origin!r} would split into multiple sources or inject a "
+                        "new CSP directive when rendered."
+                    )
+                if origin.strip("'\"").lower() in {"unsafe-inline", "unsafe-eval"}:
+                    raise ValueError(
+                        "Site(trusted_script_origins=...) can't include "
+                        f"{origin!r} -- ARKlight's strict CSP deliberately has no "
+                        "kwarg that reintroduces 'unsafe-inline'/'unsafe-eval' "
+                        "into script-src."
+                    )
+        self.trusted_script_origins: list[str] = list(trusted_script_origins or [])
+
+        # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md, feature
+        # `provider-integration`; `v0.065` `Provider` stage 1): a site
+        # declaring that it talks to an external service. Recorded as
+        # an `ExperimentalUsage` at construction, like `css-import` and
+        # `raw-postprocess` are at registration, so the pipeline's
+        # existing loop prints the inline banner and the CLI's summary
+        # prints the block -- nothing else in the pipeline needs to know.
+        # Stage 1 stores the declaration and emits nothing from it.
+        self.provider: ProviderDeclaration | None = None
+        if provider is not None:
+            if not isinstance(provider, ProviderDeclaration):
+                raise ValueError(
+                    "Site(provider=...) needs the value Provider.declare(name=..., "
+                    f"capabilities=[...]) returns, got {provider!r}."
+                )
+            self.provider = provider
+            # `Provider` stage 5 (`v0.069`): make the declared contract
+            # visible to `arklight search <name>` in this process.
+            register_provider(provider)
+            self.experimental_usages.append(experimental.emit("provider-integration"))
+
     def _set_css_var_override(self, kwarg_name: str, var_name: str, value: str) -> None:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(
                 f"Site({kwarg_name}=...) needs a non-empty CSS value string, "
                 f"got {value!r}."
             )
+        _check_css_var_value(f"Site({kwarg_name}=...)", value)
         self.css_var_overrides[var_name] = value
 
-    def style(self, name: str, rules: dict[str, str]) -> None:
+    def style(self, name: str, rules: dict[str, str], *, allow_redefine: bool = False) -> None:
         """
         Register a real, named, reusable CSS class -- `class_name="name"`
         anywhere in the site then picks up `rules` from the generated
@@ -965,9 +2379,14 @@ class Site:
         already used for the per-node `style={...}` prop -- deliberately
         not a raw CSS string, so this doesn't reopen the "no arbitrary
         CSS/HTML strings" boundary the rest of ARKlight holds. Calling
-        this again with a name that's already registered overwrites the
-        previous rules for that name (last call wins), which lets a site
-        redefine a class as it's built up without needing a separate
+        this again with a name that's already registered raises
+        `DuplicateStyleNameError` unless `allow_redefine=True` is
+        passed -- this used to be silent, unconditional "last call
+        wins", which hid two unrelated `site.style(...)` calls
+        accidentally colliding on the same class name behind whichever
+        one happened to run last. Pass `allow_redefine=True` for the
+        one legitimate case that served: deliberately redefining a
+        class as a site is built up, without needing a separate
         "update" method.
 
         A key may also be a pseudo-class-scoped property, written
@@ -982,6 +2401,16 @@ class Site:
                 f"site.style({name!r}, ...) needs a valid CSS class name -- "
                 f"letters, digits, hyphens, and underscores only, and it "
                 f"can't start with a digit."
+            )
+        if name in self.custom_styles and not allow_redefine:
+            raise DuplicateStyleNameError(
+                f"site.style({name!r}, ...) is already registered. "
+                "Registering it again would silently replace the "
+                "earlier rules -- if that's deliberate, pass "
+                f"allow_redefine=True: site.style({name!r}, rules, "
+                "allow_redefine=True). Otherwise two different calls "
+                f"are colliding on the class name {name!r}; pick a "
+                "different name for one of them."
             )
         if not isinstance(rules, dict) or not rules:
             raise ValueError(
@@ -1004,7 +2433,7 @@ class Site:
 
     def media_query(self, condition: str, class_name: str, rules: dict[str, str]) -> None:
         """
-        EXPERIMENTAL (see `docs/EXPERIMENTAL-APIS.md`) -- register a
+        EXPERIMENTAL (see `docs/Foundational/EXPERIMENTAL-APIS.md`) -- register a
         `@media` block: `.class_name { ... }` rendered inside
         `@media (condition) { ... }` in the generated stylesheet.
 
@@ -1074,36 +2503,16 @@ class Site:
         strings here. Raises `CSSSyntaxError` (a `ValueError` subclass)
         on anything that isn't valid CSS syntax for the shape ARKlight
         accepts; returns `None` on a valid pair.
-        """
-        if prop.startswith(":"):
-            match = _CSS_PSEUDO_RULE_RE.match(prop)
-            if not match:
-                raise CSSSyntaxError(
-                    f"site.style({name!r}, ...) has an invalid pseudo-class "
-                    f"rule key {prop!r} -- expected the form "
-                    f"':pseudo:property', e.g. ':hover:background'."
-                )
-            pseudo = match.group("pseudo")
-            if pseudo not in ALLOWED_PSEUDO_CLASSES:
-                raise CSSSyntaxError(
-                    f"site.style({name!r}, ...) uses unsupported pseudo-class "
-                    f"{pseudo!r} in {prop!r}. Supported: "
-                    f"{', '.join(sorted(ALLOWED_PSEUDO_CLASSES))}."
-                )
-        elif not _CSS_PROPERTY_NAME_RE.match(prop):
-            raise CSSSyntaxError(
-                f"site.style({name!r}, ...) has an invalid CSS property name "
-                f"{prop!r} -- letters, digits, and hyphens only (or a "
-                f"'--custom-property'), and it can't start with a digit."
-            )
 
-        if any(ch in value for ch in _CSS_VALUE_INJECTION_CHARS):
-            raise CSSSyntaxError(
-                f"site.style({name!r}, ...) property {prop!r} has a value "
-                f"{value!r} containing '{{', '}}', or a newline -- that would "
-                f"break out of its declaration. Use one property/value pair "
-                f"per key instead of a raw CSS block."
-            )
+        Thin wrapper around the free function `_check_css_syntax` below
+        -- kept as a method (rather than inlined) so every existing
+        `self._validate_css_syntax(...)` call site in this class is
+        unaffected; the free function exists so `component(...,
+        default_style=...)` (registered independently of any `Site`
+        instance) can reuse the exact same rules -- see
+        `_validate_component_default_style`.
+        """
+        _check_css_syntax(f"site.style({name!r}, ...)", prop, value)
 
     def _validate_plain_rules(self, context: str, rules: dict[str, str]) -> dict[str, str]:
         """
@@ -1248,7 +2657,7 @@ class Site:
         (`::before`), and parameterized pseudo-classes (`:not(.a)`,
         `:has(> .icon)`, `:is(...)`, `:where(...)`, `:nth-child(2n+1)`)
         -- everything `Site.style(...)`'s single flat `.name { }` block
-        can't reach. See docs/DESIGN-NOTES.md ("CSS selector algebra +
+        can't reach. See docs/Foundational/DESIGN-NOTES.md ("CSS selector algebra +
         at-rule vocabulary") for why this is a separate method rather
         than widening `style()` itself.
 
@@ -1304,7 +2713,7 @@ class Site:
         """
         Register a real `@keyframes name { ... }` block -- one of the
         gaps explicitly deferred in earlier design notes ("not silently
-        dropped", see docs/DESIGN-NOTES.md). `transition` itself
+        dropped", see docs/Foundational/DESIGN-NOTES.md). `transition` itself
         already worked (it's just a property value inside `style=`),
         but there was no way to *define* a keyframe sequence to
         transition/animate through.
@@ -1586,7 +2995,7 @@ class Site:
 
     def import_style(self, url: str) -> None:
         """
-        EXPERIMENTAL (see `docs/EXPERIMENTAL-APIS.md`) -- register a
+        EXPERIMENTAL (see `docs/Foundational/EXPERIMENTAL-APIS.md`) -- register a
         sitewide `@import url("...");` statement, emitted first in
         the generated stylesheet (required -- `@import` must precede
         every other rule per the CSS spec, aside from `@charset`).
@@ -1620,48 +3029,59 @@ class Site:
         self, fn: Callable[[dict[str, str]], dict[str, str]]
     ) -> Callable[[dict[str, str]], dict[str, str]]:
         """
-        \u26a0\ufe0f EXPERIMENTAL -- ADVANCED, UNCHECKED ESCAPE HATCH (see
-        `docs/EXPERIMENTAL-APIS.md`). Register a raw postprocessing
-        function that runs directly over the site's *final* output
-        files -- the same combined `{relative_path: contents}` dict
-        every `Backend.postprocess()` gets (see
-        `arklight.backend.base.Backend.postprocess`), except this one
-        is authored by you, not a backend, and runs last: after every
-        backend's own render() + postprocess() pass, in the order
-        `site.raw_postprocess(...)` was called. Whatever `fn` returns
-        replaces the output dict entirely and is written to disk
-        as-is -- add, remove, or rewrite any file, in any way.
+        \u26a0\ufe0f DEPRECATED -- officially removed. `site.raw_postprocess(fn)`
+        no longer registers or runs `fn` at all; it only prints a log
+        pointing at its replacement. See `docs/Foundational/EXPERIMENTAL-APIS.md`,
+        `script-extension`.
 
-        This is an advanced experimental feature. It is recommended to
-        use it wisely: because nothing about `fn`'s output is
-        validated, normalized, or checked against ARKlight's layout
-        model the way every other generated file is, it hands you a
-        million different ways to shoot yourself in the foot -- a
-        stray string replace can silently corrupt every page in the
-        site with no error at build time. Proceed with caution. Every
-        call is flagged: an `[EXPERIMENTAL FEATURE ACTIVE]` banner
-        prints the moment the build detects it, and a summary block
-        prints again at the end of the build.
+        The full-output-dict escape hatch this used to be (`fn` handed
+        the entire combined `{relative_path: contents}` output,
+        whatever it returned written to disk verbatim) is gone. What
+        most callers actually reached for it to do -- add hand-written
+        JS alongside the generated `arklight.js` runtime -- is now
+        `site.register_script_extension(...)`
+        (`arklight.backend.script_extension.ScriptExtension`): a
+        narrower, class-based surface that only ever touches
+        `arklight.js`, never an arbitrary file.
 
-        Can be used directly (`site.raw_postprocess(my_fn)`) or as a
-        bare decorator (`@site.raw_postprocess`) -- either way `fn` is
-        returned unchanged, so decorating doesn't shadow the name.
-
-        Prefer a real `Backend` subclass overriding `postprocess()`
-        instead whenever the transformation is reusable across
-        projects or depends on what another backend already produced
-        -- it gets the exact same second pass with none of the
-        unchecked-arbitrary-code risk. Reach for this only for a
-        genuine one-off that can't be expressed that way.
+        Still validates `fn` is callable and still returns it unchanged
+        (so `@site.raw_postprocess` continues to parse and doesn't
+        shadow the decorated name), but nothing further happens: `fn`
+        is never added to `site.raw_postprocessors`, never runs at
+        build time, and no `ExperimentalUsage` is recorded for it.
         """
         if not callable(fn):
             raise TypeError(
                 f"site.raw_postprocess(fn) needs a callable taking and "
                 f"returning a dict[str, str], got {fn!r}."
             )
-        self.raw_postprocessors.append(fn)
-        self.experimental_usages.append(experimental.emit("raw-postprocess"))
+        print(
+            "[ARKlight] site.raw_postprocess(...) is deprecated and no "
+            "longer registers or runs your function. Use "
+            "site.register_script_extension(...) "
+            "(arklight.backend.script_extension.ScriptExtension) instead -- "
+            "see docs/Foundational/EXPERIMENTAL-APIS.md."
+        )
         return fn
+
+    def register_script_extension(
+        self, extension: "ScriptExtension | type[ScriptExtension]"
+    ) -> "ScriptExtension":
+        """
+        \u26a0\ufe0f EXPERIMENTAL -- see `docs/Foundational/EXPERIMENTAL-APIS.md`,
+        `script-extension`. Class-based successor to
+        `site.raw_postprocess(fn)` for adding hand-written JS alongside
+        the generated `arklight.js` runtime -- see
+        `arklight.backend.script_extension` for the full contract
+        (Svelte-script-only source, OOP subclassing on purpose, the
+        `#include <expapilib.ARKlight>` marker convention). Accepts
+        either a `ScriptExtension` instance or a bare subclass
+        (instantiated with no args), and returns the registered
+        instance.
+        """
+        from arklight.backend.script_extension import register as _register_script_extension
+
+        return _register_script_extension(self, extension)
 
     def page(self, route: str) -> Callable[[Callable[[], ARKNode]], Callable[[], ARKNode]]:
         if not route.startswith("/"):
@@ -1783,6 +3203,8 @@ __all__ = [
     "Area",
     "IFrame",
     "NoScript",
+    "component",
+    "Prop",
     "State",
     "Bind",
     "Action",
@@ -1791,5 +3213,21 @@ __all__ = [
     "Watch",
     "Derive",
     "DerivationRef",
+    # `vdom-7`/`v0.062` (REFACTOR-INDEX.md row 15): these
+    # were defined in this module but missing from `__all__` --
+    # reachable via `arklight.api.Repeat` etc., but not via `from
+    # arklight.api import *`, the same gap `test_package_exports.py`
+    # already found and fixed once for the v0.003 second vocabulary
+    # addendum. `arklight/__init__.py` re-exports all of these too, so
+    # `from arklight import *` (the documented way users are told to
+    # import everything) reaches them as well.
+    "Repeat",
+    "RepeatItem",
+    "Show",
+    "Predicate",
+    "PredicateRef",
+    "ItemIndexRef",
+    "ClassBindSpec",
+    "ModelBindSpec",
     "ARKNode",
 ]

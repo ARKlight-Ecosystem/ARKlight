@@ -26,12 +26,12 @@ job that's finished.
 **v0.54 plan:** all stages (0-9) done -- see that file's own status
 note.
 
-**v0.070 plan:** planning, nothing landed yet.
+**v0.070 plan:** in progress.
 
 | Stage | Scope | Status |
 | --- | --- | --- |
-| 0 | Foundational docs + version-history sync | Not started |
-| 1 | Shared plumbing | Not started |
+| 0 | Foundational docs + version-history sync | Not started (checked: `Foundational/`, version history, and root docs all still differ from alpha's v0.070 commit) |
+| 1 | Shared plumbing | Ported -- not yet import-clean, see plan doc's coupling note; needs Stages 2/4/5 alongside it |
 | 2 | User-defined components (`v0.060`) | Not started |
 | 3 | JS vocabulary ladder, 10 rungs (`v0.061`-`v0.070`) | Not started |
 | 4 | `Provider` SDK, 6 stages (`v0.065`-`v0.070`) | Not started |

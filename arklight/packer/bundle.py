@@ -3,7 +3,7 @@ ARK Bundle packer -- v0.037 ("ARK Bundle spec v1" + sealing).
 
 Packs an already-built ARKlight output directory (whatever `arklight
 build` wrote to disk) into a single `.ark` file: an HTML/[sealed or
-plain ZIP] polyglot. See docs/DESIGN-NOTES.md, "v0.036: ARK Bundle
+plain ZIP] polyglot. See docs/Foundational/DESIGN-NOTES.md, "v0.036: ARK Bundle
 spec v1" and "v0.037: sealed bundles", for the full format writeup and
 rationale.
 
@@ -118,7 +118,7 @@ def _inline_entry_page(entry_html: str, css: str, js: str) -> str:
     # A `</script>` sequence inside the inlined JS would otherwise close
     # the tag early. ARKlight's JS backend only ever emits its own fixed
     # runtime (no arbitrary user JS strings are accepted -- see
-    # docs/DESIGN-NOTES.md), so this should never trigger in practice;
+    # docs/Foundational/DESIGN-NOTES.md), so this should never trigger in practice;
     # it's a defensive escape, not a workaround for a known case.
     safe_js = js.replace("</script>", "<\\/script>")
 

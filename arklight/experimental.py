@@ -1,8 +1,8 @@
 """
-Experimental / legacy API registry -- see `docs/EXPERIMENTAL-APIS.md`.
+Experimental / legacy API registry -- see `docs/Foundational/EXPERIMENTAL-APIS.md`.
 
 ARKlight's default surface is intrinsic-layout-only (see
-`docs/DESIGN-NOTES.md`): nothing in it is keyed to a viewport width,
+`docs/Foundational/DESIGN-NOTES.md`): nothing in it is keyed to a viewport width,
 device class, or browser engine. A feature that steps outside that
 model isn't refused outright, but it isn't silent either -- it has to
 be registered here, and every use prints a warning, both inline (at
@@ -29,6 +29,16 @@ class ExperimentalFeature:
     # Trailing "Legacy API detected" note -- why it's still here /
     # what to prefer instead.
     legacy_note: str
+    # Whether heavy reliance on this feature is a sign of a genuine
+    # missing-feature gap (worth a PR against ARKlight or ACC) rather
+    # than a deliberate, permanent design tradeoff. `css-media-queries`
+    # is the model case of `False`: ARKlight *chose* intrinsic layout
+    # over viewport queries on purpose, so "lots of media-query usage"
+    # isn't a signal anything is missing, just that this project needs
+    # the escape hatch a lot. Defaults to `True` since most features
+    # registered here are, in fact, "we haven't built the real thing
+    # yet" gaps -- see `heavy_reliance_nudge` below.
+    upstream_candidate: bool = True
 
 
 FEATURES: dict[str, ExperimentalFeature] = {
@@ -52,6 +62,9 @@ FEATURES: dict[str, ExperimentalFeature] = {
             ".switcher, .grid, .cluster, .sidebar, or other intrinsic "
             "layout primitives wherever the design can be expressed that way."
         ),
+        # Deliberate, permanent design tradeoff (intrinsic layout over
+        # viewport queries) -- not a gap. Heavy use isn't a PR signal.
+        upstream_candidate=False,
     ),
     "experimental-install-pwa": ExperimentalFeature(
         id="experimental-install-pwa",
@@ -98,30 +111,147 @@ FEATURES: dict[str, ExperimentalFeature] = {
         id="raw-postprocess",
         inline_note="Runs your own code directly over the final output files, completely unchecked by ARKlight.",
         detail_lines=[
-            "This is an advanced experimental feature. It hands your",
-            "function the *entire* dict of generated output files --",
-            "every path, every byte -- after every backend has already",
-            "rendered and postprocessed them, and whatever your function",
-            "returns is written to disk exactly as-is.",
-            "Nothing about it is validated, normalized, or checked against",
-            "ARKlight's layout model, HTML/CSS/JS correctness, or anything",
-            "else the rest of the pipeline guarantees -- it is the single",
-            "widest surface exposed to user code in the whole project.",
-            "Used carelessly, it can give you a million different ways to",
-            "shoot yourself in the foot: a typo can silently corrupt every",
-            "page, strip a <script> tag, or ship broken CSS with no error",
-            "at build time. Use it wisely, and proceed with caution.",
+            "OFFICIALLY DEPRECATED -- Site.raw_postprocess(fn) no longer",
+            "registers or runs anything; calling it only prints a log",
+            "pointing at its replacement. This entry stays registered for",
+            "historical/documentation purposes only (old builds, old docs,",
+            "and anything that still calls experimental.emit(\"raw-postprocess\")",
+            "directly), not because the escape hatch itself still exists.",
+            "",
+            "This used to be an advanced experimental feature that handed",
+            "your function the *entire* dict of generated output files --",
+            "every path, every byte -- after every backend had already",
+            "rendered and postprocessed them, with whatever it returned",
+            "written to disk exactly as-is. Nothing about it was validated,",
+            "normalized, or checked against ARKlight's layout model,",
+            "HTML/CSS/JS correctness, or anything else the rest of the",
+            "pipeline guarantees -- it was the single widest surface",
+            "exposed to user code in the whole project, hence the removal.",
+            "",
+            "What most callers actually used it for -- adding hand-written",
+            "JS alongside the generated arklight.js runtime -- is now",
+            "site.register_script_extension(...)",
+            "(arklight.backend.script_extension.ScriptExtension): narrower,",
+            "class-based, and it only ever touches arklight.js.",
         ],
         legacy_note=(
-            "Not a legacy API in the historical sense -- a raw, unchecked "
-            "escape hatch for the rare transformation that genuinely can't "
-            "be expressed any other way (e.g. a one-off script-based build "
-            "step). If the transformation is reusable or depends on what "
-            "another backend produced, prefer a real Backend subclass "
-            "overriding postprocess() (see arklight.backend.base.Backend) "
-            "instead -- it gets the same second pass with none of the "
-            "unchecked-arbitrary-code risk."
+            "Officially deprecated and removed as of the script-extension "
+            "capability. Site.raw_postprocess(fn) is now a no-op that only "
+            "logs. Prefer site.register_script_extension(...) "
+            "(arklight.backend.script_extension.ScriptExtension) for JS "
+            "injection, or a real Backend subclass overriding postprocess() "
+            "(see arklight.backend.base.Backend) for anything reusable or "
+            "dependent on another backend's output."
         ),
+    ),
+    "script-extension": ExperimentalFeature(
+        id="script-extension",
+        inline_note=(
+            "Hand-written JS, lowered from a Svelte-script-only subclass, "
+            "appended to arklight.js -- unchecked the way every other "
+            "escape hatch here is."
+        ),
+        detail_lines=[
+            "ScriptExtension (arklight.backend.script_extension) is the",
+            "class-based successor to site.raw_postprocess(fn) for the one",
+            "job most raw_postprocess uses were actually for: adding",
+            "hand-written JS alongside the arklight.js runtime every page",
+            "already loads.",
+            "Its surface is narrower than raw_postprocess's -- only the",
+            "<script> portion of Svelte single-file-component syntax is",
+            "accepted, and only arklight.js is ever touched, never an",
+            "arbitrary output file -- but the JS itself is still unchecked:",
+            "no eval, no new Function, but also no guarantee it's even",
+            "syntactically valid, the same as every other hand-written JS",
+            "surface ARKlight ships.",
+            "Usage is expected to carry a '#include <expapilib.ARKlight>'",
+            "marker comment in the subclass's own source file. Missing it",
+            "doesn't block the build -- it just adds one more warning on",
+            "top of this one.",
+        ],
+        legacy_note=(
+            "Not a legacy API -- ScriptExtension is new, offered as the "
+            "narrower, class-based successor to site.raw_postprocess(fn) "
+            "for JS-injection specifically. Flagged for the same reason "
+            "every hand-written-JS escape hatch here is: ARKlight cannot "
+            "validate the script's contents the way it validates its own "
+            "generated runtime."
+        ),
+    ),
+    "provider-integration": ExperimentalFeature(
+        id="provider-integration",
+        inline_note=(
+            "This site declares a Provider -- ARKlight does not implement, "
+            "audit, or guarantee the external service it points at."
+        ),
+        detail_lines=[
+            "A Provider declares that this site talks to an external service",
+            "(a hosted database, an auth service, your own API) at runtime.",
+            "ARKlight only checks the declaration itself against a finalized",
+            "vocabulary of capabilities -- four well-known names, plus a",
+            "custom: prefix for one of your own -- and exposes it to your own",
+            "scripts as window.ARKLIGHT_PROVIDER. It ships no vendor SDK,",
+            "makes no network calls, and does not implement, audit, or",
+            "guarantee the service the declaration points at.",
+            "Networking, authentication, data handling and security are",
+            "entirely the responsibility of whatever concrete implementation",
+            "you supply. ARKlight has no opinion on auth flows, token storage",
+            "or security rules, and takes no responsibility for them.",
+        ],
+        legacy_note=(
+            "Not a legacy API -- Provider is new, and nothing here is being "
+            "kept for backward compatibility yet. It is flagged because the "
+            "external service a site points at is outside anything ARKlight "
+            "can validate; ARKlight itself still does not implement, audit, "
+            "or guarantee that service, whatever capability vocabulary the "
+            "declaration draws from."
+        ),
+        # A deliberate boundary, not a missing-feature gap: the concrete
+        # implementation being the site author's own code is the whole
+        # design (PROVIDER-SDK-PROPOSAL.md, sections 2 and 6). The
+        # heavy-reliance nudge ("open a pull request for your missing
+        # feature") would be the wrong advice to give someone who simply
+        # uses a Provider, the same reasoning `css-media-queries` uses.
+        upstream_candidate=False,
+    ),
+    "provider-scripts": ExperimentalFeature(
+        id="provider-scripts",
+        inline_note="The script's contents can't be validated by ARKlight, and it runs with full page access.",
+        detail_lines=[
+            "Page(scripts=[...]) adds an external <script src=\"...\"> to this",
+            "page's <head> -- the small primitive Provider, stage 4 of 6",
+            "(docs/Foundational/PROVIDER-SDK.md), adds so a real",
+            "vendor SDK (the actual Firebase JS SDK, say) can be loaded at",
+            "all. The referenced file is fetched and run at request time,",
+            "from whatever the URL resolves to then -- unlike everything",
+            "else ARKlight emits, its contents can't be validated ahead of",
+            "time, and once it runs it has the same full page access any",
+            "other same-origin script would.",
+            "Gated separately from provider-integration on purpose:",
+            "declaring a Provider's capability contract carries none of",
+            "this risk by itself, and folding the two together would",
+            "either under-warn script loading or over-warn every plain",
+            "Provider declaration that never needs one.",
+            "The site's own Content-Security-Policy (arklight/backend/",
+            "html/csp.py) still applies -- script-src defaults to 'self',",
+            "so a script src on another origin also needs that origin",
+            "added via Site(trusted_script_origins=[...]), or the build",
+            "will ship a page whose own CSP blocks the tag it just added.",
+        ],
+        legacy_note=(
+            "Not a legacy API -- this is new, gated the same day it's "
+            "introduced. A Page(scripts=[...]) entry is opaque to ARKlight "
+            "the same way an @import URL (css-import) or a Provider's "
+            "external service (provider-integration) is: retained as an "
+            "explicit escape hatch for loading a vendor SDK a declared "
+            "Provider needs, not the default path for anything ARKlight "
+            "can generate itself."
+        ),
+        # Same reasoning as `provider-integration`: needing to load an
+        # external vendor SDK is a deliberate boundary of what a static-
+        # site compiler can own, not a sign ARKlight is missing a
+        # built-in feature.
+        upstream_candidate=False,
     ),
 }
 
@@ -137,7 +267,7 @@ class ExperimentalUsage:
 
 def format_inline_banner(usage: ExperimentalUsage) -> str:
     """The compact, interleaved-with-stage-log banner, printed the
-    moment a feature is detected -- see `docs/EXPERIMENTAL-APIS.md`
+    moment a feature is detected -- see `docs/Foundational/EXPERIMENTAL-APIS.md`
     "CLI contract"."""
     feature = FEATURES[usage.feature_id]
     if usage.component:
@@ -186,7 +316,7 @@ def emit(
         raise KeyError(
             f"{feature_id!r} isn't a registered experimental feature -- "
             f"add it to arklight.experimental.FEATURES first (see "
-            f"docs/EXPERIMENTAL-APIS.md)."
+            f"docs/Foundational/EXPERIMENTAL-APIS.md)."
         )
     usage = ExperimentalUsage(feature_id=feature_id, component=component)
     if on_warning is not None:
@@ -194,9 +324,19 @@ def emit(
     return usage
 
 
-def print_summary(usages: list[ExperimentalUsage], *, file=None) -> None:
+def print_summary(usages: list[ExperimentalUsage], *, file=None, show_nudge: bool = True) -> None:
     """Print one deduplicated end-of-run block per distinct feature
-    id in `usages`, in first-seen order. No-op for an empty list."""
+    id in `usages`, in first-seen order, followed by a heavy-reliance
+    nudge (see `heavy_reliance_nudge`) if warranted. No-op for an empty
+    list.
+
+    `show_nudge=False` suppresses only the nudge line -- the per-
+    feature warning blocks above it always print regardless, since
+    those are the actual safety notice this module exists for. Callers
+    source `show_nudge` from a project's `arklight.config.py`
+    (`CONFIG = {"experimental": {"heavy_reliance_nudge": False}}`) --
+    see docs/Foundational/EXPERIMENTAL-APIS.md.
+    """
     import sys
 
     out = file or sys.stdout
@@ -206,3 +346,56 @@ def print_summary(usages: list[ExperimentalUsage], *, file=None) -> None:
             continue
         seen.add(usage.feature_id)
         print(format_summary_block(usage.feature_id), file=out)
+
+    if not show_nudge:
+        return
+    nudge = heavy_reliance_nudge(usages)
+    if nudge is not None:
+        print(nudge, file=out)
+
+
+# How many total uses of upstream-candidate features (see
+# `ExperimentalFeature.upstream_candidate`) in a single build trip the
+# heavy-reliance nudge. Deliberately a *use* count, not a distinct-
+# feature count: someone calling `Site.raw_postprocess(...)` five
+# times in one project is leaning on the escape hatch just as hard as
+# someone touching two different experimental features once each.
+# Picked small on purpose -- this is a normal, per-build console
+# nudge, not a rare event; it's fine for it to print on every build of
+# a project that's already decided to lean on an escape hatch.
+HEAVY_RELIANCE_THRESHOLD = 3
+
+
+def heavy_reliance_nudge(
+    usages: list[ExperimentalUsage], *, threshold: int = HEAVY_RELIANCE_THRESHOLD
+) -> str | None:
+    """
+    If this build's *upstream-candidate* experimental usages (features
+    with `upstream_candidate=True` -- i.e. ones that represent an
+    actual missing-feature gap, not a deliberate permanent tradeoff
+    like `css-media-queries`) meet `threshold`, return a short nudge
+    pointing at ARKlight's and ACC's GitHub repos as places to file the
+    missing feature instead of leaning on the escape hatch forever.
+    Returns `None` if the threshold isn't met -- most builds print
+    nothing extra here.
+
+    This is a single-build heuristic only: no on-disk log, no
+    across-build history. A project that hits the threshold once will
+    see this every build until its usage drops below it again, which
+    is the intended, non-naggy behavior -- it reflects the project's
+    current reliance, not a one-time trip.
+    """
+    eligible = [usage for usage in usages if FEATURES[usage.feature_id].upstream_candidate]
+    if len(eligible) < threshold:
+        return None
+
+    features_used = sorted({usage.feature_id for usage in eligible})
+    return "\n".join(
+        [
+            "[Rei] Hey, just a heads up -- if you're relying on experimental APIs a lot",
+            f"[Rei] ({len(eligible)} experimental-API uses this build, across: "
+            f"{', '.join(features_used)})",
+            "[Rei] Might be a good idea to open a pull request for your missing feature",
+            "[Rei] In either the ARKlight or ARKlight-Component-Collections GitHub repo",
+        ]
+    )
