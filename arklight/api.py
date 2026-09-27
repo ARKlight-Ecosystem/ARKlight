@@ -32,7 +32,23 @@ from arklight.ast.nodes import (
     state_ref,
 )
 from arklight.backend.css import selectors as css_selectors
+from arklight.backend.css.base_stylesheet import BASE_CSS_BODY
 from arklight.provider import ProviderDeclaration, register_provider
+
+# The default stylesheet ARKlight ships (`base_stylesheet.BASE_CSS_BODY`)
+# already defines a handful of bare, single-class utility selectors --
+# `.card`, `.nav`, `.stack`, etc. `Site.style(...)` must refuse to let a
+# user silently register a *second*, colliding `.name { ... }` under one
+# of those names: because both rules end up at equal specificity, the
+# cascade means the custom rules only win property-by-property, and any
+# built-in property the custom rules didn't set (e.g. `.card`'s
+# `border-radius`) leaks through into the "custom" class uninvited, with
+# nothing to warn about it. Derived from `BASE_CSS_BODY` itself, rather
+# than hand-copied into a second list, so the two can never drift apart
+# as utility classes are added to the default stylesheet.
+RESERVED_UTILITY_CLASSES = frozenset(
+    re.findall(r"(?m)^\.([a-zA-Z][a-zA-Z0-9_-]*)\s*\{", BASE_CSS_BODY)
+)
 
 # v0.042: custom CSS class names must look like a real, single CSS class
 # identifier -- letters/digits/hyphens/underscores, not starting with a
@@ -2389,6 +2405,19 @@ class Site:
         class as a site is built up, without needing a separate
         "update" method.
 
+        The same check, and the same `allow_redefine=True` escape
+        hatch, also applies to `name`s that collide with one of the
+        default stylesheet's own built-in utility classes (`RESERVED_UTILITY_CLASSES`
+        -- currently `.alert`, `.card`, `.center`, `.cluster`,
+        `.fluid-heading`, `.grid`, `.hidden`, `.muted`, `.nav`,
+        `.page`, `.reel`, `.sidebar`, `.switcher`). Without this, a
+        name like `"card"` -- an easy one to reach for -- would
+        register silently, and the two same-specificity `.card { }`
+        rules would merge property-by-property in the generated
+        stylesheet rather than the custom one fully replacing the
+        built-in, leaving a class that's neither fully the user's
+        design nor fully the default.
+
         A key may also be a pseudo-class-scoped property, written
         ":<pseudo>:<property>" (e.g. ":hover:background"), to reach a
         simple interactive state -- `site.style("btn", {"background":
@@ -2411,6 +2440,20 @@ class Site:
                 "allow_redefine=True). Otherwise two different calls "
                 f"are colliding on the class name {name!r}; pick a "
                 "different name for one of them."
+            )
+        if name in RESERVED_UTILITY_CLASSES and not allow_redefine:
+            raise DuplicateStyleNameError(
+                f"site.style({name!r}, ...) collides with a built-in "
+                f"utility class of the same name that ARKlight's default "
+                f"stylesheet already ships. Registering it anyway would "
+                f"silently merge with the built-in '.{name}' rule instead "
+                f"of replacing it -- both end up at equal CSS specificity, "
+                f"so your custom rules only win property-by-property, and "
+                f"any built-in property you didn't set leaks through "
+                f"uninvited. Pick a different name, or pass "
+                f"allow_redefine=True: site.style({name!r}, rules, "
+                f"allow_redefine=True) if you specifically mean to "
+                f"override ARKlight's own '.{name}' rules."
             )
         if not isinstance(rules, dict) or not rules:
             raise ValueError(

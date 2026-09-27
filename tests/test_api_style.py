@@ -29,6 +29,23 @@ def test_style_called_twice_with_allow_redefine_overwrites():
     assert site.custom_styles == {"brand": {"color": "blue"}}
 
 
+def test_style_colliding_with_reserved_utility_class_raises():
+    site = Site()
+
+    with pytest.raises(DuplicateStyleNameError, match="built-in"):
+        site.style("card", {"background": "#1F2E27"})
+
+    # The failed call didn't register anything.
+    assert site.custom_styles == {}
+
+
+def test_style_colliding_with_reserved_utility_class_allows_redefine():
+    site = Site()
+    site.style("card", {"background": "#1F2E27"}, allow_redefine=True)
+
+    assert site.custom_styles == {"card": {"background": "#1F2E27"}}
+
+
 def test_style_two_different_names_both_kept():
     site = Site()
     site.style("brand", {"color": "red"})
