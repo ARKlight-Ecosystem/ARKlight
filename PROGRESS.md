@@ -100,6 +100,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | v0.06616 | Capability fix: `Provider`, stage 6 of 6 (capstone) -- capability vocabulary finalized. Resolves proposal open question §7.2: `PROVIDER_CAPABILITIES` (`auth`, `read`, `write`, `subscribe`) is locked in as-is (audited stages 2-5's own usage; none needed a fifth well-known name), and the word "provisional" is retired from `arklight/provider.py`, `arklight/ir/validate.py` and `arklight/experimental.py`. Also opens a namespaced escape hatch the proposal's four-name ceiling didn't otherwise allow for: a `custom:`-prefixed capability (`Provider.declare(capabilities=["auth", "custom:inventory-sync"])`) names something a site's own service needs that the four well-known names don't cover, the same way a user-defined component covers markup ARKlight has no built-in name for. Researched against two precedents before landing on this shape: LSP's `experimental`/vendor-namespaced capability keys, and OAuth's `custom:`-prefixed scope convention (both: closed core, explicit separate namespace for anything added on top). An unprefixed name is still checked strictly against the closed four -- `"raed"` still fails as unknown, not silently accepted as a new custom word -- so the typo discipline the original closed set existed for is unchanged; `custom:read` (reusing a well-known name under the prefix) gets its own error pointing at the unprefixed form. `arklight/provider.py` (`CUSTOM_CAPABILITY_PREFIX`, `is_custom_capability`, `is_known_capability`), `arklight/ir/validate.py` (`validate_provider` re-check updated), `arklight/api.py` (`Provider.declare` docstring), `arklight/experimental.py` (`provider-integration` wording), `arklight/cli/search.py` (`_format_provider_spec` now tags `(custom)` capabilities). New, dedicated `tests/test_provider_custom_capability.py` (45 tests) covers the finalized vocabulary and the `custom:` path end to end; full suite 2959 passed, no regressions (the 1 failure on this checkout, `test_doc_citations.py::test_live_docs_citations_resolve` on the pre-existing `SEARCH-RETRIEVE-DOC-ADDENDUM.md` citation, is pre-existing, confirmed unchanged against a clean-checkout baseline of 2914 passed/1 failed -- this pass's own doc-citation fallout, elsewhere, is fixed rather than left as new instances of that same failure). Closes the six-rung `Provider` ladder: its accepted proposal and implementation addendum are retired from `docs/Proposals/`/`docs/Implementation/` and graduated into the settled design record `docs/Foundational/PROVIDER-SDK.md`; `docs/version history/v0.070.md` rewritten to the shipped-`Provider`/PLANNED-JS-vocabulary split (same precedent as `v0.064.md`), and index rows updated in `docs/README.md`/`docs/Foundational/README.md`/`docs/Implementation/README.md`/`docs/Proposals/README.md`. `0.069` -> `0.06616`; out-of-band, no roadmap row of its own, roadmap `v0.070` untouched (JS vocabulary stage 10/10 remains PLANNED) | DONE |
 | v0.065 (interleaved third piece) | Rei, the compiler narrator -- `--narrate` flag on `arklight build` (sibling to `--verbose`/`--debug`) narrating pipeline stages in natural language, plus a `rei` config section (`default_mode`) for a project-wide default log mode -- see `docs/version history/v0.065.md`. One version, no ladder; accepted and interleaved into `v0.065` after the other two pieces above were already reserved there, same "make room for one more" precedent as `v0.041`/`v0.064` | DONE (shipped as `0.06510`) |
 | v0.065 (interleaved fourth piece) | Platform API IR, stage 1 of 2: Web reference implementation -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)` on `on_click=`, compiler-owned interface registry (`arklight.ir.platform_api`), validation, HTML attribute compilation, Web JS fragments + click-dispatch wiring, and `check_backend_support` actually enforced during a build -- `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`, accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`. Stage 2 (Android/Desktop native implementations) stays unscheduled, gated on each backend's own maturity. Interleaved into `v0.065` as a fourth piece, same "make room for one more" precedent as Rei above | DONE |
+| (docs audit) | Docs-only: repository-layout drift fix -- `arklight/provider.py` added to `docs/Foundational/GETTING-STARTED.md`'s repository-layout tree (was missing despite `Provider`'s six-rung ladder being fully SHIPPED as of `v0.070`); everything else audited (doc-link/citation tests, CLI-REFERENCE vs. `--help`, full test suite, version-history PLANNED markers, `pyproject.toml` vs. `CHANGELOG.md`) came back clean. No code changed; out-of-band, no roadmap slot | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
@@ -133,6 +134,41 @@ go-ahead before implementation starts on any of these:
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
+
+## Docs audit -- repository-layout drift fix (DONE)
+
+Ran a documentation drift audit against the current `alpha` checkout
+(this branch). Leaned on the project's own existing automated
+drift-checks rather than re-deriving them: `tests/test_doc_links.py`,
+`tests/test_doc_citations.py`, and `tests/test_link_check.py` all
+passed (43/43 combined), and the full suite passed clean (3076/3076).
+
+Spot-checked the things those tests don't cover:
+
+- `docs/Foundational/CLI-REFERENCE.md`'s subcommand list against
+  `arklight --help`'s actual output -- matches exactly (`build`,
+  `pack`, `unpack`, `pwa`, `android`, `desktop`, `deploy`, `new`,
+  `search`, `live-streaming`, `--version`, `--upgrade-alpha`).
+- `pyproject.toml`'s `version = "0.070"` against `CHANGELOG.md`'s last
+  *closed* milestone (`[0.070]`) -- consistent; everything past it is
+  correctly still filed under `Unreleased`.
+- `docs/version history/v0.071.md`-`v0.078.md` -- correctly marked
+  `Status: PLANNED -- not yet started`, not misrepresented as shipped.
+- Each doc folder's own `README.md` index against the files actually
+  present in that folder -- no missing or orphaned entries once
+  cross-folder mentions (e.g. `docs/Foundational/README.md` noting a
+  proposal/addendum pair as "now-retired") are excluded.
+
+Found one real drift: `arklight/provider.py` -- the `Provider` SDK,
+fully SHIPPED as of `v0.070` (six-rung ladder, settled design record
+at `docs/Foundational/PROVIDER-SDK.md`) -- was absent from
+`docs/Foundational/GETTING-STARTED.md`'s annotated repository-layout
+tree, even though sibling top-level modules of the same kind
+(`capabilities.py`, `experimental.py`, `pwa.py`) are all listed there.
+Same class of omission `v0.0645` fixed for `capabilities.py` at the
+time. Fixed by adding a `provider.py` row in the same annotation
+style, pointing at `PROVIDER-SDK.md`. No code changed. Out-of-band,
+no roadmap slot -- this is a docs-correctness pass, not a feature.
 
 ## v0.079 -- `arklight assistant` Miko MVP, Stage A (PLANNED)
 
