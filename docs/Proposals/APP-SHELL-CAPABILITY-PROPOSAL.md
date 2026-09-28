@@ -3,8 +3,9 @@
 
 ## Status
 
-Proposed. Not accepted, not staged, not scheduled against a version.
-Filed to give "should ARKlight get closer to SPA-shaped UX" a decision
+**Accepted, staged in
+[`docs/Implementation/APP-SHELL-ADDENDUM.md`](../Implementation/APP-SHELL-ADDENDUM.md)**
+(`S1`-`S6`, no version slots reserved yet). Originally filed to give "should ARKlight get closer to SPA-shaped UX" a decision
 record instead of a recurring conversation.
 
 ## The actual question
@@ -134,3 +135,18 @@ a way to keep pushing the *illusion* further, on purpose, while making
 the line between "boosted navigation" and "a router" a checked thing
 instead of a debate that recurs every time someone asks for SPA-shaped
 UX.
+
+## Amendments on acceptance
+
+Two items were added to the candidate list when this was accepted, and
+the fine-grained-tracking candidate was narrowed:
+
+- **Global-scope persistence** (`State(..., persist=True,
+  scope="global")`) -- `persist=True` keys are path-prefixed today, so
+  a value does not follow the visitor between pages. Serializable
+  values only; live non-serializable objects stay out of scope.
+- **Static-params routes** -- build-time enumeration of a finite page
+  set from one route definition. Explicitly not a runtime matcher.
+- **Fine-grained tracking** is scoped to the *lookup* step (key-scoped
+  updates via a per-page binding index), not to how updates are
+  applied. `Show` keeps its `hidden` toggle.
