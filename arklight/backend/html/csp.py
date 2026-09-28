@@ -60,18 +60,30 @@ What it does set, and why each line is safe for every existing site:
   `<object>`/`<embed>`.
 - `base-uri 'self'` -- prevents a `<base>` tag (injected some other
   way) from silently rewriting every relative URL on the page.
-- `trusted-types default; require-trusted-types-for 'script'` -- the
-  actual browser mechanism for locking down `innerHTML`/`outerHTML`/
-  `insertAdjacentHTML`/`document.write`/etc: once declared, the browser
-  refuses to let a *plain string* flow into any of those sinks at all,
-  from any script, unless it was produced by a registered
-  `TrustedTypePolicy`. ARKlight's vendored HTMX (`htmx.py`) already
-  avoids the covered sinks for its core swap path (it parses via
-  `DOMParser`, not `innerHTML=`, and `Q.config.includeIndicatorStyles =
-  false` -- see `arklight/backend/js/render.py` -- removes the one
-  remaining `insertAdjacentHTML` call it would otherwise make), so no
-  default policy needs registering here: there's nothing left in
-  ARKlight's own runtime for one to allow.
+- `trusted-types default arklight-htmx; require-trusted-types-for
+  'script'` -- the actual browser mechanism for locking down
+  `innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`/etc:
+  once declared, the browser refuses to let a *plain string* flow into
+  any of those sinks at all, from any script, unless it was produced by
+  a registered `TrustedTypePolicy`. **`DOMParser.parseFromString()` and
+  `Document.parseHTMLUnsafe()` are sinks too** (MDN lists both), and
+  vendored HTMX's response parse `I()` calls one or the other on every
+  boosted navigation -- an earlier version of this docstring claimed the
+  DOMParser path was exempt, which is wrong: with enforcement on and no
+  policy, the parse throws a `TypeError`, nothing swaps, and every
+  `Site(app_shell=True)` link looked dead in Chromium/Android WebView.
+  `arklight-htmx` is the one named policy that closes that gap: the
+  vendored HTMX (`arklight/backend/js/htmx.py`, `_apply_trusted_types_patch`)
+  creates it inside its own closure -- so nothing else on the page can
+  reach it -- and routes exactly its own sinks through it (the response
+  parse, the `hx-preserve` pantry `insertAdjacentHTML`, and
+  `<script>` re-creation). The name has to be allow-listed here or
+  `createPolicy` throws and HTMX falls back to plain strings (which
+  reproduces the dead-link failure). `default` stays allow-listed
+  exactly as before this change; nothing in ARKlight registers it.
+  A blanket `default` policy was deliberately *not* used to fix this: it
+  would be applied to every sink on the page and switch enforcement off
+  in practice.
 
 **Graceful degradation is the browser's job, not this module's.** CSP
 directives degrade per-directive by spec: a browser that doesn't
@@ -124,7 +136,7 @@ def _render_csp_meta_tag(trusted_script_origins: list[str] | None = None) -> str
         f"script-src {script_src}",
         "object-src 'none'",
         "base-uri 'self'",
-        "trusted-types default",
+        "trusted-types default arklight-htmx",
         "require-trusted-types-for 'script'",
     ]
     policy = "; ".join(directives)

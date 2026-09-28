@@ -56,16 +56,33 @@ that fails just... does nothing.
   Shipped and wired wherever HTMX itself is (`needs_htmx` in
   `arklight/backend/js/render.py`), which already covers every
   `app_shell` site -- see that module's `needs_htmx` docstring.
-- `warnIfAppShellServedFromFileProtocol()` -- one specific failure mode
-  `wireHtmxErrorHandling()` can't reliably catch after the fact:
-  opening an `app_shell` page directly from disk (`file://.../index.
-  html`) instead of serving it over http(s). Boosted navigation issues
-  its swaps via `XMLHttpRequest`, which browsers refuse outright
-  against a `file://` URL (there is no origin to authorize the request
-  against) -- and in that case some browsers never even dispatch
-  HTMX's own error events, so the visitor would otherwise get no
-  notice that every link on the page is now silently inert. Checked
-  once, directly, via `window.location.protocol`, and shipped only for
+- `fallBackToPlainNavigation()` (inside `wireHtmxErrorHandling`) -- a
+  boosted link swallows the browser's own navigation
+  (`preventDefault`) before its XHR runs, so if that XHR or the swap
+  then fails, the link is dead. On `htmx:sendError`, `htmx:swapError`
+  and `htmx:onLoadError` for a boosted GET, the handler re-issues the
+  same URL as one real navigation (`location.assign`) -- the
+  JavaScript counterpart of what the Android host already does for a
+  failed boosted request (`android/runtime.py`,
+  `isBoostedNavigationRequest`). It fires once per page, never for
+  non-GET requests (a form POST is never replayed), and never for
+  `htmx:sendAbort`/`htmx:timeout`.
+- `disableBoostOnFileProtocol()` and
+  `warnIfAppShellServedFromFileProtocol()` -- the one failure mode
+  the fallback above shouldn't have to rely on: opening an `app_shell`
+  page directly from disk (`file://.../index.html`). Boosted
+  navigation issues its swaps via `XMLHttpRequest`, which browsers
+  refuse outright against a `file://` URL (there is no origin to
+  authorize the request against), and some browsers never dispatch
+  HTMX's own error events for it. So on `file:` the runtime removes
+  `hx-boost` from `<body>` *before HTMX's DOMContentLoaded init reads
+  it* (`disableBoostOnFileProtocol`, emitted as a top-level statement
+  right after HTMX loads, not from the DOMContentLoaded handler --
+  HTMX's own listener is registered first and would win the race),
+  so every link is an ordinary page load, and
+  `warnIfAppShellServedFromFileProtocol` tells the visitor once, via
+  `console.warn` and an on-page notice, that HTMX is unavailable and
+  navigation is falling back to plain page loads. Shipped only for
   `app_shell` sites -- a plain site never boosts navigation, so
   `file://` is a perfectly normal way to open one.
 """
@@ -162,35 +179,93 @@ HTMX_ERROR_HANDLING_JS = """  function wireHtmxErrorHandling() {
       "htmx:timeout",
       "htmx:swapError",
       "htmx:targetError",
-      "htmx:invalidPath"
+      "htmx:invalidPath",
+      "htmx:onLoadError"
     ];
+    // The failures after which a boosted link is provably dead (the
+    // browser's own navigation was already cancelled, and HTMX could not
+    // finish the swap): degrade to one real page load instead. Not
+    // htmx:responseError (the server answered; a real load would just
+    // show the same answer), not htmx:timeout/htmx:sendAbort.
+    var fallbackEvents = {
+      "htmx:sendError": true,
+      "htmx:swapError": true,
+      "htmx:onLoadError": true
+    };
+    var navigating = false;
+    function fallBackToPlainNavigation(event) {
+      var detail = (event && event.detail) || {};
+      var config = detail.requestConfig || {};
+      // Only a boosted navigation, and only an idempotent one: never
+      // replay a form POST.
+      if (!detail.boosted) return;
+      if (String(config.verb || "get").toLowerCase() !== "get") return;
+      var info = detail.pathInfo || {};
+      var link = detail.elt;
+      var target =
+        (link && link.tagName === "A" && link.href) ||
+        info.finalRequestPath ||
+        info.requestPath;
+      if (!target) return;
+      navigating = true;
+      window.location.assign(target);
+    }
     failureEvents.forEach(function (eventName) {
       document.body.addEventListener(eventName, function (event) {
+        // A swap failure fires htmx:swapError and then htmx:onLoadError
+        // for the same click; once we're already navigating there is
+        // nothing left to report or redo.
+        if (navigating) return;
         try {
           arkReportError(message, event && event.detail && event.detail.error);
         } catch (handlerErr) {
           /* the handler itself must never throw */
         }
+        try {
+          if (fallbackEvents[eventName]) { fallBackToPlainNavigation(event); }
+        } catch (fallbackErr) {
+          /* the fallback itself must never throw */
+        }
       });
     });
   }"""
 
+APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS = """  (function disableBoostOnFileProtocol() {
+    // Site(app_shell=True) puts hx-boost on <body>. From file:// every
+    // boosted click would be cancelled and then its XMLHttpRequest
+    // refused by the browser, leaving a dead link. Removing the
+    // attribute here -- synchronously, at script evaluation, i.e.
+    // before HTMX's own DOMContentLoaded init reads it -- makes each
+    // link an ordinary page load instead. The visitor is told once by
+    // warnIfAppShellServedFromFileProtocol().
+    try {
+      if (window.location.protocol === "file:" && document.body) {
+        document.body.removeAttribute("hx-boost");
+      }
+    } catch (bootErr) {
+      /* best-effort */
+    }
+  })();"""
+
 APP_SHELL_FILE_PROTOCOL_CHECK_JS = """  function warnIfAppShellServedFromFileProtocol() {
-    // Site(app_shell=True) boosts every same-origin link into an
-    // in-place XMLHttpRequest-driven swap (htmx-4) instead of a real
-    // document navigation. Browsers refuse to issue that request at
-    // all against a page opened directly from disk (file://...) --
-    // there is no origin to authorize an XHR against -- and some
-    // browsers never even dispatch HTMX's own failure events for a
-    // blocked file:// request, so wireHtmxErrorHandling() above can't
-    // be relied on to catch this one. Checked once, directly, instead.
+    // Companion to disableBoostOnFileProtocol(): app-shell navigation
+    // (hx-boost, htmx-4) is an in-place XMLHttpRequest-driven swap, which
+    // browsers refuse to issue at all against a page opened directly
+    // from disk (file://...) -- there is no origin to authorize an XHR
+    // against. On file: the boost has already been switched off, so
+    // links are plain page loads; this says so once, instead of leaving
+    // the visitor to wonder why the page reloads. Checked directly via
+    // window.location.protocol, not via HTMX's own events.
     try {
       if (window.location.protocol === "file:") {
-        arkNotify(
-          "This page was opened directly from a file (file://) -- " +
-          "app-shell navigation needs it to be served over http(s), " +
-          "so links here will not work."
-        );
+        var notice =
+          "Opened from file:// -- htmx is unavailable here, so navigation " +
+          "is falling back to plain page loads. Serve the site over " +
+          "http(s) for app-shell mode.";
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("[ARKlight] " + notice);
+        }
+        arkNotify(notice);
       }
     } catch (checkErr) {
       /* best-effort, same as arkNotify itself */

@@ -46,6 +46,39 @@ they no longer touch any `hx-*` attribute) -- a site using neither
 gets no HTMX, no `arklight.js`, and no JavaScript at all, unchanged
 from the "only ship what's used" discipline this codebase already
 applies everywhere else.
+
+**Trusted Types patch (`_apply_trusted_types_patch`, bottom of this
+file).** The `HTMX_JS` literal above stays the upstream 2.0.10 build
+byte for byte. What `_build_runtime_js` actually ships is
+`HTMX_JS = _apply_trusted_types_patch(<that literal>)`: the same bytes
+plus one prelude and four call-site rewrites, applied at import time by
+exact-match string replacement (each anchor must occur exactly once,
+otherwise import fails loudly -- so bumping the vendored htmx can never
+silently drop the patch). Why it exists: the CSP `csp.py` emits
+(`require-trusted-types-for 'script'`) makes the browser reject a plain
+string at every HTML/script injection sink, and htmx has several that
+run on the boosted-navigation path -- `Document.parseHTMLUnsafe()` /
+`DOMParser.parseFromString()` in `I()` (the response parse, MDN lists
+both as Trusted Types sinks), `insertAdjacentHTML()` when `hx-preserve`
+uses `moveBefore` (Chromium 133+, so current Android WebView), and
+`script.textContent` / `script.setAttribute("src", ...)` in `r()` when
+a swapped-in `<script>` is re-created. A fifth rewrite is not about
+Trusted Types but is required for this fix to hold on current Chromium:
+`D()` re-runs a swapped-in `<script hx-preserve>` (ARKlight's own
+runtime tag) on `moveBefore` browsers, so the runtime would execute
+again on every boosted swap and history restore; a preserved script
+that already exists in the live page is now neutralized instead. Without the patch the XHR
+succeeds, the parse throws a `TypeError`, nothing swaps, and the
+boosted link looks dead. The patch routes exactly those sinks through
+one named policy, `arklight-htmx`, created inside htmx's own closure
+(nothing else on the page can reach it) and allow-listed in the CSP's
+`trusted-types` directive. It is a pass-through policy on purpose:
+the strings are same-origin, site-authored responses (htmx's
+`selfRequestsOnly` is on), `DOMParser` output is inert until swapped
+in, and `script-src 'self'` still gates what any re-created `<script>`
+may run. If the browser has no Trusted Types, or the CSP doesn't
+allow-list the policy name (`strict_csp=False`), the wrapper degrades
+to the plain string, i.e. exactly upstream behavior.
 """
 
 from __future__ import annotations
@@ -66,3 +99,101 @@ DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
 AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 """
+
+
+# ---------------------------------------------------------------------------
+# Trusted Types patch (see the module docstring). Anchors are literal
+# substrings of the minified 2.0.10 build above; each must match exactly
+# once, or import raises -- a future htmx bump has to re-derive them
+# rather than silently shipping an unpatched (dead-link) runtime.
+# ---------------------------------------------------------------------------
+
+# Closure-scoped so the policy object is unreachable from anywhere but
+# htmx's own code. `arkTT.h/.s/.u` wrap a string as TrustedHTML /
+# TrustedScript / TrustedScriptURL, or return it untouched when no
+# policy could be created.
+_TT_PRELUDE = (
+    "const arkTT=function(){let p=null;"
+    "try{if(window.trustedTypes&&window.trustedTypes.createPolicy){"
+    'p=window.trustedTypes.createPolicy("arklight-htmx",{'
+    "createHTML:function(v){return v},"
+    "createScript:function(v){return v},"
+    "createScriptURL:function(v){return v}})}}catch(e){}"
+    "return{"
+    'h:function(v){return p?p.createHTML(v):v},'
+    's:function(v){return p?p.createScript(v):v},'
+    'u:function(v){return p?p.createScriptURL(v):v}}}();'
+)
+
+_TT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    # Start of the htmx closure: define the policy holder.
+    (
+        'var htmx=function(){"use strict";',
+        'var htmx=function(){"use strict";' + _TT_PRELUDE,
+    ),
+    # I(): the one HTML parse every swap, OOB swap and history restore
+    # goes through -- both branches are Trusted Types sinks.
+    (
+        'return Document.parseHTMLUnsafe(e)}const t=new DOMParser;'
+        'return t.parseFromString(e,"text/html")',
+        'return Document.parseHTMLUnsafe(arkTT.h(e))}const t=new DOMParser;'
+        'return t.parseFromString(arkTT.h(e),"text/html")',
+    ),
+    # r(): re-creating a swapped-in <script>. `src` is a TrustedScriptURL
+    # sink, `textContent` on a script is a TrustedScript sink.
+    (
+        "ie(e.attributes,function(e){t.setAttribute(e.name,e.value)});"
+        "t.textContent=e.textContent;",
+        "ie(e.attributes,function(e){t.setAttribute(e.name,"
+        'e.name.toLowerCase()==="src"?arkTT.u(e.value):e.value)});'
+        "t.textContent=arkTT.s(e.textContent);",
+    ),
+    # D(): htmx re-creates every swapped-in <script> so it executes. A
+    # script marked hx-preserve that already exists in the live page is
+    # supposed to be swapped for the old node -- but on `moveBefore`
+    # browsers (Chromium 133+, so current Android WebView) `Re()` defers
+    # that until *after* the fresh copy has been inserted into the live
+    # document, and a script that came out of `parseHTMLUnsafe` /
+    # DOMParser is not yet "already started", so the copy runs. For
+    # ARKlight that re-runs the whole runtime
+    # (`<script id="ark-runtime" hx-preserve>`) on every boosted swap
+    # and history restore: a second htmx, a second
+    # `createPolicy("arklight-htmx")` the browser rejects as a
+    # duplicate, doubled listeners. So such a script is neutralized
+    # (given a type nothing executes) instead of re-created; `Te()`
+    # replaces it with the preserved original a moment later either way.
+    # Only when a live element with that id exists -- otherwise the
+    # script still runs as before.
+    (
+        "if(i(e)){const t=r(e);const n=e.parentNode;",
+        'if(i(e)){if((e.hasAttribute("hx-preserve")||e.hasAttribute("data-hx-preserve"))'
+        '&&e.id&&te().getElementById(e.id)){e.type="text/x-arklight-preserved";return}'
+        "const t=r(e);const n=e.parentNode;",
+    ),
+    # hx-preserve + moveBefore (Chromium 133+): the pantry <div>.
+    (
+        'te().body.insertAdjacentHTML("afterend",'
+        "\"<div id='--htmx-preserve-pantry--'></div>\")",
+        'te().body.insertAdjacentHTML("afterend",'
+        "arkTT.h(\"<div id='--htmx-preserve-pantry--'></div>\"))",
+    ),
+)
+
+
+def _apply_trusted_types_patch(source: str) -> str:
+    patched = source
+    for old, new in _TT_REPLACEMENTS:
+        found = patched.count(old)
+        if found != 1:
+            raise RuntimeError(
+                "vendored htmx no longer matches the Trusted Types patch "
+                f"anchor (found {found}, expected 1): {old[:60]!r}... -- "
+                "re-derive _TT_REPLACEMENTS in arklight/backend/js/htmx.py "
+                "against the new build"
+            )
+        patched = patched.replace(old, new)
+    return patched
+
+
+HTMX_UPSTREAM_JS = HTMX_JS
+HTMX_JS = _apply_trusted_types_patch(HTMX_UPSTREAM_JS)

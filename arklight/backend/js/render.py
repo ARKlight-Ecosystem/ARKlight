@@ -295,14 +295,17 @@ just `needs_click_interceptor`/`has_state`), so `wireHtmxErrorHandling`
 (`runtime/notify.py`) ships and is registered once, alongside
 `wireErrorBoundary`, wherever HTMX itself does -- which already
 includes every `Site(app_shell=True)` site, even a plain nav-only one
-with no state or behaviors. `app_shell` sites also ship
-`warnIfAppShellServedFromFileProtocol`, called once at ready time: a
-boosted swap is an `XMLHttpRequest`, which browsers refuse against a
+with no state or behaviors. `wireHtmxErrorHandling` also degrades a
+dead boosted link (`htmx:sendError`/`swapError`/`onLoadError`, boosted GET
+only) into one real page load. `app_shell` sites also ship
+`disableBoostOnFileProtocol` and `warnIfAppShellServedFromFileProtocol`:
+a boosted swap is an `XMLHttpRequest`, which browsers refuse against a
 page opened directly from disk (`file://.../index.html`) rather than
-served over http(s) -- and some browsers never even dispatch HTMX's
-own failure events for a blocked `file://` request, so this one
-failure mode is checked directly instead of relying solely on
-`wireHtmxErrorHandling` to catch it after the fact.
+served over http(s), and some browsers never even dispatch HTMX's own
+failure events for a blocked `file://` request. So on `file:` the
+runtime switches `hx-boost` off (before HTMX's own init runs, i.e. as a
+top-level statement right after HTMX loads) and the ready-time warning
+says once that htmx is unavailable and navigation is plain page loads.
 """
 
 from __future__ import annotations
@@ -321,6 +324,7 @@ from arklight.experimental import FEATURES
 from arklight.ir.platform_api import check_backend_support
 from arklight.backend.js.runtime import CLICK_INTERCEPTOR_JS as _CLICK_INTERCEPTOR_JS
 from arklight.backend.js.runtime import NAV_HIGHLIGHT_JS as _NAV_HIGHLIGHT_JS
+from arklight.backend.js.runtime import APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS as _APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS
 from arklight.backend.js.runtime import APP_SHELL_FILE_PROTOCOL_CHECK_JS as _APP_SHELL_FILE_PROTOCOL_CHECK_JS
 from arklight.backend.js.runtime import ERROR_BOUNDARY_JS as _ERROR_BOUNDARY_JS
 from arklight.backend.js.runtime import ERROR_REPORT_JS as _ERROR_REPORT_JS
@@ -903,11 +907,13 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # dependency features ARKlight doesn't use.
         parts.append("htmx.config.allowEval = false;")
         # Runtime policy enforcement (arklight/backend/html/csp.py):
-        # vendored HTMX's core swap path already avoids Trusted-Types-
-        # gated sinks (it parses via DOMParser, not `innerHTML=`), with
-        # one exception -- `Wn()`'s indicator-style injection calls
-        # `head.insertAdjacentHTML(...)`, which `require-trusted-types-
-        # for 'script'` (the CSP directive `csp.py` always sets) would
+        # vendored HTMX's core sinks (the DOMParser/parseHTMLUnsafe
+        # response parse, the hx-preserve pantry, <script> re-creation)
+        # are routed through the `arklight-htmx` Trusted Types policy by
+        # `_apply_trusted_types_patch` in `htmx.py`. One sink is instead
+        # closed at the source -- `Wn()`'s indicator-style injection
+        # calls `head.insertAdjacentHTML(...)`, which `require-trusted-
+        # types-for 'script'` (the CSP directive `csp.py` always sets) would
         # otherwise block outright. ARKlight already ships its own
         # generated stylesheet (`STYLESHEET_PATH`) that this feature's
         # indicator CSS is redundant with, so disabling it here removes
@@ -916,6 +922,16 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # instead of trusting it" choice `allowEval = false` above
         # already made for htmx's other optional features.
         parts.append("htmx.config.includeIndicatorStyles = false;")
+        if ir.app_shell:
+            # `file://` cannot do XHR, so hx-boost there only produces
+            # dead links. Switched off *here* -- synchronously at script
+            # evaluation, ahead of HTMX's own DOMContentLoaded init,
+            # which is registered before anything in the IIFE below and
+            # would otherwise read the attribute first. The visitor is
+            # told once by `warnIfAppShellServedFromFileProtocol` (a
+            # ready-time call, further down). See runtime/notify.py.
+            parts.append("")
+            parts.append(_APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS)
 
     parts.append("")
     parts.append("(function () {")
