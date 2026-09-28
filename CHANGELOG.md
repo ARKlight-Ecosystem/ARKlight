@@ -5,6 +5,50 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- `app_shell`: boosted links no longer die under the strict CSP (Trusted Types), `file://` falls back to plain routing
+
+**Bug.** On `Site(app_shell=True)`, clicking any internal link did nothing in
+Chromium and Android WebView (Chrome tab, the APK): the XHR succeeded, then
+htmx threw `Failed to execute 'parseHTMLUnsafe' on 'Document': This document
+requires 'TrustedHTML' assignment` and the swap never happened
+(`htmx:swapError`). Cause: the generated CSP sets `require-trusted-types-for
+'script'`, and `DOMParser.parseFromString()` / `Document.parseHTMLUnsafe()` --
+which vendored htmx's response parse `I()` calls on every boosted navigation --
+are Trusted Types sinks; `csp.py` documented them as exempt, which is wrong.
+Reproduced in headless Chromium 153 against an unpatched build.
+
+**Fix.**
+
+- `arklight/backend/js/htmx.py`: `HTMX_JS` is now the byte-for-byte upstream
+  2.0.10 literal plus `_apply_trusted_types_patch` -- one closure-scoped policy,
+  `arklight-htmx`, wrapped around exactly htmx's own sinks (response parse, the
+  `hx-preserve` pantry `insertAdjacentHTML`, `<script>` re-creation). Anchors
+  are exact-match and must occur once, so a future htmx bump fails at import
+  instead of silently shipping unpatched. The policy degrades to plain strings
+  when Trusted Types is absent or the name isn't allow-listed.
+- `csp.py`: `trusted-types default` becomes `trusted-types default
+  arklight-htmx`. No blanket `default` policy (it would switch enforcement off
+  in practice), no `'allow-duplicates'`.
+- Same patch, fifth rewrite: on `moveBefore` browsers htmx re-ran the preserved
+  `<script id="ark-runtime" hx-preserve>` on every boosted swap and history
+  restore (a second htmx, a duplicate `createPolicy`, doubled listeners). A
+  preserved script that already exists in the live page is now neutralized
+  instead of re-created.
+- `runtime/notify.py`: `wireHtmxErrorHandling` now degrades a dead boosted link
+  to one real navigation (`location.assign`) on `htmx:sendError` /
+  `htmx:swapError` / `htmx:onLoadError`, boosted GET only (never replays a
+  POST), once per page. Mirrors what `android/runtime.py` already does natively
+  for failed boosted requests. `htmx:responseError` (the server answered) keeps
+  its existing notice only.
+- `file://`: XHR can never work there, so `disableBoostOnFileProtocol()` removes
+  `hx-boost` from `<body>` synchronously, before htmx's DOMContentLoaded init
+  reads it, and `warnIfAppShellServedFromFileProtocol()` now says once (console
+  + on-page notice) that htmx is unavailable and navigation is falling back to
+  plain page loads, instead of "links will not work".
+
+Tests: `tests/test_htmx_trusted_types.py` (new), plus updates to
+`test_csp.py` and `test_htmx_failure_handling.py`.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Version scheme migrated to `0.MMM.PP`, syncing `alpha`'s numbering with `main`
 
 `pyproject.toml`'s `version` had drifted back to the two/three-digit

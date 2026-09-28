@@ -186,6 +186,7 @@ def test_wire_htmx_error_handling_registers_every_failure_event():
             "htmx:swapError",
             "htmx:targetError",
             "htmx:invalidPath",
+            "htmx:onLoadError",
         ]
     )
 
@@ -245,6 +246,10 @@ def test_file_protocol_triggers_notice():
     assert len(out["notified"]) == 1
     assert "file://" in out["notified"][0]
     assert "http" in out["notified"][0]
+    # The notice says what is actually happening now: htmx is off and
+    # navigation is plain page loads (not "links will not work").
+    assert "htmx is unavailable" in out["notified"][0]
+    assert "plain page loads" in out["notified"][0]
 
 
 @needs_node
