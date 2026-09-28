@@ -3534,3 +3534,4 @@ See the "Snapshot" table at the top of this file for current status,
 and [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md) for the canonical
 milestone roadmap (kept in sync with this file as the single source of
 truth, rather than a third copy of the same list).
+
