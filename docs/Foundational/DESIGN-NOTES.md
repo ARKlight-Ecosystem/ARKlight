@@ -1028,6 +1028,13 @@ worth a future PLANNING section of its own once the Desktop backend
 gives a second real data point for what such a bridge would need to
 support, not something to speculatively scope into this milestone.
 
+*Update:* the `ark.db` slice of that idea now exists as
+`PlatformAPI.db` (IndexedDB on Web, SQLite on Android behind one
+origin-restricted `WebMessageListener`; see
+`docs/Foundational/PLATFORM-APIS.md`). The rest of the bridge --
+`ark.fs`, `ark.clipboard`, `ark.notify` on Android, anything on
+Desktop -- stays deferred.
+
 ### What this is, in one line
 
 A new `arklight android` CLI backend that packages an existing

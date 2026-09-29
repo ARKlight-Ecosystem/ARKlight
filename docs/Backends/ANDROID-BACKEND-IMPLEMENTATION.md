@@ -143,7 +143,9 @@ Same list `DESIGN-NOTES.md`'s "v0.0438" section already states --
 repeated here only so this table doesn't imply any of it is
 Stage-0-through-7 work: iOS (`WKWebView`/`WKURLSchemeHandler` is a
 separate design), any native-plugin/push/deep-link bridge beyond
-serving assets, Play Store signing/publishing automation beyond
+serving assets (the one exception is the single, origin-restricted
+`WebMessageListener` behind `PlatformAPI.db`, `ArkDb.kt` -- see
+`docs/Foundational/PLATFORM-APIS.md`), Play Store signing/publishing automation beyond
 passing signing config through to Gradle, and any change to the
 HTML/CSS/JS backends themselves -- this is a packaging backend that
 consumes an existing `build-dir` as opaque input, the same way

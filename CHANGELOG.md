@@ -5,6 +5,59 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- `PlatformAPI.db`: local key/value storage (IndexedDB on Web, SQLite on Android)
+
+**Added.** One author-facing platform API, `PlatformAPI.db`, for persistent
+local storage. Authors write against a single interface; the engine is a
+backend detail.
+
+```python
+Button("Save", on_click=PlatformAPI.db.set("draft", Bind("text")))
+Button("Load", on_click=PlatformAPI.db.get("draft", into="text"))
+Button("Forget", on_click=PlatformAPI.db.delete("draft"))
+Button("List", on_click=PlatformAPI.db.keys(into="names", prefix="dr"))
+```
+
+- `arklight/ir/platform_api.py`: `db` registered; `DB_OPERATIONS` is the
+  compiler-owned op/argument table; `BACKEND_PLATFORM_API_SUPPORT` gives `db`
+  to `web` and `android` (`desktop` unchanged -- still implements nothing).
+- `arklight/api.py`: `PlatformAPI.db.set/get/delete/keys`. Reads write into a
+  declared `State(...)` named by `into` (a compiled page has no return values;
+  same shape as `Action.geolocate`). `key`/`value`/`prefix` accept `Bind(...)`.
+- `arklight/ir/validate.py`: `_validate_platform_db` -- known op, exact
+  required/optional args, JSON-serializable `value`, `into` must be a declared
+  `State(...)` (not `Computed`), `Bind(...)` must name declared state. Wired
+  into both `on_click` sites, including `Repeat(...)` templates.
+- `arklight/backend/js/runtime/dispatch.py`: the `"platform:"` branch now
+  resolves `Bind(...)` args (same `resolveActionArgs` as actions) and passes
+  the page store as a second argument. `notify`/`clipboard_write` ignore it.
+- `arklight/backend/js/platform_apis/db.py`: shipped only when used. Uses
+  `window.arkDbBridge` when present (Android), IndexedDB otherwise. Both store
+  `key -> JSON text`; `keys` filters/sorts in JS for both so behavior matches.
+- `arklight/backend/android/runtime.py`: new generated `ArkDb.kt` (SQLite,
+  table `kv`, one background thread, parameterized statements) registered from
+  `MainActivity` via `WebViewCompat.addWebMessageListener`, restricted to the
+  app's own asset origin. Not `addJavascriptInterface`, so `allow_navigation`
+  hosts never see it. Feature-checked: a WebView too old for it falls back to
+  IndexedDB.
+
+**Behavior change worth knowing.** This is the first JS-to-native channel in
+the Android backend, previously an explicit non-goal. It is one listener, four
+string operations, own-origin only; docs updated to say so
+(`PLATFORM-APIS.md`, `ANDROID-BACKEND-IMPLEMENTATION.md`, `DESIGN-NOTES.md`).
+
+**Not included.** On-load reads (`db` is `on_click`-triggered like every
+platform API), a `clear` operation, and any Desktop implementation. Already-
+scaffolded Android projects need re-scaffolding to gain `ArkDb.kt`
+(`arklight android sync` only refreshes `assets/`).
+
+**Tests.** `tests/test_platform_api_db.py` (factories, validation, HTML, JS
+shipping, Node-executed fragment against an IndexedDB stub and a fake Android
+bridge, real click interceptor) and `tests/test_android_db.py` (generated
+Kotlin: origin restriction, install-before-load, JS/Kotlin name and wire-format
+agreement). The generated Kotlin is syntax-checked but has not been compiled or
+run on a device.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- `app_shell`: boosted links no longer die under the strict CSP (Trusted Types), `file://` falls back to plain routing
 
 **Bug.** On `Site(app_shell=True)`, clicking any internal link did nothing in

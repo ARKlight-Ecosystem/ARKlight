@@ -186,6 +186,7 @@ def project_files(
             package_id, edge_to_edge, has_splash, tuple(allow_navigation)
         ),
         f"{java_dir}/ArkApplication.kt": _kt_with_package(_ARK_APPLICATION_KT, package_id),
+        f"{java_dir}/ArkDb.kt": _kt_with_package(_ARK_DB_KT, package_id),
         f"{java_dir}/ArkBundle.kt": _kt_with_package(_ARK_BUNDLE_KT, package_id),
         f"{java_dir}/ArkSeal.kt": _kt_with_package(_ARK_SEAL_KT, package_id),
         f"{java_dir}/MemoryGuard.kt": _kt_with_package(_MEMORY_GUARD_KT, package_id),
@@ -829,7 +830,12 @@ import androidx.webkit.WebViewAssetLoader
  * `State(persist=True)` -> `localStorage` reliable here.
  *
  * Native-shell behavior (docs/Proposals/ANDROID-BACKEND-HARDENING-
- * PROPOSAL.md; none of it involves a JS-to-native bridge):
+ * PROPOSAL.md; none of it involves a JS-to-native bridge, with the one
+ * exception below):
+ *
+ * - Storage: `PlatformAPI.db` is backed by SQLite through a single,
+ *   origin-restricted `WebMessageListener` (ArkDb.kt). It is the only
+ *   thing the page can call into; nothing else crosses to native code.
  *
  * - Links: a main-frame navigation to this app's own origin, or to a
  *   host listed in `android.allow_navigation`, loads in the WebView.
@@ -864,6 +870,9 @@ import androidx.webkit.WebViewAssetLoader
 class MainActivity : AppCompatActivity() {{
 
     private lateinit var webView: WebView
+
+    // SQLite backend for `PlatformAPI.db` (see ArkDb.kt).
+    private var arkDb: ArkDb? = null
 
     // Enabled only while the WebView has history to go back through.
     // When disabled the system handles back itself, which is what lets
@@ -939,6 +948,10 @@ class MainActivity : AppCompatActivity() {{
 
         onBackPressedDispatcher.addCallback(this, backCallback)
 
+        // Registered before the first load, as WebMessageListener
+        // requires. Reachable only from this app's own origin.
+        arkDb = ArkDb(this).also {{ it.install(webView, "{_ASSET_ORIGIN}") }}
+
         // A saved state that can't be restored (null) falls through to
         // a normal first load rather than leaving a blank WebView.
         if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {{
@@ -950,6 +963,12 @@ class MainActivity : AppCompatActivity() {{
     override fun onSaveInstanceState(outState: Bundle) {{
         super.onSaveInstanceState(outState)
         webView.saveState(outState)
+    }}
+
+    override fun onDestroy() {{
+        arkDb?.close()
+        arkDb = null
+        super.onDestroy()
     }}
 
     /**
@@ -1049,6 +1068,159 @@ class ArkApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         DynamicColors.applyToActivitiesIfAvailable(this)
+    }
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Kotlin -- new for Application mode: the `PlatformAPI.db` SQLite backend
+# ---------------------------------------------------------------------------
+
+_ARK_DB_KT = """\
+package com.arklight.viewer
+
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+import android.util.Log
+import android.webkit.WebView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.JavaScriptReplyProxy
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+
+/**
+ * SQLite implementation of ARKlight's `db` platform API interface
+ * (`PlatformAPI.db.set/get/delete/keys`; see
+ * docs/Foundational/PLATFORM-APIS.md). The site's own JavaScript picks
+ * this backend automatically when `window.arkDbBridge` exists and
+ * falls back to IndexedDB when it doesn't -- the page author never
+ * sees which one served a call. The wire format is documented in
+ * `arklight/backend/js/platform_apis/db.py`; this file is its native
+ * half and must be kept in step with it.
+ *
+ * This is deliberately the *only* JS-to-native channel in the app, and
+ * a narrow one:
+ *
+ * - Registered with `WebViewCompat.addWebMessageListener`, restricted
+ *   to the app's own asset origin. Unlike `addJavascriptInterface`,
+ *   that means a page loaded from any host in `android.allow_navigation`
+ *   never sees the object at all.
+ * - String messages in, string replies out; no reflection, no native
+ *   method surface beyond the four operations below.
+ * - One table, `kv(key TEXT PRIMARY KEY, value TEXT)`, in the app's
+ *   private database `arklight.db`. Values are the JSON *text* the page
+ *   already serialized; nothing here parses or interprets them. The
+ *   database file isn't created until the first request arrives.
+ * - Every request runs on one background thread, so requests execute in
+ *   the order the page sent them and never block the UI thread.
+ *
+ * If the device's WebView is too old to support WebMessageListener,
+ * [install] returns false, no bridge exists, and the page's JavaScript
+ * uses IndexedDB instead -- storage still works, just not through SQLite.
+ */
+class ArkDb(private val activity: AppCompatActivity) {
+
+    private val helper = object : SQLiteOpenHelper(activity.applicationContext, DB_FILE, null, DB_VERSION) {
+        override fun onCreate(db: SQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)")
+        }
+
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            // Version 1 is the only schema so far.
+        }
+    }
+
+    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    /**
+     * Must be called before the WebView loads its first page. Returns
+     * whether the bridge was registered.
+     */
+    fun install(webView: WebView, allowedOrigin: String): Boolean {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return false
+        WebViewCompat.addWebMessageListener(
+            webView, BRIDGE_NAME, setOf(allowedOrigin)
+        ) { _, message, _, _, replyProxy ->
+            val text = message.data
+            if (text != null) handle(text, replyProxy)
+        }
+        return true
+    }
+
+    /** Finishes queued requests, then closes the database. */
+    fun close() {
+        executor.execute { helper.close() }
+        executor.shutdown()
+    }
+
+    private fun handle(text: String, replyProxy: JavaScriptReplyProxy) {
+        executor.execute {
+            var id = -1L
+            val reply = JSONObject()
+            try {
+                val request = JSONObject(text)
+                id = request.getLong("id")
+                reply.put("id", id)
+                reply.put("result", run(request))
+                reply.put("ok", true)
+            } catch (e: Exception) {
+                Log.w(TAG, "db request failed", e)
+                reply.put("id", id)
+                reply.put("ok", false)
+                reply.put("error", e.message ?: e.javaClass.simpleName)
+                reply.remove("result")
+            }
+            val body = reply.toString()
+            // Replies go out on the UI thread; the WebView owns it.
+            activity.runOnUiThread {
+                try {
+                    replyProxy.postMessage(body)
+                } catch (e: Exception) {
+                    // The page went away while the request was running.
+                    Log.w(TAG, "db reply dropped", e)
+                }
+            }
+        }
+    }
+
+    /** Executes one request; the returned value becomes the reply's `result`. */
+    private fun run(request: JSONObject): Any {
+        val db = helper.writableDatabase
+        return when (val op = request.getString("op")) {
+            "set" -> {
+                db.execSQL(
+                    "INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)",
+                    arrayOf<Any>(request.getString("key"), request.getString("value"))
+                )
+                JSONObject.NULL
+            }
+            "get" -> db.rawQuery(
+                "SELECT value FROM kv WHERE key = ?", arrayOf(request.getString("key"))
+            ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else JSONObject.NULL }
+            "delete" -> {
+                db.execSQL("DELETE FROM kv WHERE key = ?", arrayOf<Any>(request.getString("key")))
+                JSONObject.NULL
+            }
+            "keys" -> db.rawQuery("SELECT key FROM kv", null).use { cursor ->
+                val keys = JSONArray()
+                while (cursor.moveToNext()) keys.put(cursor.getString(0))
+                keys
+            }
+            else -> throw IllegalArgumentException("unknown op: " + op)
+        }
+    }
+
+    companion object {
+        /** The name the page sees: `window.arkDbBridge`. */
+        const val BRIDGE_NAME = "arkDbBridge"
+        private const val DB_FILE = "arklight.db"
+        private const val DB_VERSION = 1
+        private const val TAG = "ArkDb"
     }
 }
 """
@@ -1901,6 +2073,10 @@ want it back.
   `androidx.webkit.WebViewAssetLoader`, so `fetch()`/`localStorage`
   behave the same way they would if `arklight build`'s output were
   served over plain HTTP, not `file://`.
+- `ArkDb.kt` -- SQLite storage for `PlatformAPI.db`. Registered once by
+  `MainActivity.kt` as a message listener reachable only from this
+  app's own origin; a site that never calls `PlatformAPI.db` never
+  touches it (the database file isn't created until first use).
 - `ArkBundle.kt` / `ArkSeal.kt` / `MemoryGuard.kt` -- vendored from
   [ARKlight-Viewer-for-Android-Devices](
   https://github.com/Rae-ARK/ARKlight-Viewer-for-Android-Devices)

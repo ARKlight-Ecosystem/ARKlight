@@ -100,12 +100,25 @@ once either backend reaches the maturity bar Section 22 sets.
 `check_backend_support` already fails loudly for either backend today
 -- Stage 2 is closing that gap, not opening a new one.
 
+### Stage 2, first slice: `db` on Android (SHIPPED, unreleased)
+
+`db` (local key/value storage; see
+[`PLATFORM-APIS.md`](../Foundational/PLATFORM-APIS.md)'s "`db`: one
+interface, a different engine per backend") is the first capability
+Android has earned: `BACKEND_PLATFORM_API_SUPPORT["android"]` is now
+`{"db"}`. It also added the first argument-level Validation to this
+layer (`_validate_platform_db`: op/argument rules, `into` must be a
+declared `State(...)`, `Bind(...)` args must name declared state) and
+widened the click dispatcher's platform branch to resolve `Bind(...)`
+args and pass the store through. `notify`/`clipboard_write` remain
+Web-only on Android, and Desktop implements nothing yet.
+
 ## Status tracking
 
 | Stage | Covers | Status |
 | --- | --- | --- |
 | 1 of 2 | Web reference implementation (architecture + `notify`/`clipboard_write`) | SHIPPED (`v0.065`) |
-| 2 of 2 | Android/Desktop native implementations | PLANNED, unscheduled |
+| 2 of 2 | Android/Desktop native implementations | IN PROGRESS: `db` on Web + Android shipped; Android `notify`/`clipboard_write` and all of Desktop PLANNED, unscheduled |
 
 See `docs/version history/v0.065.md` for this stage's forward-looking,
 user-facing summary (updated to reflect actual shipped behavior), and

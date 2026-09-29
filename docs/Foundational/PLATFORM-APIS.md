@@ -96,6 +96,7 @@ Interface              Web       Android       Desktop
 --------------------------------------------------------
 notify                 done      later         later
 clipboard_write        done      later         later
+db                     done      done          later
 ```
 
 > **An interface becomes available on a platform only when that
@@ -104,6 +105,78 @@ clipboard_write        done      later         later
 > large native API surface -- see
 > `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`'s Stage 2 for
 > where that work lands once it starts.
+
+## `db`: one interface, a different engine per backend
+
+`PlatformAPI.db` is local key/value storage -- the first capability
+whose implementation genuinely differs per platform, and so the clearest
+statement of the split above. The author sees one interface:
+
+```python
+State("text", "")
+State("names", [])
+Button("Save",  on_click=PlatformAPI.db.set("draft", Bind("text")))
+Button("Load",  on_click=PlatformAPI.db.get("draft", into="text"))
+Button("Forget", on_click=PlatformAPI.db.delete("draft"))
+Button("List",  on_click=PlatformAPI.db.keys(into="names", prefix="dr"))
+```
+
+Which engine serves it is the backend's concern, never source's:
+
+```text
+Web (default)    IndexedDB   database "arklight", object store "kv"
+Android          SQLite      app-private "arklight.db", table kv(key, value)
+Desktop          --          not implemented (build fails with a named diagnostic)
+```
+
+**Contract** (`arklight.ir.platform_api.DB_OPERATIONS` is the compiler-
+owned table; every backend implements exactly this):
+
+- Keys are non-empty strings; values are any JSON-serializable value,
+  stored and returned as that JSON value (a stored `None` reads back as
+  `None`).
+- `set(key, value)` inserts or replaces. `delete(key)` removes; deleting
+  a missing key is not an error.
+- `get(key, into=name)` and `keys(into=name, prefix=None)` are *reads*.
+  A compiled page has no return values, so a read writes its result into
+  the declared `State(...)` named by `into` -- the same shape
+  `Action.geolocate` uses for one-shot platform reads. A missing key
+  writes `None`; `keys` writes a list sorted ascending by UTF-16 code
+  unit, filtered to `prefix` when given.
+- `key`, `value` and `prefix` may each be `Bind("name")`, resolved at
+  click time exactly like an `Action.*(...)` argument. `into` must be a
+  declared `State(...)`, not a `Computed(...)`. All of this is checked
+  at Validation.
+- Operations are asynchronous and run in the order issued. Failures
+  (storage unavailable, quota) show ARKlight's in-page notice, never a
+  thrown error.
+
+**How the two engines meet one runtime.** The Web runtime ships one `db`
+fragment (`arklight/backend/js/platform_apis/db.py`), only when a site
+uses it. At call time it checks for `window.arkDbBridge`: present inside
+an ARKlight Android app, absent everywhere else. Present -> each
+operation is one JSON message to native SQLite; absent -> IndexedDB.
+Both store `key -> the JSON text of the value`, and `keys` filters and
+sorts in JavaScript for both, so behavior is the same by construction.
+An Android device whose WebView is too old for the bridge simply uses
+IndexedDB -- storage still works.
+
+**The Android bridge is deliberately narrow.** It is registered with
+`WebViewCompat.addWebMessageListener`, restricted to the app's own asset
+origin, so pages loaded from `android.allow_navigation` hosts never see
+it (unlike `addJavascriptInterface`, which exposes to every page the
+WebView loads). It carries four string-message operations and nothing
+else, and is the only JS-to-native channel in the generated app. This is
+the first, minimal slice of the "capability-based JS-to-native bridge"
+`DESIGN-NOTES.md` deferred -- taken now because storage is a capability
+where the web engine (IndexedDB) and the native one (SQLite) are
+genuinely different, and it stays scoped to that one capability.
+
+**Scope, as shipped.** `db` is triggered from `on_click=` like every
+other platform API. There is no on-page-load read yet (a page can't
+auto-populate `State` from the db without a click), and no `clear`
+operation. Existing scaffolded Android projects need re-scaffolding to
+gain `ArkDb.kt`; `arklight android sync` only refreshes `assets/`.
 
 ## Relationship to the `copy` behavior
 

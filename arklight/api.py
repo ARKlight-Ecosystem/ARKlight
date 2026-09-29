@@ -894,6 +894,66 @@ class Action:
         return ActionRef(action="geolocate", state=name, args={})
 
 
+class _PlatformDB:
+    """
+    `PlatformAPI.db` -- persistent local key/value storage. One
+    interface for the author; which engine sits underneath (IndexedDB
+    on the Web backend, SQLite inside the Android app) is each
+    backend's own business and never appears in source.
+
+        Button("Save", on_click=PlatformAPI.db.set("draft", Bind("text")))
+        Button("Load", on_click=PlatformAPI.db.get("draft", into="text"))
+        Button("Forget", on_click=PlatformAPI.db.delete("draft"))
+        Button("List", on_click=PlatformAPI.db.keys(into="drafts", prefix="draft"))
+
+    Values are anything JSON-serializable. Reads (`get`, `keys`) don't
+    return anything to the caller -- there is no return value in a
+    compiled page -- they write their result into a declared
+    `State(...)` named by `into`, the same shape `Action.geolocate`
+    already uses for one-shot platform reads. `get` writes `None` for a
+    key that doesn't exist. `key`, `value` and `prefix` may each be a
+    `Bind("name")`, read from state at click time.
+
+    All operations are asynchronous: a `get`/`keys` write lands in
+    `into` shortly after the click, not before the click handler
+    returns. If storage isn't available (a locked-down browser, private
+    mode) the visitor sees ARKlight's in-page notice instead of a
+    thrown error.
+    """
+
+    @staticmethod
+    def set(key: Any, value: Any) -> PlatformAPIRef:
+        """Store `value` under `key`, replacing anything already there."""
+        return PlatformAPIRef(
+            capability="db",
+            args={"op": "set", "key": _action_arg(key), "value": _action_arg(value)},
+        )
+
+    @staticmethod
+    def get(key: Any, into: str) -> PlatformAPIRef:
+        """Read `key` into `State(into)` (`None` if the key doesn't exist)."""
+        return PlatformAPIRef(
+            capability="db",
+            args={"op": "get", "key": _action_arg(key), "into": into},
+        )
+
+    @staticmethod
+    def delete(key: Any) -> PlatformAPIRef:
+        """Remove `key`. Removing a key that doesn't exist does nothing."""
+        return PlatformAPIRef(capability="db", args={"op": "delete", "key": _action_arg(key)})
+
+    @staticmethod
+    def keys(into: str, prefix: Any = None) -> PlatformAPIRef:
+        """
+        Write the sorted list of stored keys into `State(into)`. With
+        `prefix`, only keys starting with it are included.
+        """
+        args: dict[str, Any] = {"op": "keys", "into": into}
+        if prefix is not None:
+            args["prefix"] = _action_arg(prefix)
+        return PlatformAPIRef(capability="db", args=args)
+
+
 class PlatformAPI:
     """
     A closed vocabulary of platform-supplied capabilities (`v0.065`,
@@ -906,6 +966,7 @@ class PlatformAPI:
 
         Button("Notify me", on_click=PlatformAPI.notify("Saved!", body="Your changes were saved."))
         Button("Copy link", on_click=PlatformAPI.clipboard_write("https://example.com"))
+        Button("Save", on_click=PlatformAPI.db.set("draft", Bind("text")))
 
     Unlike `Action.*(...)`, a `PlatformAPI.*(...)` call never targets a
     declared `State(...)` name -- it asks the *execution platform* to
@@ -915,16 +976,19 @@ class PlatformAPI:
     why `Action.geolocate` stayed an `Action` rather than becoming the
     first `PlatformAPI.*(...)` entry.
 
-    Deliberately a small, closed catalogue at acceptance (Section 23
-    of the proposal, "Initial scope"): two capabilities, both
-    implemented today by the Web backend (the reference/default
-    implementation, Section 5) and by neither the Android nor the
-    Linux Desktop backend yet (Section 6/22 -- earned progressively,
-    not granted because the backend exists). Requesting either of
-    these against `android`/`desktop` fails the build with a named
-    diagnostic rather than silently doing nothing -- see
+    Deliberately a small, closed catalogue (Section 23 of the
+    proposal, "Initial scope"): `notify` and `clipboard_write`, both
+    implemented by the Web backend only, and `db` (local key/value
+    storage, see `PlatformAPI.db`), implemented by the Web and Android
+    backends. Nothing is implemented by the Linux Desktop backend yet
+    (Section 6/22 -- earned progressively, not granted because the
+    backend exists). Requesting a capability against a backend that
+    doesn't implement it fails the build with a named diagnostic rather
+    than silently doing nothing -- see
     `arklight.ir.platform_api.check_backend_support`.
     """
+
+    db = _PlatformDB
 
     @staticmethod
     def notify(title: str, body: str | None = None) -> PlatformAPIRef:
