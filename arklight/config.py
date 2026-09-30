@@ -50,10 +50,10 @@ CONFIG_FILENAME = "arklight.config.py"
 # in this branch will read it.
 #
 # "android" and "desktop" sections are deliberately not carried over
-# from `alpha` here -- see `docs/syncing main with alpha branch/
-# MAIN TO ALPHA V0.070.md`, Stages 11-12: the Android backend/CLI
-# stays excluded from `main` as standing policy, and the Desktop
-# backend is a new-since-v0.054 addition pending an explicit go/no-go
+# here -- see the sync-plan folder under `docs/` (Stages 11-12): the
+# Android backend/CLI stays excluded from `main` as standing policy,
+# and the Desktop backend is a new-since-v0.054 addition pending an
+# explicit go/no-go
 # decision (`main`'s own roadmap still places it at v0.100). Add both
 # back to `_KNOWN_SECTIONS`/`_KNOWN_KEYS` together if and when either
 # backend actually lands.

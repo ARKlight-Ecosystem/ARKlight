@@ -1,7 +1,7 @@
 # Deployment Design
 
-**Status: implemented for Cloudflare Workers, alpha-only so far** (`arklight deploy`,
-`arklight/cli/deploy.py`, shipped as `0.06515`; not yet on `main`). Cloudflare
+**Status: implemented for Cloudflare Workers** (`arklight deploy`,
+`arklight/cli/deploy.py`, shipped as `0.06515`). Cloudflare
 Workers is the only provider. Every other target below is still a spec for
 future work. Flags, defaults and exit codes are in
 [`CLI-REFERENCE.md`](CLI-REFERENCE.md); "As implemented" below records the

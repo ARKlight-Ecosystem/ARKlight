@@ -44,8 +44,7 @@ compile time the left-hand name is replaced by the right-hand text.
 Both sides are strings -- the right one is *whatever the rest of the
 line says*, so it can be a number, a string literal, another name, any
 text that is valid Python where it lands. That makes it different in
-kind from `# include` (and from the not-yet-accepted `# use`, see
-`docs/Proposals/USE-PREAMBLE-PROPOSAL.md`): an include *binds
+kind from `# include` (and from the reserved, not-yet-built `# use`): an include *binds
 vocabulary*, a define *rewrites the file's own source*. It binds
 nothing, resolves nothing, and needs no include to exist.
 
@@ -163,7 +162,7 @@ _DEFINE_RE = re.compile(r"^#\s*define\s+(\S+?)\s*->\s*(.*?)\s*$")
 # for one of these is refused, not skipped: silently ignoring it would
 # let someone write it believing it does something.
 _RESERVED_DIRECTIVES: dict[str, str] = {
-    "use": "docs/Proposals/USE-PREAMBLE-PROPOSAL.md",
+    "use": "see docs/Foundational/AUTHORING-GUIDE.md, \"Preamble directives\"",
 }
 _RESERVED_RE = re.compile(
     r"^#\s*(" + "|".join(re.escape(word) for word in _RESERVED_DIRECTIVES) + r")\s*<"

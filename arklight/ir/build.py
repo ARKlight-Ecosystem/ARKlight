@@ -118,7 +118,7 @@ class IRPage:
     # already establishes for a key with a second, non-`Action.*(...)`
     # writer. Empty for pages that declare no media-driven `State(...)`.
     media: list[tuple[str, str]] = field(default_factory=list)
-    # `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md):
+    # `v0.0641` (docs/version history/v0.0641.md):
     # `(name, param, type_tag, history_mode)` tuples for every
     # `State(..., query=...)` on this page, in declaration order --
     # same marker/`<body>`-attribute duality every piece of hydration

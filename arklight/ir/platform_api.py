@@ -1,6 +1,6 @@
 """
-Platform API interface layer (`v0.065`, accepted from
-`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`; see
+Platform API interface layer (`v0.065`, accepted; see
+`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md` and
 `docs/Foundational/PLATFORM-APIS.md` for the settled design record).
 
 This module is the compiler-owned half of the split the proposal
@@ -25,10 +25,10 @@ Three registries, matching the proposal's own terminology (Section 3):
   implements. Web is the reference implementation and starts non-empty;
   Android and Linux Desktop start empty on purpose (Section 6/22 --
   "native implementations are earned by backends", not granted because
-  a backend merely exists). (On `alpha`, Android has since earned
-  exactly one capability, `db`, backed by SQLite; that backend is not
-  on this branch, so it stays empty here -- see `docs/syncing main
-  with alpha branch/MAIN TO ALPHA V0.070.md`, Stages 11 and 16.)
+  a backend merely exists). (An Android backend could earn `db`, backed
+  by SQLite, but no Android backend ships on this branch, so its entry
+  stays empty here -- see the sync-plan folder under `docs/`, Stages
+  11 and 16.)
 - Nothing here is a `PlatformAPIRequest`'s *value* -- that's
   `arklight.ast.nodes.PlatformAPIRef`, the small structured object an
   author actually writes (`PlatformAPI.notify(...)`), validated
@@ -148,8 +148,8 @@ DB_OPERATIONS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 # backend that actually emits the dispatch code -- see
 # `arklight/backend/js/platform_apis/`). "android" and "desktop" are
 # listed and empty on purpose (Section 6): neither backend exists on
-# this branch (`alpha`'s Android backend implements `db` on its own;
-# that entry is deliberately not carried over), so nothing requested
+# this branch (an Android entry for `db` is deliberately not carried
+# over), so nothing requested
 # against either succeeds today -- see `check_backend_support` below
 # for the diagnostic a build against an unsupported backend gets
 # instead of a silent no-op.
@@ -207,7 +207,7 @@ def check_backend_support(
     raise PlatformAPIError(
         f"platform interface(s) {names} requested by this site are not "
         f"implemented by backend {backend_name!r}. See "
-        f"docs/Proposals/PLATFORM-API-IR-PROPOSAL.md Section 6/22 -- a "
+        f"docs/Foundational/PLATFORM-APIS.md -- a "
         f"backend only gains a platform API capability once it has "
         f"implemented that capability's own contract, not merely "
         f"because the backend exists."

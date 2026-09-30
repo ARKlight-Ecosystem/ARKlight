@@ -117,8 +117,7 @@ Checks performed:
     JSON scalars), and whose `names` resolve to `State(...)`/
     `Computed(...)` declared on the same page; its children are ordinary content, validated the
     same way any other component's children are.
-17. `State(..., query="...")` (`v0.064`, `docs/Proposals/
-    URL-STATE-AS-PRIMITIVE-PROPOSAL.md`), if present, must be a legal
+17. `State(..., query="...")` (`v0.0641`, `docs/version history/v0.0641.md`), if present, must be a legal
     query-parameter key (`_LEGAL_QUERY_KEY_RE`). `State(...,
     history="...")`, if present, must be a known mode
     (`arklight.ir.schema.KNOWN_QUERY_HISTORY_MODES`) and requires
@@ -291,7 +290,7 @@ def _validate_platform_api(
 ) -> None:
     """
     `v0.065`: the backend-agnostic half of Platform API validation
-    (Section 7/11 of `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) --
+    (`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`) --
     capability existence and argument names, checked here at
     Validation because those are compiler-owned semantic facts, true
     regardless of which backend eventually builds this site. Whether
@@ -854,7 +853,7 @@ def _validate_state_declaration(node: ARKNode, *, path: str, parent_is_page: boo
             f"State(...) at {path} has media={media!r}, which must be a "
             f'non-empty media condition string, e.g. "(min-width: 768px)".'
         )
-    # `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md):
+    # `v0.0641` (docs/version history/v0.0641.md):
     # `query` defaults to `None` (unset, plain state -- unchanged
     # behavior) but a value that *is* provided must be a legal query-
     # parameter key -- same "fail loudly at build time" discipline

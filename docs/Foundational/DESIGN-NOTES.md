@@ -881,7 +881,7 @@ implementation not started" discipline every other PLANNING section
 in this file follows when it's written. Status has moved on since
 this section was written: the design below is complete and Stages 0-4
 of the staged implementation ladder
-(`docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`) have shipped --
+(the Android backend's implementation doc (kept outside `main`)) have shipped --
 see `PROGRESS.md`'s Snapshot table (`v0.080`) for the current
 per-stage record; Stages 5-7 (the local-toolchain counterparts to the
 CI-only stages below) remain open. Placed here, right after Stage 8 above rather
@@ -1027,6 +1027,13 @@ implementation per backend) with no concrete forcing use case yet --
 worth a future PLANNING section of its own once the Desktop backend
 gives a second real data point for what such a bridge would need to
 support, not something to speculatively scope into this milestone.
+
+*Update:* the `ark.db` slice of that idea now exists as
+`PlatformAPI.db` (IndexedDB on Web, SQLite on Android behind one
+origin-restricted `WebMessageListener`; see
+`docs/Foundational/PLATFORM-APIS.md`). The rest of the bridge --
+`ark.fs`, `ark.clipboard`, `ark.notify` on Android, anything on
+Desktop -- stays deferred.
 
 ### What this is, in one line
 
@@ -1233,7 +1240,7 @@ sharing one number each (`2a`/`2b`, `3a`/`3b`, `4a`/`4b`) since each
 pair does the equivalent thing on two different machines. That
 numbering is retired now that all three CI halves have shipped well
 ahead of their local counterparts -- see
-`docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`'s "Numbering" note
+the Android backend's implementation doc (kept outside `main`)'s "Numbering" note
 for the full reasoning; this list uses the same plain 0-7 numbering
 that doc's table does.
 
@@ -1315,7 +1322,7 @@ file, nothing here is scheduled to a version number yet:
    pass-through.
 
 Tracked with status/dependencies per stage in
-`docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md`, the same
+the Android backend's implementation doc (kept outside `main`), the same
 routing-table role `REFACTOR-INDEX.md` plays for the HTML/HTMX/JS
 refactor track -- that file also gives Stage 0 a file-by-file
 breakdown of what in `ARKlight-Viewer-for-Android-Devices` (linked
@@ -2093,7 +2100,7 @@ lands here. Behavior and usage live in `AUTHORING-GUIDE.md` and `CLI-REFERENCE.m
 
 **Accepted -- shipped as `v0.064`; see `docs/version history/v0.064.md`.**
 Follows the format and conventions of
-[`docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/alpha/docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md).
+the assistant CLI proposal (kept outside `main`).
 The content below is left as filed -- it's the design record this
 proposal was accepted on -- and is not rewritten to reflect
 in-progress implementation detail; see the addendum above for the
@@ -2327,7 +2334,7 @@ growing every time a proposal is accepted and graduates into
 `Implementation/` or `Foundational/`. A dedicated boolean per file
 means every new doc file requires an `argparse` change in
 `arklight/cli/main.py` just to become reachable -- the same "grows
-without bound" problem `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`
+without bound" problem the JS vocabulary expansion proposal (kept outside `main`)
 flags for other unbounded catalogs. `--file NAME` is the one-flag
 equivalent of the same idea: the *directory* flags stay as named
 booleans because that set is small and stable (it's the lifecycle
@@ -2701,7 +2708,7 @@ not an implicit extension of §5.
 
 Unchanged from the original concept sketch's separation, restated
 briefly since both those assistants are discussed in
-`docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`:
+the assistant CLI proposal (kept outside `main`):
 
 - **Raeliana** -- read-only, doc-grounded question answering. Not
   authorized for implementation yet (see that proposal's own status).
@@ -2754,7 +2761,7 @@ Implemented, alpha (`0.06503`). Out-of-band, numbered capability fix per
 `docs/Foundational/V1-DEFINITION.md`'s "Issue triage during Alpha"
 section -- not a broken promise but a missing one, so it doesn't wait for
 whichever milestone is already in flight. Traces to
-[`ARKlight-ISSUE-REGISTER.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/alpha/docs/Proposals/ARKlight-ISSUE-REGISTER.md) #7.
+`ARKlight-ISSUE-REGISTER.md` #7.
 
 #### The missing capability
 
@@ -2932,7 +2939,7 @@ Implemented, alpha (`0.06506`). Out-of-band, numbered capability fix per
 `docs/Foundational/V1-DEFINITION.md`'s "Issue triage during Alpha"
 section, the same slot-sharing precedent as `0.0650`-`0.06505`; the
 roadmap's `v0.065` is untouched. Traces to
-[`ARKlight-ISSUE-REGISTER.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/alpha/docs/Proposals/ARKlight-ISSUE-REGISTER.md) #5 (positional
+`ARKlight-ISSUE-REGISTER.md` #5 (positional
 component errors leak a raw `TypeError`) and #32 (component API
 diagnostics aren't consistently compiler-native). Not a broken promise
 but a missing one: `@component`'s own docstring already says a misused

@@ -71,7 +71,7 @@ is folded into `STATE_CORE_JS` either -- each ships only on a page that
 actually uses the corresponding construct (`has_repeat`/`has_show` in
 `arklight/backend/js/render.py`'s `_collect_usage`).
 
-`v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md) adds one
+`v0.0641` (docs/version history/v0.0641.md) adds one
 more sibling the same way: `query.py` (`WIRE_QUERY_SYNC_JS` /
 `wireQuerySync`), the `popstate` half of `State(..., query=...)`. Like
 `watch.py`, not folded into `STATE_CORE_JS` -- only shipped on a site

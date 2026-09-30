@@ -634,8 +634,7 @@ def State(
     means this key is plain, non-media-driven state, unchanged
     behavior for existing `State(...)` calls.
 
-    `query="page"` (`v0.064`, `docs/Proposals/URL-STATE-AS-PRIMITIVE-
-    PROPOSAL.md`) opts this key into two-way URL query-parameter
+    `query="page"` (`v0.0641`, `docs/version history/v0.0641.md`) opts this key into two-way URL query-parameter
     syncing, the primitive this project previously had no authored
     answer for at all:
 
@@ -957,7 +956,7 @@ class _PlatformDB:
 class PlatformAPI:
     """
     A closed vocabulary of platform-supplied capabilities (`v0.065`,
-    accepted from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`), for
+    accepted; see `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`), for
     `on_click=`, alongside named behaviors and `Action.*(...)`. Each
     returns a small structured `PlatformAPIRef` -- validated against
     `arklight.ir.platform_api.PLATFORM_API_REGISTRY` at compile time,

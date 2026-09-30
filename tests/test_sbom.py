@@ -103,6 +103,6 @@ def test_interactive_site_lists_only_what_it_actually_uses(tmp_path):
 # ACC (ARKlight Component Collections) package-listing tests are
 # deliberately not carried over here: `arklight/capabilities.py`, the
 # entry-point-based capability-discovery module ACC is built on, is an
-# `alpha`-only feature not included in this sync (same standing
+# feature not included on this branch (same standing
 # exclusion policy as the Android/Desktop backends) -- see
 # `arklight/compiler/sbom.py`'s module docstring.

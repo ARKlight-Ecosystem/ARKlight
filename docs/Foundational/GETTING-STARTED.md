@@ -73,11 +73,6 @@ arklight-framework/
     config.py          `arklight.config.py` project-config loader
                         (optional, per-project settings file -- see
                         docs/Foundational/AUTHORING-GUIDE.md#configuration-arklightconfigpy)
-    capabilities.py    ACC (ARKlight Component Collections) capability-
-                        discovery hook -- scans the `arklight.capabilities`
-                        entry-point group; zero effect on a build with no
-                        ACC packages installed -- see
-                        docs/Foundational/ACC-CAPABILITIES.md
     experimental.py    Registry + CLI-warning contract for opt-in,
                         outside-the-intrinsic-model features -- see
                         docs/Foundational/EXPERIMENTAL-APIS.md
@@ -102,13 +97,6 @@ arklight-framework/
       js/               Stateful JS runtime -- `behaviors/`/`actions/`/
                         `derivations/` (one file per registry entry) and
                         `runtime/` (the shared vdom/dispatch/state core)
-      android/          `arklight android` packaging backend -- see
-                        docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md
-                        (alpha-only so far, not yet on `main`)
-      desktop/          `arklight desktop` packaging backend, Linux
-                        only so far -- see
-                        docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md
-                        (alpha-only so far, not yet on `main`)
     compiler/          Pipeline orchestration
     cli/               `arklight` command-line entry point (incl.
                         `deploy.py`, the `arklight deploy` -> Wrangler hand-off)

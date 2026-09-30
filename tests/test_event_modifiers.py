@@ -169,8 +169,7 @@ def test_wire_click_interceptor_action_branch_has_exactly_one_try_block():
     # plus an inner per-click dispatch guard) with a single delegated
     # click listener -- there's no separate wiring phase per element
     # any more, so one try/catch around the attribute-read + dispatch
-    # is the whole guard for a given dispatch kind. htmx-5 (docs/
-    # Backends/REFACTOR-INDEX.md row 10) renamed that listener
+    # is the whole guard for a given dispatch kind. htmx-5 (refactor index, row 10) renamed that listener
     # wireActionInterceptor -> wireClickInterceptor and gave it a
     # second branch (behaviors), each with its own try/catch -- so
     # this test now scopes to the action branch specifically. See

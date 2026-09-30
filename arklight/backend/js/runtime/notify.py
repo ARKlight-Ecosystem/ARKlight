@@ -9,7 +9,7 @@ failure can never itself become a second, worse error.
 Split out of `arklight/backend/js/render.py`'s old `_NOTIFY_JS`
 constant (`refactor-0`). Pure move, no JS output change.
 
-`0.06505` (docs/Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md) adds two
+`0.06505` (runtime error handling) adds two
 siblings that ship in the same fragment, under the same gating:
 
 - `arkReportError(message, err)` -- the one funnel every runtime

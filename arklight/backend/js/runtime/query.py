@@ -1,9 +1,8 @@
 """
-`wireQuerySync`: `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-
-PROPOSAL.md, `docs/version history/v0.064.md`) -- the back/forward
+`wireQuerySync`: `v0.0641` (`docs/version history/v0.0641.md`) -- the back/forward
 half of `State(..., query=...)` (`arklight.api.State`).
 
-Per the proposal's §3.5: nothing in ARKlight's shipped runtime
+Per the `v0.0641` design: nothing in ARKlight's shipped runtime
 listened for `popstate` before this -- there is no SPA router, so
 there was never a reason to. This is genuinely new runtime surface,
 not an extension of an existing mechanism (unlike the read/write

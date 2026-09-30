@@ -265,7 +265,7 @@ without also shipping the click interceptor it would never use (see
 `needs_actions_object` vs. `needs_click_interceptor` in
 `_build_runtime_js`).
 
-`v0.065` (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) adds Platform
+`v0.065` (`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`) adds Platform
 APIs: `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)`
 (`arklight.api.PlatformAPI`), compiled to a `PlatformAPIRef` on
 `on_click=` the same way `Action.*(...)` compiles to an `ActionRef`.

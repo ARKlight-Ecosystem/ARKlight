@@ -1,7 +1,7 @@
 """
 `PlatformAPI.db` -- persistent local key/value storage, one author-
-facing interface with a per-backend engine (IndexedDB on Web; `alpha`'s
-Android SQLite half is not on this branch -- sync plan Stage 11).
+facing interface with a per-backend engine (IndexedDB on Web; an Android
+SQLite half is not on this branch -- sync plan Stage 11).
 
 Grouped like `tests/test_platform_api.py`, plus a Node section that runs
 the *shipped* JavaScript rather than only inspecting it:
@@ -267,7 +267,7 @@ def test_js_db_page_with_no_state_still_works_without_a_store():
 
 
 def test_only_web_implements_db_on_main():
-    # `alpha` also lists "android" here (its SQLite engine); that backend
+    # "android" would be listed here with a SQLite engine, but that backend
     # is excluded from `main` (sync plan Stage 11), so it stays empty.
     assert "db" in BACKEND_PLATFORM_API_SUPPORT["web"]
     assert "db" not in BACKEND_PLATFORM_API_SUPPORT["android"]

@@ -2,7 +2,7 @@
 
 > Accurate as of package version **`v0.070.0`**, commit
 > [`96ada2c`](https://github.com/ARKlight-Ecosystem/ARKlight/commit/96ada2c3112afe46a218503d07385f2597216be4)
-> on `alpha`. This is a settled-record doc (`docs/Foundational/`,
+> of the development tree. This is a settled-record doc (`docs/Foundational/`,
 > updated in place, never removed) -- if you're reading this from a
 > later checkout, cross-check anything version-sensitive against
 > `CHANGELOG.md` and `pyproject.toml`'s `[project] version` before
@@ -158,7 +158,7 @@ than guessing.
 
 **`# use` is reserved, not implemented.** A `# use <...>` line in the
 preamble is refused with an error pointing at the proposal
-([`USE-PREAMBLE-PROPOSAL.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/alpha/docs/Proposals/USE-PREAMBLE-PROPOSAL.md),
+(`USE-PREAMBLE-PROPOSAL.md`,
 *not accepted*), because silently ignoring it would let you write it
 believing it does something. More directives can be added later: each
 is one recogniser plus one handler in `arklight/parser/preamble.py`.
@@ -504,7 +504,7 @@ Anything other than `false` (or no hook at all) leaves the notice
 showing. A throwing hook is ignored. The `message` is always one of
 ARKlight's own fixed strings. The hook also sees every uncaught error on
 the page, including from your own scripts. Design record:
-[`../Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/alpha/docs/Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md).
+`../Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md`.
 
 ## Component vocabulary (90 components)
 

@@ -1,5 +1,5 @@
 """
-Stage 13 guard (docs/syncing main with alpha branch/MAIN TO ALPHA V0.070.md):
+Stage 13 guard (see the sync-plan folder under docs/):
 root metadata after the v0.070 catch-up.
 
 Locks the three things that stage is responsible for, so a later stage's
@@ -10,7 +10,7 @@ patch regeneration cannot silently undo them:
   which is what ``arklight --version`` prints).
 * ``.github/workflows/apt-repo.yml`` -- the one ``main``-only file --
   is still present and non-empty.
-* ``main``-only root differences from ``alpha`` were kept on purpose:
+* ``main``-only root differences were kept on purpose:
   the SPDX ``license`` string / empty ``classifiers`` in ``pyproject.toml``
   and the ``ARK/`` line in ``.gitignore``.
 """

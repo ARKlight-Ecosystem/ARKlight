@@ -147,8 +147,7 @@ a media query the browser can't parse, or a very old browser lacking
 `matchMedia` entirely, means this key just never updates on its own,
 never a page-breaking error.
 
-`v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md, `docs/
-version history/v0.064.md`): `initState()` also reads a sibling
+`v0.0641` (`docs/version history/v0.0641.md`): `initState()` also reads a sibling
 `data-ark-query` attribute (`IRPage.query`, same marker/`<body>`-
 attribute duality again) -- `[name, param, type_tag, history_mode]`
 tuples for every `State(..., query=...)` declared on the page. Same

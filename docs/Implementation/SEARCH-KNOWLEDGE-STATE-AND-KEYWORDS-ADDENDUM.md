@@ -2,7 +2,7 @@
 # Keywords Addendum
 
 **Status:** Stage 0 (plan) -- SHIPPED. Stage 1 (implementation) --
-SHIPPED, unreleased (`alpha`). A capability fix to
+SHIPPED. A capability fix to
 `arklight.search.knowledge.build_knowledge_base()` and
 `arklight.cli.search`, in the same spirit `ActionSpec.state_args`
 (`arklight/ir/schema.py`) already calls a "capability fix" elsewhere
@@ -103,7 +103,7 @@ path 2 (and, for the first, to path 1 too):
   only ever read `.tokens`, so a dedicated shape would add a type with
   no consumer that needs it.
 
-## Stage 1 -- Implementation (SHIPPED, unreleased -- alpha)
+## Stage 1 -- Implementation (SHIPPED)
 
 Shipped exactly as planned in Stage 0, items 1-3. See the patch this
 addendum accompanies for the full diff; summary below.
@@ -132,10 +132,10 @@ addendum accompanies for the full diff; summary below.
 | Stage | Covers | Status |
 | --- | --- | --- |
 | 0 | Game plan | SHIPPED |
-| 1 | `knowledge.py` + `cli/search.py` capability fix, tests | SHIPPED (unreleased, `alpha`) |
+| 1 | `knowledge.py` + `cli/search.py` capability fix, tests | SHIPPED |
 
 See `PROGRESS.md`/`CHANGELOG.md` for the internal record once this is
 rolled into a version-history entry; not yet given one, the same
-"shipped, unreleased on `alpha`" gap `arklight search --retrieve-doc`'s
+"shipped, unreleased" gap `arklight search --retrieve-doc`'s
 own follow-up fixes sat in before their `0.06605`/`0.06606` entries
 landed.

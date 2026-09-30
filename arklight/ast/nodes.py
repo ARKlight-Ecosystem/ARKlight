@@ -150,8 +150,8 @@ class ActionRef:
 @dataclass(frozen=True)
 class PlatformAPIRef:
     """
-    A reference to a Platform API interface call (`v0.065`, accepted
-    from `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) -- e.g.
+    A reference to a Platform API interface call (`v0.065`, accepted;
+    see `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`) -- e.g.
     `PlatformAPI.notify("Saved", body="Your changes were saved.")`.
     Used as an `on_click=` value, alongside a named behavior string and
     `ActionRef`.

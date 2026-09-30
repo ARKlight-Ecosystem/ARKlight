@@ -1,6 +1,6 @@
 """
 Tests for `0.06505`: closing the JS runtime error-handling coverage gap
-(`docs/Proposals/RUNTIME-ERROR-HANDLING-PROPOSAL.md`).
+(the runtime error-handling design).
 
 Three layers, mirroring the proposal:
 

@@ -1,8 +1,7 @@
 """
 `arklight live-streaming` -- a dev-only auto-rebuild + browser-reload
-server, plus (opt-in) a live `State(...)` SSE channel. Alpha-only (see
-`arklight.CHANNEL`): this is exactly the kind of experimental,
-moving-fast dev tool alpha exists for.
+server, plus (opt-in) a live `State(...)` SSE channel. A development-only
+tool: never run it in production or CI.
 
     arklight live-streaming --subscribe site.py [-o ARK] [--host H] [--port P]
     arklight live-streaming --subscribe site.py --channel               # + random free port
@@ -10,8 +9,8 @@ moving-fast dev tool alpha exists for.
     arklight live-streaming --status [site.py] [--status-pin]
     arklight live-streaming --unsubscribe [site.py]
 
-This is the unified CLI surface for both of the dev servers ARKlight's
-alpha channel used to expose as two separate subcommands
+This is the unified CLI surface for both of the dev servers ARKlight
+used to expose as two separate subcommands
 (`arklight live-streaming` and `arklight cctv`). `arklight cctv` no
 longer exists on its own; what it did is now `--channel`, a flag on
 this command, since both are the same kind of thing -- a foreground,
@@ -91,7 +90,7 @@ _LIVE_PREFIX = "[ARKlight] Live-streaming:"
 
 # One-time banner printed at the start of every --subscribe session --
 # impossible to miss, same [ARKlight]-prefixed style as the rest of
-# the CLI, matching the existing [ARKlight ALPHA] warning-marker
+# the CLI, matching the existing [ARKlight LIMITATION] warning-marker
 # convention for "this is not a silent/ordinary code path."
 _DEV_ONLY_BANNER = (
     f"{_STAGE_PREFIX} Live-streaming is a development tool only "
@@ -450,9 +449,9 @@ def _stage_logger(message: str) -> None:
         print(f"{_STAGE_PREFIX} {message}")
 
 
-def _print_alpha_warnings(caught: list[warnings.WarningMessage]) -> None:
-    alpha_warnings = [w for w in caught if "[ARKlight ALPHA]" in str(w.message)]
-    for w in alpha_warnings:
+def _print_limitation_warnings(caught: list[warnings.WarningMessage]) -> None:
+    limitation_warnings = [w for w in caught if "[ARKlight LIMITATION]" in str(w.message)]
+    for w in limitation_warnings:
         print(f"  - {w.message}", file=sys.stderr)
 
 
@@ -478,7 +477,7 @@ def _rebuild(entry: Path, output: Path, backends: list[Backend]) -> BuildResult 
         traceback.print_exc(file=sys.stderr)
         return None
 
-    _print_alpha_warnings(caught)
+    _print_limitation_warnings(caught)
     return result
 
 
@@ -764,7 +763,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
 def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser(
         "live-streaming",
-        help="Alpha-only dev tool: auto-rebuild + browser auto-reload on file change.",
+        help="Dev-only tool: auto-rebuild + browser auto-reload on file change.",
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(

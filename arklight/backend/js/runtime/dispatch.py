@@ -137,7 +137,7 @@ single `try`/`catch` guard -- just now invoked either synchronously or
 from inside the debounce timer's callback, instead of always
 synchronously.
 
-**`v0.065`** (docs/Proposals/PLATFORM-API-IR-PROPOSAL.md): adds a
+**`v0.065`** (docs/Implementation/PLATFORM-API-IR-ADDENDUM.md): adds a
 third branch, `\"platform:<capability>\"`, dispatching
 `PlatformAPI.*(...)` references the same way the `\"action:\"` branch
 above dispatches `Action.*(...)` -- reading `data-ark-platform-api-

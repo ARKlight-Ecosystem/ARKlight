@@ -82,11 +82,10 @@ def _write_config(tmp_path, body: str) -> None:
 
 
 def test_a_correct_config_produces_no_warnings(tmp_path):
-    # `main` note: `alpha`'s own version of this test also includes an
-    # `"android": {...}` section -- dropped here since `android` is not
-    # a known config section on `main` (standing Android-exclusion
-    # policy; see `docs/syncing main with alpha branch/`), so including
-    # it would make `config_warnings` correctly flag it as unknown and
+    # Note: an `"android": {...}` section is deliberately absent here,
+    # since `android` is not a known config section on `main` (standing
+    # Android-exclusion policy; see the sync-plan folder under `docs/`),
+    # so including it would make `config_warnings` correctly flag it as unknown and
     # break this test's own "no warnings" assertion.
     _write_config(
         tmp_path,
@@ -150,9 +149,8 @@ def test_known_key_table_matches_the_readers_own_defaults():
     """The table is hand-maintained; this stops it drifting from the
     modules that actually read each section.
 
-    `main` note: `alpha`'s own version of this test also checks the
-    `android`/`desktop` entries (`arklight.cli.android`/`desktop`).
-    Those backends are excluded from `main` as standing policy, so
+    Note: the `android`/`desktop` entries (`arklight.cli.android`/`desktop`)
+    are not checked. Those backends are excluded from `main` as standing policy, so
     `_KNOWN_KEYS` has no `"android"`/`"desktop"` entries to check here
     -- only the `live_streaming` assertions apply.
     """

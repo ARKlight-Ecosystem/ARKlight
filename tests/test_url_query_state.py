@@ -1,6 +1,6 @@
 """
 Tests for `State(..., query=..., history=...)` -- URL query-parameter
-state syncing (`docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`,
+state syncing (`docs/version history/v0.0641.md`,
 `docs/version history/v0.064.md`). Landed as a third accepted piece
 of `v0.064`, alongside `arklight search --retrieve-doc`, under the
 same "make room for one more" precedent `PROGRESS.md`'s Snapshot
