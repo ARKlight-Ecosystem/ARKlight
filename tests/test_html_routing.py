@@ -1,7 +1,7 @@
 """
 Unit tests for `arklight/backend/html/routing.py` -- HTML backend
-refactor Stage 2 (see docs/Backends/HTML-BACKEND-REFACTOR.md /
-docs/Backends/REFACTOR-INDEX.md row 1, `html-2`).
+refactor Stage 2 (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] /
+REFACTOR-INDEX.md row 1, `html-2`).
 
 These test the route/asset-path resolution functions directly,
 independent of `HTMLBackend.render`/a full IR build -- the same

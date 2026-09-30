@@ -1,5 +1,5 @@
 """
-Stage 3 of "Reactive-core vdom staging" (docs/DESIGN-NOTES.md): event
+Stage 3 of "Reactive-core vdom staging" (docs/Foundational/DESIGN-NOTES.md): event
 modifiers via `.with_modifiers(...)` / `.debounce(...)` / `.throttle(...)`
 on an `ActionRef`.
 """
@@ -164,7 +164,7 @@ def test_js_backend_ships_nothing_extra_without_state():
 
 
 def test_wire_click_interceptor_action_branch_has_exactly_one_try_block():
-    # htmx-3 (see docs/Backends/HTMX-INTEGRATION.md "Stage 3") replaced
+    # htmx-3 (see HTMX-INTEGRATION.md [retired -- see CHANGELOG.md] "Stage 3") replaced
     # wireActions()'s two-try-block shape (a per-element wiring guard
     # plus an inner per-click dispatch guard) with a single delegated
     # click listener -- there's no separate wiring phase per element
@@ -209,7 +209,7 @@ def test_runtime_still_has_no_eval_or_new_function():
 
 
 # ---------------------------------------------------------------------------
-# Bug fix (docs/bug_fixes.md finding 1): compiled `hx-trigger` modifiers
+# Bug fix (bug_fixes.md finding 1): compiled `hx-trigger` modifiers
 # are now actually enforced by wireClickInterceptor at dispatch time,
 # not just compiled into inert markup. These assertions are static --
 # same as every other test in this module -- since nothing in this test

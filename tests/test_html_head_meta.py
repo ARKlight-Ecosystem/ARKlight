@@ -1,7 +1,7 @@
 """
 Unit tests for `arklight/backend/html/head_meta.py` -- HTML backend
-refactor Stage 4 (see docs/Backends/HTML-BACKEND-REFACTOR.md /
-docs/Backends/REFACTOR-INDEX.md row 7, `html-4`).
+refactor Stage 4 (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] /
+REFACTOR-INDEX.md row 7, `html-4`).
 
 These test `_render_head_meta` directly, independent of
 `HTMLBackend.render`/a full IR build -- the same "independent
@@ -146,3 +146,32 @@ def test_values_are_html_escaped():
     result = _render_head_meta(page, "Home", current_route="/", route_to_path=ROUTE_TO_PATH)
     assert "<script>" not in result
     assert "&lt;script&gt;" in result
+
+
+def test_scripts_list_renders_verbatim_external_script_tags():
+    # `Provider`, stage 4 of 6 (v0.068) -- external script loading.
+    page = _page({"scripts": [{"src": "https://example.com/sdk.js", "defer": "true"}]})
+    result = _render_head_meta(page, "Home", current_route="/blog/post", route_to_path=ROUTE_TO_PATH)
+    # Verbatim, like `links` -- no relative-path rewriting.
+    assert '<script src="https://example.com/sdk.js" defer="true"></script>' in result
+
+
+def test_scripts_list_supports_multiple_entries_after_other_head_tags():
+    page = _page(
+        {
+            "description": "A test site",
+            "scripts": [
+                {"src": "https://example.com/one.js"},
+                {"src": "https://example.com/two.js", "async": "true"},
+            ],
+        }
+    )
+    result = _render_head_meta(page, "Home", current_route="/", route_to_path=ROUTE_TO_PATH)
+    assert result.count("<script") == 2
+    assert result.index("<meta") < result.index("<script")
+
+
+def test_no_scripts_prop_omits_script_tags():
+    page = _page({})
+    result = _render_head_meta(page, "Home", current_route="/", route_to_path=ROUTE_TO_PATH)
+    assert "<script" not in result

@@ -126,7 +126,7 @@ def test_css_backend_background_covers_full_browser_window():
 
 
 def test_css_backend_has_no_media_or_container_queries():
-    # Structural constraint (see docs/DESIGN-NOTES.md): everything
+    # Structural constraint (see docs/Foundational/DESIGN-NOTES.md): everything
     # responsive has to come from intrinsic sizing, since `Page` has no
     # `<head>` hook for a breakpoint-based rule.
     pages = {"/": Page(Text("hi"))}
