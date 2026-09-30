@@ -1,6 +1,6 @@
 """
 HTML Backend refactor, Stage 5 (see
-docs/Backends/HTML-BACKEND-REFACTOR.md / docs/Backends/REFACTOR-INDEX.md
+HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] / REFACTOR-INDEX.md
 row 8, `html-5`): the fifth of the six staged extractions splitting
 `arklight/backend/html/render.py`'s five unrelated jobs into their own
 modules.
@@ -17,7 +17,7 @@ becomes a short composition of the sibling modules -- exactly the
 target shape's stated end state.
 
 Sequenced ahead of `htmx-4` (app-shell navigation) deliberately, per
-`docs/Backends/REFACTOR-INDEX.md` row 8: `_render_page` is exactly
+`REFACTOR-INDEX.md` row 8: `_render_page` is exactly
 where the shell-persistent-region audit that stage calls for has to
 look, so landing this extraction first meant that audit landed
 directly in `page_render.py` rather than in `render.py` a few commits
@@ -26,7 +26,7 @@ already applied ahead of `htmx-1`.
 
 At the point this module was split out, that was zero behavior
 change: same recursion, same tag emission, same generated HTML
-byte-for-byte as before it existed. `htmx-4` (docs/Backends/REFACTOR-INDEX.md row 9) is the first stage to actually change what
+byte-for-byte as before it existed. `htmx-4` (REFACTOR-INDEX.md row 9) is the first stage to actually change what
 `_render_page` emits -- see `_render_page`'s own docstring below for
 what `app_shell=True` adds. Every existing caller that doesn't pass
 `app_shell` gets the prior byte-for-byte output, unchanged.
@@ -211,7 +211,7 @@ def _repeat_template_spec(node: IRNode) -> dict:
     documented limitation of this stage -- other props render
     correctly for the items the server already produced, but won't be
     reproduced for one added purely client-side; see
-    docs/Backends/REFACTOR-INDEX.md row 15 for what's left for a
+    REFACTOR-INDEX.md row 15 for what's left for a
     future version).
     """
     tag = _tag_for(node)
@@ -375,7 +375,7 @@ def _render_page(
     trusted_script_origins: list[str] | None = None,
 ) -> str:
     """
-    `app_shell` (htmx-4, docs/Backends/REFACTOR-INDEX.md row 9):
+    `app_shell` (htmx-4, REFACTOR-INDEX.md row 9):
     `Site(app_shell=True)` -- defaults to `False`, unchanged output
     (same byte-for-byte HTML this function always produced). Set, two
     things change:
@@ -413,7 +413,7 @@ def _render_page(
     """
     title = page.root.props.get("title", site_name)
     lang = page.root.props.get("lang", site_lang)
-    # `vdom-4` (docs/Backends/REFACTOR-INDEX.md row 12): `Bind(...)`/
+    # `vdom-4` (REFACTOR-INDEX.md row 12): `Bind(...)`/
     # `bind_class=` may reference a Computed(...) name exactly like a
     # State(...)'s, so both build-time text-fill (_render_bind) and
     # build-time truthiness checks (attrs.py's bind_class rendering)
@@ -460,7 +460,7 @@ def _render_page(
         if page.computed:
             computed_json = escape(json.dumps(page.computed), quote=True)
             computed_attr = f' data-ark-computed="{computed_json}"'
-        # `vdom-5` (docs/Backends/REFACTOR-INDEX.md row 13): `page.watch`
+        # `vdom-5` (REFACTOR-INDEX.md row 13): `page.watch`
         # rides along as its own `data-ark-watch` attribute, same
         # reasoning as `data-ark-computed` above -- it carries no
         # value of its own to hydrate, just the (name, then) pairs the
@@ -477,7 +477,7 @@ def _render_page(
         if page.watch:
             watch_json = escape(json.dumps(page.watch), quote=True)
             watch_attr = f' data-ark-watch="{watch_json}"'
-        # `vdom-8` (docs/Backends/REFACTOR-INDEX.md row 16): `page.persist`
+        # `vdom-8` (REFACTOR-INDEX.md row 16): `page.persist`
         # rides along as its own `data-ark-persist` attribute, same
         # reasoning as `data-ark-watch`/`data-ark-computed` above -- a
         # plain list of `State(...)` names, no value of its own, read
@@ -546,6 +546,24 @@ def _render_page(
     # site that opts out gets exactly today's tag set back, byte for
     # byte.
     csp_meta = _render_csp_meta_tag(trusted_script_origins) if strict_csp else ""
+    # `app_shell`'s hx-boost swaps `<body>`'s *innerHTML* on every
+    # navigation (see the docstring above) -- and this runtime
+    # `<script>` tag lives inside that innerHTML. Without `hx-preserve`,
+    # htmx's own script-tag-re-execution handling (`allowScriptTags`,
+    # on by default) treats the incoming copy of this same tag as new
+    # content and re-runs it on every boosted navigation: the runtime's
+    # `Wn()` (indicator-style injection, `arklight/backend/js/htmx.py`)
+    # fires again before that re-run reaches the line disabling it, and
+    # `head.insertAdjacentHTML(...)` is exactly the sink CSP's
+    # `require-trusted-types-for 'script'` (`csp.py`) blocks -- throwing
+    # partway through htmx's own re-init and aborting the rest of it
+    # (the new page's hx-* attributes never get processed). `id` +
+    # `hx-preserve="true"` -- the same mechanism `shell_persistent`
+    # already compiles to elsewhere in this file -- keeps the original
+    # script node in place across the swap instead of it being reparsed
+    # and re-executed, so it runs exactly once per page load, same as a
+    # non-app_shell site.
+    script_preserve_attrs = ' id="ark-runtime" hx-preserve="true"' if app_shell else ""
     return (
         "<!DOCTYPE html>\n"
         f'<html lang="{escape(str(lang), quote=True)}">\n'
@@ -558,7 +576,7 @@ def _render_page(
         f"{head_meta}"
         "</head>\n"
         f"<body{body_attrs}>\n{state_marker}{body_inner}\n"
-        f'<script src="{escape(script_src, quote=True)}" defer></script>\n'
+        f'<script src="{escape(script_src, quote=True)}"{script_preserve_attrs} defer></script>\n'
         "</body>\n"
         "</html>\n"
     )

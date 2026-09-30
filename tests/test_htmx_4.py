@@ -192,6 +192,33 @@ def test_shell_persistent_is_inert_without_app_shell():
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Bugfix: the runtime <script> tag lives inside <body>, which hx-boost's
+# innerHTML swap replaces on every navigation. Without hx-preserve, htmx
+# re-executes the freshly-swapped-in copy of that same tag on every
+# boosted nav, re-running Wn()'s indicator-style injection
+# (head.insertAdjacentHTML) before that re-run disables it -- which
+# strict CSP's Trusted Types directive (csp.py) blocks outright,
+# throwing partway through htmx's own re-init and breaking hx-boost
+# processing on the newly swapped page. id + hx-preserve="true" keeps
+# the original script node in place across a swap instead.
+# ---------------------------------------------------------------------------
+
+
+def test_runtime_script_is_preserved_across_boosted_swaps_with_app_shell():
+    html = HTMLBackend().render(_plain_ir(app_shell=True))["index.html"]
+    script_line = [line for line in html.splitlines() if line.startswith("<script")][0]
+    assert 'id="ark-runtime"' in script_line
+    assert 'hx-preserve="true"' in script_line
+
+
+def test_runtime_script_has_no_preserve_attrs_without_app_shell():
+    html = HTMLBackend().render(_plain_ir())["index.html"]
+    script_line = [line for line in html.splitlines() if line.startswith("<script")][0]
+    assert "hx-preserve" not in script_line
+    assert 'id="ark-runtime"' not in script_line
+
+
 def test_app_shell_alone_ships_htmx_even_with_no_behaviors_or_state():
     # The gap this stage's audit found: a plain nav-only page in an
     # app_shell site previously shipped with no HTMX runtime at all,

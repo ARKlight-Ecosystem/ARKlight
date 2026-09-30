@@ -210,11 +210,41 @@ def _find_session(entry_path: str | Path | None) -> tuple[str, dict[str, Any]] |
 class _LiveReloadBackend(Backend):
     name = "live-reload"
 
-    def render(self, ir: WebsiteIR) -> dict[str, str]:  # noqa: ARG002
+    def __init__(self) -> None:
+        # Set by render() on every build, read back by postprocess()
+        # immediately after -- see the `app_shell` handling below.
+        self._app_shell = False
+
+    def render(self, ir: WebsiteIR) -> dict[str, str]:
+        self._app_shell = ir.app_shell
         return {}
 
     def postprocess(self, output_files: dict[str, str]) -> dict[str, str]:
-        tag = f'<script src="{_CLIENT_JS_PATH}"></script>'
+        # `Site(app_shell=True)` puts `hx-boost="true"` on `<body>`
+        # (`arklight/backend/html/page_render.py`), so every same-
+        # origin nav becomes an in-place swap of `<body>`'s innerHTML
+        # -- and this injected tag lives inside that innerHTML. HTMX
+        # re-executes `<script>` tags it finds in swapped content by
+        # default (`allowScriptTags`), so without a guard, *every*
+        # boosted navigation would create a brand new `EventSource`
+        # connecting to `_EVENTS_PATH` on top of the one(s) already
+        # open from earlier navigations -- none of them ever get
+        # closed, since the client script never calls `.close()`. SSE
+        # connections are long-lived, and browsers cap concurrent
+        # HTTP/1.1 connections per origin at ~6; a handful of boosted
+        # clicks is enough to exhaust that cap and stall every further
+        # request to this origin -- including HTMX's own boosted XHRs,
+        # breaking navigation on the very page live-streaming is
+        # serving. `id` + `hx-preserve="true"` is the same fix already
+        # used for the compiled runtime's own `<script>` tag in this
+        # exact situation (`page_render.py`'s `script_preserve_attrs`):
+        # it keeps this original script node in place across every
+        # swap instead of it being reparsed and re-run, so exactly one
+        # `EventSource` is ever opened per page load, same as a
+        # non-app_shell site. Harmless to leave off when `app_shell`
+        # is False -- there's no boosting happening to re-execute it.
+        attrs = ' id="__arklight_live_reload__" hx-preserve="true"' if self._app_shell else ""
+        tag = f'<script{attrs} src="{_CLIENT_JS_PATH}"></script>'
         updated = dict(output_files)
         for path, contents in output_files.items():
             if not path.endswith(".html"):

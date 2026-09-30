@@ -82,6 +82,20 @@ this same feature *is* folded directly into `STATE_CORE_JS`'s
 are -- see `state.py`'s module docstring, "v0.064" section, for why
 the two halves of one feature are split across "always present, no-op
 when unused" vs. "only shipped when used" this way.
+
+Three more exports -- `HTMX_ERROR_HANDLING_JS` (`wireHtmxErrorHandling`,
+including the real-navigation fallback for a dead boosted link),
+`APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS` (`disableBoostOnFileProtocol`)
+and `APP_SHELL_FILE_PROTOCOL_CHECK_JS`
+(`warnIfAppShellServedFromFileProtocol`) -- live in `notify.py`
+alongside `NOTIFY_JS`/`ERROR_REPORT_JS`/`ERROR_BOUNDARY_JS` rather than
+as their own siblings: they're both extensions of that same error-
+funnel idea (see `notify.py`'s module docstring), not independent
+reactive-core pieces. `arklight/backend/js/render.py`'s
+`_build_runtime_js` ships the error handling wherever HTMX itself ships
+(`needs_htmx`), which already covers every `Site(app_shell=True)` site
+-- see that module's `needs_htmx` docstring -- and the two `file://`
+pieces for `app_shell` sites only.
 """
 
 from __future__ import annotations
@@ -97,8 +111,11 @@ from arklight.backend.js.runtime.model import (
 )
 from arklight.backend.js.runtime.nav import NAV_HIGHLIGHT_JS
 from arklight.backend.js.runtime.notify import (
+    APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS,
+    APP_SHELL_FILE_PROTOCOL_CHECK_JS,
     ERROR_BOUNDARY_JS,
     ERROR_REPORT_JS,
+    HTMX_ERROR_HANDLING_JS,
     NOTIFY_JS,
 )
 from arklight.backend.js.runtime.query import WIRE_QUERY_SYNC_JS
@@ -123,6 +140,9 @@ __all__ = [
     "NOTIFY_JS",
     "ERROR_REPORT_JS",
     "ERROR_BOUNDARY_JS",
+    "HTMX_ERROR_HANDLING_JS",
+    "APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS",
+    "APP_SHELL_FILE_PROTOCOL_CHECK_JS",
     "NAV_HIGHLIGHT_JS",
     "WIRE_WATCHERS_JS",
     "RENDER_MODEL_BINDINGS_JS",
