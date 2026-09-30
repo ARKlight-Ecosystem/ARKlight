@@ -57,6 +57,21 @@ def test_csp_tag_requires_trusted_types_for_script():
     assert "trusted-types" in tag
 
 
+def test_csp_tag_allow_lists_the_htmx_trusted_types_policy():
+    # Vendored HTMX creates exactly this policy (htmx.py's
+    # `_apply_trusted_types_patch`); if the name isn't allow-listed,
+    # `createPolicy` throws and every boosted swap fails on the
+    # DOMParser/parseHTMLUnsafe sink -- the dead-link bug.
+    from html import unescape
+
+    directives = [d.strip() for d in unescape(_render_csp_meta_tag()).split(";")]
+    (trusted_types,) = [d for d in directives if d.split()[0].endswith("trusted-types")]
+    assert trusted_types.split()[1:] == ["default", "arklight-htmx"]
+    # Never a wildcard or 'allow-duplicates': the allow-list stays closed.
+    assert "*" not in trusted_types
+    assert "allow-duplicates" not in trusted_types
+
+
 def test_csp_tag_includes_object_src_none_and_base_uri_self():
     tag = _render_csp_meta_tag()
     assert "object-src &#x27;none&#x27;" in tag or "object-src 'none'" in tag

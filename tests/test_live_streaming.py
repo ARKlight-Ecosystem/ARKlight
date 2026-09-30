@@ -18,7 +18,8 @@ from arklight.cli import cctv, live_streaming as ls
 
 
 class _FakeIR:
-    pass
+    def __init__(self, *, app_shell: bool = False) -> None:
+        self.app_shell = app_shell
 
 
 def test_live_reload_backend_injects_script_before_closing_body():
@@ -43,6 +44,56 @@ def test_live_reload_backend_leaves_non_html_files_untouched():
 def test_live_reload_backend_render_contributes_no_files():
     backend = ls._LiveReloadBackend()
     assert backend.render(_FakeIR()) == {}
+
+
+def test_live_reload_backend_no_app_shell_ships_plain_script_tag():
+    # Default/no render() call yet -- same as a non-app_shell site.
+    backend = ls._LiveReloadBackend()
+    out = backend.postprocess({"index.html": "<html><body>hi</body></html>"})
+    assert out["index.html"].count("<script") == 1
+    assert f'<script src="{ls._CLIENT_JS_PATH}"></script>' in out["index.html"]
+    assert "hx-preserve" not in out["index.html"]
+
+
+def test_live_reload_backend_app_shell_adds_id_and_hx_preserve():
+    # `hx-boost="true"` swaps <body>'s innerHTML on every boosted nav,
+    # and HTMX re-executes <script> tags found in swapped content by
+    # default -- without a stable id + hx-preserve, every navigation
+    # would open a brand new EventSource on top of the ones already
+    # open, eventually exhausting the browser's per-origin connection
+    # cap and stalling HTMX's own boosted requests.
+    backend = ls._LiveReloadBackend()
+    backend.render(_FakeIR(app_shell=True))
+    out = backend.postprocess({"index.html": "<html><body>hi</body></html>"})
+    tag = out["index.html"]
+    assert 'id="__arklight_live_reload__"' in tag
+    assert 'hx-preserve="true"' in tag
+    assert f'src="{ls._CLIENT_JS_PATH}"' in tag
+
+
+def test_live_reload_backend_preserve_id_stable_across_rebuilds():
+    # Same backend instance is reused across every rebuild in a
+    # --subscribe session -- hx-preserve only works if the id matches
+    # between the old and new content, so it must stay identical from
+    # one rebuild's output to the next.
+    backend = ls._LiveReloadBackend()
+    backend.render(_FakeIR(app_shell=True))
+    first = backend.postprocess({"index.html": "<html><body>one</body></html>"})["index.html"]
+    backend.render(_FakeIR(app_shell=True))
+    second = backend.postprocess({"index.html": "<html><body>two</body></html>"})["index.html"]
+    assert 'id="__arklight_live_reload__"' in first
+    assert 'id="__arklight_live_reload__"' in second
+
+
+def test_live_reload_backend_reverts_to_plain_tag_if_app_shell_turned_off():
+    # Backends are re-rendered from scratch every rebuild -- a site
+    # that flips app_shell off on a later save shouldn't keep the
+    # stale hx-preserve attribute from the previous build.
+    backend = ls._LiveReloadBackend()
+    backend.render(_FakeIR(app_shell=True))
+    backend.render(_FakeIR(app_shell=False))
+    out = backend.postprocess({"index.html": "<html><body>hi</body></html>"})
+    assert "hx-preserve" not in out["index.html"]
 
 
 def test_registry_round_trip(tmp_path, monkeypatch):

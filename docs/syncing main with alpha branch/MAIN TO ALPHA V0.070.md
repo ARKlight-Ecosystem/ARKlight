@@ -591,7 +591,7 @@ Full suite: **2744 passed / 15 failed** -- the same 15 as Stages 10-12
 (8 docs-tree tests awaiting Stage 0's link decision, 7 Stage 8 runtime
 registry gaps); the 6 new tests all pass.
 
-## Stage 15 — htmx under Trusted Types, CSP, and `file://`/live-streaming fallbacks (new, `0df63e7` -> `23ebc24`)
+## Stage 15 — htmx under Trusted Types, CSP, and `file://`/live-streaming fallbacks (new, `0df63e7` -> `23ebc24`) ✅ ported
 
 Commits: `e9da11d`, `2ed1674`, `3a933df`, `85a8eee` (the live-streaming
 half). The bug: on `Site(app_shell=True)` every boosted link died under
@@ -624,6 +624,41 @@ content in this stage.
 htmx patch is exact-match-anchored, so it needs the vendored htmx
 literal on `main` to match `alpha`'s. Checked: both are htmx 2.0.10, so
 the anchors should apply; run `test_htmx_trusted_types.py` to confirm.
+
+**Result (run on `main` at `a44525b`, Stage 14 upstream):**
+
+- Before touching anything, confirmed `main`'s copies of the seven source
+  files were byte-identical to `alpha@0df63e7` except `htmx.py` and
+  `page_render.py`, which differed only in doc-path comments. Only the
+  four listed commits touched these files on `alpha`, so the
+  `main`-vs-`23ebc24` delta was exactly this stage's delta and nothing
+  else -- the files were taken from `23ebc24` whole rather than merged
+  hunk by hunk. Stage 8's `render.py`/`runtime/__init__.py` work is
+  preserved because `alpha`'s versions already contain it.
+- Ported: `backend/js/htmx.py`, `backend/html/csp.py`,
+  `backend/html/page_render.py`, `backend/js/render.py`,
+  `backend/js/runtime/__init__.py`, `backend/js/runtime/notify.py`,
+  `cli/live_streaming.py`. Tests: new `test_htmx_trusted_types.py` (392
+  lines) and `test_htmx_failure_handling.py` (275); expanded
+  `test_htmx_4.py`, `test_csp.py`, `test_live_streaming.py`.
+- The risk flagged above did not materialise: the vendored htmx literal
+  matched (2.0.10 both sides), every Trusted Types patch anchor applied,
+  and `import arklight` succeeds. Node (`/usr/bin/node`) is present, so
+  the Node-executed cases in the two new files ran rather than skipped
+  (46 passed, 0 skipped).
+- **Android/Desktop:** no imports, wiring or config. The ported files
+  mention Android WebView only as prose (why `moveBefore` and Trusted
+  Types matter on current Chromium) and one comment cites
+  `android/runtime.py` as the behaviour `wireHtmxErrorHandling` mirrors.
+  Byte-identical on `alpha`, so left in place under Stage 11's rule
+  about prose that names a backend without implementing it. Both
+  exclusion guards still pass.
+- Suite: **2816 passed / 8 failed** (was 2763 / 8). The same 8
+  docs-tree failures as Stage 14 -- Stage 0's link decision. The 53 new
+  passes are the stage's tests.
+- Stage 14's remaining-diff table: the "htmx / CSP / `file://`" row and
+  the five Stage 15 test files are now closed; re-check them on the
+  final Stage 14 run.
 
 ## Stage 16 — `PlatformAPI.db`, Web half only (new, `f719455`, `23ebc24`)
 
