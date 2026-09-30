@@ -5,11 +5,18 @@ project's own source, its own design docs, and hands-on verification --
 not from the pitch alone. Current as of **v0.070** (latest closed
 milestone on `alpha`; `v0.080`/`v0.100` -- the Android and Linux desktop
 native backends -- are IN PROGRESS, and `v0.071`-`v0.079`, Project
-Knowledge and the `arklight assistant` MVP, are PLANNED). Cross-check
-`PROGRESS.md`'s Snapshot table before treating any version-specific
-claim here as still accurate -- this document is a snapshot, not a
-live view, and it has gone stale before (this revision replaces one
-pinned to `v0.0644`, six milestones behind)._
+Knowledge and the `arklight assistant` MVP, are PLANNED), **plus one
+piece of code landed after `v0.070` closed**: `PlatformAPI.db`
+(local key/value storage, Web + Android), shipped in source but still
+`[Unreleased -- draft, version slot unconfirmed]` per `CHANGELOG.md` --
+folded into this revision because it changes two "no" answers below
+(offline key/value persistence beyond `localStorage`, and the first
+real JS-to-native bridge in the Android backend), not because it closed
+a milestone. Cross-check `PROGRESS.md`'s Snapshot table and
+`CHANGELOG.md`'s `[Unreleased]` section before treating any
+version-specific claim here as still accurate -- this document is a
+snapshot, not a live view, and it has gone stale before (this revision
+replaces one pinned to `v0.0644`, six milestones behind)._
 
 ## The Goal
 
@@ -246,9 +253,19 @@ version-by-version breakdown):
   `PlatformAPI.notify(...)` / `PlatformAPI.clipboard_write(...)` on
   `on_click=`, backed by a compiler-owned interface registry
   (`arklight.ir.platform_api`) with the Web reference implementation
-  shipped end-to-end. Stage 2 (native Android/Desktop
-  implementations) stays unscheduled, gated on each backend's own
-  maturity.
+  shipped end-to-end.
+- **Platform API IR, stage 2 of 2 -- first slice, `db`** (landed after
+  `v0.070`, `[Unreleased]` per `CHANGELOG.md`): stage 2 is no longer
+  purely unscheduled -- `PlatformAPI.db.set/get/delete/keys(...)` is a
+  fourth-and-fifth-backend capability (local key/value storage) with
+  real, distinct engines per platform: IndexedDB on Web, and a new
+  generated `ArkDb.kt` (SQLite) on Android, registered through
+  `WebViewCompat.addWebMessageListener` and restricted to the app's own
+  asset origin -- the first JS-to-native bridge anywhere in the Android
+  backend, previously an explicit non-goal. `notify`/`clipboard_write`
+  remain Web-only; Desktop implements nothing yet. See
+  `docs/Foundational/PLATFORM-APIS.md`'s "`db`: one interface, a
+  different engine per backend" for the full contract.
 - **The closed reactive vocabulary grew substantially**: the ~90-entry
   `Derive.*`/`Predicate.*` catalog referenced in `docs/Implementation/
   JS-VOCABULARY-ADDENDUM-v0.070.md` is now fully shipped end to end
@@ -373,7 +390,8 @@ The following is the practical capability boundary for the current alpha. These 
 | Local reactive UI | Yes | `State`, `Computed`/`Derive.*`, `Watch`, `Show`, and related primitives provide synchronous in-memory reactivity. |
 | Interactive forms with local state | Yes | Form elements can bind values to state and participate in the supported action/derivation vocabulary. |
 | Deep-linkable UI state | Yes | `State(..., query=..., history=...)` synchronizes state with URL query parameters and browser history. |
-| Persisted user preferences | Yes | `State(..., persist=True)` uses `localStorage` for supported client-side persistence. |
+| Persisted user preferences | Yes | `State(..., persist=True)` uses `localStorage` for supported client-side persistence -- one state key, one fixed slot. |
+| General-purpose local key/value storage | Yes (Unreleased) | `PlatformAPI.db.set/get/delete/keys(...)` -- an arbitrary number of named keys, JSON-serializable values, read back into any declared `State(...)`. Distinct from `persist=`: this is a store an author addresses directly, not a state-level convenience. Web uses IndexedDB; ships in source but still `[Unreleased -- draft, version slot unconfirmed]`. |
 | Viewport-responsive behavior | Yes | `State(..., media="...")` can expose media-query state to the closed reactive vocabulary. |
 | Lists rendered from data | Yes | `Repeat`/`RepeatItem` provides data-driven repeated rendering. |
 
@@ -391,6 +409,7 @@ The following is the practical capability boundary for the current alpha. These 
 | Client need | Feasible today? | Why / mechanism |
 |---|---|---|
 | Android wrapper around an ARKlight site | Alpha | Android backend uses AndroidX/WebView infrastructure and `WebViewAssetLoader` to provide the packaged site through a stable HTTPS-style asset origin. |
+| App that persists data through real native storage, not just the WebView's own | Alpha (Unreleased) | `PlatformAPI.db` gives the Android build a generated `ArkDb.kt` (SQLite) reached through a narrow, own-origin-only `WebViewCompat` message bridge; the same author-facing calls fall back to IndexedDB on Web. Still `[Unreleased]`, on-click-triggered only (no on-load read, no `clear`), and Desktop has no `db` implementation. |
 | Linux desktop wrapper | Alpha | Desktop backend uses GTK3 + WebKit2GTK and packages the compiled web output in a native shell. |
 | Cross-platform native distribution | Partially | Android and Linux desktop backends exist, but the native target surface is still alpha and does not provide a general native plugin/API ecosystem. |
 | iOS application | No | There is no iOS backend, and the current native-shell architecture does not provide an equivalent implementation. |
@@ -402,7 +421,7 @@ The following is the practical capability boundary for the current alpha. These 
 | Backend-driven application with authentication | No | ARKlight has no server runtime, authentication system, or account model. |
 | Database-backed application | No | There is no database/server integration in the current closed vocabulary. |
 | Checkout or payment application | No | No sanctioned backend/payment-service integration exists in the current compiler vocabulary. |
-| API-driven application requiring arbitrary HTTP requests | No | There is currently no general fetch/HTTP primitive in the closed vocabulary. `Provider` is the accepted direction for external services, but that does not make arbitrary API consumption available today. |
+| API-driven application requiring arbitrary HTTP requests | No | There is no `fetch`/HTTP primitive anywhere in ARKlight's closed vocabulary, and `PlatformAPI.db` does not change that -- it is local storage, not a network call. `Provider` (`Site(provider=Provider.declare(...))`) is the accepted, gated *boundary* for a site to declare it talks to an external service; the actual request -- "your own `fetch` calls" against a vendor SDK loaded via `Page(scripts=[...])`, in the maintainer's own words (`arklight/provider.py`) -- is the site author's hand-written JavaScript, never something ARKlight authors, generates, or validates. |
 | Large SPA-shaped application | No | ARKlight does not provide a persistent application-level component tree, general client-side router, or fine-grained reactive dependency graph. |
 | Complex multi-view client application | Not currently targeted | Pages remain independently compiled documents; `app_shell=True` improves navigation behavior but does not turn the output into a conventional SPA. |
 | Arbitrary custom JavaScript | No | Client behavior is intentionally restricted to the closed vocabulary. There is no general JavaScript escape hatch in the normal authoring model. |
@@ -425,18 +444,28 @@ For evaluation purposes, the important question is therefore not simply whether 
 
 - **No fetch/HTTP primitive anywhere in the closed vocabulary** -- a
   real, checkable wall (verified against `ACTION_REGISTRY` and
-  `DERIVATION_REGISTRY` directly) that rules out a whole class of
-  common beginner projects (weather apps, anything API-driven) until
-  or unless a sanctioned, closed-vocabulary way to fetch data is
-  designed. `Provider` (`docs/Foundational/PROVIDER-SDK.md`, six-rung
-  `v0.065`-`v0.070` ladder fully shipped) is the accepted answer for
-  *external services*; a Platform APIs layer
-  (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`, accepted and staged
-  in `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md` -- stage 1 of
-  2, the Web reference implementation, shipped as of `v0.065`) is a
-  related but distinct answer for *execution-platform* capabilities --
-  Section 25 of that proposal draws the
-  line between the two explicitly.
+  `DERIVATION_REGISTRY` directly, and still true after `PlatformAPI.db`
+  landed -- `db` is local storage, not a network call) that rules out a
+  whole class of common beginner projects (weather apps, anything
+  API-driven) until or unless a sanctioned, closed-vocabulary way to
+  fetch data is designed. `Provider` (`docs/Foundational/
+  PROVIDER-SDK.md`, six-rung `v0.065`-`v0.070` ladder fully shipped) is
+  the accepted *boundary* for external services -- it declares that a
+  site talks to one and can load its vendor script
+  (`Page(scripts=[...])`), but the actual request is the site author's
+  own hand-written code, never something ARKlight authors or
+  validates; `arklight/provider.py`'s own docstring names this
+  directly ("the real Firebase SDK, your own fetch calls"). A Platform
+  APIs layer (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`, accepted
+  and staged in `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`) is
+  a related but distinct answer for *execution-platform* capabilities
+  -- stage 1 of 2 (Web reference implementation, `notify`/
+  `clipboard_write`) shipped as of `v0.065`, and stage 2's first slice
+  (`db`, local key/value storage on Web + Android) has now landed in
+  source (`[Unreleased]` per `CHANGELOG.md`), narrowing but not closing
+  this gap: `db` reads and writes bytes a site already has, it still
+  doesn't put a byte on the wire. Section 25 of the Platform API
+  proposal draws the line between the two layers explicitly.
 - **No slot/children-passing model for user-defined components** --
   `Card(Text("content"))` forwarding `"content"` into `Card`'s render
   function the way React/Vue `children`/`<slot>` works does not exist
