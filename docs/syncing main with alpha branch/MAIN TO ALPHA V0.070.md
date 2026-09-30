@@ -465,7 +465,7 @@ creating an empty `arklight/cli/android.py` makes it fail. Full suite
 after this stage: 2725 passed / 15 failed (same 15 as after Stage 10;
 the 9 new tests all pass).
 
-## Stage 12 — Desktop-backend exclusion (new decision needed)
+## Stage 12 — Desktop-backend exclusion ✅ excluded, verified (go/no-go still the maintainer's)
 
 `backend/desktop/` did not exist at `alpha`'s `v0.054` snapshot -- it
 first landed mid-range (`be519fd`, Linux-only, explicitly marked
@@ -481,13 +481,60 @@ silently deciding either way:
 
 - [ ] Confirm with maintainer whether Desktop should land now or wait
       for its `v0.100` roadmap slot.
-- [ ] If excluded: skip `arklight/backend/desktop/`, `cli/desktop.py`,
+- [x] If excluded: skip `arklight/backend/desktop/`, `cli/desktop.py`,
       `examples/hello_desktop/`, `docs/Backends/
       ARKLIGHT_DESKTOP_BACKEND_PROPOSAL.md` /
       `DESKTOP-BACKEND-IMPLEMENTATION.md`, `tests/test_desktop.py`.
 - [ ] If included: treat it as its own Stage 12a with the same
       per-file review this plan gives every other stage, and update
       `main`'s roadmap table to reflect the pulled-forward timeline.
+
+**Result (run on `main` at `40f10d4`, Stage 11 upstream):** the "if
+excluded" branch was executed and holds. This was already the working
+assumption of Stages 1 and 10 (`config.py` never learned a `desktop`
+section; `cli/main.py` and `templates/_common.py` were ported with all
+Desktop wiring stripped), so this stage's job was to verify it and make
+it enforceable, not to remove anything.
+
+- All nine Desktop-only paths `alpha` has at `23ebc24` are absent on
+  `main`: `arklight/backend/desktop/{__init__,runtime}.py`,
+  `arklight/cli/desktop.py`, `examples/hello_desktop/{.gitignore,
+  README.md,arklight.config.py}`, `docs/Backends/ARKLIGHT_DESKTOP_
+  BACKEND_PROPOSAL.md`, `docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`,
+  `tests/test_desktop.py`.
+- `arklight desktop ...` exits with argparse's `invalid choice`;
+  `config._KNOWN_SECTIONS` is `csp, experimental, live_streaming, rei`;
+  `cli/main.py` and `templates/_common.py` contain no "desktop".
+- No Desktop files changed on `alpha` between `0df63e7` and `23ebc24`,
+  so nothing in Stages 15-17 can reintroduce this.
+- `main`'s roadmap (`README.md`, `ARCHITECTURE.md`) already places the
+  Desktop backend at `v0.100`, after Android (`v0.080`); nothing to
+  edit there. `.github/workflows/apt-repo.yml` untouched.
+
+**Left in place (not violations):** the shared Platform API IR and
+component-dispatch vocabulary that names `desktop` as a backend without
+implementing it (`ir/platform_api.py`'s `"desktop": frozenset()`,
+`test_platform_api.py`'s `backend_name="desktop"` case, docstrings in
+`api.py`/`provider.py`/`render.py`/`component_dispatch.py`), the "phone vs
+desktop" CSS/`Show` examples, and two dangling prose references to a
+command `main` lacks: `cli/deploy.py`'s docstring ("same reasoning as
+`arklight desktop build`'s `make` call") and `cli/doc_retrieval.py`'s
+`--backends` help string. Both are byte-identical on `alpha`; reword
+them only if you want `main` to stop mentioning the command at all.
+
+**Still open, and only yours to answer:** the first checkbox. The plan
+recommended exclusion "pending an explicit decision" and this stage
+applied that recommendation; it does not settle whether Desktop lands
+early. If you want it in, that is **Stage 12a** -- per-file review of the
+nine paths above, `config.py`'s `desktop` section/keys (which must be
+added back together with `android`'s, per the comment in `config.py`, or
+split deliberately), a `Backend` registration, and a roadmap-table edit
+-- and `tests/test_desktop_exclusion.py` must be deleted in that same
+change.
+
+**Now enforced by the suite:** `tests/test_desktop_exclusion.py` (13
+tests), sibling of Stage 11's guard. Mutation-checked: creating an empty
+`arklight/backend/desktop/__init__.py` makes it fail.
 
 ## Stage 13 — Root metadata
 
