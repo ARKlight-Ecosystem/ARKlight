@@ -17,13 +17,16 @@ and a line in `BEHAVIOR_MODULES` below -- never a change to
 
 from __future__ import annotations
 
-from arklight.backend.js.behaviors import copy, dismiss, scroll_to, toggle
+from arklight.backend.js.behaviors import copy, dismiss, paste, scroll_to, toggle
 
 BEHAVIOR_MODULES = {
     toggle.NAME: toggle,
     scroll_to.NAME: scroll_to,
     copy.NAME: copy,
     dismiss.NAME: dismiss,
+    # `v0.063` (docs/version history/v0.063.md): JS vocabulary
+    # addendum stage 3/10 -- clipboard paste, mirroring `copy` above.
+    paste.NAME: paste,
 }
 
 # name -> that behavior's JS dispatch-object entry (source text).

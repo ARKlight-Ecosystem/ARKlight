@@ -18,13 +18,11 @@ job that's finished.
 
 | File | Covers |
 | --- | --- |
-| [`MAIN TO ALPHA V0.54.md`](<MAIN TO ALPHA V0.54.md>) | **Complete.** The v0.054 catch-up: ground-truth diff stats, Stage 0-9 scope and dependency order, the Android-exclusion checklist, and what was deliberately left out. Superseded by the plan below; kept for history until this folder's next cleanup pass. |
 | [`MAIN TO ALPHA V0.070.md`](<MAIN TO ALPHA V0.070.md>) | **Current plan.** The v0.070 catch-up: ten JS-vocabulary rungs, user-defined components, the full `Provider` SDK, Platform API IR, the Rei narrator, search/knowledge additions, compiler hardening, the standing Android exclusion, and a new Desktop-backend exclusion decision. **Target moved from the `0df63e7` milestone boundary to `alpha` HEAD `23ebc24`** (23 commits later): Stages 15-17 cover the htmx/CSP fixes, `PlatformAPI.db` and small deltas; Stages 0, 11, 13, 14 were amended. Filename kept so links do not break. |
 
 ## Status
 
-**v0.54 plan:** all stages (0-9) done -- see that file's own status
-note.
+**v0.54 plan:** all stages (0-9) done; its plan doc has been retired (Stage 14) and lives in git history.
 
 **v0.070 plan:** in progress. Target is `alpha` `23ebc24` (2026-09-29), not the `0df63e7` boundary the plan was first written against; the stage rows below marked "Ported" were ported at `0df63e7`, and the delta on their files is carried by Stages 15-17.
 
@@ -44,7 +42,7 @@ note.
 | 11 | Android-exclusion verification pass | Verified clean at Stage 10's tree -- all checklist items hold; the `android sync`/`ArkDb.kt`/`db`-prose items are guarded for the future stages that could reintroduce them. New `tests/test_android_exclusion.py` (9 tests) makes the check re-runnable. Suite: 2725 passed / 15 failed (same 15 as Stage 10). Pre-existing Android prose in main's Foundational docs left to Stage 0. |
 | 12 | Desktop-backend exclusion decision | Excluded and verified -- all nine alpha Desktop paths absent, no `desktop` CLI/config wiring, no Desktop change on alpha in the `0df63e7`->`23ebc24` range. Applies the plan's recommended default; the go/no-go on landing it early (Stage 12a) is still the maintainer's. New `tests/test_desktop_exclusion.py` (13 tests). |
 | 13 | Root metadata (preserve `apt-repo.yml`) | Ported -- `pyproject.toml` version `0.54.1` -> `0.070.0` (`arklight --version` prints `0.70.0`). `main`'s SPDX `license`/empty `classifiers` and `.gitignore`'s `ARK/` line are `main`-only and deliberately kept; `apt-repo.yml` untouched. New `tests/test_root_metadata.py` (6 tests). Suite: 2744 passed / 15 failed (same 15 as Stages 10-12). |
-| 14 | Full verification | Not started -- now runs after Stages 15-17 and diffs against `23ebc24` |
+| 14 | Full verification | **Pre-flight run -- Stages 0, 15, 16, 17 are still outstanding, so this must be re-run once they land.** Diffed `arklight/`, `tests/`, `examples/`, root against `23ebc24`; closed six gaps that earlier stages left behind (Stage 8 `geolocate`/`paste` registries, a stale `test_js_error_handling.py`, stale doc-path comments, missing `test_upgrade.py`, two missed test expansions, the example site's preamble). `MAIN TO ALPHA V0.54.md` retired. Suite: 2763 passed / 8 failed (was 2744 / 15) -- the 8 are all Stage 0's docs-link decision. |
 | 15 | htmx under Trusted Types, CSP, `file://` + live-streaming fallbacks (`e9da11d`, `2ed1674`, `3a933df`, `85a8eee`) | **New**, not started. Follows Stages 8/9 (shared `render.py`, `runtime/__init__.py`, `csp.py`); `htmx.py` literal already matches (2.0.10 both sides) |
 | 16 | `PlatformAPI.db`, Web half only (`f719455`, `23ebc24`) | **New**, not started. Follows Stage 5; Android `ArkDb.kt` excluded, `db` listed for `web` only |
 | 17 | Small post-v0.070 deltas: custom-class collision guard, `open_in_browser` fix, PWA precache encoding | **New**, not started. `api.py` lands once, together with Stage 16 |

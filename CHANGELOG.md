@@ -46,7 +46,7 @@ has nothing to resolve against -- it just points at
 ## [0.54.0] -- Alpha catch-up: CSS media queries, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV
 
 Bulk catch-up release, porting `alpha`'s Stages 1-7 onto `main` per
-`docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md`, Android
+`docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md` (since retired; see git history), Android
 excluded throughout (Stage 8, below). `alpha`'s individual sub-stage
 commits (`htmx-1`..`htmx-5`, `vdom-4`..`vdom-8`, and similar) are
 folded into one entry per subsystem here rather than reproduced

@@ -1,7 +1,7 @@
 """
 Tests for v0.048 Stage B: `responsive_style={...}` + `@media`
-compilation -- see docs/DESIGN-NOTES.md ("v0.048: CSS media queries +
-`<head>` extension") and docs/EXPERIMENTAL-APIS.md.
+compilation -- see docs/Foundational/DESIGN-NOTES.md ("v0.048: CSS media queries +
+`<head>` extension") and docs/Foundational/EXPERIMENTAL-APIS.md.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """
 HTML Backend refactor, Stage 4 (see
-docs/Backends/HTML-BACKEND-REFACTOR.md / docs/Backends/REFACTOR-INDEX.md
+HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] / REFACTOR-INDEX.md
 row 7, `html-4`): the fourth of the six staged extractions splitting
 `arklight/backend/html/render.py`'s five unrelated jobs into their own
 modules.
@@ -19,7 +19,7 @@ direction ("What does the HTML backend do" should be answerable from
 `render.py`'s imports without a module depending on something that
 hasn't been split out yet).
 
-Independent of the `htmx-*` track per `docs/Backends/REFACTOR-INDEX.md`
+Independent of the `htmx-*` track per `REFACTOR-INDEX.md`
 row 7's own note: this stage has no shared surface with behavior/
 modifier/action attribute emission, so it can land in any order
 relative to rows 4-6 -- it's listed in file order here, not because it

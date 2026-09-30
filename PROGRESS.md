@@ -90,7 +90,7 @@ that pointed at the old path was updated; a repo-wide link checker
 confirms every relative Markdown link in the tree resolves.
 
 Also ran the Stage 8 and 9 checks from
-`docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md` (the
+`docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md` (since retired; see git history) (the
 Stages 1-7 code-porting work itself -- CSS backend rewrite, HTML
 backend refactor, JS backend/vdom, search engine, live-streaming/CCTV,
 root metadata -- had already landed in the preceding seven commits):

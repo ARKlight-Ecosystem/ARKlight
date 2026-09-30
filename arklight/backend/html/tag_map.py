@@ -1,6 +1,6 @@
 """
 HTML Backend refactor, Stage 1 (see
-docs/Backends/HTML-BACKEND-REFACTOR.md): the first of the six staged
+HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md]): the first of the six staged
 extractions splitting `arklight/backend/html/render.py`'s five
 unrelated jobs into their own modules, mirroring the CSS backend
 refactor's "modules, not classes-for-everything" split.
@@ -132,7 +132,7 @@ TAG_MAP: dict[str, str] = {
     "IFrame": "iframe",
     # v0.003: no-JS fallback.
     "NoScript": "noscript",
-    # vdom-7 (docs/Backends/REFACTOR-INDEX.md row 15): both wrap
+    # vdom-7 (REFACTOR-INDEX.md row 15): both wrap
     # arbitrary content in a plain, transparent container -- a
     # `Repeat(...)`'s per-item elements/a `Show(...)`'s children carry
     # their own real tags already; this is just the reactive anchor

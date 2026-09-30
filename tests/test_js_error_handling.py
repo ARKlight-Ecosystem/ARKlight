@@ -7,7 +7,7 @@ behavior/action can't silently take down interactivity for the rest
 of the page -- and the person sees a visible notice instead of
 nothing at all.
 
-`htmx-3` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 3") renamed
+`htmx-3` (see `HTMX-INTEGRATION.md` [retired -- see CHANGELOG.md] "Stage 3") renamed
 `wireActions()` to `wireActionInterceptor()` and replaced its
 per-element wiring loop with a single delegated `click` listener --
 see `arklight/backend/js/runtime/dispatch.py`'s module docstring.
@@ -15,9 +15,8 @@ see `arklight/backend/js/runtime/dispatch.py`'s module docstring.
 updated for that shape; see `tests/test_htmx_3.py` for this stage's
 own dedicated coverage.
 
-`htmx-5` (see `docs/Backends/HTMX-INTEGRATION.md` "Stage 4 -- Audit
-and remove remaining hand-rolled plumbing" / `docs/Backends/
-REFACTOR-INDEX.md` row 10) renamed `wireActionInterceptor()` again, to
+`htmx-5` (see `HTMX-INTEGRATION.md` "Stage 4 -- Audit
+and remove remaining hand-rolled plumbing" / `REFACTOR-INDEX.md` row 10) renamed `wireActionInterceptor()` again, to
 `wireClickInterceptor()`, and removed `wireBehaviors()`'s successor,
 `arkRunBehavior()`, entirely: behavior dispatch now happens inside
 `wireClickInterceptor()`'s own `"behavior:"` branch, guarded by its
@@ -103,7 +102,7 @@ def test_init_state_is_guarded_against_malformed_json():
     init_state_body = js.split("function initState() {")[1].split("function wireClickInterceptor")[0]
     assert "try {" in init_state_body
     assert "catch (err)" in init_state_body
-    assert "arkNotify(" in init_state_body
+    assert "arkReportError(" in init_state_body
 
 
 def test_wire_click_interceptor_guards_action_dispatch_independently():
@@ -115,7 +114,8 @@ def test_wire_click_interceptor_guards_action_dispatch_independently():
     # the shipped function now always carries both an action branch
     # and a behavior branch (each with its own try/catch), regardless
     # of which this particular page actually uses -- see
-    # tests/test_htmx_5.py.
+    # tests/test_htmx_5.py. `v0.065` adds a third, always-present
+    # platform branch the same way -- see tests/test_platform_api.py.
     pages = {
         "/": Page(
             State("count", 0),
@@ -126,9 +126,9 @@ def test_wire_click_interceptor_guards_action_dispatch_independently():
     wire_body = js.split("function wireClickInterceptor(getStore) {")[1].split(
         "function highlightActiveNavLink"
     )[0]
-    assert wire_body.count("try {") == 2
-    assert wire_body.count("catch (err)") == 2
-    assert "arkNotify(" in wire_body
+    assert wire_body.count("try {") == 3
+    assert wire_body.count("catch (err)") == 3
+    assert "arkReportError(" in wire_body
 
 
 def test_wire_click_interceptor_guards_behavior_dispatch_independently():
@@ -145,10 +145,16 @@ def test_wire_click_interceptor_guards_behavior_dispatch_independently():
     wire_body = js.split("function wireClickInterceptor(getStore) {")[1].split(
         "function highlightActiveNavLink"
     )[0]
-    behavior_branch = wire_body.split('raw.indexOf("behavior:") === 0) {')[1]
+    # `v0.065` adds a trailing "platform:" branch after "behavior:", so
+    # bound the slice there rather than running to the end of
+    # wire_body -- otherwise the platform branch's own try/catch would
+    # be double-counted as part of the behavior branch.
+    behavior_branch = wire_body.split('raw.indexOf("behavior:") === 0) {')[1].split(
+        'raw.indexOf("platform:") === 0) {'
+    )[0]
     assert behavior_branch.count("try {") == 1
     assert behavior_branch.count("catch (err)") == 1
-    assert "arkNotify(" in behavior_branch
+    assert "arkReportError(" in behavior_branch
 
 
 def test_copy_behavior_handles_clipboard_rejection():

@@ -1,7 +1,7 @@
 """
 Unit tests for `arklight/backend/html/attrs.py` -- HTML backend
-refactor Stage 3 (see docs/Backends/HTML-BACKEND-REFACTOR.md /
-docs/Backends/REFACTOR-INDEX.md row 3, `html-3`).
+refactor Stage 3 (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md] /
+REFACTOR-INDEX.md row 3, `html-3`).
 
 These test the attribute-rendering data/functions directly,
 independent of `HTMLBackend.render`/a full IR build -- the same

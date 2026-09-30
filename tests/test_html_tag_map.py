@@ -1,6 +1,6 @@
 """
 Unit tests for `arklight/backend/html/tag_map.py` -- HTML backend
-refactor Stage 1 (see docs/Backends/HTML-BACKEND-REFACTOR.md).
+refactor Stage 1 (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md]).
 
 These test `TAG_MAP`/`VOID_TAGS`/`_tag_for` directly, independent of
 `HTMLBackend.render`/a full IR build -- exactly the "independent

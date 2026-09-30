@@ -1,6 +1,6 @@
 """
 CSS Backend -- selector grammar (structural addendum, see
-docs/DESIGN-NOTES.md "CSS selector algebra + at-rule vocabulary").
+docs/Foundational/DESIGN-NOTES.md "CSS selector algebra + at-rule vocabulary").
 
 `arklight.api.Site.style(name, rules)` only ever emits one flat
 `.name { ... }` block -- deliberately, since a bare pseudo-class

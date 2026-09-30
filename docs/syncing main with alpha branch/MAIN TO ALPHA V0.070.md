@@ -677,7 +677,7 @@ One patch each, all verified independent of Stages 15-16 except `api.py`:
 
 *Risk:* low.
 
-## Stage 14 — Full verification (runs last -- after Stages 15-17)
+## Stage 14 — Full verification (runs last -- after Stages 15-17) ⚠️ pre-flight run done, re-run required
 
 - Run `main`'s full test suite together, including every file added or
   expanded across Stages 1-10 and 15-17. Baseline going in: 2716 passed /
@@ -692,6 +692,82 @@ One patch each, all verified independent of Stages 15-16 except `api.py`:
   resolves.
 - Delete `MAIN TO ALPHA V0.54.md` (superseded) and update this folder's
   `README.md` index/status table to point at this file instead.
+
+**Result of the pre-flight run (on `main` after Stage 13, `42a3b59`;
+diffed against `23ebc24`).** Stage 14 was run *before* Stages 0 and
+15-17, at the maintainer's request, so it is a triage, not the final
+sign-off this section describes: the diff below cannot be empty until
+those four stages land. What it did establish:
+
+*Closed here* -- gaps earlier stages left behind that no later stage
+owns, all found by diffing rather than by a failing test alone:
+
+- `arklight/backend/js/actions/__init__.py` and `behaviors/__init__.py`
+  (Stage 8): `geolocate.py` and `paste.py` existed but were never added
+  to the registries. Taken from `alpha`. Clears the 4
+  `test_js_vocabulary_v0063.py` failures.
+- `tests/test_js_error_handling.py`: `main`'s copy pre-dated `v0.065`
+  (`arkNotify` -> `arkReportError`, third `platform:` branch). Taken from
+  `alpha`; clears the 3 `try {` count failures. Together with the row
+  above these were the "7 Stage 8 runtime-registry gaps" of Stages 9-13.
+- Stale doc paths in comments/docstrings (`docs/DESIGN-NOTES.md`,
+  `docs/Backends/...`) in 12 `arklight/` files and 8 test files --
+  comment/docstring/string-literal only, taken from `alpha`. The
+  paths pointed at files that do not exist on `main`.
+- `tests/test_upgrade.py` (new, pre-boundary; covers the PEP 668 retry in
+  `cli/upgrade.py`, which Stage 10 had already ported) and the
+  `test_html_head_meta.py` / `test_html_page_render.py` expansions
+  (`Provider` `scripts` head tags; integral-float `Bind` formatting).
+  All three pass against `main`'s code as-is, so no source gap hid
+  behind them.
+- `examples/hello_site/site.py`: `alpha` uses the preamble
+  (`# include <stdlib.ARKlight>`) instead of `from arklight import *`.
+  Built both; output is byte-identical, so the preamble system Stage 2
+  ported works end to end.
+- `MAIN TO ALPHA V0.54.md` deleted and this folder's index updated;
+  the two prose mentions in `CHANGELOG.md`/`PROGRESS.md` now say
+  "since retired".
+
+*Remaining `arklight/` diff against `23ebc24`, every file attributed*
+(34 files before this stage, 20 after -- 12 were doc-path comments
+only and 2 were the Stage 8 registries above):
+
+| Bucket | Files | Owner |
+| --- | --- | --- |
+| Post-`0df63e7` htmx / CSP / `file://` | `backend/js/htmx.py`, `backend/html/csp.py`, `backend/html/page_render.py`, `backend/js/render.py`, `backend/js/runtime/__init__.py`, `runtime/notify.py`, `cli/live_streaming.py` | Stage 15 |
+| `PlatformAPI.db` (Web half) | `backend/js/platform_apis/db.py` (new), `platform_apis/__init__.py`, `runtime/dispatch.py`, `ir/platform_api.py`, `ir/validate.py`, `api.py` | Stage 16 |
+| Small deltas | `api.py` (collision guard, shared with 16), `pwa.py`, `cli/main.py` (`open_in_browser` hunk only) | Stage 17 |
+| Deliberate `main` differences | `__init__.py` (`CHANNEL`), `config.py` + `cli/templates/_common.py` (no `android`/`desktop`), `cli/main.py` (no android/desktop wiring), `compiler/sbom.py` (no ACC section), `capabilities.py` (`alpha`-only, absent) | Stages 1, 9, 10-12 |
+| Excluded | `backend/android/`, `backend/desktop/`, `cli/android.py`, `cli/desktop.py` | Stages 11-12 |
+
+Two pieces of `platform_api.py` are Stage 16 *and* need a judgment call
+when it lands: `BACKEND_PLATFORM_API_SUPPORT["android"]` must stay
+`frozenset()` on `main`, and the docstring that credits Android's
+`ArkDb.kt` must be trimmed.
+
+*Remaining test-tree diff:* `test_csp`, `test_htmx_4`,
+`test_htmx_failure_handling`, `test_htmx_trusted_types`,
+`test_live_streaming` (Stage 15); `test_platform_api_db` (Stage 16);
+`test_api_style`, `test_css_structural_addendum`, `test_cli`, `test_pwa`
+(Stage 17); `test_capabilities`, `test_sbom`, `test_config`,
+`test_version` (deliberate: ACC, Android/Desktop config, `CHANNEL`);
+`test_root_metadata` is `main`-only by design.
+
+*Checklists re-run:* `tests/test_android_exclusion.py` (9) and
+`tests/test_desktop_exclusion.py` (13) pass. `.github/workflows/`
+holds `apt-repo.yml` and `publish.yml`; `apt-repo.yml` is the only file
+under `.github/` that differs from `alpha`, as intended.
+
+*Suite:* **2763 passed / 8 failed** (was 2744 / 15). The 8 are the
+docs-tree tests -- `test_doc_citations` (2), `test_doc_links` (1),
+`test_doc_retrieval` (5) -- blocked on Stage 0's link decision and
+`docs/Foundational/` sync (4 files differ: `AUTHORING-GUIDE`,
+`CLI-REFERENCE`, `DESIGN-NOTES`, `PLATFORM-APIS`), not on code.
+
+*Not done, because it belongs to other stages:* the doc cross-reference
+spot-check (cannot pass until Stage 0), and the final "diff is empty
+except deliberate differences" sign-off. **Re-run this stage after
+Stages 0, 15, 16 and 17.**
 
 ## What's deliberately out of scope
 
