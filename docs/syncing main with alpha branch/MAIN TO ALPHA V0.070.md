@@ -728,7 +728,7 @@ existing branch every Platform API call goes through; re-run
   `api.py` closed. `ir/platform_api.py` will still differ from `alpha` on
   purpose (the `android` entry and its prose).
 
-## Stage 17 — Small post-v0.070 deltas (new)
+## Stage 17 — Small post-v0.070 deltas (new) ✅ ported
 
 One patch each, all verified independent of Stages 15-16 except `api.py`:
 
@@ -751,6 +751,38 @@ One patch each, all verified independent of Stages 15-16 except `api.py`:
 - **`pyproject.toml`:** version, handled by Stage 13.
 
 *Risk:* low.
+
+**Result (run on `main` at `33eafae` + Stage 16):**
+
+- **`api.py`:** already landed whole with Stage 16, as planned (collision
+  guard, `test_api_style.py`, `test_css_structural_addendum.py`).
+- **`pwa.py`** (`804c7d3`): precache paths percent-encoded via
+  `quote(p, safe="/")`. Taken from `23ebc24` (the file matched
+  `0df63e7` on `main`, so the delta was exactly this commit). Test:
+  `test_pwa.py` +22.
+- **`cli/main.py`** (`19c5d0b`): applied as a **single-function hunk**,
+  not a file copy -- `open_in_browser` now returns
+  `bool(webbrowser.open(...))`. Everything else in `alpha`'s `main.py`
+  delta is Android/Desktop wiring, which stays out; `git diff` of the
+  file against `main` is 10 added / 6 removed lines, all in that one
+  function. `arklight android sync` (`dd85d0e`) is not carried over.
+- **`test_cli.py` was a bigger gap than the plan said.** The plan lists
+  only `+17` for this file, but `main`'s copy was missing **220 lines**
+  that `alpha` already had at the `0df63e7` boundary and no earlier
+  stage had ported it: the `[Rei]` nudge and config suppression,
+  `search --retrieve-doc` (Stage 7 features), design-token breakout
+  refusal, the "Did you mean" suggestion for misspelled components, and
+  the `arklight deploy site.py` diagnostic. The file was taken whole
+  from `23ebc24` and **every added test passes against `main`'s
+  existing source**, so no source gap was hiding behind it -- it was
+  purely un-synced coverage. No Android or Desktop content in it.
+- Suite: **2890 passed / 8 failed** (was 2867 / 8). Same 8 docs-tree
+  failures; both exclusion guards, `test_root_metadata`, `test_version`
+  pass.
+- Code-stage checklist: with this, **Stages 1-13 and 15-17 are ported**.
+  The only stages left are **0** (docs/version-history/CHANGELOG/PROGRESS
+  sync plus the link decision that owns the last 8 red tests) and
+  **14** (re-run after Stage 0).
 
 ## Stage 14 — Full verification (runs last -- after Stages 15-17) ⚠️ pre-flight run done, re-run required
 

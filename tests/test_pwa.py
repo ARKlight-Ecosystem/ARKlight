@@ -82,6 +82,28 @@ def test_enable_pwa_precaches_every_build_file(tmp_path):
         assert json.dumps(path) in sw_contents
 
 
+def test_enable_pwa_percent_encodes_precache_urls_with_spaces(tmp_path):
+    """
+    `cache.addAll()` is atomic -- one entry with a raw, unencoded space
+    (or other URL-unsafe character) failing to fetch/cache rejects the
+    whole call, so the service worker's `install` event never reaches
+    `activate`. Every `PRECACHE_URLS` entry must be percent-encoded.
+    """
+    out_dir = build_dir(tmp_path)
+    tricky = out_dir / "assets" / "images"
+    tricky.mkdir(parents=True)
+    (tricky / "Summoned By Mistake, Arc 1.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    result = enable_pwa(out_dir, name="My Site")
+
+    sw_contents = (out_dir / SERVICE_WORKER_NAME).read_text()
+    assert "Summoned By Mistake, Arc 1.png" not in sw_contents
+    assert "assets/images/Summoned%20By%20Mistake%2C%20Arc%201.png" in sw_contents
+    # Unaffected, already-safe entries are untouched.
+    assert "index.html" in result.cached_paths
+    assert json.dumps("index.html") in sw_contents
+
+
 def test_enable_pwa_is_idempotent(tmp_path):
     out_dir = build_dir(tmp_path)
 
