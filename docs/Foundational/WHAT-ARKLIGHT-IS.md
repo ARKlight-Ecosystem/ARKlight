@@ -3,7 +3,7 @@
 _A grounding document for `docs/Foundational/`. Written from the
 project's own source, its own design docs, and hands-on verification --
 not from the pitch alone. Current as of **v0.070** (latest closed
-milestone on `alpha`; `v0.080`/`v0.100` -- the Android and Linux desktop
+milestone; `v0.080`/`v0.100` -- the Android and Linux desktop
 native backends -- are IN PROGRESS, and `v0.071`-`v0.079`, Project
 Knowledge and the `arklight assistant` MVP, are PLANNED). Cross-check
 `PROGRESS.md`'s Snapshot table before treating any version-specific
@@ -155,7 +155,7 @@ state, local storage, network responses, device capabilities.
 Every distinctive property described below is a direct consequence of
 this one rule, not an independent design choice. It's also the rule
 that a Platform APIs layer has to fit into without bending: see
-`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` for how "the compiler
+`docs/Foundational/PLATFORM-APIS.md` for how "the compiler
 owns the semantic interface, the platform backend owns the
 implementation" is this same agreement applied to device/OS
 capabilities specifically.
@@ -163,7 +163,7 @@ capabilities specifically.
 ## 3. What actually exists today, verified hands-on
 
 This section reflects what was built and tested directly against the
-`alpha` branch's real source -- not the roadmap, not the pitch.
+project's real source -- not the roadmap, not the pitch.
 
 **The compiler pipeline** (`arklight/compiler/pipeline.py`):
 
@@ -265,14 +265,6 @@ version-by-version breakdown):
 - **`arklight deploy`** (`v0.06515`): builds, then shells out to a
   locally-installed `wrangler` for a one-command Cloudflare Workers
   deploy. Never installs Wrangler itself, never touches credentials.
-- **ACC capability discovery** (`arklight/capabilities.py`, documented
-  at `v0.0645`): the one piece of **ARKlight Component Collections**
-  (a separate repository,
-  [`Rae-ARK/ARKlight-Component-Collections`](https://github.com/Rae-ARK/ARKlight-Component-Collections))
-  that has to live in `alpha` itself, since it's the compiler's own
-  side of discovering capabilities an installed ACC package
-  advertises, without the compiler depending on ACC to exist. See
-  `docs/Foundational/ACC-CAPABILITIES.md`.
 - **Bracket-nesting indentation is now a checked compiler diagnostic**
   (`v0.06603`-`v0.06611`): a continuation line inside an open bracket
   must indent further than its opener, a closing-only line must sit
@@ -320,8 +312,8 @@ inferred from Section 1's wording:
   embedded-runtime approach in favor of a plain WebView wrapper. (This
   is the one boundary a Platform APIs layer is deliberately designed
   to approach without crossing -- see
-  `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` Section 15's "No
-  Generic Native Escape Hatch.")
+  `docs/Foundational/PLATFORM-APIS.md`'s "No
+  Generic Native Escape Hatch" rule.)
 - **Not a client-side application framework.** No persistent
   application state across page navigations by default, no dynamic
   client-side router, no component instances that survive a
@@ -353,7 +345,7 @@ ARKlight's authoring ideas come from frontend/UI-framework lineage; its compiled
 
 ### What can you build with ARKlight?
 
-The following is the practical capability boundary for the current alpha. These categories describe what ARKlight can reasonably produce today, rather than what may exist on the roadmap.
+The following is the practical capability boundary for the current release. These categories describe what ARKlight can reasonably produce today, rather than what may exist on the roadmap.
 
 #### Content, marketing, and documentation
 
@@ -390,9 +382,9 @@ The following is the practical capability boundary for the current alpha. These 
 
 | Client need | Feasible today? | Why / mechanism |
 |---|---|---|
-| Android wrapper around an ARKlight site | Alpha | Android backend uses AndroidX/WebView infrastructure and `WebViewAssetLoader` to provide the packaged site through a stable HTTPS-style asset origin. |
-| Linux desktop wrapper | Alpha | Desktop backend uses GTK3 + WebKit2GTK and packages the compiled web output in a native shell. |
-| Cross-platform native distribution | Partially | Android and Linux desktop backends exist, but the native target surface is still alpha and does not provide a general native plugin/API ecosystem. |
+| Android wrapper around an ARKlight site | Not on `main` yet | The planned Android backend uses AndroidX/WebView infrastructure and `WebViewAssetLoader` to provide the packaged site through a stable HTTPS-style asset origin. |
+| Linux desktop wrapper | Not on `main` yet | The planned Desktop backend uses GTK3 + WebKit2GTK and packages the compiled web output in a native shell. |
+| Cross-platform native distribution | No | The Android and Linux desktop backends are still in development and not part of this release, and would not provide a general native plugin/API ecosystem. |
 | iOS application | No | There is no iOS backend, and the current native-shell architecture does not provide an equivalent implementation. |
 
 #### Applications ARKlight does not currently target
@@ -413,7 +405,7 @@ The current capability boundary can therefore be summarized as:
 
 **Strong fit:** static/content sites, marketing sites, documentation, portfolios, responsive pages, interactive widgets, locally reactive interfaces, URL-addressable state, persisted preferences, PWAs, and packaged/offline websites.
 
-**Possible but alpha:** Android and Linux desktop wrappers.
+**Planned, not yet on `main`:** Android and Linux desktop wrappers.
 
 **Outside the current model:** backend-heavy applications, authentication/account systems, database-backed applications, arbitrary API-driven applications, large SPA-shaped systems, and projects whose development model depends on unrestricted client-side JavaScript.
 
@@ -431,27 +423,19 @@ For evaluation purposes, the important question is therefore not simply whether 
   designed. `Provider` (`docs/Foundational/PROVIDER-SDK.md`, six-rung
   `v0.065`-`v0.070` ladder fully shipped) is the accepted answer for
   *external services*; a Platform APIs layer
-  (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`, accepted and staged
+  (accepted and staged
   in `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md` -- stage 1 of
   2, the Web reference implementation, shipped as of `v0.065`) is a
   related but distinct answer for *execution-platform* capabilities --
-  Section 25 of that proposal draws the
+  `docs/Foundational/PLATFORM-APIS.md` draws the
   line between the two explicitly.
 - **No slot/children-passing model for user-defined components** --
   `Card(Text("content"))` forwarding `"content"` into `Card`'s render
   function the way React/Vue `children`/`<slot>` works does not exist
   yet.
-- **`main`/PyPI still lag `alpha` significantly, though the gap is
-  narrower than it once was.** The published package (`0.54.1` as of
-  this check against PyPI, not the `0.42.2` an earlier revision of
-  this document reported) does now carry a real reactive core (`State`,
-  a smaller `Action.*`/`Derive.*` vocabulary, named click behaviors)
-  and the `.ark` bundle packager. It still has, confirmed directly
-  against `main`'s own source: no `@component` user-defined-component
-  system, no `Provider`, no preamble directives, no Rei narrator, and
-  no native backends (Android/Desktop). Nothing in Section 3 beyond
-  the reactive core basics and bundling is currently reachable via
-  `pip install arklight`.
+- **No native backends on `main` yet.** The Android and Linux Desktop
+  backends are still in development and are not part of this release,
+  so a site built with `main` targets the Web output only.
 - **Zero independent adoption signal.** No stars, forks, or community
   discussion found under the project's own name at any point this was
   checked.

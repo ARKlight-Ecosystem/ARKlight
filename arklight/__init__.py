@@ -185,8 +185,8 @@ except PackageNotFoundError:  # pragma: no cover -- only when running from
 # inspection at import time. A git-based check would silently go blank
 # (or lie) for the common case of a real `pip install arklight`, which
 # has no `.git` directory at all -- fragile for something call sites
-# may treat as authoritative. `main` and `alpha` diverge enough in
-# available subsystems (search engine, PWA, license gate, live-
+# may treat as authoritative. The stable and development branches
+# diverge enough in available subsystems (search engine, PWA, license gate, live-
 # streaming dev server, ...) that a tool wired into both trees needs a
 # reliable, install-method-independent way to ask "which feature set
 # do I actually have here", without maintaining a parallel list of

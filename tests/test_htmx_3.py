@@ -118,8 +118,7 @@ def test_interceptor_is_a_single_delegated_listener_not_a_per_element_loop():
 
 def test_no_op_when_store_is_falsy():
     # Same short-circuit wireActions() always had, just moved inside
-    # the click handler's action branch (htmx-4, docs/Backends/
-    # REFACTOR-INDEX.md row 9; htmx-5 moved it from the top of the
+    # the click handler's action branch (htmx-4, refactor index, row 9; htmx-5 moved it from the top of the
     # handler into the action-specific branch, since a behavior click
     # never needs a store at all -- see test_htmx_5.py): the listener
     # is always registered once, but an action click does nothing if

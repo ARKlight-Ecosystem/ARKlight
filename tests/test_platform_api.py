@@ -1,5 +1,5 @@
 """
-`v0.065` (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`): Platform
+`v0.065` (`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`): Platform
 APIs -- `PlatformAPI.notify(...)`/`PlatformAPI.clipboard_write(...)`
 on `on_click=`, compiled to a `PlatformAPIRef` the same way
 `Action.*(...)` compiles to an `ActionRef`.

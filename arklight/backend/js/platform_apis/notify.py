@@ -1,6 +1,6 @@
 """
 `notify` platform API fragment (`v0.065`, accepted from
-`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) -- the Web backend's own
+`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`) -- the Web backend's own
 implementation of the `notify` interface registered in
 `arklight.ir.platform_api.PLATFORM_API_REGISTRY`. See
 `arklight/backend/js/actions/geolocate.py` for the sibling shape this

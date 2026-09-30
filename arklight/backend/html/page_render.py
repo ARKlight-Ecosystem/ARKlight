@@ -506,7 +506,7 @@ def _render_page(
         if page.media:
             media_json = escape(json.dumps(page.media), quote=True)
             media_attr = f' data-ark-media="{media_json}"'
-        # `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md):
+        # `v0.0641` (docs/version history/v0.0641.md):
         # `page.query` rides along as its own `data-ark-query`
         # attribute, same reasoning as `data-ark-media` above --
         # `[name, param, type_tag, history_mode]` tuples, no value of

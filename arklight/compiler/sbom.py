@@ -22,11 +22,9 @@ change, just the serialization -- see the `##`-prefixed header comment
 this module writes into the file itself, so nobody downstream mistakes
 this for the auditable thing.
 
-`main` note: `alpha` also lists installed ARKlight Component
-Collections (ACC) packages here -- external distributions discovered
-via an `arklight.capabilities` entry-point group. That package-manager
-layer (`arklight/capabilities.py`) is an `alpha`-only feature and is
-not carried over by this sync, so this module only ever emits the
+Note: installed ARKlight Component Collections (ACC) packages are not
+listed here -- that package-manager layer (`arklight/capabilities.py`)
+does not ship on this branch, so this module only ever emits the
 first-party section below.
 """
 

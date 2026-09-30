@@ -189,41 +189,41 @@ def _stage_logger(message: str, *, mode: str) -> None:
 
 
 # v0.0431 emergency patch: marker prefix `arklight.backend.html.render`
-# used to put on every known-alpha-limitation warning it raised. That
+# used to put on every known-limitation warning it raised. That
 # particular warning (UNROUTED_REFERENCE_ATTRS/_warn_unrouted_reference)
 # was removed once the HTML backend refactor's Stage 2 fixed the gap it
 # flagged (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md], CHANGELOG.md's
 # [0.0491]) -- the marker mechanism itself stays, generic across any
-# `[ARKlight ALPHA]`-prefixed warning a future alpha limitation might
-# raise. Matched here so the CLI can surface these clearly and always --
+# `[ARKlight LIMITATION]`-prefixed warning a future known limitation
+# might raise. Matched here so the CLI can surface these clearly and always --
 # not gated behind --verbose, and not dependent on Python's default
 # warning filters (which only show a `UserWarning` once per call site,
 # and not at all if the caller has warnings configured/silenced) --
 # without touching unrelated warnings a site's own code might raise.
-_ALPHA_WARNING_MARKER = "[ARKlight ALPHA]"
+_LIMITATION_WARNING_MARKER = "[ARKlight LIMITATION]"
 
 
-def _print_alpha_warnings(caught: list[warnings.WarningMessage]) -> None:
-    """Print every captured `[ARKlight ALPHA]`-marked warning from a
-    build, framed as a known, non-fatal alpha limitation -- not a build
+def _print_limitation_warnings(caught: list[warnings.WarningMessage]) -> None:
+    """Print every captured `[ARKlight LIMITATION]`-marked warning from a
+    build, framed as a known, non-fatal limitation -- not a build
     failure, but not silent either. This is the graceful-degradation
     path: the feature the site author used isn't broken by ARKlight
     refusing to build, it's flagged as "may not work everywhere yet"
     with a pointer to the patch tracking it.
     """
-    alpha_warnings = [w for w in caught if _ALPHA_WARNING_MARKER in str(w.message)]
-    if not alpha_warnings:
+    limitation_warnings = [w for w in caught if _LIMITATION_WARNING_MARKER in str(w.message)]
+    if not limitation_warnings:
         return
 
     print(
-        f"{_STAGE_PREFIX} NOTE: this alpha build is under active maintenance. "
-        f"{len(alpha_warnings)} known limitation(s) were hit during this build "
+        f"{_STAGE_PREFIX} NOTE: this build hit known, documented limitations. "
+        f"{len(limitation_warnings)} known limitation(s) were hit during this build "
         f"-- the site was still built, but the feature(s) below may not work "
         f"correctly everywhere. Please wait for (or update to) the emergency "
         f"patch series (v0.043x) to have these handled gracefully:",
         file=sys.stderr,
     )
-    for w in alpha_warnings:
+    for w in limitation_warnings:
         print(f"  - {w.message}", file=sys.stderr)
 
 
@@ -409,7 +409,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
             f.write(payload)
         print(f"  {arklight_path} ({len(payload)} bytes, binary IR)")
 
-    _print_alpha_warnings(caught)
+    _print_limitation_warnings(caught)
     experimental.print_summary(result.ir.experimental_usages, show_nudge=show_experimental_nudge)
 
     if args.open:
@@ -653,7 +653,7 @@ def _cmd_deploy(args: argparse.Namespace) -> int:
             return 1
         # Deliberately re-enters the CLI rather than calling
         # `compiler.pipeline.build` directly: `arklight build` already
-        # owns project config, CSP/experimental handling, alpha-warning
+        # owns project config, CSP/experimental handling, limitation-warning
         # and experimental-API output, and Rei's log mode, and deploy
         # should build *exactly* like `arklight build` does -- not a
         # second copy of that logic that drifts. `--no-open` because

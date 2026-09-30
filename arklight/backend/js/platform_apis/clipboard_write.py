@@ -1,6 +1,6 @@
 """
 `clipboard_write` platform API fragment (`v0.065`, accepted from
-`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) -- the Web backend's own
+`docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`) -- the Web backend's own
 implementation of the `clipboard_write` interface registered in
 `arklight.ir.platform_api.PLATFORM_API_REGISTRY`. See `notify.py` in
 this same package for the sibling shape this mirrors: a per-capability

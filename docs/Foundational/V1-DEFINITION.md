@@ -4,8 +4,8 @@ _A grounding, scope-defining document for `docs/Foundational/`, filed
 alongside `WHAT-ARKLIGHT-IS.md`'s "The Goal" section as the answer to
 the question that section raises but doesn't settle: what does
 "stable" actually mean for this project, and exactly where does that
-promise stop applying? Current as of **v0.0646** (latest shipped
-milestone on `alpha`); cross-check `PROGRESS.md`'s Snapshot table and
+promise stop applying? Current as of **v0.0646** (a snapshot; the
+latest shipped milestone on `main` is `v0.070`); cross-check `PROGRESS.md`'s Snapshot table and
 `docs/Foundational/ARCHITECTURE.md`'s Milestones table -- where this
 file says `v1.0 | Stable compiler | PLANNED` in one line -- before
 treating any version-specific claim here as still accurate._
@@ -74,7 +74,7 @@ numbered version was already in flight to finish first:
   route-shaped `srcset`/`poster`/`action`/`formaction` values 404
   outside the domain root. A broken promise.
 - A **capability fix** (`v0.0641`, the first of the category; see
-  `docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`) closes a place
+  `docs/version history/v0.0641.md`) closes a place
   where the compiler shipped *no* authored answer at all for something
   every other primitive in the reactive vocabulary implied it should
   have -- `State`'s `persist=`/`media=` two-way-sync precedent existing
@@ -102,22 +102,22 @@ the supply of capability fixes (and, ideally, bug fixes) for the
 in-scope surface below has run dry, not the point at which someone
 decides to stop looking for them.
 
-### Issue triage during Alpha
+### Issue triage before v1
 
 Every incoming issue sorts into exactly one of three buckets, and only
 two of them are accepted:
 
 - **Bug fix.** The compiler broke a contract it had already made (see
   `v0.0431` above). Accepted, and gets its own multistage
-  implementation doc under `docs/Proposals/` before any code lands.
+  implementation doc before any code lands.
 - **Capability fix.** The compiler shipped no authored answer for
   something the existing vocabulary implied it should have (see
   `v0.0641` above). Accepted, and likewise gets its own multistage
-  implementation doc under `docs/Proposals/` before any code lands.
+  implementation doc before any code lands.
 - **Everything else.** Feature requests, scope expansions, and
   anything not traceable to a broken or missing contract as defined
-  above. Not accepted during Alpha -- not because the idea lacks
-  merit, but because it isn't the current focus of ARKlight Alpha,
+  above. Not accepted before v1 -- not because the idea lacks
+  merit, but because it isn't the current focus of the road to `v1.0`,
   which is closing the supply of bug fixes and capability fixes for
   the in-scope surface in Section 3, not opening new surface.
 
@@ -162,9 +162,8 @@ Named individually, not left to be inferred from Section 3's silence:
   (`arklight desktop`, `arklight/backend/desktop/`). Both are still
   `IN PROGRESS` per `ARCHITECTURE.md`'s own Milestones table, both wrap
   the Web target's output rather than replacing it, and each is
-  earning its own maturity independently (see
-  `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md` and
-  `docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`). A packaging
+  earning its own maturity independently, and neither ships on
+  `main` yet. A packaging
   backend reaching its own "stable" bar is a separate, later claim --
   not something `v1.0`'s Web-scoped promise makes on its behalf.
 - **CLI conveniences beyond `build`** -- `arklight search`,
@@ -183,11 +182,10 @@ Named individually, not left to be inferred from Section 3's silence:
   the compiler narrator (`docs/Foundational/DESIGN-NOTES.md`,
   shipped as `0.06510`), **the Rei language** -- a `.rei` native
   source frontend added *beside* Python authoring, not a replacement
-  for it (`docs/Proposals/REI-LANGUAGE-PROPOSAL.md`, staged as
+  for it (staged as
   `docs/Implementation/REI-LANGUAGE-ADDENDUM.md`, `v0.081`-`v0.084`) --
-  **Project Knowledge** (`docs/Implementation/
-  PROJECT-KNOWLEDGE-ADDENDUM.md`), and **`arklight assistant`**
-  (Miko/Raeliana, `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`).
+  **Project Knowledge** (planned, `v0.071`-`v0.078`), and
+  **`arklight assistant`** (Miko/Raeliana, planned).
   All five are explicitly experimental, staged, or provisional as of
   this writing -- useful, in-flight work, but not "the compiler" in
   the sense Section 1 uses the word. (Rei the narrator and the Rei
@@ -204,15 +202,10 @@ and foundational design document --
 [`Rae-ARK/ARKlight-Component-Collections`](https://github.com/Rae-ARK/ARKlight-Component-Collections),
 `docs/design/acc-foundational-design.md` there -- superseding this
 section's original "no design doc yet, defined here for the first
-time" framing. One piece of ACC's own five-stage implementation
-ladder, the capability-discovery hook, has already landed in `alpha`
-as `arklight/capabilities.py`; see
-[`ACC-CAPABILITIES.md`](ACC-CAPABILITIES.md) for that module's own
-settled design record. That does not move the boundary this section
-draws: the discovery hook is a small, inert compiler-side entry point
-that does nothing when no ACC package is installed -- not a capability
-or component itself, and not the actual capability/component packages
-ACC exists to distribute.
+time" framing. Nothing of ACC ships in this compiler: no
+capability-discovery hook, no registry, no packages. That keeps the
+boundary this section draws simple -- ACC is entirely outside `v1.0`'s
+promise.
 
 ACC is the working name for curated, distributable bundles of
 ready-to-use, `@component`-registered components, built on top of the
@@ -273,18 +266,11 @@ name, rather than simply not-yet-covered:
   somehow behind schedule.
 
 This section is a scope note, not a proposal. Per `docs/README.md`'s
-own lifecycle rule (`docs/Far Future Concern/` -> `docs/Proposals/` ->
+own lifecycle rule (idea -> proposal ->
 `docs/Implementation/` -> `docs/Foundational/`), a real ARKlight
 Component Collections feature -- registries, distribution mechanism,
-versioning policy, a curation process -- would need its own proposal
-filed in `docs/Proposals/` before any of it is real. The one landed
-exception is the capability-discovery hook itself
-(`arklight/capabilities.py`, `ACC-CAPABILITIES.md`): it shipped
-directly, without a `docs/Proposals/` entry in this repo, because it
-was filed as a proposal against `alpha` from ACC's own
-`docs/design/IMPLEMENTATION-LADDER.md` rather than something this
-repo proposed to itself -- a real doc-index gap this patch closes, not
-a precedent for skipping `docs/Proposals/` on anything else. Nothing
+versioning policy, a curation process -- would need its own accepted
+proposal before any of it is real. Nothing
 here authorizes any further Collections work; this section exists
 only so the exclusion isn't left to be inferred later, after some
 Collection-shaped feature has already started drifting into "the
@@ -303,16 +289,15 @@ to earn "stable" first and alone. A Collection, an experimental flag,
 or a packaging backend sitting on top of or beside that trust boundary
 does not get to borrow its stability claim for free just by being
 part of the same repository -- each one earns its own, on its own
-schedule, the same way `docs/Backends/`'s own README already treats
-Android and Desktop as maturing independently of each other and of the
-Web target underneath both.
+schedule, the same way Android and Desktop mature independently of each other
+and of the Web target underneath both.
 
 ## 7. What changes if this boundary moves
 
 - If **ARKlight Component Collections** graduates from this section's
   scope-note into a real, accepted proposal, this section should be
   trimmed to a pointer and the real definition should live in
-  `docs/Proposals/` (then `docs/Implementation/`, then its own
+  an accepted proposal (then `docs/Implementation/`, then its own
   `docs/Foundational/` entry) -- not be expanded in place here, per
   the same "single canonical copy" discipline `docs/README.md`
   enforces everywhere else.

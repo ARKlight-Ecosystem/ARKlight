@@ -2,8 +2,7 @@
 Guard for the standing Android exclusion on `main`.
 
 `main` deliberately ships no Android backend or CLI (see
-`docs/syncing main with alpha branch/MAIN TO ALPHA V0.070.md`,
-Stage 11). The sync from `alpha` is done in many patches, and a
+the sync-plan folder under `docs/`, Stage 11). The sync is done in many patches, and a
 wholesale-copied file (`cli/main.py`, `config.py`, `templates/_common.py`)
 can quietly bring Android wiring back in. This makes the Stage 11
 checklist re-runnable by the test suite instead of by hand.
@@ -11,7 +10,7 @@ checklist re-runnable by the test suite instead of by hand.
 Deliberately NOT checked: the word "android" appearing in prose or as a
 backend *name* (`BACKEND_PLATFORM_API_SUPPORT["android"]`,
 `register_backend("android")`, docstrings). Those are the shared
-Platform API IR / component-dispatch vocabulary, identical on `alpha`,
+Platform API IR / component-dispatch vocabulary,
 and they name a backend `main` does not have without implementing it.
 """
 

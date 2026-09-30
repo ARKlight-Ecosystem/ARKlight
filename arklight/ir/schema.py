@@ -413,8 +413,7 @@ MODIFIER_REGISTRY: dict[str, ModifierSpec] = {
 KNOWN_MODIFIERS = frozenset(MODIFIER_REGISTRY)
 
 
-# `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md, `docs/
-# version history/v0.064.md`): `State(..., query=..., history=...)`'s
+# `v0.0641` (`docs/version history/v0.0641.md`): `State(..., query=..., history=...)`'s
 # `history` prop names how a query-tracked key's writes affect the
 # browser history stack -- `"replace"` (the unmarked default, `State
 # (..., query=...)` with `history` left `None`) calls

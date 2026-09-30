@@ -147,8 +147,8 @@ handled by `arklight/experimental.py` and printed by the CLI
 
 2. **End-of-run summary** -- one full block per *distinct* feature
    actually used (not once per occurrence), printed after the command
-   reports success, mirroring the existing `[ARKlight ALPHA]` warning
-   pattern in `_print_alpha_warnings`:
+   reports success, mirroring the existing `[ARKlight LIMITATION]` warning
+   pattern in `_print_limitation_warnings`:
 
    ```
    ⚠ Experimental API enabled

@@ -1,8 +1,7 @@
 # Rei Language Addendum: Staged Order, v0.081 -> v0.084
 
 **Status:** PLANNED -- stages 1-4 (`v0.081`-`v0.084`) not yet started.
-This file turns the accepted
-[`docs/Proposals/REI-LANGUAGE-PROPOSAL.md`](../Proposals/REI-LANGUAGE-PROPOSAL.md)
+This file turns the accepted Rei language proposal
 into a trackable, four-rung landing order, the same role
 `JS-VOCABULARY-ADDENDUM-v0.070.md` plays for the JS vocabulary
 addendum and `PROVIDER-SDK-ADDENDUM.md` plays for `Provider`. It does
@@ -11,8 +10,8 @@ update's five resolved open questions and four language-surface
 decisions; it exists to turn "here's what was decided" into "here's
 the version each rung ships under."
 
-This is a **capability fix** in `V1-DEFINITION.md`'s Alpha issue-triage
-sense (see that file's "Issue triage during Alpha" section): before
+This is a **capability fix** in `V1-DEFINITION.md`'s pre-v1 issue-triage
+sense (see that file's "Issue triage before v1" section): before
 this ladder, ARKlight shipped no authored answer at all for a native,
 compiler-owned source language -- Python authoring was the *only* way
 to write a site, with no closed-vocabulary alternative that skips
@@ -31,7 +30,7 @@ unchanged by acceptance:
 
 - **In scope:** the `.rei` source frontend and `arklight.config.rei`,
   both lowering to the exact same `dict[str, ARKNode]`/`CONFIG` shapes
-  Python authoring already produces; the alpha-channel maturity gate;
+  Python authoring already produces; the pre-stable-channel maturity gate;
   RNI, Rei's own gated escape-hatch tier (replacing the retired Fun
   tier); the four language-surface decisions the maintainer specified
   directly at acceptance (shared preamble syntax, the entry-point
@@ -79,7 +78,7 @@ last):
 
 ### v0.081 -- Foundation: maturity gate, package skeleton, RNI
 
-Proposal §1.5 (the alpha guard) and the 2026-09-21 acceptance update's
+Proposal §1.5 (the channel guard) and the 2026-09-21 acceptance update's
 resolutions to Open questions 10 and 11. Nothing here parses a `.rei`
 file yet -- this stage is the scaffolding every later stage builds on.
 
@@ -91,11 +90,11 @@ file yet -- this stage is the scaffolding every later stage builds on.
 - **The maturity gate, not the Fun tier.** Per Open question 11's
   resolution, the Fun tier (`arklight/fun.py`, the `🎲` banner,
   invariants I3/I4) is retired in full and never built -- checking
-  `arklight.CHANNEL == "alpha"` at the `.rei` dispatch point is an
+  that `arklight.CHANNEL` is not `"main"` at the `.rei` dispatch point is an
   ordinary "not yet stable" maturity gate, the same mechanism
   `EXPERIMENTAL-APIS.md`'s gate already uses, not a "may vanish
   without notice" playground marker. A `.rei` file or
-  `arklight.config.rei` on a non-alpha channel is a loud build error,
+  `arklight.config.rei` on the `main` channel is a loud build error,
   never a silent skip -- the one invariant (I3) that survives the Fun
   tier's retirement, now stated as an ordinary channel guard rather
   than a playground rule.
@@ -120,7 +119,7 @@ byte-identical with this stage's code present (the same no-residue
 invariant the retired Fun tier's own I1 stated, now checked against
 the real package instead of a playground one). The maturity gate
 fires a loud, named error for a `.rei` file or `arklight.config.rei`
-on a non-alpha channel.
+on the `main` channel.
 
 ### v0.082 -- Tree subset and the entry point
 
@@ -226,6 +225,6 @@ already produces.
 | 4 of 4 | RNI grammar, Java-shaped exceptions, Platform APIs as an interface | PLANNED |
 | -- | Compute (`const`, functions, minimal evaluator) | **Blocked** on Open question 3, no version slot |
 
-See `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` for the full design
+See the Rei language proposal for the full design
 record and open questions, and `docs/version history/` for each
 stage's forward-looking, user-facing summary once filed.

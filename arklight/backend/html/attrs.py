@@ -327,8 +327,7 @@ def _attr_string(
             # htmx-1 originally wired a named behavior through HTMX's
             # `hx-on:click="arkRunBehavior('<name>', this)"`. `htmx-5`
             # (HTMX-INTEGRATION.md "Stage 4 -- Audit and
-            # remove remaining hand-rolled plumbing" / docs/Backends/
-            # REFACTOR-INDEX.md row 10) reverts the attribute shape
+            # remove remaining hand-rolled plumbing" / the refactor index, row 10) reverts the attribute shape
             # back to `data-ark-on-click`, matched-pair with the
             # `"action:..."` shape `on_click=Action.*(...)` already
             # gets below -- both are now read by the same delegated
@@ -451,14 +450,14 @@ def _attr_string(
                 # once compiled, so there is nothing left in the *output* for
                 # an author to notice. Flagged here, unconditionally (never
                 # gated behind --verbose/--narrate, same "always prints"
-                # contract as any other `[ARKlight ALPHA]`-marked warning --
-                # see `arklight/cli/main.py`'s `_print_alpha_warnings`) with
+                # contract as any other `[ARKlight LIMITATION]`-marked warning --
+                # see `arklight/cli/main.py`'s `_print_limitation_warnings`) with
                 # the structural `path` the caller threaded in, so a mistake
                 # is something the author can go find and fix, not a
                 # silently-compiled `data-*` attribute they'd never spot in
                 # the generated HTML.
                 warnings.warn(
-                    f"[ARKlight ALPHA] Unknown prop {key!r} on {node_type!r} at "
+                    f"[ARKlight LIMITATION] Unknown prop {key!r} on {node_type!r} at "
                     f"{path} was compiled to a generic {f'data-{attr_name}'!r} "
                     f"attribute instead of a recognized one -- if this was a "
                     f"typo, fix it at {path}; if it's deliberate, nothing else "
