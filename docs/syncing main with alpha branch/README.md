@@ -19,34 +19,35 @@ job that's finished.
 | File | Covers |
 | --- | --- |
 | [`MAIN TO ALPHA V0.54.md`](<MAIN TO ALPHA V0.54.md>) | **Complete.** The v0.054 catch-up: ground-truth diff stats, Stage 0-9 scope and dependency order, the Android-exclusion checklist, and what was deliberately left out. Superseded by the plan below; kept for history until this folder's next cleanup pass. |
-| [`MAIN TO ALPHA V0.070.md`](<MAIN TO ALPHA V0.070.md>) | **Current plan.** The v0.070 catch-up: ten JS-vocabulary rungs, user-defined components, the full `Provider` SDK, Platform API IR, the Rei narrator, search/knowledge additions, compiler hardening, the standing Android exclusion, and a new Desktop-backend exclusion decision. |
+| [`MAIN TO ALPHA V0.070.md`](<MAIN TO ALPHA V0.070.md>) | **Current plan.** The v0.070 catch-up: ten JS-vocabulary rungs, user-defined components, the full `Provider` SDK, Platform API IR, the Rei narrator, search/knowledge additions, compiler hardening, the standing Android exclusion, and a new Desktop-backend exclusion decision. **Target moved from the `0df63e7` milestone boundary to `alpha` HEAD `23ebc24`** (23 commits later): Stages 15-17 cover the htmx/CSP fixes, `PlatformAPI.db` and small deltas; Stages 0, 11, 13, 14 were amended. Filename kept so links do not break. |
 
 ## Status
 
 **v0.54 plan:** all stages (0-9) done -- see that file's own status
 note.
 
-**v0.070 plan:** in progress.
+**v0.070 plan:** in progress. Target is `alpha` `23ebc24` (2026-09-29), not the `0df63e7` boundary the plan was first written against; the stage rows below marked "Ported" were ported at `0df63e7`, and the delta on their files is carried by Stages 15-17.
 
 | Stage | Scope | Status |
 | --- | --- | --- |
-| 0 | Foundational docs + version-history sync | Not started (checked: `Foundational/`, version history, and root docs all still differ from alpha's v0.070 commit) |
+| 0 | Foundational docs + version-history sync | Not started -- and grown: now targets `23ebc24`, adding seven Foundational deltas, `CHANGELOG.md`/`PROGRESS.md` through the `db` entries, and an open decision on links into excluded folders (see plan doc's Stage 0 amendment). `APP-SHELL-ADDENDUM.md` deliberately left out (PLANNED, none started). |
 | 1 | Shared plumbing | Ported -- not yet import-clean, see plan doc's coupling note; needs Stages 2/4/5 alongside it |
 | 2 | User-defined components (`v0.060`) | Ported -- confirmed no new import gaps beyond Stage 1's note |
 | 3 | JS vocabulary ladder, 10 rungs (`v0.061`-`v0.070`) | Ported -- confirmed no new import gaps beyond Stage 1's note |
-| 2 | User-defined components (`v0.060`) | Not started |
-| 3 | JS vocabulary ladder, 10 rungs (`v0.061`-`v0.070`) | Not started |
 | 4 | `Provider` SDK, 6 stages (`v0.065`-`v0.070`) | Ported -- `import arklight` still fails, but now for exactly the single remaining reason predicted (Stage 5's `arklight.ir.platform_api`), confirming no new import gaps introduced |
 | 5 | Platform API IR | Ported -- resolves the `arklight.ir.platform_api` gap Stage 1 predicted. `import arklight` still fails, but for a gap this plan hadn't documented: `ir/__init__.py` (Stage 1) unconditionally imports `arklight.ir.binary` (Stage 9, not yet landed). Not a Stage 5 defect -- pre-existing in the Stage 1 port, just unmasked now that Stage 5's own gap is closed. Flagging here rather than pulling Stage 9 forward. |
 | 6 | Rei compiler narrator | Ported -- self-contained, no existing code references `arklight.compiler.rei` yet, so this introduces no new import coupling. `import arklight` still blocked only by the pre-existing Stage 9 `ir.binary` gap noted at Stage 5. `docs/Proposals/REI-LANGUAGE-PROPOSAL.md` deliberately left out (Proposals dir is out of scope). |
 | 7 | Search/knowledge-state additions + doc tooling | Ported -- CLI wiring in `cli/main.py` (importing `deploy`/`doc_retrieval`/`mdrender`/`whats_new`) deliberately deferred to Stage 10, per that stage's own scope (`cli/main.py` is listed there, not here); the new modules and their tests stand alone until then. `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` deliberately left out per the plan's gray-area note -- no version-history entry yet claims it. `import arklight` still blocked only by the pre-existing Stage 9 `ir.binary` gap; no new coupling from this stage. |
 | 8 | URL state, class binding, action-arg runtime | Ported -- all nine modified runtime files diffed carefully (not wholesale) before landing; confirmed the "main-only" lines were only earlier vdom/htmx refactor stages of the same functions, not unique main features, so alpha's versions were taken as-is. **Scope gap found, not in this stage's file list:** `arklight/backend/js/runtime/__init__.py` and `arklight/backend/js/render.py` needed updating too, or the new `action_args.py`/`query.py`/`reveal.py` (and Stage 5's already-landed `PLATFORM_API_FRAGMENTS`, and render.py's provider-config wiring) would sit unwired and non-functional -- neither file is scoped to any single stage in this plan, they're each stages' shared integration point. Checked render.py's full diff against alpha first: confirmed every symbol it newly imports (`ACTION_FRAGMENTS`, `BEHAVIOR_FRAGMENTS`, `DERIVATION_FRAGMENTS`, `PLATFORM_API_FRAGMENTS`, `check_backend_support`) already exists in `main` from Stages 3/5, so no forward-reference to a not-yet-landed stage was pulled in. `docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md` deliberately left out per standing exclusion. `import arklight` still blocked only by the pre-existing Stage 9 `ir.binary` gap. |
 | 9 | Compiler hardening & supply-chain tooling | Ported -- `import arklight` finally succeeds (the `ir.binary` gap flagged since Stage 5 is closed) and a real `pip install -e .` + full suite run is now possible for the first time. See notes below. |
-| 10 | Live-streaming/CCTV/upgrade maintenance | Not started |
-| 11 | Android-exclusion verification pass | Not started |
+| 10 | Live-streaming/CCTV/upgrade maintenance | Ported at `0df63e7` -- `cli/main.py` and `templates/_common.py` landed with all `android`/`desktop` wiring stripped; `test_binary_ir.py`/`test_scaffold.py` taken from alpha, `test_config.py` kept as main's with its one stale `xfail` removed. Full suite: 2716 passed / 15 failed (was 2591 / 86 failed + 1 collection error). Remaining 15: 8 docs-tree tests (Stage 0's link decision) and 7 Stage 8 runtime-registry gaps -- none from this stage. `live_streaming.py`/`main.py` post-boundary changes deferred to Stages 15/17. |
+| 11 | Android-exclusion verification pass | Verified clean at Stage 10's tree -- all checklist items hold; the `android sync`/`ArkDb.kt`/`db`-prose items are guarded for the future stages that could reintroduce them. New `tests/test_android_exclusion.py` (9 tests) makes the check re-runnable. Suite: 2725 passed / 15 failed (same 15 as Stage 10). Pre-existing Android prose in main's Foundational docs left to Stage 0. |
 | 12 | Desktop-backend exclusion decision | Not started |
-| 13 | Root metadata (preserve `apt-repo.yml`) | Not started |
-| 14 | Full verification | Not started |
+| 13 | Root metadata (preserve `apt-repo.yml`) | Not started -- version target changed to `0.070.0` (`0.MMM.PP` scheme); needs a maintainer decision, `main` reads `0.54.1` |
+| 14 | Full verification | Not started -- now runs after Stages 15-17 and diffs against `23ebc24` |
+| 15 | htmx under Trusted Types, CSP, `file://` + live-streaming fallbacks (`e9da11d`, `2ed1674`, `3a933df`, `85a8eee`) | **New**, not started. Follows Stages 8/9 (shared `render.py`, `runtime/__init__.py`, `csp.py`); `htmx.py` literal already matches (2.0.10 both sides) |
+| 16 | `PlatformAPI.db`, Web half only (`f719455`, `23ebc24`) | **New**, not started. Follows Stage 5; Android `ArkDb.kt` excluded, `db` listed for `web` only |
+| 17 | Small post-v0.070 deltas: custom-class collision guard, `open_in_browser` fix, PWA precache encoding | **New**, not started. `api.py` lands once, together with Stage 16 |
 
 **Known gap until Stage 6 lands:** with Stage 5 in, the full suite runs
 714 tests clean (0 failures) under a proper `pip install -e .`. Only 4
