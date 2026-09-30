@@ -47,7 +47,7 @@ external *service* at runtime.
 ## The contract
 
 ```python
-from arklight import Provider, Site
+# include <stdlib.ARKlight>
 
 site = Site(
     provider=Provider.declare(

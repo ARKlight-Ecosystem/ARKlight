@@ -17,11 +17,11 @@ section, for everything else.
 
 ## Preamble directives (`# include`, `# define`)
 
-`from arklight import *` is **retired**. It still works, but the
-compiler now logs a notice for it (file, line, and what to write
-instead) on every build. A site file opens with reserved-shape
-*comments* instead -- ARKlight reads these itself, before your code
-runs, rather than delegating to Python's own `from X import *`:
+A site file opens with reserved-shape *comments* -- ARKlight reads
+these itself, before your code runs, rather than delegating to
+Python's own `from X import ...`. `# include <stdlib.ARKlight>` is the
+one way to bring ARKlight's vocabulary into a file, and every example
+in these docs uses it:
 
 ```python
 # include <stdlib.ARKlight>
@@ -60,6 +60,20 @@ step that gets names into the namespace in the first place.
 
 There is deliberately no directive that picks a winner. Drop one of
 the includes, or have one side export a different name.
+
+### Migrating off `from arklight import ...`
+
+`from arklight import *` is **retired**. It still works, but the
+compiler logs a notice for it on every build (file, line, and what to
+write instead). Replace the line with `# include <stdlib.ARKlight>` at
+the top of the file, above all code.
+
+A named import, `from arklight import Site, Page`, still works too,
+but it is not the documented style and, unlike the star form, the
+compiler does not log a notice for it yet. It bypasses the preamble's
+collision tracking, so prefer the include there as well. Both forms are
+plain Python and are resolved by Python, not by ARKlight, which is why
+neither one gets the `PreambleCollisionError` protection.
 
 ### `# define` -- replace a name with text, at compile time
 
@@ -157,10 +171,9 @@ what vocabulary that module is meant to contribute, and raises rather
 than guessing.
 
 **`# use` is reserved, not implemented.** A `# use <...>` line in the
-preamble is refused with an error pointing at the proposal
-(`USE-PREAMBLE-PROPOSAL.md`,
-*not accepted*), because silently ignoring it would let you write it
-believing it does something. More directives can be added later: each
+preamble is refused with an error saying it is reserved for a proposal
+that has not been accepted, because silently ignoring it would let you
+write it believing it does something. More directives can be added later: each
 is one recogniser plus one handler in `arklight/parser/preamble.py`.
 See that file for the full resolution rules and
 `arklight/parser/loader.py` for how the resolved bindings land in each

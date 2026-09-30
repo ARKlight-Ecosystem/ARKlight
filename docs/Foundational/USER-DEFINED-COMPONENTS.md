@@ -23,7 +23,7 @@ suggestions, can ship default styling, and (in `mode="registry"`) can
 render differently per backend.
 
 ```python
-from arklight import component, Prop, Container, Link
+# include <stdlib.ARKlight>
 
 @component(props={"active": Prop(default=None)})
 def NavBar(active=None):
