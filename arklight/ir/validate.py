@@ -152,6 +152,7 @@ Checks performed:
 
 from __future__ import annotations
 
+import json
 import math
 import re
 
@@ -166,7 +167,7 @@ from arklight.ast.nodes import (
     PredicateRef,
     is_state_ref,
 )
-from arklight.ir.platform_api import PLATFORM_API_REGISTRY
+from arklight.ir.platform_api import DB_OPERATIONS, PLATFORM_API_REGISTRY
 from arklight.provider import PROVIDER_CAPABILITIES, ProviderDeclaration, is_known_capability
 from arklight.ir.schema import (
     ACTION_REGISTRY,
@@ -281,7 +282,13 @@ def _validate_modifiers(action: ActionRef, *, path: str) -> None:
     _validate_modifier_tokens(action.modifiers, path=path, label="on_click")
 
 
-def _validate_platform_api(ref: PlatformAPIRef, *, path: str) -> None:
+def _validate_platform_api(
+    ref: PlatformAPIRef,
+    *,
+    path: str,
+    mutable_state: frozenset[str] = frozenset(),
+    page_state: frozenset[str] | None = None,
+) -> None:
     """
     `v0.065`: the backend-agnostic half of Platform API validation
     (Section 7/11 of `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`) --
@@ -293,6 +300,10 @@ def _validate_platform_api(ref: PlatformAPIRef, *, path: str) -> None:
     (`arklight.ir.platform_api.check_backend_support`, run once per
     backend during rendering) -- Validation has no backend selected
     yet to check that against.
+
+    `mutable_state`/`page_state` (the same two sets `_validate_action`
+    takes) matter only to capabilities whose arguments touch state --
+    today, `db`, checked by `_validate_platform_db`.
     """
     if ref.capability not in PLATFORM_API_REGISTRY:
         known = ", ".join(sorted(PLATFORM_API_REGISTRY))
@@ -310,6 +321,105 @@ def _validate_platform_api(ref: PlatformAPIRef, *, path: str) -> None:
             f"unexpected keyword argument(s) {unknown_args}. Accepted "
             f"arguments for {ref.capability!r} are: {allowed}."
         )
+    if ref.capability == "db":
+        _validate_platform_db(
+            ref,
+            path=path,
+            mutable_state=mutable_state,
+            readable_state=mutable_state if page_state is None else page_state,
+        )
+
+
+def _validate_platform_db(
+    ref: PlatformAPIRef,
+    *,
+    path: str,
+    mutable_state: frozenset[str],
+    readable_state: frozenset[str],
+) -> None:
+    """
+    `PlatformAPI.db.*(...)` argument rules, from
+    `arklight.ir.platform_api.DB_OPERATIONS`: a known `op`, exactly its
+    required arguments (plus only its own optional ones), `key`/`prefix`
+    as non-empty strings or `Bind(...)` references, `value` as any
+    JSON-serializable value or a `Bind(...)`, and `into` as a
+    `State(...)` declared on this page -- a read has to land somewhere,
+    and a `Computed(...)` has no value of its own to write to.
+    """
+    label = f"on_click at {path} (PlatformAPI.db(...))"
+    op = ref.args.get("op")
+    if op not in DB_OPERATIONS:
+        known = ", ".join(sorted(DB_OPERATIONS))
+        raise ValidationError(
+            f"{label} has unknown op {op!r}. Known db operations are: {known}."
+        )
+    required, optional = DB_OPERATIONS[op]
+    given = set(ref.args) - {"op"}
+    missing = sorted(set(required) - given)
+    if missing:
+        raise ValidationError(
+            f"{label} op {op!r} is missing required argument(s) {missing}."
+        )
+    extra = sorted(given - set(required) - set(optional))
+    if extra:
+        accepted = ", ".join(required + optional) or "(none)"
+        raise ValidationError(
+            f"{label} op {op!r} doesn't accept argument(s) {extra}. "
+            f"Accepted arguments for {op!r} are: {accepted}."
+        )
+
+    for arg_name in ("key", "prefix", "value"):
+        if arg_name not in ref.args:
+            continue
+        value = ref.args[arg_name]
+        arg_label = f"{label} op {op!r} argument {arg_name!r}"
+        if isinstance(value, ARKNode):
+            raise ValidationError(
+                f"{arg_label} holds a {value.type!r} node, which can't be "
+                f"serialized. Build the call with PlatformAPI.db.{op}(...) so "
+                f"Bind(\"name\") is converted, or pass a plain value."
+            )
+        if is_state_ref(value):
+            name = value[STATE_REF_KEY] if len(value) == 1 else None
+            if not isinstance(name, str) or not name:
+                raise ValidationError(
+                    f"{arg_label} uses the reserved key {STATE_REF_KEY!r} in a "
+                    f"dict that isn't a state reference. Use Bind(\"name\") to "
+                    f"read state."
+                )
+            if name not in readable_state:
+                known = ", ".join(sorted(readable_state)) or "(none declared)"
+                raise ValidationError(
+                    f"{arg_label} reads Bind({name!r}), which isn't declared on "
+                    f"this page as State(...) or Computed(...). State/Computed "
+                    f"declared on this page: {known}."
+                )
+        elif arg_name == "value":
+            try:
+                json.dumps(value)
+            except (TypeError, ValueError) as exc:
+                raise ValidationError(
+                    f"{arg_label} isn't JSON-serializable ({exc}). The db stores "
+                    f"JSON values: str, int, float, bool, None, list and dict."
+                ) from exc
+        elif not isinstance(value, str):
+            raise ValidationError(
+                f"{arg_label} must be a string or a Bind(...) reference, got {value!r}."
+            )
+        elif arg_name == "key" and not value:
+            raise ValidationError(
+                f"{arg_label} must be a non-empty string or a Bind(...) reference."
+            )
+
+    if "into" in ref.args:
+        into = ref.args["into"]
+        if not isinstance(into, str) or into not in mutable_state:
+            known = ", ".join(sorted(mutable_state)) or "(none declared)"
+            raise ValidationError(
+                f"{label} op {op!r} writes into {into!r}, which isn't declared "
+                f"on this page as State(...) (a Computed(...) name can't be a "
+                f"write target). State declared on this page: {known}."
+            )
 
 
 def _validate_action_args(
@@ -667,7 +777,9 @@ def _validate_behavior_props(
         return
 
     if isinstance(on_click, PlatformAPIRef):
-        _validate_platform_api(on_click, path=path)
+        _validate_platform_api(
+            on_click, path=path, mutable_state=mutable_state, page_state=page_state
+        )
         return
 
     if on_click not in KNOWN_BEHAVIORS:
@@ -1170,7 +1282,9 @@ def _validate_repeat_template(
     if isinstance(on_click, ActionRef):
         _validate_action(on_click, path=path, mutable_state=mutable_state, page_state=page_state)
     elif isinstance(on_click, PlatformAPIRef):
-        _validate_platform_api(on_click, path=path)
+        _validate_platform_api(
+            on_click, path=path, mutable_state=mutable_state, page_state=page_state
+        )
     elif isinstance(on_click, str) and on_click not in KNOWN_BEHAVIORS:
         known = ", ".join(sorted(KNOWN_BEHAVIORS))
         raise ValidationError(

@@ -1,6 +1,6 @@
 import pytest
 
-from arklight.api import CSSSyntaxError, Page, Site, Text
+from arklight.api import CSSSyntaxError, DuplicateStyleNameError, Page, Site, Text
 from arklight.backend.css.render import CSSBackend, STYLESHEET_PATH
 from arklight.ir.build import build_website_ir
 from arklight.ir.normalize import normalize_ark_ast
@@ -94,24 +94,24 @@ def test_style_selector_functional_pseudo_classes():
 
 def test_style_selector_nesting_pseudo_class():
     site = _new_site()
-    site.style_selector(".card", {
+    site.style_selector(".panel", {
         "padding": "1rem",
         "&:hover": {"box-shadow": "0 2px 8px rgba(0,0,0,.15)"},
     })
     css = _render_css(site)
-    assert ".card {" in css
-    assert ".card:hover {" in css
+    assert ".panel {" in css
+    assert ".panel:hover {" in css
 
 
 def test_style_selector_nesting_descendant_and_combinator():
     site = _new_site()
-    site.style_selector(".card", {
+    site.style_selector(".panel", {
         "& .title": {"font-weight": "bold"},
         "& > img": {"border-radius": "8px"},
     })
     css = _render_css(site)
-    assert ".card .title {" in css
-    assert ".card > img {" in css
+    assert ".panel .title {" in css
+    assert ".panel > img {" in css
 
 
 def test_style_selector_nesting_requires_single_base_selector():
@@ -130,6 +130,59 @@ def test_style_selector_rejects_pseudo_shorthand():
     site = _new_site()
     with pytest.raises(CSSSyntaxError):
         site.style_selector(".a", {":hover:color": "red"})
+
+
+def test_style_selector_bare_class_colliding_with_reserved_utility_raises():
+    site = _new_site()
+    with pytest.raises(DuplicateStyleNameError, match="built-in"):
+        site.style_selector(".card", {"background": "#1F2E27"})
+    assert site.selector_rules == []
+
+
+def test_style_selector_bare_class_colliding_with_reserved_utility_allows_redefine():
+    site = _new_site()
+    site.style_selector(".card", {"background": "#1F2E27"}, allow_redefine=True)
+    assert (".card", {"background": "#1F2E27"}) in site.selector_rules
+
+
+def test_style_selector_grouped_bare_class_colliding_with_reserved_utility_raises():
+    site = _new_site()
+    with pytest.raises(DuplicateStyleNameError, match="built-in"):
+        site.style_selector(".panel, .nav", {"color": "red"})
+
+
+def test_style_selector_non_bare_selector_is_not_checked_against_reserved_utility():
+    # `.card::before` and `.card:not(.disabled)` aren't the bare `.card`
+    # shape `style()` itself can emit, so they don't collide with it.
+    site = _new_site()
+    site.style_selector(".card::before", {"content": '""'})
+    site.style_selector(".card:not(.disabled)", {"cursor": "pointer"})
+    assert len(site.selector_rules) == 2
+
+
+def test_style_selector_bare_class_colliding_with_existing_style_raises():
+    site = _new_site()
+    site.style("brand", {"color": "red"})
+    with pytest.raises(DuplicateStyleNameError, match="site.style"):
+        site.style_selector(".brand", {"color": "blue"})
+
+
+def test_style_selector_called_twice_with_same_selector_raises():
+    site = _new_site()
+    site.style_selector(".panel", {"color": "red"})
+    with pytest.raises(DuplicateStyleNameError, match="already registered"):
+        site.style_selector(".panel", {"color": "blue"})
+    assert site.selector_rules == [(".panel", {"color": "red"})]
+
+
+def test_style_selector_called_twice_with_allow_redefine_appends():
+    site = _new_site()
+    site.style_selector(".panel", {"color": "red"})
+    site.style_selector(".panel", {"color": "blue"}, allow_redefine=True)
+    assert site.selector_rules == [
+        (".panel", {"color": "red"}),
+        (".panel", {"color": "blue"}),
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +348,7 @@ def test_import_style_is_flagged_experimental():
     # above), an @import URL's contents can't be validated by ARKlight --
     # they're fetched and applied by the browser at request time -- so
     # this goes through the same css-media-queries-style experimental
-    # gate (docs/EXPERIMENTAL-APIS.md).
+    # gate (docs/Foundational/EXPERIMENTAL-APIS.md).
     site = _new_site()
     site.import_style("https://fonts.googleapis.com/css2?family=Inter")
     assert len(site.experimental_usages) == 1
