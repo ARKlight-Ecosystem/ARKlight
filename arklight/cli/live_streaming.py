@@ -77,7 +77,13 @@ from typing import Any
 from arklight.backend.base import Backend
 from arklight.cli import cctv
 from arklight.compiler.pipeline import BuildResult, CompileError, build, default_backends
-from arklight.config import ConfigError, load_config, section
+from arklight.config import (
+    ConfigError,
+    emit_config_warnings,
+    load_config,
+    section,
+    validate_live_streaming,
+)
 from arklight.ir.build import WebsiteIR
 
 _STAGE_PREFIX = "[ARKlight]"
@@ -481,11 +487,17 @@ def _cmd_subscribe(args: argparse.Namespace) -> int:
     except ConfigError as exc:
         print(f"ARKlight live-streaming failed: {exc}", file=sys.stderr)
         return 1
+    emit_config_warnings(project_config, entry.parent)
     live_cfg = section(
         project_config,
         "live_streaming",
         {"host": _DEFAULT_HOST, "port": _DEFAULT_PORT, "poll_interval": _DEFAULT_POLL_INTERVAL},
     )
+    try:
+        validate_live_streaming(live_cfg)
+    except ConfigError as exc:
+        print(f"ARKlight live-streaming failed: {exc}", file=sys.stderr)
+        return 1
     host = args.host or live_cfg["host"]
     port = args.port or live_cfg["port"]
     poll_interval = live_cfg["poll_interval"]
@@ -531,7 +543,7 @@ def _cmd_subscribe(args: argparse.Namespace) -> int:
 
         channel_state = cctv._State(page.state)
         channel_hub = cctv._SSEHub()
-        channel_handler_cls = cctv._make_handler(channel_state, channel_hub)
+        channel_handler_cls = cctv._make_handler(channel_state, channel_hub, bind_host=host)
         try:
             channel_server = _bind_channel_server(channel_handler_cls, host, args.channel)
         except OSError as exc:

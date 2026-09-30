@@ -7,7 +7,7 @@ Turns one of the in-package templates (`arklight.cli.templates`) into
 a real directory of files. This module owns validation and filesystem
 writing; the templates themselves only ever return
 `dict[relative_path, contents]` and never touch disk. See
-docs/DESIGN-NOTES.md, "v0.004: CLI scaffolding (`arklight new`)".
+docs/Foundational/DESIGN-NOTES.md, "v0.004: CLI scaffolding (`arklight new`)".
 """
 
 from __future__ import annotations

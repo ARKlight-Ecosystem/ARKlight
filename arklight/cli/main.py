@@ -6,6 +6,7 @@ ARKlight CLI.
     arklight pack ARK -o site.ark
     arklight unpack site.ark -o ARK
     arklight pwa ARK --name "My Site" --icon assets/icon-192.png:192x192
+    arklight deploy cloudflare
     arklight search Picture
 
 Beginner-friendly by design: a handful of subcommands, sensible
@@ -19,6 +20,7 @@ from __future__ import annotations
 import argparse
 import functools
 import mimetypes
+import os
 import re
 import sys
 import traceback
@@ -27,13 +29,27 @@ import webbrowser
 from pathlib import Path
 
 from arklight import __version__, experimental
-from arklight.cli import live_streaming
+from arklight.cli import deploy, live_streaming
+from arklight.cli.deploy import DeployError
+from arklight.cli.doc_retrieval import DOC_FOLDERS, DocRetrievalError, ignored_flag_notices, run_retrieve_doc
 from arklight.cli.license_gate import ensure_license_accepted
+from arklight.cli.mdrender import render_markdown, resolve_color
+from arklight.cli.whats_new import read_version, show_release_notes_if_new
 from arklight.cli.scaffold import ScaffoldError, new_project
 from arklight.cli.search import record_acceptance, resolve_exact, search_component
 from arklight.cli.templates import TEMPLATES
 from arklight.cli.upgrade import upgrade_to_alpha
+from arklight.compiler import rei
 from arklight.compiler.pipeline import BuildResult, CompileError, build
+from arklight.config import (
+    ConfigError,
+    emit_config_warnings,
+    load_config,
+    overdrive_enabled,
+    section,
+)
+from arklight.ir import binary as binary_ir
+from arklight.ir.validate import ValidationError
 from arklight.packer.bundle import PackError, pack, unpack
 from arklight.pwa import PWAError, enable_pwa
 from arklight.search.endpoint import serve_stdio
@@ -72,10 +88,15 @@ ARKlight production layout: service-oriented, separated by concern
   pages/*.py        one module per route. Builds that page's Page(...)
                      tree by composing components/ + content/ --
                      no markup lives inline in site.py.
-  components/*.py   reusable pieces (nav, footer, cards, ...) as plain
-                     functions. No special "component" mechanism --
-                     ordinary composition, so there's nothing framework-
-                     specific to learn.
+  components/*.py   reusable pieces (nav, footer, cards, ...). Plain
+                     functions still work with zero setup -- ordinary
+                     composition, nothing framework-specific required.
+                     For a piece that wants a checked prop contract
+                     (required/optional props, build-time validation)
+                     or per-backend rendering, register it instead with
+                     the optional @component(...) decorator (v0.060) --
+                     see docs/Foundational/USER-DEFINED-COMPONENTS.md.
+                     Neither is required to use the other; mix freely.
   content/*.py      copy/text/config constants, kept out of both
                      components/ and pages/ so wording can change
                      without touching markup or logic.
@@ -132,33 +153,42 @@ def open_in_browser(result: BuildResult, output_dir: str | Path) -> bool:
     return True
 
 
-def _stage_logger(message: str, *, verbose: bool) -> None:
+def _stage_logger(message: str, *, mode: str) -> None:
     """`on_stage` callback for `build()` -- prints each pipeline stage
     as it starts, prefixed like the rest of ARKlight's CLI output.
+    `mode` is one of `arklight.compiler.rei.LOG_MODES`
+    (`"plain"`/`"verbose"`/`"narrate"`) -- `arklight.compiler.rei`'s
+    closed vocabulary, since both the CLI and that renderer need to
+    agree on it.
 
     Two different things flow through this one callback:
       - plain pipeline narration ("Running validation...", etc.) --
-        only printed when `verbose` (`--verbose`/`--debug`) is set,
-        same as before.
+        printed as a `[ARKlight] ...` line when `mode == "verbose"`
+        (`--verbose`/`--debug`), or as one of Rei's narrated sentences
+        when `mode == "narrate"`; nothing prints in `"plain"` mode,
+        same as before `--narrate` existed.
       - an inline experimental-API banner (see
         `arklight.experimental.format_inline_banner`; always starts
-        with the warning glyph) -- printed unconditionally, per
-        docs/EXPERIMENTAL-APIS.md's CLI contract ("neither surface is
-        gated behind --verbose/--debug"): an experimental-feature
-        warning isn't narration, it's the entire point of gating the
-        feature, so it always prints regardless of verbosity.
+        with the warning glyph) -- printed unconditionally in every
+        mode, per docs/Foundational/EXPERIMENTAL-APIS.md's CLI contract ("neither
+        surface is gated behind --verbose/--debug"): an experimental-
+        feature warning isn't narration, it's the entire point of
+        gating the feature, so it always prints regardless of log
+        mode, and Rei never narrates it (`rei.is_unconditional_banner`).
     """
-    if message.startswith("\u26a0"):
+    if rei.is_unconditional_banner(message):
         print(message)
-    elif verbose:
+    elif mode == "verbose":
         print(f"{_STAGE_PREFIX} {message}")
+    elif mode == "narrate":
+        print(rei.narrate_stage(message))
 
 
 # v0.0431 emergency patch: marker prefix `arklight.backend.html.render`
 # used to put on every known-alpha-limitation warning it raised. That
 # particular warning (UNROUTED_REFERENCE_ATTRS/_warn_unrouted_reference)
 # was removed once the HTML backend refactor's Stage 2 fixed the gap it
-# flagged (see docs/Backends/HTML-BACKEND-REFACTOR.md, CHANGELOG.md's
+# flagged (see HTML-BACKEND-REFACTOR.md [retired -- see CHANGELOG.md], CHANGELOG.md's
 # [0.0491]) -- the marker mechanism itself stays, generic across any
 # `[ARKlight ALPHA]`-prefixed warning a future alpha limitation might
 # raise. Matched here so the CLI can surface these clearly and always --
@@ -198,11 +228,39 @@ def _cmd_build(args: argparse.Namespace) -> int:
     # with the stage-by-stage narration already on screen above the
     # traceback, so there's no reason to ask for both separately.
     verbose = args.verbose or args.debug
-    # Always wired up now, not just when verbose -- `_stage_logger`
-    # itself decides what to actually print (see its docstring): plain
-    # stage narration stays gated behind `verbose`, but an experimental-
-    # API inline banner always gets through regardless.
-    on_stage = functools.partial(_stage_logger, verbose=verbose)
+
+    # `--narrate` is mutually exclusive with `--verbose`/`--debug` --
+    # at most one log mode wins per invocation (proposal §1), the same
+    # "last flag wins, no silent stacking" rule `--open`/`--no-open`
+    # already follows. Checked here (rather than an argparse mutually
+    # exclusive group) because `--debug` implying `--verbose` isn't
+    # itself a flag conflict -- only `--narrate` alongside either of
+    # the other two is.
+    if args.narrate and verbose:
+        conflicting = "--debug" if args.debug else "--verbose"
+        print(
+            f"ARKlight build failed: --narrate can't be combined with "
+            f"{conflicting} -- pick one log mode per build.",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Project config's `rei.default_mode` only matters when *no*
+    # `--verbose`/`--debug`/`--narrate` flag was passed at all -- a
+    # flag on this invocation always wins over the project's pinned
+    # default (proposal §2). Resolved after the config load below,
+    # once `project_config` exists; `mode_source` records *why* this
+    # build ended up in the mode it did, purely for Rei's first-compile
+    # introduction banner (§3).
+    if args.narrate:
+        mode = "narrate"
+        mode_source = "--narrate flag"
+    elif verbose:
+        mode = "verbose"
+        mode_source = "--verbose/--debug flag"
+    else:
+        mode = None  # resolved from config below
+        mode_source = "arklight.config.py"
 
     # --max-width/--bg let the *build invocation* set a design token
     # without touching the site file's Site(...) call -- e.g. CI
@@ -221,6 +279,77 @@ def _cmd_build(args: argparse.Namespace) -> int:
     if args.button_text is not None:
         css_var_overrides["--ark-button-text"] = args.button_text
 
+    # arklight.config.py's "experimental"/"csp" sections are the only
+    # control for the heavy-reliance nudge, the devtools console
+    # reminder (docs/Foundational/EXPERIMENTAL-APIS.md), and a project-wide CSP
+    # override (arklight/backend/html/csp.py) -- no CLI flag for any of
+    # these, on purpose: a project that's decided it's fine leaning on
+    # an escape hatch (or wants one CSP policy for every site it
+    # builds) sets this once, next to the site file, the same place
+    # `live_streaming` project settings already
+    # live, rather than remembering a flag on every invocation.
+    try:
+        project_config = load_config(Path(args.entry).resolve().parent)
+    except ConfigError as exc:
+        print(f"ARKlight build failed: {exc}", file=sys.stderr)
+        return 1
+    emit_config_warnings(project_config, Path(args.entry).resolve().parent)
+    experimental_cfg = section(
+        project_config,
+        "experimental",
+        {"heavy_reliance_nudge": True, "devtools_console_reminder": True},
+    )
+    show_experimental_nudge = bool(experimental_cfg["heavy_reliance_nudge"])
+    devtools_console_reminder = bool(experimental_cfg["devtools_console_reminder"])
+
+    csp_cfg = section(project_config, "csp", {"strict_csp": None})
+    strict_csp_override = csp_cfg["strict_csp"]
+    if strict_csp_override is not None and not isinstance(strict_csp_override, bool):
+        print(
+            f"ARKlight build failed: `CONFIG['csp']['strict_csp']` must be "
+            f"True, False, or None, got {strict_csp_override!r}.",
+            file=sys.stderr,
+        )
+        return 1
+
+    # `overdrive` (top-level flag): waives the gates' *unverifiable*
+    # findings -- see `arklight.compiler.overdrive`. Validated here so a
+    # bad value gets the same "build failed" treatment as `csp`'s.
+    try:
+        overdrive = overdrive_enabled(project_config)
+    except ConfigError as exc:
+        print(f"ARKlight build failed: {exc}", file=sys.stderr)
+        return 1
+
+    # `rei.default_mode` (proposal §2) only resolves `mode` when no
+    # `--verbose`/`--debug`/`--narrate` flag was passed above -- a flag
+    # always wins over the project's pinned default.
+    if mode is None:
+        rei_cfg = section(project_config, "rei", {"default_mode": "plain"})
+        default_mode = rei_cfg["default_mode"]
+        if default_mode not in rei.LOG_MODES:
+            print(
+                f"ARKlight build failed: `CONFIG['rei']['default_mode']` must "
+                f"be one of {rei.LOG_MODES!r}, got {default_mode!r}.",
+                file=sys.stderr,
+            )
+            return 1
+        mode = default_mode
+
+    # Always wired up now, not just when a log mode is active --
+    # `_stage_logger` itself decides what to actually print (see its
+    # docstring): plain stage narration stays gated behind `mode`, but
+    # an experimental-API inline banner always gets through regardless.
+    on_stage = functools.partial(_stage_logger, mode=mode)
+
+    # Rei's one-time-per-fresh-output-directory introduction (proposal
+    # §3): only when narration is actually active for this build, and
+    # only the first time into a missing-or-empty output directory --
+    # checked *before* `build()` runs, since `build()` itself creates
+    # the directory as part of writing output.
+    if mode == "narrate" and rei.is_fresh_output_dir(args.output):
+        print(rei.introduction(mode_source=mode_source, resolved_mode=mode))
+
     try:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -230,6 +359,9 @@ def _cmd_build(args: argparse.Namespace) -> int:
                 on_stage=on_stage,
                 css_var_overrides=css_var_overrides or None,
                 lang=args.lang,
+                strict_csp_override=strict_csp_override,
+                devtools_console_reminder=devtools_console_reminder,
+                overdrive=overdrive,
             )
     except CompileError as exc:
         if args.debug:
@@ -240,6 +372,22 @@ def _cmd_build(args: argparse.Namespace) -> int:
             # which pipeline stage wrapped it.
             print(f"{_STAGE_PREFIX} Build failed -- full trace (--debug):", file=sys.stderr)
             traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+        elif mode == "narrate":
+            # Proposal §5: the `arklight search <name>` pointer only
+            # ever comes from `ValidationError.component_name` --
+            # structured data threaded through `CompileError.__cause__`
+            # -- never from re-parsing `str(exc)`. `__cause__` is only
+            # a `ValidationError` when *that* stage is what failed
+            # (`compile_site_file`'s `except ValidationError as exc:
+            # raise CompileError(...) from exc`); any other failing
+            # stage (site load, component expansion, IR build, a
+            # backend, ...) leaves `component_name` unset, same as any
+            # other `ValidationError` that isn't schema-backed.
+            cause = exc.__cause__
+            component_name = (
+                cause.component_name if isinstance(cause, ValidationError) else None
+            )
+            print(rei.render_failure(str(exc), component_name=component_name), file=sys.stderr)
         else:
             print(f"ARKlight build failed: {exc}", file=sys.stderr)
             print("Re-run with --debug for the full traceback.", file=sys.stderr)
@@ -249,8 +397,16 @@ def _cmd_build(args: argparse.Namespace) -> int:
     for path in result.written_paths:
         print(f"  {path}")
 
+    if args.emit_arklight is not None:
+        arklight_path = args.emit_arklight or os.path.join(args.output, "site.arklight")
+        os.makedirs(os.path.dirname(arklight_path) or ".", exist_ok=True)
+        payload = binary_ir.encode_arklight(result.ir)
+        with open(arklight_path, "wb") as f:
+            f.write(payload)
+        print(f"  {arklight_path} ({len(payload)} bytes, binary IR)")
+
     _print_alpha_warnings(caught)
-    experimental.print_summary(result.ir.experimental_usages)
+    experimental.print_summary(result.ir.experimental_usages, show_nudge=show_experimental_nudge)
 
     if args.open:
         opened = open_in_browser(result, args.output)
@@ -403,7 +559,7 @@ def _cmd_pwa(args: argparse.Namespace) -> int:
         print(f"ARKlight pwa failed: {exc}", file=sys.stderr)
         return 1
 
-    # Experimental API warning (docs/EXPERIMENTAL-APIS.md) -- printed
+    # Experimental API warning (docs/Foundational/EXPERIMENTAL-APIS.md) -- printed
     # inline before the normal success output, unconditionally (not
     # gated behind any verbosity flag), same contract `arklight build`
     # follows for `site.media_query(...)`.
@@ -434,6 +590,129 @@ def _cmd_pwa(args: argparse.Namespace) -> int:
 
     return 0
 
+
+def _deploy_provider(value: str) -> str:
+    """`argparse` `type=` for `arklight deploy`'s provider positional:
+    a value that looks like a site file (the first thing a beginner
+    types -- `arklight deploy site.py`) gets a message naming the fix,
+    not just "invalid choice". Anything else passes through unchanged
+    to `choices=`, which still rejects it exactly as before."""
+    if value not in deploy.PROVIDERS and (
+        value.endswith(".py") or "/" in value or os.sep in value
+    ):
+        raise argparse.ArgumentTypeError(
+            f"{value!r} looks like a site file, not a provider. Name the provider "
+            f"first: `arklight deploy {deploy.DEFAULT_PROVIDER} {value}` "
+            f"(providers: {', '.join(deploy.PROVIDERS)})."
+        )
+    return value
+
+
+def _cmd_deploy(args: argparse.Namespace) -> int:
+    """
+    `arklight deploy [cloudflare]` -- build, check that Wrangler is
+    there, then hand the build directory to it. See
+    docs/Foundational/DEPLOYMENT-CLI.md, and `arklight.cli.deploy` for
+    what this deliberately does *not* do (install Wrangler, authenticate,
+    upload, capture Wrangler's output).
+
+    Exit code: 0 on success; a failed build's own code; 1 for a problem
+    ARKlight itself found (missing Wrangler, missing build directory);
+    otherwise Wrangler's exit code, unchanged.
+    """
+    entry = Path(args.entry)
+    output = Path(args.output)
+    # Same rule `arklight build` uses to find `arklight.config.py`: the
+    # project is the directory the site file lives in. It is also where
+    # a project-owned `wrangler.jsonc` is looked for and where Wrangler
+    # runs.
+    project_dir = entry.resolve().parent
+
+    if not project_dir.is_dir():
+        print(f"ARKlight deploy failed: directory not found: {project_dir}", file=sys.stderr)
+        return 1
+
+    if args.skip_build:
+        try:
+            deploy.check_build_dir(output)
+        except DeployError as exc:
+            print(f"ARKlight deploy failed: {exc}", file=sys.stderr)
+            return 1
+    else:
+        if not entry.is_file():
+            print(
+                f"ARKlight deploy failed: site file not found: {entry}. Pass "
+                f"its path (`arklight deploy cloudflare path/to/site.py`), or "
+                f"use --skip-build to deploy an existing build directory.",
+                file=sys.stderr,
+            )
+            return 1
+        # Deliberately re-enters the CLI rather than calling
+        # `compiler.pipeline.build` directly: `arklight build` already
+        # owns project config, CSP/experimental handling, alpha-warning
+        # and experimental-API output, and Rei's log mode, and deploy
+        # should build *exactly* like `arklight build` does -- not a
+        # second copy of that logic that drifts. `--no-open` because
+        # nobody wants a browser window in the middle of a deploy.
+        build_code = main(["build", str(entry), "-o", str(output), "--no-open"])
+        if build_code != 0:
+            print(
+                "ARKlight deploy: the build failed, so nothing was deployed.",
+                file=sys.stderr,
+            )
+            return build_code
+
+    try:
+        wrangler = deploy.find_wrangler()
+        plan = deploy.plan_cloudflare(
+            wrangler=wrangler,
+            output_dir=output,
+            project_dir=project_dir,
+            name=args.name,
+        )
+    except DeployError as exc:
+        print(f"ARKlight deploy failed: {exc}", file=sys.stderr)
+        if not args.skip_build:
+            print(
+                f"(The site was built -> {output}/, but nothing was deployed.)",
+                file=sys.stderr,
+            )
+        return 1
+
+    print(f"ARKlight v{__version__} deploying {output}/ to Cloudflare Workers with Wrangler.")
+    if plan.uses_project_config:
+        print(
+            f"Using the Wrangler config in {project_dir}/ -- it decides what "
+            f"gets deployed. (ARKlight does not check that its assets "
+            f"directory is {output}/.)"
+        )
+    else:
+        print(
+            f"No Wrangler config in {project_dir}/, so deploying {output}/ as "
+            f"Worker {plan.worker_name!r} (compatibility date "
+            f"{plan.compatibility_date}). Add a wrangler.jsonc there to "
+            f"control this yourself."
+        )
+    print(f"$ {plan.display}")
+
+    if args.dry_run:
+        print("--dry-run: Wrangler was not run.")
+        return 0
+
+    print()
+    try:
+        code = deploy.run_wrangler(plan)
+    except DeployError as exc:
+        print(f"ARKlight deploy failed: {exc}", file=sys.stderr)
+        return 1
+
+    if code != 0:
+        print(
+            f"ARKlight deploy: Wrangler exited with code {code} -- see its "
+            f"output above for the reason.",
+            file=sys.stderr,
+        )
+    return code
 
 
 def _cmd_new(args: argparse.Namespace) -> int:
@@ -478,6 +757,41 @@ def _cmd_new(args: argparse.Namespace) -> int:
 
 
 def _cmd_search(args: argparse.Namespace) -> int:
+    if args.retrieve_doc:
+        if args.serve:
+            print(
+                "arklight search: --retrieve-doc and --serve are mutually "
+                "exclusive -- --serve starts the component-lookup stdio "
+                "server, which has nothing to do with doc retrieval.",
+                file=sys.stderr,
+            )
+            return 1
+
+        for notice in ignored_flag_notices(args):
+            print(f"arklight search: {notice}", file=sys.stderr)
+
+        try:
+            output = run_retrieve_doc(args)
+        except DocRetrievalError as exc:
+            print(f"arklight search: {exc}", file=sys.stderr)
+            return 1
+        print(render_markdown(output, color=resolve_color(args.color)))
+        return 0
+
+    doc_flags_used = [folder.flag for folder in DOC_FOLDERS if getattr(args, folder.attr, False)]
+    if args.file is not None:
+        doc_flags_used.append("--file")
+    if getattr(args, "section", None) is not None:
+        doc_flags_used.append("--section")
+    if getattr(args, "color", "auto") != "auto":
+        doc_flags_used.append("--color")
+    if doc_flags_used:
+        print(
+            f"arklight search: {', '.join(doc_flags_used)} only apply with "
+            "--retrieve-doc and are ignored here.",
+            file=sys.stderr,
+        )
+
     if args.serve:
         if args.name is not None:
             print(
@@ -540,7 +854,13 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=False)
 
     build_parser = subparsers.add_parser("build", help="Compile a site file to static HTML + CSS.")
-    build_parser.add_argument("entry", help="Path to the Python site file (e.g. site.py)")
+    build_parser.add_argument(
+        "entry",
+        help="Path to the Python site file (e.g. site.py), or a previously "
+        "--emit-arklight'd .arklight binary IR snapshot (detected by "
+        "extension or magic bytes) -- rebuilds straight from the snapshot, "
+        "skipping the Python compiler pipeline entirely.",
+    )
     build_parser.add_argument(
         "-o", "--output", default="ARK", help="Output directory (default: ARK)"
     )
@@ -574,6 +894,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Like --verbose, plus print the full chained traceback (instead of "
         "a short message) if the build fails -- for tracing a compiler "
         "error back to the exact stage and Python frame that raised it.",
+    )
+    build_parser.add_argument(
+        "--narrate",
+        action="store_true",
+        default=False,
+        help="Like --verbose, but narrated in short natural-language sentences "
+        "by Rei, ARKlight's compiler narrator, instead of '[ARKlight] ...' "
+        "stage lines. Mutually exclusive with --verbose/--debug. A "
+        "project can pin this as its default via arklight.config.py's "
+        "CONFIG = {'rei': {'default_mode': 'narrate'}} instead of "
+        "passing the flag every time -- see "
+        "docs/Foundational/DESIGN-NOTES.md.",
     )
     build_parser.add_argument(
         "--max-width",
@@ -623,6 +955,22 @@ def main(argv: list[str] | None = None) -> int:
         "Takes precedence over Site(button_text=...) in the site file. "
         "Default: '#ffffff' -- worth setting explicitly if you also choose a "
         "light --ark-accent, since button background follows accent.",
+    )
+    build_parser.add_argument(
+        "--emit-arklight",
+        dest="emit_arklight",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="PATH",
+        help="Also write the compiled Website IR as a binary .arklight file "
+        "(arklight.ir.binary -- magic bytes, format version, schema "
+        "generation tag, deduped string table). Bare flag writes "
+        "<output>/site.arklight; pass a path to choose your own, e.g. "
+        "--emit-arklight=build/site.arklight. A standalone, versioned "
+        "snapshot of the IR that can be read back and rebuilt into a full "
+        "site (`arklight build <that file>.arklight`) without re-running "
+        "the Python compiler pipeline.",
     )
     build_parser.set_defaults(func=_cmd_build)
 
@@ -719,7 +1067,7 @@ def main(argv: list[str] | None = None) -> int:
         "--install-button",
         action="store_true",
         help=(
-            "EXPERIMENTAL (see docs/EXPERIMENTAL-APIS.md): inject a native "
+            "EXPERIMENTAL (see docs/Foundational/EXPERIMENTAL-APIS.md): inject a native "
             "install-prompt button into every page, via the "
             "`beforeinstallprompt` browser event. Off by default -- prints "
             "an experimental-API warning when used, since browser support "
@@ -728,6 +1076,67 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     pwa_parser.set_defaults(func=_cmd_pwa)
+
+    deploy_parser = subparsers.add_parser(
+        "deploy",
+        help="Build the site, then deploy it with the hosting provider's own CLI "
+        "(Cloudflare Workers via Wrangler). See docs/Foundational/DEPLOYMENT-CLI.md.",
+        description="Build the site, then hand the build directory to the hosting "
+        "provider's own CLI. ARKlight does not install that CLI, authenticate, or "
+        "upload anything itself: it runs `wrangler deploy` and Wrangler does the rest, "
+        "with its output shown as-is. Bare `arklight deploy` is `arklight deploy "
+        "cloudflare`. Name the provider before the site file: `arklight deploy "
+        "cloudflare my_site.py`.",
+    )
+    # The provider is deliberately named *before* the site file, so
+    # `arklight deploy site.py` stays an error rather than a guess
+    # (docs/Foundational/DEPLOYMENT-CLI.md, "Command shape"). It is
+    # also the first thing a beginner types, though -- `_deploy_provider`
+    # (the `type=` hook) turns argparse's bare "invalid choice" into the
+    # actual fix for that specific case. Every other unknown provider
+    # is still rejected by `choices=` exactly as before.
+    deploy_parser.add_argument(
+        "provider",
+        nargs="?",
+        type=_deploy_provider,
+        choices=deploy.PROVIDERS,
+        default=deploy.DEFAULT_PROVIDER,
+        help="Where to deploy (default: %(default)s, the only provider so far).",
+    )
+    deploy_parser.add_argument(
+        "entry",
+        nargs="?",
+        default="site.py",
+        help="Path to the Python site file to build (default: site.py). Its directory "
+        "is the project directory: where a wrangler.jsonc is looked for and where "
+        "Wrangler runs.",
+    )
+    deploy_parser.add_argument(
+        "-o", "--output", default="ARK", help="Build output directory to deploy (default: ARK)"
+    )
+    deploy_parser.add_argument(
+        "--name",
+        default=None,
+        help="Cloudflare Worker name, passed to Wrangler as-is (Wrangler/Cloudflare "
+        "validate it). Default: the project directory's name, lowercased, when the "
+        "project has no wrangler config; with one, the config's own name is used "
+        "unless you pass this.",
+    )
+    deploy_parser.add_argument(
+        "--skip-build",
+        action="store_true",
+        default=False,
+        help="Deploy the existing --output directory as it is, without running "
+        "`arklight build` first.",
+    )
+    deploy_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Build (unless --skip-build) and check for Wrangler, then print the "
+        "Wrangler command that would run instead of running it. Nothing is deployed.",
+    )
+    deploy_parser.set_defaults(func=_cmd_deploy)
 
     new_parser = subparsers.add_parser(
         "new", help="Scaffold a new ARKlight project from a built-in template."
@@ -803,6 +1212,61 @@ def main(argv: list[str] | None = None) -> int:
         "the same way an LSP client launches a language server. Runs "
         "until stdin closes. 'name' must be omitted when this is given.",
     )
+    search_parser.add_argument(
+        "--retrieve-doc",
+        dest="retrieve_doc",
+        action="store_true",
+        default=False,
+        help="Switch 'search' from component-schema lookup into doc-tree "
+        "retrieval: bare, prints the root docs/README.md; add a folder "
+        "flag (--foundational, --proposals, ...) to print that folder's "
+        "own README.md index; add --file NAME to also print one file's "
+        "full contents, or --file NAME --section QUERY for just one "
+        "section of it. Mutually exclusive with a component 'name' lookup "
+        "(the literal 'index' is accepted in its place) and with --serve.",
+    )
+    doc_folder_group = search_parser.add_mutually_exclusive_group()
+    for _doc_folder in DOC_FOLDERS:
+        doc_folder_group.add_argument(
+            _doc_folder.flag,
+            dest=_doc_folder.attr,
+            action="store_true",
+            default=False,
+            help=f"With --retrieve-doc, print docs/{_doc_folder.path}/README.md "
+            f"({_doc_folder.blurb}).",
+        )
+    search_parser.add_argument(
+        "--file",
+        dest="file",
+        metavar="NAME",
+        default=None,
+        help="With --retrieve-doc and a directory flag, append that file's "
+        "full contents after the folder index. Matched case-insensitively "
+        "against the folder's filenames by stem, with spaces/hyphens/"
+        "underscores normalized (e.g. --file architecture).",
+    )
+    search_parser.add_argument(
+        "--section",
+        dest="section",
+        metavar="QUERY",
+        default=None,
+        help="With --retrieve-doc, --file NAME, and a folder flag, print "
+        "only one `##` section of that file instead of the whole thing. "
+        "QUERY is a section number (that heading's own '## N. Title' "
+        "numbering if the file uses one, else its 1-based position in the "
+        "file), a heading-text fragment (matched the same way --file "
+        "matches filenames, with a 'did you mean' on a near miss), or both "
+        "together, e.g. --section '3 terminology'.",
+    )
+    search_parser.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="With --retrieve-doc, control ANSI styling of the printed "
+        "Markdown. 'auto' (default) styles it when stdout is a terminal "
+        "and NO_COLOR isn't set; 'always' forces styling (e.g. piping to "
+        "`less -R`); 'never' prints the raw Markdown bytes untouched.",
+    )
     search_parser.set_defaults(func=_cmd_search)
 
     live_streaming.add_subparser(subparsers)
@@ -831,6 +1295,21 @@ def main(argv: list[str] | None = None) -> int:
     # at `pip install` time.
     if not ensure_license_accepted():
         return 1
+
+    # Once per version, a fresh/plain-reinstalled `arklight` prints its
+    # release note here on the first real command it runs -- same
+    # marker-file idea as the license gate just above, see
+    # arklight/cli/whats_new.py. `--upgrade-alpha` already prints its
+    # own copy immediately (force=True there), so this is a no-op for
+    # that path once the marker is recorded. Note this deliberately
+    # does NOT use the `__version__` imported above -- that's the
+    # PEP 440-normalized string from installed-package metadata (e.g.
+    # "0.641"), which would never match a "v0.0641.md" file; see
+    # whats_new.read_version for why the raw pyproject.toml spelling
+    # is what has to be looked up instead.
+    _current_version = read_version()
+    if _current_version is not None:
+        show_release_notes_if_new(_current_version)
 
     try:
         return args.func(args)

@@ -87,6 +87,7 @@ import time
 import uuid
 from queue import Empty, Queue
 from typing import Any
+from urllib.parse import urlsplit
 
 from arklight.backend.base import Backend
 from arklight.ir.build import IRPage, WebsiteIR
@@ -274,9 +275,30 @@ class _CCTVHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
 
 
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _host_of(host_header: str | None) -> str:
+    """Hostname from a `Host` header value, port and IPv6 brackets stripped."""
+    if not host_header:
+        return ""
+    host = host_header.strip().lower()
+    if host.startswith("["):  # "[::1]:2172"
+        return host[1 : host.find("]")] if "]" in host else host
+    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+
+
 def _make_handler(
-    state: _State, hub: _SSEHub
+    state: _State, hub: _SSEHub, *, bind_host: str | None = None
 ) -> type[http.server.BaseHTTPRequestHandler]:
+    """
+    `bind_host` is the address the channel is bound to (`--host`, or
+    the default loopback address). When it's a loopback address,
+    requests must also arrive with a loopback `Host` header -- see
+    `Handler._guard`.
+    """
+    loopback_only = bind_host is None or _host_of(bind_host) in _LOOPBACK_HOSTS
+
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
             return  # quiet -- the CLI prints its own startup/broadcast lines
@@ -291,6 +313,42 @@ def _make_handler(
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
+
+        def _guard(self, *, writes: bool) -> bool:
+            """
+            Refuse a request a web page on another origin could make.
+            Returns True if the request may proceed; otherwise a 403
+            has already been sent.
+
+            This channel sends no CORS headers, so a browser stops a
+            foreign page from *reading* a reply -- but a `text/plain`
+            POST needs no CORS preflight ("simple request"), so
+            without this a page at `evil.example` could still *write*
+            state with no visible response. (The CCTV channel is
+            opt-in, dev-only, and localhost-bound by default, so the
+            impact is limited to someone's dev preview, not a
+            production site -- still worth closing.)
+
+            - Loopback-bound (the default): the `Host` header must
+              name a loopback host, which also stops DNS rebinding (an
+              attacker's own hostname resolved to 127.0.0.1 arrives
+              with that hostname as `Host`, not `127.0.0.1`).
+            - On a write, if `Origin` is present it must match this
+              server's own origin. curl and other non-browser clients
+              send no `Origin` and are unaffected; a page served by
+              the channel itself is same-origin and unaffected.
+            """
+            if loopback_only and _host_of(self.headers.get("Host")) not in _LOOPBACK_HOSTS:
+                self._send_json(403, {"error": "forbidden: unexpected Host header"})
+                return False
+            if writes:
+                origin = self.headers.get("Origin")
+                if origin is not None:
+                    own_host = (self.headers.get("Host") or "").strip().lower()
+                    if not own_host or urlsplit(origin).netloc.lower() != own_host:
+                        self._send_json(403, {"error": "forbidden: cross-origin request"})
+                        return False
+            return True
 
         def _read_json_body(self) -> dict[str, Any] | None:
             length = int(self.headers.get("Content-Length", "0") or "0")
@@ -345,6 +403,8 @@ def _make_handler(
         # -- routes -------------------------------------------------------
 
         def do_GET(self) -> None:  # noqa: N802 -- stdlib method name
+            if not self._guard(writes=False):
+                return
             path = self.path.split("?", 1)[0]
 
             if path == _CLIENT_JS_PATH:
@@ -372,6 +432,8 @@ def _make_handler(
             self._send_json(404, {"error": f"no such route: GET {path}"})
 
         def do_POST(self) -> None:  # noqa: N802 -- stdlib method name
+            if not self._guard(writes=True):
+                return
             path = self.path.split("?", 1)[0]
             body = self._read_json_body()
             if body is None:

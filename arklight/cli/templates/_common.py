@@ -13,9 +13,16 @@ ARKLIGHT_CONFIG_PY = '''\
 ARKlight project configuration -- optional.
 
 ARKlight works fine without this file; every section below is
-commented out and only takes effect once you uncomment it. See the
-"Configuration" section of the ARKlight README (or `arklight/config.py`
-in the ARKlight source) for the full, current list of sections.
+commented out and only takes effect once you uncomment it. Full
+reference: `arklight/config.py` in the ARKlight source (there is no
+separate "Configuration" section in the README).
+
+This file must be named exactly `arklight.config.py` and sit next to
+`site.py` -- it is not searched for in parent directories, and other
+names (`config.py`, `config.js`, `arklight.config.json`) are ignored.
+Section and key names must match exactly: an unrecognized one prints a
+build-time warning ("did you mean ...?") rather than silently doing
+nothing, but is never rejected outright.
 """
 
 CONFIG = {
@@ -24,7 +31,25 @@ CONFIG = {
     # `--subscribe`; irrelevant to a plain `arklight build`.
     # "live_streaming": {
     #     "host": "127.0.0.1",
-    #     "port": 8347,
+    #     "port": 8347,          # int, 1-65535
+    #     "poll_interval": 0.5,  # seconds between file checks
+    # },
+
+    # Force the Content-Security-Policy on/off for every build from
+    # this project, regardless of what any individual `Site(strict_csp
+    # =...)` says. `None` (the default) means "no override".
+    # "csp": {"strict_csp": None},
+
+    # Default build narration when no --verbose/--narrate flag is
+    # passed: "plain", "verbose", or "narrate".
+    # "rei": {"default_mode": "plain"},
+
+    # Warnings about experimental APIs (docs/Foundational/
+    # EXPERIMENTAL-APIS.md) -- silence them once you've made peace
+    # with leaning on an escape hatch.
+    # "experimental": {
+    #     "heavy_reliance_nudge": True,
+    #     "devtools_console_reminder": True,
     # },
 }
 '''
