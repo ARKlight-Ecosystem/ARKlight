@@ -123,7 +123,7 @@ def upgrade_to_alpha() -> int:
             "(no .git directory found above the installed package), so "
             "there's no branch to switch to. This flag only works for an "
             "editable/source install, e.g.:\n"
-            "  git clone https://github.com/Rae-ARK/ARKlight.git\n"
+            "  git clone https://github.com/ARKlight-Ecosystem/ARKlight.git\n"
             "  cd ARKlight && pip install -e .\n"
             "(on a system Python with no virtualenv, add --break-system-packages)\n"
             "then `arklight --upgrade-alpha` from within that checkout.",

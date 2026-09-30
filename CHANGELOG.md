@@ -7,8 +7,20 @@ SemVer.
 
 ## [Unreleased]
 
-Nothing yet. Planned work is tracked in [`PROGRESS.md`](./PROGRESS.md)
-and in the milestone table in
+Docs-only consistency pass; no behavior change.
+
+- `PROGRESS.md`: removed the stale "Planned, not yet scheduled" list
+  (custom CSS classes and `search` shipped in `v0.042`; `--help` too),
+  marked `v0.048` DONE, retitled the `v0.010` entry as shipped in
+  `v0.060`, dropped the dropped Vue/Svelte `v0.100` row, and added the
+  missing `v0.042`/`v0.048` snapshot rows.
+- Install instructions (`README.md`, `GETTING-STARTED.md`) now name
+  `pip install arklight` and the license flag a source build needs.
+- Links moved from `Rae-ARK` to `ARKlight-Ecosystem`, including the
+  two user-facing strings in `arklight/cli/` and the APT source URL.
+
+Planned work is tracked in [`PROGRESS.md`](./PROGRESS.md) and in the
+milestone table in
 [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md).
 
 ## [0.070.0] -- Catch-up release: user-defined components, JS vocabulary ladder, `Provider`, Platform API IR (`db`), preamble system, Rei narrator, htmx/CSP hardening, `arklight deploy`
@@ -285,7 +297,7 @@ than a raw traceback" -- `arklight/cli/main.py` module docstring).
   and message, an explicit note that this isn't a documented/
   recommended failure path) instead of a raw traceback, and returns
   exit code `1` like every other failure mode. Points at
-  https://github.com/Rae-ARK/ARKlight/issues for reporting.
+  https://github.com/ARKlight-Ecosystem/ARKlight/issues for reporting.
 - **`OSError` guards around `build()`'s file-write loop and asset
   copy** (`arklight/compiler/pipeline.py`) -- previously neither step
   was guarded against filesystem failures (permissions, disk full, a

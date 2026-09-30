@@ -199,7 +199,7 @@ Named individually, not left to be inferred from Section 3's silence:
 
 **ARKlight Component Collections** (ACC) now has its own repository
 and foundational design document --
-[`Rae-ARK/ARKlight-Component-Collections`](https://github.com/Rae-ARK/ARKlight-Component-Collections),
+[`ARKlight-Ecosystem/ARKlight-Component-Collections`](https://github.com/ARKlight-Ecosystem/ARKlight-Component-Collections),
 `docs/design/acc-foundational-design.md` there -- superseding this
 section's original "no design doc yet, defined here for the first
 time" framing. Nothing of ACC ships in this compiler: no

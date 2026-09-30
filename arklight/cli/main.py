@@ -1334,7 +1334,7 @@ def main(argv: list[str] | None = None) -> int:
             f"  {type(exc).__name__}: {exc}\n"
             f"This isn't a documented/recommended failure path -- if you "
             f"can reproduce it, please file an issue at "
-            f"https://github.com/Rae-ARK/ARKlight/issues with the exact "
+            f"https://github.com/ARKlight-Ecosystem/ARKlight/issues with the exact "
             f"command you ran.",
             file=sys.stderr,
         )
