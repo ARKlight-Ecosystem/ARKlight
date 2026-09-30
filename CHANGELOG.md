@@ -16,6 +16,10 @@ Docs-only consistency pass; no behavior change.
   missing `v0.042`/`v0.048` snapshot rows.
 - Install instructions (`README.md`, `GETTING-STARTED.md`) now name
   `pip install arklight` and the license flag a source build needs.
+- Preamble docs: `USER-DEFINED-COMPONENTS.md` and `PROVIDER-SDK.md`
+  now open with `# include <stdlib.ARKlight>` instead of
+  `from arklight import ...`; `AUTHORING-GUIDE.md` gained a migration
+  note and no longer cites a proposal file `main` does not carry.
 - Links moved from `Rae-ARK` to `ARKlight-Ecosystem`, including the
   two user-facing strings in `arklight/cli/` and the APT source URL.
 
