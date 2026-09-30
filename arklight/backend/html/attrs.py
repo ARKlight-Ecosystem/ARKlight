@@ -76,9 +76,10 @@ shape changed this stage.
 from __future__ import annotations
 
 import json
+import warnings
 from html import escape
 
-from arklight.ast.nodes import ActionRef, ClassBindSpec
+from arklight.ast.nodes import ActionRef, ClassBindSpec, ModelBindSpec, PlatformAPIRef
 from arklight.backend.html.routing import (
     ASSET_OR_ROUTE_AWARE_ATTRS,
     ROUTE_AWARE_ATTRS,
@@ -87,6 +88,7 @@ from arklight.backend.html.routing import (
     _resolve_route_ref,
     _resolve_src_ref,
     _resolve_srcset_ref,
+    _resolve_style_urls,
 )
 
 # Prop names that map straight through to HTML attributes.
@@ -126,7 +128,13 @@ PASSTHROUGH_ATTRS = {
     # v0.003 (second addendum): <track> (video/audio captions).
     "kind", "srclang", "default",
     # v0.003 (second addendum): image maps (<area>).
-    "shape", "coords",
+    # Bugfix (found via the unknown-prop compiler notice above): `usemap`
+    # -- the <img> half of the pairing, without which `<map name="rooms">`
+    # has nothing pointing at it -- was missing from this list entirely,
+    # so it silently compiled to `data-usemap` instead of the real
+    # attribute: inert data on the page, not a functioning image map.
+    # `shape`/`coords` (the <area> half) were already here and correct.
+    "shape", "coords", "usemap",
     # v0.003 (second addendum): <iframe> embeds.
     "allow", "allowfullscreen", "sandbox", "referrerpolicy",
 }
@@ -232,6 +240,12 @@ def _attr_string(
     # again that dropping and later re-adding the parameter isn't
     # worth the churn.
     node_type: str = "node",
+    # `_render_node`/`_render_children` (`page_render.py`) thread this
+    # through using the same "{path}/{type}[{i}]" convention
+    # `arklight/ir/validate.py`'s `validate_node` already uses -- see the
+    # unknown-prop notice below, the reason `node_type` above was kept
+    # around unused for.
+    path: str = "root",
 ) -> str:
     props = dict(props)  # local copy -- may splice the initial bound class in below
 
@@ -249,15 +263,24 @@ def _attr_string(
             props["class_name"] = " ".join(classes)
 
     bind_value = props.get("bind_value")
-    if isinstance(bind_value, str) and bind_value and page_state is not None:
+    bind_value_state = (
+        bind_value.state
+        if isinstance(bind_value, ModelBindSpec)
+        else bind_value if isinstance(bind_value, str) else None
+    )
+    if bind_value_state and page_state is not None:
         # vdom-6: pre-fill `value` from state the same way bind_class
         # pre-fills `class_name` above, so the page reflects its
         # initial state correctly with JS disabled -- the shipped
         # runtime keeps it in sync (both directions) after that. An
         # explicit `value=` prop, if also given, wins -- bind_value
-        # only fills the gap, it doesn't override.
-        if "value" not in props and bind_value in page_state:
-            props["value"] = page_state.get(bind_value)
+        # only fills the gap, it doesn't override. `v0.063`: a
+        # `ModelBindSpec` (a debounced/throttled `Bind.model(...)`)
+        # pre-fills from its own `.state` exactly like a plain string
+        # bind_value does -- the modifier only changes when the
+        # client-side write-back happens, never the initial render.
+        if "value" not in props and bind_value_state in page_state:
+            props["value"] = page_state.get(bind_value_state)
 
     parts = []
     for key, value in props.items():
@@ -285,12 +308,27 @@ def _attr_string(
                     parts.append(f' hx-trigger="{escape(hx_trigger, quote=True)}"')
             continue
 
+        if key == "on_click" and isinstance(value, PlatformAPIRef):
+            # `v0.065`: PlatformAPI.*(...) values carry their own
+            # attribute shape (capability name + JSON args), reusing
+            # the same `data-ark-on-click="<prefix>:<name>"` slot
+            # ActionRef's `"action:"` prefix already established --
+            # `wireClickInterceptor` (arklight/backend/js/runtime/
+            # dispatch.py) branches on the prefix. No modifiers/hx-
+            # trigger support yet (Section 23's "Initial scope" -- kept
+            # deliberately small at acceptance); every PlatformAPI.*(...)
+            # click runs immediately, same as an unmodified Action.*(...).
+            parts.append(f' data-ark-on-click="platform:{escape(value.capability, quote=True)}"')
+            if value.args:
+                parts.append(f' data-ark-platform-api-args="{escape(json.dumps(value.args), quote=True)}"')
+            continue
+
         if key == "on_click" and isinstance(value, str):
             # htmx-1 originally wired a named behavior through HTMX's
             # `hx-on:click="arkRunBehavior('<name>', this)"`. `htmx-5`
             # (docs/Backends/HTMX-INTEGRATION.md "Stage 4 -- Audit and
             # remove remaining hand-rolled plumbing" / docs/Backends/
-            # REFACTOR-INDEX.md row 10) reverts the attribute shape
+            # docs/Backends/REFACTOR-INDEX.md row 10) reverts the attribute shape
             # back to `data-ark-on-click`, matched-pair with the
             # `"action:..."` shape `on_click=Action.*(...)` already
             # gets below -- both are now read by the same delegated
@@ -310,6 +348,24 @@ def _attr_string(
             # already rejects anything not in `KNOWN_BEHAVIORS` before
             # this code runs.
             parts.append(f' data-ark-on-click="behavior:{escape(value, quote=True)}"')
+            continue
+
+        if key == "on_reveal" and isinstance(value, str):
+            # `v0.063`: a closed reveal-behavior name (see
+            # `arklight.ir.schema.REVEAL_REGISTRY`), compiled to its
+            # own `data-ark-on-reveal` attribute rather than folding
+            # into `on_click`'s `data-ark-on-click` -- `wireReveal`
+            # (`arklight/backend/js/runtime/reveal.py`) queries for
+            # this attribute directly at mount time, never through the
+            # click interceptor. `toggle_class`, if also given, is
+            # already handled generically below via
+            # `BEHAVIOR_PROP_ATTRS` -- the same `data-ark-toggle-class`
+            # attribute `toggle`/`dismiss` already emit, read here by
+            # `wireReveal` instead of a click handler. The behavior
+            # name is escaped, not validated here -- the Validation
+            # stage (`arklight.ir.validate`) already rejects anything
+            # not in `KNOWN_REVEAL_BEHAVIORS` before this code runs.
+            parts.append(f' data-ark-on-reveal="{escape(value, quote=True)}"')
             continue
 
         if key == "shell_persistent":
@@ -338,12 +394,24 @@ def _attr_string(
             parts.append(f' data-ark-bind-class-state="{escape(value.state, quote=True)}"')
             continue
 
-        if key == "bind_value" and isinstance(value, str) and value:
+        if key == "bind_value" and isinstance(value, (str, ModelBindSpec)) and value:
             # vdom-6: the runtime reads this to know which state key
             # to keep this element's `value` synced with, in both
             # directions -- the initial value (if any) was already
-            # folded into `value` above.
-            parts.append(f' data-ark-model="{escape(value, quote=True)}"')
+            # folded into `value` above. `v0.063`: a `ModelBindSpec`
+            # carries the same state key plus an optional
+            # debounce/throttle modifier, compiled into a second,
+            # plain `data-ark-model-modifiers` attribute --
+            # `wireModelBinding` (`arklight/backend/js/runtime/
+            # model.py`) reads it directly rather than routing through
+            # HTMX's `hx-trigger` syntax `on_click=Action.*(...)`
+            # modifiers use, since this is an `input` event, not a
+            # click HTMX's own attribute processing ever touches.
+            state_name = value.state if isinstance(value, ModelBindSpec) else value
+            parts.append(f' data-ark-model="{escape(state_name, quote=True)}"')
+            if isinstance(value, ModelBindSpec) and value.modifiers:
+                modifiers_str = ",".join(value.modifiers)
+                parts.append(f' data-ark-model-modifiers="{escape(modifiers_str, quote=True)}"')
             continue
 
         if key in BEHAVIOR_PROP_ATTRS:
@@ -359,6 +427,8 @@ def _attr_string(
 
             if attr_name == "style" and isinstance(value, dict):
                 value = _style_dict_to_css(value)
+            if attr_name == "style" and isinstance(value, str):
+                value = _resolve_style_urls(value, current_route=current_route, route_to_path=route_to_path)
 
             if attr_name in ROUTE_AWARE_ATTRS and isinstance(value, str) and _is_internal_route_ref(value):
                 value = _resolve_route_ref(value, current_route=current_route, route_to_path=route_to_path)
@@ -374,7 +444,27 @@ def _attr_string(
 
             if attr_name not in PASSTHROUGH_ATTRS and not attr_name.startswith("data-"):
                 # Unknown props are still emitted as data-* attributes rather
-                # than silently dropped, so nothing a user writes disappears.
+                # than silently dropped, so nothing a user writes disappears --
+                # but silently doesn't mean quietly: this is exactly as likely
+                # to be a typo (`clas_name=` instead of `class_name=`) as a
+                # deliberate custom data attribute, and the two look identical
+                # once compiled, so there is nothing left in the *output* for
+                # an author to notice. Flagged here, unconditionally (never
+                # gated behind --verbose/--narrate, same "always prints"
+                # contract as any other `[ARKlight ALPHA]`-marked warning --
+                # see `arklight/cli/main.py`'s `_print_alpha_warnings`) with
+                # the structural `path` the caller threaded in, so a mistake
+                # is something the author can go find and fix, not a
+                # silently-compiled `data-*` attribute they'd never spot in
+                # the generated HTML.
+                warnings.warn(
+                    f"[ARKlight ALPHA] Unknown prop {key!r} on {node_type!r} at "
+                    f"{path} was compiled to a generic {f'data-{attr_name}'!r} "
+                    f"attribute instead of a recognized one -- if this was a "
+                    f"typo, fix it at {path}; if it's deliberate, nothing else "
+                    f"to do here, this is the documented fallback.",
+                    stacklevel=2,
+                )
                 attr_name = f"data-{attr_name}"
 
         if value is True:

@@ -138,6 +138,7 @@ from arklight.backend.html.routing import (
 )
 from arklight.backend.html.tag_map import TAG_MAP, VOID_TAGS, _tag_for
 from arklight.ir.build import WebsiteIR
+from arklight.ir.component_dispatch import resolve_backend_dispatch
 
 # All of the re-exported names above (Stages 1-5) exist purely for
 # backward compatibility with anything already doing
@@ -153,11 +154,28 @@ class HTMLBackend(Backend):
     name = "html"
 
     def render(self, ir: WebsiteIR) -> dict[str, str]:
+        # `v0.060`, Stage 3 (USER-DEFINED-COMPONENTS-IMPLEMENTATION.md):
+        # resolve any `mode="registry"` component instance that has an
+        # `"html"` backend override registered to that override's own
+        # rendered subtree, before this backend's own per-node walk
+        # below ever sees it -- see arklight.ir.component_dispatch's
+        # module docstring for why this can't happen earlier, in
+        # `compile_site_file` itself. A no-op (returns `ir`'s pages
+        # structurally unchanged) for a site that never registers a
+        # backend override, i.e. every site before Stage 3.
+        ir = resolve_backend_dispatch(ir, self.name)
+
         route_to_path = {page.route: _output_path_for_route(page.route) for page in ir.pages}
         output: dict[str, str] = {}
         for page in ir.pages:
             path = route_to_path[page.route]
             output[path] = _render_page(
-                page, ir.site_name, route_to_path, site_lang=ir.lang, app_shell=ir.app_shell
+                page,
+                ir.site_name,
+                route_to_path,
+                site_lang=ir.lang,
+                app_shell=ir.app_shell,
+                strict_csp=ir.strict_csp,
+                trusted_script_origins=ir.trusted_script_origins,
             )
         return output
