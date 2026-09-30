@@ -536,7 +536,7 @@ change.
 tests), sibling of Stage 11's guard. Mutation-checked: creating an empty
 `arklight/backend/desktop/__init__.py` makes it fail.
 
-## Stage 13 — Root metadata
+## Stage 13 — Root metadata ✅ ported
 
 `pyproject.toml` version bump, `.gitignore` diff. **Do not touch
 `.github/workflows/apt-repo.yml`** -- it is `main`-only, per the
@@ -556,6 +556,40 @@ during earlier stages).
 
 *Risk:* trivial, aside from the one explicit do-not-touch and the
 version-number decision.
+
+**Result (run on `main` at `4ada548`, Stage 1 upstream):**
+
+- `pyproject.toml` `version`: `0.54.1` -> **`0.070.0`** (alpha's value at
+  `23ebc24`). Version-number decision taken as the plan's first option;
+  `importlib.metadata` normalizes it, so `arklight --version` prints
+  `arklight 0.70.0` and `arklight.__version__` is `0.70.0`.
+  `CHANNEL` is still `"main"`. `tests/test_version.py` passes.
+  (`tests/test_upgrade.py` does not exist on `main`; the only tests
+  reading the version are `test_version.py` and `test_sbom.py`.)
+- **Two `pyproject.toml` differences from `alpha` kept on purpose, not
+  ported.** `alpha` still has the legacy `license = { text = ... }` plus
+  a `License ::` classifier; `main` moved to the SPDX string
+  `license = "GPL-3.0-or-later"` with `classifiers = []` in the
+  `ed77192` "Workflow update" commit, and nothing in this range
+  changes that reasoning. Taking alpha's block would silently undo a
+  `main`-only packaging change.
+- **`.gitignore` difference kept on purpose, not ported.** The diff is
+  one line: `main` has `ARK/`, `alpha` does not. `main` added it in
+  Stage 9 (`4609718`) and it never existed on `alpha`, so this is
+  `main`-only, not something `alpha` deleted after the fact. Porting
+  the diff literally would drop it.
+- `.github/workflows/apt-repo.yml` untouched (verified: no diff under
+  `.github/`).
+- Left as-is deliberately: `docs/Foundational/WHAT-ARKLIGHT-IS.md`
+  says the *published* package is `0.54.1`. That stays accurate until
+  a release is actually cut from this version; Stage 0 owns that prose.
+
+**Now enforced by the suite:** `tests/test_root_metadata.py` (6 tests):
+version scheme and value, installed-metadata normalization, `CHANNEL`,
+`apt-repo.yml` present, and the two `main`-only differences above.
+Full suite: **2744 passed / 15 failed** -- the same 15 as Stages 10-12
+(8 docs-tree tests awaiting Stage 0's link decision, 7 Stage 8 runtime
+registry gaps); the 6 new tests all pass.
 
 ## Stage 15 — htmx under Trusted Types, CSP, and `file://`/live-streaming fallbacks (new, `0df63e7` -> `23ebc24`)
 
