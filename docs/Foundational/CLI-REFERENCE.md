@@ -6,9 +6,8 @@ the root [`README.md`](../../README.md)'s Documentation section, which
 keeps no CLI content of its own and points here for all of it.
 
 `build`, `pack`, `unpack`, `search`, `new`, `pwa`, `live-streaming`,
-`--version`, and `--upgrade-alpha` below are implemented and shipped.
-`android`, `desktop` and `deploy` (below) are implemented, but
-alpha-only so far -- see the note in their own sections.
+`deploy`, `--version`, and `--upgrade-alpha` below are implemented and
+shipped.
 
 **One-time license gate.** The first time any `arklight <command>`
 runs on a machine, it prints the ARKlight Additional Terms and asks
@@ -174,10 +173,10 @@ Two more things print unconditionally after that, never gated behind
   [`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md)'s "CLI contract" for
   the exact format and why these aren't gated like ordinary stage
   narration.
-- **Alpha-limitation warnings** -- any `[ARKlight ALPHA]`-marked
-  warning raised during the build (a known, non-fatal alpha-branch
-  limitation, not a build failure) is collected and printed as a
-  `NOTE: this alpha build is under active maintenance...` block.
+- **Limitation warnings** -- any `[ARKlight LIMITATION]`-marked
+  warning raised during the build (a known, non-fatal limitation, not
+  a build failure) is collected and printed as a
+  `NOTE: this build hit known, documented limitations...` block.
 
 Both flags are off by default -- a plain `arklight build` is
 unchanged.
@@ -307,7 +306,10 @@ arklight search --retrieve-doc [index | --<folder> [--file NAME]]
   `--implementation`, `--far-future`,
   `--version-history`, one per `docs/README.md`'s own Folder Guide) --
   prints that folder's own `README.md` index, plus a footer listing
-  the files available inside it.
+  the files available inside it. A flag only resolves when its folder
+  exists in the checkout: `main` carries `Foundational`,
+  `Implementation` and `version history`, so `--backends`,
+  `--proposals` and `--far-future` report the missing README there.
 - `--file NAME`, scoped to a preceding folder flag -- appends that
   file's full contents after the folder index. Matched
   case-insensitively by filename stem, with spaces/hyphens/underscores
@@ -393,7 +395,7 @@ arklight live-streaming --status [entry.py] [--status-pin]
 arklight live-streaming --unsubscribe [entry.py]
 ```
 
-Alpha-only dev tool (see `arklight.CHANNEL`): watches the entry file's
+Development tool: watches the entry file's
 directory and rebuilds automatically, pushing a browser reload over
 Server-Sent Events after each rebuild. **Development only -- do not
 run in production/CI.**
@@ -424,77 +426,10 @@ arklight live-streaming --unsubscribe
 ```
 
 ```bash
-arklight android scaffold <build-dir> -o OUTPUT_DIR [--debug-keystore PATH] [--release]
-arklight android sync <build-dir> -o OUTPUT_DIR [--patch PATH]
-arklight desktop scaffold <build-dir> -o OUTPUT_DIR [--target linux]
-arklight desktop build <project-dir> [--run]
-```
-
-**Alpha-only so far -- not yet on `main`.** `android` and `desktop`
-are real, implemented subcommands, but
-they're part of the in-progress Android/Desktop backend work (see
-`PROGRESS.md`'s Snapshot table -- `v0.080`/`v0.100`, both IN
-PROGRESS) and haven't landed on the stable `main` branch yet. Full
-design and staging detail:
-the Android backend's implementation doc (kept outside `main`)
-and
-the Desktop backend's implementation doc (kept outside `main`).
-
-- `arklight android scaffold <build-dir> -o OUTPUT_DIR` -- generates
-  an Android Studio / Gradle project (Application mode) from an
-  `arklight build` output directory. Templating only -- no JDK/Android
-  SDK required to run this command. Includes a GitHub Actions workflow
-  that builds a debug APK and smoke-tests it (install + launch on an
-  emulator) in CI, no local toolchain needed.
-  - `--debug-keystore PATH` -- pin a shared debug signing key (copied
-    in as `app/debug.keystore`) so debug APKs built on different
-    machines/CI runs share a signature and can be installed as updates
-    over each other. Without it, every machine auto-generates its own.
-  - `--release` -- also generate a signed release-build job. Off by
-    default; it's a no-op until you set the
-    `RELEASE_KEYSTORE_BASE64`/`RELEASE_KEYSTORE_PASSWORD`/
-    `RELEASE_KEY_ALIAS`/`RELEASE_KEY_PASSWORD` repo secrets (see the
-    generated project's own README).
-  - `arklight android build`, `--install`, and local (on-this-machine)
-    release builds are staged as later stages of the same ladder and
-    are **not implemented yet**.
-- `arklight android sync <build-dir> -o OUTPUT_DIR` -- re-syncs an
-  already-`scaffold`ed project's `app/src/main/assets/` with a fresh
-  `arklight build` output directory, wholesale (every file replaced,
-  nothing merged). Nothing else about the project (Gradle files,
-  manifest, `res/`, debug keystore, `.github/`) is touched, so it's
-  the command to re-run after every site-content change instead of
-  re-scaffolding. Writes a unified diff of exactly what changed under
-  `assets/` to a `.patch` file (default: `<project-dir>/sync.patch`)
-  and prints it, since a wholesale replace otherwise leaves no record
-  of what moved.
-  - `--patch PATH` -- write the diff somewhere other than the default
-    `<project-dir>/sync.patch`.
-- `arklight desktop scaffold <build-dir> -o OUTPUT_DIR [--target linux]`
-  -- generates a native GTK3 + WebKit2GTK host project. Templating +
-  asset-embedding only -- no C toolchain required to run this command
-  itself. `--target` only supports `linux` so far (the default);
-  Windows/macOS aren't implemented. Includes a GitHub Actions workflow
-  that builds the project and smoke-tests it under a headless Xvfb
-  display, no local toolchain or display server needed.
-- `arklight desktop build <project-dir> [--run]` -- builds an
-  already-scaffolded project by shelling out to its own `make`. Needs
-  a C compiler, `pkg-config`, and the GTK3/WebKit2GTK dev headers on
-  this machine. `--run` launches the built binary once `make`
-  succeeds.
-
-```bash
-arklight android scaffold ARK -o android-project --release
-arklight android sync ARK -o android-project
-arklight desktop scaffold ARK -o desktop-project
-arklight desktop build desktop-project --run
-```
-
-```bash
 arklight deploy [cloudflare] [entry] [-o OUTPUT_DIR] [--name NAME] [--skip-build] [--dry-run]
 ```
 
-**Alpha-only so far -- not yet on `main`.** Builds the site, then hands
+Builds the site, then hands
 the build directory to the hosting provider's own CLI. Cloudflare
 Workers (static assets), deployed by [Wrangler](https://developers.cloudflare.com/workers/wrangler/),
 is the only provider so far, and bare `arklight deploy` means

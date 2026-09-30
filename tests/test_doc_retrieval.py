@@ -5,6 +5,7 @@ import pytest
 from arklight.cli.doc_retrieval import (
     DOC_FOLDERS,
     DocRetrievalError,
+    _docs_root,
     ignored_flag_notices,
     run_retrieve_doc,
 )
@@ -54,7 +55,13 @@ def test_folder_flag_alone_prints_folder_readme_and_files_footer():
 
 
 def test_every_folder_flag_resolves_without_error():
-    for folder in DOC_FOLDERS:
+    # Only folders this branch actually carries: `main` ships
+    # Foundational, Implementation and version history, not the
+    # working-reference folders (Backends, Proposals, Far Future
+    # Concern), so their flags have nothing to resolve here.
+    carried = [f for f in DOC_FOLDERS if (_docs_root() / f.path / "README.md").is_file()]
+    assert carried, "expected at least one docs folder with a README"
+    for folder in carried:
         output = run_retrieve_doc(_args(**{folder.attr: True}))
         assert f"Files in docs/{folder.path}/" in output
 
@@ -154,30 +161,30 @@ def test_section_by_text_fragment_case_and_punctuation_insensitive():
 
 def test_section_by_declared_number_on_a_numbered_doc():
     output = run_retrieve_doc(
-        _args(proposals=True, file="platform-api-ir-proposal", section="3")
+        _args(foundational=True, file="system-design-agreements", section="3")
     )
-    assert "## 3. Terminology" in output
-    assert "Platform backend" in output
+    assert "## 3. Do Not Reimplement the Target Runtime" in output
+    assert "## 4. The Compiler May Specialize for the Target" not in output
 
 
 def test_section_by_number_and_text_together():
     by_number_only = run_retrieve_doc(
-        _args(proposals=True, file="platform-api-ir-proposal", section="3")
+        _args(foundational=True, file="system-design-agreements", section="3")
     )
     by_both = run_retrieve_doc(
-        _args(proposals=True, file="platform-api-ir-proposal", section="3 terminology")
+        _args(foundational=True, file="system-design-agreements", section="3 do not reimplement")
     )
     assert by_number_only == by_both
 
 
 def test_section_declared_number_is_not_confused_with_positional_index():
-    # "Terminology" is declared "## 3." in the file but isn't the 3rd
-    # `##` heading overall (earlier unnumbered headings like "Status"
-    # and "Framing note" precede the numbered ones).
+    # "Do Not Reimplement the Target Runtime" is declared "## 3." in the
+    # file but isn't the 3rd `##` heading overall (the unnumbered
+    # "Compiler First, Runtime Last" heading precedes the numbered ones).
     output = run_retrieve_doc(
-        _args(proposals=True, file="platform-api-ir-proposal", section="3")
+        _args(foundational=True, file="system-design-agreements", section="3")
     )
-    assert "-- section 3: Terminology" in output
+    assert "-- section 3: Do Not Reimplement the Target Runtime" in output
 
 
 def test_section_requires_file(tmp_path):
