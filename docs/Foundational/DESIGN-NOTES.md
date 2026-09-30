@@ -2084,8 +2084,8 @@ iteration, independent of Python's general popularity.
 ## Graduated proposal design records
 
 Design records of proposals that were accepted and fully shipped, moved here
-from `docs/Proposals/` when those files were retired (per the graduation rule in
-`docs/Proposals/README.md`). Each is kept **as filed** -- only heading levels and
+from the proposal files when those were retired (per the project's graduation
+rule for proposals). Each is kept **as filed** -- only heading levels and
 relative link paths were adjusted -- because the reasoning, deliberate limits, and
 out-of-scope decisions are the part `CHANGELOG.md` and `docs/version history/` do
 not carry. The old filename is named in each entry so `grep -rn OLD-NAME .` still
@@ -2547,7 +2547,7 @@ CONFIG = {
   same stage-completion calls `--verbose` already makes in
   `arklight/cli/main.py`'s build path, not a parallel instrumentation
   pass.
-- Experimental-feature warnings and alpha-limitation warnings
+- Experimental-feature warnings and limitation warnings
   (`CLI-REFERENCE.md`'s "Two more things print unconditionally"
   section) are unaffected -- they print exactly as they do today,
   regardless of log mode.
@@ -2757,11 +2757,11 @@ implicit stage 2 of this one.
 
 #### Status at graduation
 
-Implemented, alpha (`0.06503`). Out-of-band, numbered capability fix per
-`docs/Foundational/V1-DEFINITION.md`'s "Issue triage during Alpha"
+Implemented (`0.06503`). Out-of-band, numbered capability fix per
+`docs/Foundational/V1-DEFINITION.md`'s "Issue triage before v1"
 section -- not a broken promise but a missing one, so it doesn't wait for
 whichever milestone is already in flight. Traces to
-`ARKlight-ISSUE-REGISTER.md` #7.
+the project's issue register, #7.
 
 #### The missing capability
 
@@ -2863,8 +2863,8 @@ jsdom with a full build: add, add again, input cleared, debounced click.
 
 #### Status at graduation
 
-Implemented, alpha. Out-of-band, numbered bug fix per
-`docs/Foundational/V1-DEFINITION.md`'s "Issue triage during Alpha"
+Implemented. Out-of-band, numbered bug fix per
+`docs/Foundational/V1-DEFINITION.md`'s "Issue triage before v1"
 section -- a broken contract, not a missing feature, so it doesn't
 wait for whichever milestone is already in flight.
 
@@ -2935,11 +2935,11 @@ one-entry-per-shipped-version convention (`docs/version history/`,
 
 #### Status at graduation
 
-Implemented, alpha (`0.06506`). Out-of-band, numbered capability fix per
-`docs/Foundational/V1-DEFINITION.md`'s "Issue triage during Alpha"
+Implemented (`0.06506`). Out-of-band, numbered capability fix per
+`docs/Foundational/V1-DEFINITION.md`'s "Issue triage before v1"
 section, the same slot-sharing precedent as `0.0650`-`0.06505`; the
 roadmap's `v0.065` is untouched. Traces to
-`ARKlight-ISSUE-REGISTER.md` #5 (positional
+the project's issue register, #5 (positional
 component errors leak a raw `TypeError`) and #32 (component API
 diagnostics aren't consistently compiler-native). Not a broken promise
 but a missing one: `@component`'s own docstring already says a misused
@@ -2965,7 +2965,7 @@ the declared ones. But Python gets to a call first, in two places:
    raised a raw `TypeError` from inside the expansion pass, with no
    mention of `props=`.
 
-Reproduced first, on `alpha` at `0.06505`:
+Reproduced first, at `0.06505`:
 
 ```python
 @component(props={"label": Prop(), "value": Prop(default=0)})
@@ -3075,8 +3075,8 @@ validation), `0.06518` (stage 3, `window.ARKLIGHT_PROVIDER`),
 vocabulary finalized + the `custom:` escape hatch). Unlike the shorter
 entries elsewhere in this section, `Provider`'s content did not move
 into this file directly -- it graduated into its own standalone
-settled design record, the same pattern `PLATFORM-APIS.md` and
-`ACC-CAPABILITIES.md` already use for a substantial enough surface:
+settled design record, the same pattern `PLATFORM-APIS.md`
+already uses for a substantial enough surface:
 
 **[`docs/Foundational/PROVIDER-SDK.md`](./PROVIDER-SDK.md)** -- the
 full contract, the finalized capability vocabulary and its `custom:`

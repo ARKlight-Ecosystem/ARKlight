@@ -7,50 +7,79 @@ SemVer.
 
 ## [Unreleased]
 
-Custom CSS class authoring and an `arklight --search <name>` schema
-lookup are sketched but not yet scheduled to a version -- see
-"Planned, not yet scheduled" in [`PROGRESS.md`](./PROGRESS.md).
+Nothing yet. Planned work is tracked in [`PROGRESS.md`](./PROGRESS.md)
+and in the milestone table in
+[`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTURE.md).
 
-## [0.070.0] -- Docs-only: alpha catch-up (user-defined components, JS vocabulary ladder, `Provider`, Platform API IR, preamble system, Rei narrator, ACC hook)
+## [0.070.0] -- Catch-up release: user-defined components, JS vocabulary ladder, `Provider`, Platform API IR (`db`), preamble system, Rei narrator, htmx/CSP hardening, `arklight deploy`
 
-`docs/Foundational/` brought up to parity with `alpha`'s `0.070.0`
-copy in full (6 files updated in place, 10 net new, one renamed:
-`user-defined-components.md` -> `USER-DEFINED-COMPONENTS.md`).
-`docs/version history/` gains one bundled entry, `v0.070.0.md`, per
-`main`'s own one-file-per-release convention (`alpha` ships one file
-per rung; `main` does not mirror that granularity -- see `docs/version
-history/README.md`). **No code changed in this release** -- the
-underlying features (user-defined components, the 10-rung JS
-vocabulary ladder, `Provider`, Platform API IR stage 1, the preamble
-system, the Rei compiler narrator, the ACC capability hook) still need
-their own separate code-sync pass; see `docs/syncing main with alpha
-branch/MAIN TO ALPHA V0.070.0.md` for that plan. Android, Desktop, and
-`arklight deploy` are explicitly excluded from both the docs claim and
-any future code sync -- `docs/Foundational/CLI-REFERENCE.md` and
-`DEPLOYMENT-CLI.md` already flag all three "alpha-only so far -- not
-yet on `main`" in their own text, carried over unedited.
+`main` moves from `0.54.0` to the v0.070 milestone, code, tests and
+docs together. It landed in stages; see the sync plan under `docs/`
+for the per-stage record.
 
-Every link inside the carried-over Foundational docs that would point
-at a folder `main` doesn't have (`docs/Backends/`, `docs/Proposals/`,
-`docs/Implementation/`, `docs/Far Future Concern/`, `docs/reference/`)
-was rewritten from a relative path to a full
-`https://github.com/ARKlight-Ecosystem/ARKlight/blob/alpha/...` URL --
-9 links across `AUTHORING-GUIDE.md`, `CLI-REFERENCE.md`,
-`DESIGN-NOTES.md`, and `PLATFORM-APIS.md`. Root `README.md`'s internal
-links were also converted from relative (`./docs/...`) to full
-`.../blob/main/...` GitHub URLs, since the same README is what PyPI
-renders as the project description page, and a relative link there
-has nothing to resolve against -- it just points at
-`pypi.org/docs/...`, which doesn't exist.
+**Code.**
 
-## [0.54.0] -- Alpha catch-up: CSS media queries, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV
+- *User-defined components* (`v0.060`): `@component`, with props
+  declared through `props=` and diagnostics that fail the build with a
+  clear message rather than a raw Python `TypeError`.
+- *JS vocabulary ladder* (`v0.061`-`v0.070`, ten rungs): new
+  `Derive.*` and `Predicate.*` kinds, `Action.geolocate`, clipboard
+  `paste`, `matchMedia`-driven state, `reveal`/`lazy`, debounced and
+  throttled two-way binding, URL-state syncing, class binding, and
+  action-arg runtime support.
+- *`Provider` SDK* (six stages): the contract, IR/validation, JS
+  config emission, external script loading, `arklight search`
+  integration, and the finalized capability vocabulary with its
+  `custom:` escape hatch.
+- *Platform API IR*, including `PlatformAPI.db` (local key/value
+  storage, IndexedDB on Web). `db` is Web-only on `main`.
+- *Preamble system* (`# include <stdlib.ARKlight>`) and the *Rei
+  compiler narrator* (`--narrate`, a `rei` config section).
+- *Search and docs tooling*: knowledge-state additions and
+  `arklight search --retrieve-doc`.
+- *Compiler hardening and supply-chain tooling*: asset and link
+  checks, `overdrive`, the per-build `sbom.txt`, the binary IR, and a
+  CSP `<meta>` tag.
+- *`arklight deploy`* (Cloudflare Workers, via Wrangler).
+- *htmx under Trusted Types and the strict CSP*: boosted links no
+  longer die under the default CSP, and `file://` and live-streaming
+  fall back to plain routing.
+- *Small fixes*: a collision guard for custom class names, the
+  `open_in_browser` fix, and PWA precache encoding.
 
-Bulk catch-up release, porting `alpha`'s Stages 1-7 onto `main` per
-`docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md` (since retired; see git history), Android
-excluded throughout (Stage 8, below). `alpha`'s individual sub-stage
+**User-visible wording change.** Known, non-fatal limitations are now
+marked `[ARKlight LIMITATION]` (previously a branch-specific marker),
+and the end-of-build summary reads `NOTE: this build hit known,
+documented limitations`. The internal helper is now
+`_print_limitation_warnings`.
+
+**Docs.** `docs/Foundational/` and `docs/Implementation/` are synced
+with the v0.070 state. `docs/version history/` carries the full
+ladder: `v0.0431`, `v0.048`, `v0.054`, and `v0.060`-`v0.070` with
+their sub-versions replace the earlier `v0.043`, `v0.54.0` and
+`v0.070.0` files. `v0.071`-`v0.078` are not listed, since they are
+planned and have no code on `main`. Links from carried-over docs into
+folders `main` does not have were rewritten as plain descriptions,
+and the root `README.md`'s internal links are full
+`.../blob/main/...` GitHub URLs, since PyPI renders that README as the
+project page and a relative link has nothing to resolve against.
+
+**Not part of `main`.** The Android and Desktop backends and their
+CLIs, and ACC capability discovery (`arklight/capabilities.py`):
+`sbom.py` omits its ACC section, `config.py` does not know the
+`android`/`desktop` sections, and `ACC-CAPABILITIES.md` is not
+shipped. `tests/test_android_exclusion.py` and
+`tests/test_desktop_exclusion.py` keep those exclusions checked.
+
+## [0.54.0] -- Catch-up release: CSS media queries, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV
+
+Bulk catch-up release, porting Stages 1-7 of that release's sync plan
+onto `main` (the plan doc has since been retired; see git history),
+Android excluded throughout (Stage 8, below). The individual sub-stage
 commits (`htmx-1`..`htmx-5`, `vdom-4`..`vdom-8`, and similar) are
 folded into one entry per subsystem here rather than reproduced
-one-for-one -- see the sync plan doc if you want that level of detail.
+one-for-one -- see the retired plan doc in git history if you want
+that level of detail.
 
 **CSS backend: `@media` queries + structured `<head>`/`<header>`
 extension (the long-planned v0.048 milestone, now shipped).** New
@@ -140,11 +169,11 @@ verification") for the full detail.
 
 **Added `arklight.CHANNEL`, a static per-branch identity constant.**
 Ground work for tooling that needs to run against both `main` and
-`alpha` and behave correctly on either -- e.g. a planned live-reload
+the development branch and behave correctly on either -- e.g. a planned live-reload
 dev server -- without guessing branch identity from `.git` (which is
 silently absent for a normal `pip install arklight`, the common case).
-`CHANNEL == "main"` on this branch; `alpha` carries its own copy set to
-`"alpha"`. Hardcoded per branch on purpose, same one-line-per-branch
+`CHANNEL == "main"` on this branch; the development branch carries its
+own copy with its own value. Hardcoded per branch on purpose, same one-line-per-branch
 discipline `__version__` used to have before it moved to reading
 installed package metadata -- see `arklight/__init__.py` for the full
 rationale. New regression tests in `tests/test_version.py` lock the

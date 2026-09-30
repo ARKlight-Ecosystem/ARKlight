@@ -25,9 +25,9 @@ for the architecture-level roadmap table, see
 | v0.036   | ARK Bundle spec v1 (`arklight pack`)                         | DONE    |
 | v0.037   | Sealed ARK Bundles (encrypted by default, `arklight unpack`) | DONE    |
 | v0.041   | CLI/pipeline/JS runtime hardening + stateful JS addenda I/II | DONE    |
-| 0.54.0   | Alpha catch-up: CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV -- see below | DONE |
-| 0.070.0  | Alpha catch-up, **docs only**: user-defined components, JS vocabulary ladder, `Provider`, Platform API IR, preamble system, Rei narrator, ACC hook -- see `docs/version history/v0.070.0.md` | DOCS DONE, CODE PLANNED |
-| --       | Android/Desktop packaging backends, `arklight deploy` (shipped on `alpha`, not ported here) | NOT SCHEDULED (needs more time) |
+| 0.54.0   | Catch-up: CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV -- see below | DONE |
+| 0.070.0  | Catch-up, code + docs: user-defined components, JS vocabulary ladder, `Provider`, Platform API IR (`db`, Web half), preamble system, Rei narrator, `arklight deploy`, htmx/CSP hardening -- see `docs/version history/v0.070.md` | DONE |
+| --       | Android/Desktop packaging backends (not part of `main`) | NOT SCHEDULED (needs more time) |
 | v0.100   | Alternate backends (Vue, Svelte)                             | PLANNED |
 | v1.0     | Stable compiler                                              | PLANNED |
 
@@ -49,19 +49,61 @@ go-ahead before implementation starts on any of these:
   stage already reads from. Read-only reflection, no new data format.
 - **`arklight --help`** -- standard CLI usage/help text.
 
+## v0.070 catch-up, closing pass: Stages 0, 14 and 15-17 (DONE)
+
+Stages 15-17 (htmx under Trusted Types and the strict CSP, with
+`file://` and live-streaming fallbacks; `PlatformAPI.db`, Web half
+only; and the small deltas -- custom-class collision guard,
+`open_in_browser` fix, PWA precache encoding) landed first. This pass
+closed the two stages that had to wait for them.
+
+**Stage 0 (docs, version ladder, root files).**
+
+- `docs/version history/` now carries the full ladder: `v0.0431`,
+  `v0.048`, `v0.054`, `v0.060`-`v0.070` and their sub-versions replace
+  the earlier `v0.043`, `v0.54.0` and `v0.070.0` files. `v0.071`-`v0.078`
+  are left out on purpose: they are planned and have no code on `main`.
+- Foundational and Implementation docs are synced. Links into folders
+  `main` does not carry became plain descriptions, and citations point
+  at docs `main` does have.
+- `ACC-CAPABILITIES.md` is not shipped (ACC capability discovery is not
+  part of `main`), `APP-SHELL-ADDENDUM.md` and
+  `PROJECT-KNOWLEDGE-ADDENDUM.md` stay out (planned, nothing started),
+  and the `android`/`desktop` CLI sections are gone from the CLI
+  reference.
+- The known-limitation warning marker is now `[ARKlight LIMITATION]`;
+  the code, tests and docs were reworded to match.
+- The root `README.md` is now a short, stable entry point that states
+  no versions or release notes and links only by full URL;
+  `tests/test_root_readme.py` enforces both, and checks each link
+  against the tree.
+- `CHANGELOG.md` and this file were brought up to date.
+
+**Stage 14 (full verification).** `arklight/`, `tests/`, `examples/`
+and the root files diffed against the development branch at
+`23ebc24`; every remaining difference is deliberate: `CHANNEL`, no
+Android/Desktop code, wiring or tests (`config.py`, `cli/main.py`,
+`cli/templates/_common.py`, `ir/platform_api.py`'s `android` entry),
+`sbom.py` without its ACC section, the marker rename, comments that
+cited docs `main` does not carry, `pyproject.toml`'s SPDX license and
+empty classifiers, `.gitignore`'s `ARK/` line, `apt-repo.yml`, and the
+`test_root_metadata.py`/exclusion tests that exist only on `main`.
+`tests/test_doc_retrieval.py` differs too: its folder-flag and section
+tests use the folders and docs `main` carries.
+
 ## v0.070 catch-up, Stage 9 of 14: compiler hardening & supply-chain tooling (DONE, code)
 
 Ported `arklight/compiler/{asset_check,link_check,overdrive,sbom}.py`,
 `arklight/ir/binary.py`, `arklight/backend/script_extension.py`, and
-`arklight/backend/html/csp.py` from `alpha`'s `0df63e7`, per
-`docs/syncing main with alpha branch/MAIN TO ALPHA V0.070.md`. This is
+`arklight/backend/html/csp.py` from the development branch's `0df63e7`, per
+the sync plan under `docs/`. This is
 the stage that lands `ir/binary.py` -- **`import arklight` finally
 succeeds**, closing the gap every prior v0.070 stage since Stage 5 had
 to flag and defer.
 
 `arklight/capabilities.py` (the ACC/entry-point capability-discovery
 module `sbom.py` optionally lists installed packages from) is
-`alpha`-only and deliberately not carried over; `sbom.py`/
+not part of `main` and deliberately not carried over; `sbom.py`/
 `test_sbom.py` land with that one section trimmed out, everything else
 intact. Full details, every scope gap found and fixed along the way
 (`attrs.py`/`page_render.py`/`routing.py`/`head_meta.py`/`render.py`
@@ -90,7 +132,7 @@ that pointed at the old path was updated; a repo-wide link checker
 confirms every relative Markdown link in the tree resolves.
 
 Also ran the Stage 8 and 9 checks from
-`docs/syncing main with alpha branch/MAIN TO ALPHA V0.54.md` (since retired; see git history) (the
+the v0.54 sync plan (since retired; see git history) (the
 Stages 1-7 code-porting work itself -- CSS backend rewrite, HTML
 backend refactor, JS backend/vdom, search engine, live-streaming/CCTV,
 root metadata -- had already landed in the preceding seven commits):
@@ -115,18 +157,18 @@ live-streaming/CCTV) -- those files still only documented up through
 v0.041 even though the code and tests for all six stages had already
 landed in the tree. Closed now: `CHANGELOG.md` gained a `[0.54.0]`
 release entry (one consolidated paragraph per subsystem, in `main`'s
-own voice rather than reproducing `alpha`'s per-sub-stage commit
-history verbatim -- see the sync plan doc if that level of detail is
-wanted), the snapshot table above marks the same work `DONE`, and
+own voice rather than reproducing the per-sub-stage commit
+history verbatim -- see the retired sync plan in git history if that
+level of detail is wanted), the snapshot table above marks the same work `DONE`, and
 `README.md`'s "Status" section and "Responsive layout" section were
 updated to match (the latter no longer claims `@media` is unavailable
 at all -- it's opt-in now, intrinsic design stays the default). Also
 completed the version-scheme bump `pyproject.toml` had been due for
 since the "real version-drift bug" fix below was designed but never
 actually applied: `version` now reads `0.54.0` instead of the stale
-`0.048`. `alpha`'s own historical Android prose in `CHANGELOG.md`/
+`0.048`. The development branch's historical Android prose in `CHANGELOG.md`/
 `PROGRESS.md` (55/16 mentions) is left as narrative record, per the
-sync plan -- those entries describe what happened on `alpha`, not
+sync plan -- those entries describe what happened there, not
 `main`'s feature surface, and Android itself is confirmed absent from
 the code by Stage 8 above.
 

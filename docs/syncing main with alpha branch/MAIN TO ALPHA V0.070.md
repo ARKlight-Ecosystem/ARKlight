@@ -103,7 +103,7 @@ Diff taken between `0df63e7` and `23ebc24`: 47 files changed, +4,635 /
   `backend/js/platform_apis/db.py`, `runtime/dispatch.py`). The Android
   half (`ArkDb.kt` in `backend/android/runtime.py`) is **excluded**; the
   Web half is in scope.
-- Also new on `alpha`: `docs/Implementation/APP-SHELL-ADDENDUM.md`
+- Also new on `alpha`: `Implementation/APP-SHELL-ADDENDUM.md`
   (PLANNED ladder, none started) -- left out, see Stage 0.
 
 Android-only files in this range (7, all excluded): `backend/android/
@@ -113,7 +113,7 @@ IMPLEMENTATION.md`, `tests/test_android.py`, `test_android_db.py`,
 were touched in this range (`db` is explicitly unimplemented for
 Desktop).
 
-## Stage 0 — Foundational docs + version history sync
+## Stage 0 — Foundational docs + version history sync ✅ done
 
 Port `docs/Foundational/*.md` deltas (7 files modified: authoring
 guide, CLI reference, design notes, getting-started, platform APIs,
@@ -139,9 +139,9 @@ section untouched. Retire `MAIN TO ALPHA V0.54.md` from this folder
   with Stage 16; the Implementation `README.md` gains an
   `APP-SHELL-ADDENDUM.md` row on `alpha` that must **not** be carried
   over, because:
-- `docs/Implementation/APP-SHELL-ADDENDUM.md` is **left out**. Its own
+- `Implementation/APP-SHELL-ADDENDUM.md` is **left out**. Its own
   header says PLANNED, six stages, none started, no version slots; it
-  turns `docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md` (out of scope)
+  turns `Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md` (out of scope)
   into a landing order and no version-history entry claims it. Same
   gray-area rule as `PROJECT-KNOWLEDGE-ADDENDUM.md`.
 - `CHANGELOG.md` gains 8 draft entries and `PROGRESS.md` ~195 lines;
@@ -314,7 +314,7 @@ New action: `arklight/backend/js/actions/geolocate.py`; new behavior:
 `test_url_query_state.py` (`v0.0641`), `test_class_binding.py`,
 `test_action_value_from_state.py`, plus `test_vdom_4.py`-`test_vdom_8.py`
 and `test_htmx_3/4/5.py` (all expanded, not new). Doc:
-`docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md` (working reference
+`Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md` (working reference
 only -- see scope note below).
 
 *Risk:* medium. Touches the same reactive-core runtime files Stage 4 of
@@ -379,8 +379,8 @@ collection error (end of Stage 9) to **2716 passed / 15 failed**. The 15
 that remain, none caused by Stage 10:
 
 - 5 `test_doc_retrieval.py`, 2 `test_doc_citations.py`, 1
-  `test_doc_links.py` -- missing `docs/Proposals/README.md` /
-  `docs/Backends/README.md` and links into out-of-scope folders; closed
+  `test_doc_links.py` -- missing `Proposals/README.md` /
+  `Backends/README.md` and links into out-of-scope folders; closed
   by Stage 0's link decision.
 - 3 `test_js_error_handling.py` (try/catch-count assertions) and 4
   `test_js_vocabulary_v0063.py` (`geolocate`/`paste` registry coverage) --
@@ -500,7 +500,7 @@ it enforceable, not to remove anything.
   `main`: `arklight/backend/desktop/{__init__,runtime}.py`,
   `arklight/cli/desktop.py`, `examples/hello_desktop/{.gitignore,
   README.md,arklight.config.py}`, `docs/Backends/ARKLIGHT_DESKTOP_
-  BACKEND_PROPOSAL.md`, `docs/Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`,
+  BACKEND_PROPOSAL.md`, `Backends/DESKTOP-BACKEND-IMPLEMENTATION.md`,
   `tests/test_desktop.py`.
 - `arklight desktop ...` exits with argparse's `invalid choice`;
   `config._KNOWN_SECTIONS` is `csp, experimental, live_streaming, rei`;
@@ -784,7 +784,7 @@ One patch each, all verified independent of Stages 15-16 except `api.py`:
   sync plus the link decision that owns the last 8 red tests) and
   **14** (re-run after Stage 0).
 
-## Stage 14 — Full verification (runs last -- after Stages 15-17) ⚠️ pre-flight run done, re-run required
+## Stage 14 — Full verification (runs last -- after Stages 15-17) ✅ done
 
 - Run `main`'s full test suite together, including every file added or
   expanded across Stages 1-10 and 15-17. Baseline going in: 2716 passed /
@@ -876,6 +876,22 @@ spot-check (cannot pass until Stage 0), and the final "diff is empty
 except deliberate differences" sign-off. **Re-run this stage after
 Stages 0, 15, 16 and 17.**
 
+**Final result (re-run after Stages 0, 15, 16 and 17).** Diffed
+`arklight/`, `tests/`, `examples/` and the root files against
+`23ebc24`. Every remaining difference is deliberate: `CHANNEL`; no
+Android/Desktop code, wiring or tests; `sbom.py` without its ACC
+section; `capabilities.py` and `test_capabilities.py` absent; the
+`[ARKlight LIMITATION]` marker rename; comments that cited docs `main`
+does not carry; `pyproject.toml`'s SPDX license and empty classifiers;
+`.gitignore`'s `ARK/` line; `apt-repo.yml`; and `main`-only
+`test_root_metadata.py`, `test_root_readme.py` and the two exclusion
+tests. `test_doc_retrieval.py` also differs on purpose: its
+folder-flag and section tests use the folders and docs `main` carries.
+The Android and Desktop exclusion checklists pass. Doc cross-references
+resolve (`test_doc_links`, `test_doc_citations`). The only suite
+failures left are the three version/metadata tests that need a real
+`pip install -e .`; the rest of the suite passes.
+
 ## What's deliberately out of scope
 
 - `docs/Backends/`, `docs/Far Future Concern/`, `docs/reference/eliza/`,
@@ -898,7 +914,7 @@ Stages 0, 15, 16 and 17.**
 - ~~`alpha`'s versions `v0.071` through `v0.078` ... next plan's job.~~
   **Withdrawn.** The post-boundary bug fixes are now in scope through
   `23ebc24` (Stages 15-17). What is still out of scope: anything on
-  `alpha` *after* `23ebc24`, and `docs/version history/v0.071.md`-
+  `alpha` *after* `23ebc24`, and `version history/v0.071.md`-
   `v0.078.md` if they exist there (the Project Knowledge ladder those
   numbers are reserved for has no code in this range).
 
