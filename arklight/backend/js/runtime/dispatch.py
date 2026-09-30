@@ -149,6 +149,12 @@ mirroring `behaviors` exactly. Deliberately no modifier/`hx-trigger`
 handling for this branch yet (Section 23 of the proposal keeps
 initial scope small): every platform click runs immediately,
 unconditionally, the same as an unmodified `Action.*(...)` click.
+Each capability is called as `platformApi(args, store)`: `args` has
+any `Bind(...)` markers already resolved through the same
+`resolveActionArgs` the `\"action:\"` branch uses, and `store` is the
+page's store (`null` on a page with no `State(...)`), for capabilities
+like `db` whose reads write their result into State. `notify`/
+`clipboard_write` take only their first parameter and are unaffected.
 
 `htmx-4` (REFACTOR-INDEX.md row 9) changed this
 function's signature (then still named `wireActionInterceptor`) from
@@ -274,7 +280,13 @@ CLICK_INTERCEPTOR_JS = """  function wireClickInterceptor(getStore) {
           if (!platformApi) return;
           var platformArgsRaw = el.getAttribute("data-ark-platform-api-args");
           var platformArgs = platformArgsRaw ? JSON.parse(platformArgsRaw) : {};
-          platformApi(platformArgs);
+          // Bind(...) args resolve at click time, exactly as an
+          // action's do; the store (null on a stateless page) is also
+          // handed through for capabilities that write a result back
+          // into State (`db` reads).
+          var platformStore = getStore();
+          if (platformStore) platformArgs = resolveActionArgs(platformStore, platformArgs);
+          platformApi(platformArgs, platformStore);
         } catch (err) {
           arkReportError("Something went wrong running this action -- an unsupported or unexpected case was hit.", err);
         }

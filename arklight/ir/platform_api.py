@@ -25,7 +25,10 @@ Three registries, matching the proposal's own terminology (Section 3):
   implements. Web is the reference implementation and starts non-empty;
   Android and Linux Desktop start empty on purpose (Section 6/22 --
   "native implementations are earned by backends", not granted because
-  a backend merely exists).
+  a backend merely exists). (On `alpha`, Android has since earned
+  exactly one capability, `db`, backed by SQLite; that backend is not
+  on this branch, so it stays empty here -- see `docs/syncing main
+  with alpha branch/MAIN TO ALPHA V0.070.md`, Stages 11 and 16.)
 - Nothing here is a `PlatformAPIRequest`'s *value* -- that's
   `arklight.ast.nodes.PlatformAPIRef`, the small structured object an
   author actually writes (`PlatformAPI.notify(...)`), validated
@@ -90,9 +93,52 @@ PLATFORM_API_REGISTRY: dict[str, PlatformAPISpec] = {
         permissions=("clipboard-write",),
         description="Write plain text to the system clipboard.",
     ),
+    # Platform storage: one author-facing key/value interface. Which
+    # engine backs it (IndexedDB on Web; other backends bring their own)
+    # is decided by each backend's own implementation and never visible to the
+    # author -- see `DB_OPERATIONS` below for the operations this one
+    # capability multiplexes through its `op` argument.
+    "db": PlatformAPISpec(
+        version=1,
+        args=("op", "key", "value", "into", "prefix"),
+        permissions=(),
+        description=(
+            "Persistent local key/value storage (op: set, get, delete, keys). "
+            "Reads write their result into a State(...) named by `into`."
+        ),
+    ),
 }
 
 KNOWN_PLATFORM_APIS = frozenset(PLATFORM_API_REGISTRY)
+
+# The `db` capability's operations: op name -> (required args, optional
+# args), *excluding* `op` itself. Compiler-owned, like everything else
+# in this module -- Validation checks a `PlatformAPI.db.*(...)` call
+# against this table, so every backend's implementation can rely on
+# each op arriving with exactly the arguments listed here.
+#
+# Semantics every backend must honour (the interface contract):
+#
+# - Keys are non-empty strings; values are any JSON-serializable value,
+#   stored and returned as that JSON value (a stored `None` reads back
+#   as `None`).
+# - `set(key, value)`      -- insert or replace.
+# - `get(key, into)`       -- write the stored value, or `None` when
+#                             the key doesn't exist, into State `into`.
+# - `delete(key)`          -- remove the key; deleting a missing key is
+#                             not an error.
+# - `keys(into, prefix)`   -- write the list of stored keys starting
+#                             with `prefix` (all keys when omitted or
+#                             empty), sorted ascending by UTF-16 code
+#                             unit, into State `into`.
+# - `key`, `value` and `prefix` may each be a `Bind(...)` state
+#   reference, read at click time; `into` is always a plain State name.
+DB_OPERATIONS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "set": (("key", "value"), ()),
+    "get": (("key", "into"), ()),
+    "delete": (("key",), ()),
+    "keys": (("into",), ("prefix",)),
+}
 
 # Backend capability discovery (Section 10). A backend name maps to
 # the frozenset of capability names *that backend's own implementation
@@ -100,14 +146,15 @@ KNOWN_PLATFORM_APIS = frozenset(PLATFORM_API_REGISTRY)
 # is the compiler's own backend name for the combined HTML/CSS/JS
 # output (matching `arklight.backend.js.render.JSBackend.name`, the
 # backend that actually emits the dispatch code -- see
-# `arklight/backend/js/platform_apis/`). "android"/"desktop" are
-# listed and start empty on purpose (Section 6): those backends exist,
-# but have not yet implemented any platform API interface, so nothing
-# requested against them succeeds today -- see `check_backend_support`
-# below for the diagnostic a build against either backend gets instead
-# of a silent no-op.
+# `arklight/backend/js/platform_apis/`). "android" and "desktop" are
+# listed and empty on purpose (Section 6): neither backend exists on
+# this branch (`alpha`'s Android backend implements `db` on its own;
+# that entry is deliberately not carried over), so nothing requested
+# against either succeeds today -- see `check_backend_support` below
+# for the diagnostic a build against an unsupported backend gets
+# instead of a silent no-op.
 BACKEND_PLATFORM_API_SUPPORT: dict[str, frozenset[str]] = {
-    "web": frozenset({"notify", "clipboard_write"}),
+    "web": frozenset({"notify", "clipboard_write", "db"}),
     "android": frozenset(),
     "desktop": frozenset(),
 }

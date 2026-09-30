@@ -660,7 +660,7 @@ the anchors should apply; run `test_htmx_trusted_types.py` to confirm.
   the five Stage 15 test files are now closed; re-check them on the
   final Stage 14 run.
 
-## Stage 16 — `PlatformAPI.db`, Web half only (new, `f719455`, `23ebc24`)
+## Stage 16 — `PlatformAPI.db`, Web half only (new, `f719455`, `23ebc24`) ✅ ported
 
 New: `arklight/backend/js/platform_apis/db.py` (IndexedDB engine, plus
 a `window.arkDbBridge` hook that only the excluded Android backend
@@ -687,6 +687,46 @@ the JS side only and stay). Doc: the `db` parts of `PLATFORM-APIS.md`,
 *Risk:* low-medium. New, additive, but `dispatch.py` changes an
 existing branch every Platform API call goes through; re-run
 `test_platform_api.py` alongside.
+
+**Result (run on `main` at `a44525b` + Stage 15):**
+
+- `main`'s copies of every file here matched `alpha@0df63e7`, so the
+  delta against `23ebc24` was exactly this stage's plus Stage 17's
+  `api.py` hunk. Per the plan, `api.py` landed **once**, whole, carrying
+  both: `PlatformAPI.db` and the custom-class collision guard
+  (`RESERVED_UTILITY_CLASSES`, `_bare_class_names`, `allow_redefine=`
+  on `Site.style`/`style_selector`/`media_query`). Its two tests,
+  `test_api_style.py` and `test_css_structural_addendum.py`, came with
+  it, so **Stage 17's `api.py` item is done**; what remains there is
+  `cli/main.py`'s `open_in_browser` hunk and `pwa.py`.
+- Ported from `23ebc24`: `platform_apis/db.py` (new),
+  `platform_apis/__init__.py`, `runtime/dispatch.py`,
+  `ir/platform_api.py`, `ir/validate.py` (`_validate_platform_db`),
+  `api.py`; tests `test_platform_api_db.py` (new, 544 lines, Node-run).
+  `test_platform_api.py` needed no change and passes alongside, as the
+  risk note asked.
+- **Trimmed for the Android exclusion (the judgment call Stage 14
+  flagged):** `BACKEND_PLATFORM_API_SUPPORT["android"]` stays
+  `frozenset()`, `db` is `web`-only. The `platform_api.py` module and
+  comment prose that credited `ArkDb.kt`, and two `api.py` docstrings
+  that said Android implements `db`, were reworded to say the Android
+  half lives on `alpha`. In `test_platform_api_db.py` the Android
+  support assertions were rewritten to match (`db` rejected for
+  `android` with the standard "not implemented by backend" error;
+  `--search` reports `implemented by : web`) and the one test about
+  Android's *other* capabilities was dropped as meaningless here.
+- **Kept on purpose:** `db.py`'s `window.arkDbBridge` hook and the Node
+  test that runs it against a fake bridge. The hook is inert on the Web
+  and only ever set by the excluded Android backend; the test exercises
+  the JS side only. `db.py`'s module docstring still describes the
+  Android host in prose, identical to `alpha`.
+- Not carried over, as planned: `ArkDb.kt` and `tests/test_android_db.py`.
+- Suite: **2867 passed / 8 failed** (was 2816 / 8). Same 8 docs-tree
+  failures; both exclusion guards, `test_root_metadata`, and
+  `test_version` pass.
+- This makes Stage 14's remaining-diff rows for `PlatformAPI.db` and for
+  `api.py` closed. `ir/platform_api.py` will still differ from `alpha` on
+  purpose (the `android` entry and its prose).
 
 ## Stage 17 — Small post-v0.070 deltas (new)
 

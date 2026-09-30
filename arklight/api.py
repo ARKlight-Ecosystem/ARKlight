@@ -32,7 +32,46 @@ from arklight.ast.nodes import (
     state_ref,
 )
 from arklight.backend.css import selectors as css_selectors
+from arklight.backend.css.base_stylesheet import BASE_CSS_BODY
 from arklight.provider import ProviderDeclaration, register_provider
+
+# The default stylesheet ARKlight ships (`base_stylesheet.BASE_CSS_BODY`)
+# already defines a handful of bare, single-class utility selectors --
+# `.card`, `.nav`, `.stack`, etc. `Site.style(...)` must refuse to let a
+# user silently register a *second*, colliding `.name { ... }` under one
+# of those names: because both rules end up at equal specificity, the
+# cascade means the custom rules only win property-by-property, and any
+# built-in property the custom rules didn't set (e.g. `.card`'s
+# `border-radius`) leaks through into the "custom" class uninvited, with
+# nothing to warn about it. Derived from `BASE_CSS_BODY` itself, rather
+# than hand-copied into a second list, so the two can never drift apart
+# as utility classes are added to the default stylesheet.
+RESERVED_UTILITY_CLASSES = frozenset(
+    re.findall(r"(?m)^\.([a-zA-Z][a-zA-Z0-9_-]*)\s*\{", BASE_CSS_BODY)
+)
+
+
+def _bare_class_names(selector_ast) -> set[str]:
+    """
+    Names of every branch in a parsed `parse_selector_list(...)` result
+    that is nothing but a single, bare `.name` class selector --
+    `.card`, or each side of a grouped `.card, .nav` -- as opposed to
+    `.card > img`, `.card.featured`, or `.card:hover`, which are a
+    different, non-colliding selector even though `.card` appears in
+    them. This is exactly the selector shape `Site.style(name, ...)`
+    itself is capable of emitting (a lone `.name { }` block), so it's
+    the shape that can actually collide with a `site.style(...)`
+    registration or a built-in utility class of the same name --
+    see `style_selector`'s docstring.
+    """
+    names: set[str] = set()
+    for complex_selector in selector_ast:
+        if len(complex_selector) != 1:
+            continue
+        _combinator, compound = complex_selector[0]
+        if len(compound) == 1 and compound[0][0] == "class":
+            names.add(compound[0][1])
+    return names
 
 # v0.042: custom CSS class names must look like a real, single CSS class
 # identifier -- letters/digits/hyphens/underscores, not starting with a
@@ -855,6 +894,66 @@ class Action:
         return ActionRef(action="geolocate", state=name, args={})
 
 
+class _PlatformDB:
+    """
+    `PlatformAPI.db` -- persistent local key/value storage. One
+    interface for the author; which engine sits underneath (IndexedDB
+    on the Web backend; other backends bring their own) is each
+    backend's own business and never appears in source.
+
+        Button("Save", on_click=PlatformAPI.db.set("draft", Bind("text")))
+        Button("Load", on_click=PlatformAPI.db.get("draft", into="text"))
+        Button("Forget", on_click=PlatformAPI.db.delete("draft"))
+        Button("List", on_click=PlatformAPI.db.keys(into="drafts", prefix="draft"))
+
+    Values are anything JSON-serializable. Reads (`get`, `keys`) don't
+    return anything to the caller -- there is no return value in a
+    compiled page -- they write their result into a declared
+    `State(...)` named by `into`, the same shape `Action.geolocate`
+    already uses for one-shot platform reads. `get` writes `None` for a
+    key that doesn't exist. `key`, `value` and `prefix` may each be a
+    `Bind("name")`, read from state at click time.
+
+    All operations are asynchronous: a `get`/`keys` write lands in
+    `into` shortly after the click, not before the click handler
+    returns. If storage isn't available (a locked-down browser, private
+    mode) the visitor sees ARKlight's in-page notice instead of a
+    thrown error.
+    """
+
+    @staticmethod
+    def set(key: Any, value: Any) -> PlatformAPIRef:
+        """Store `value` under `key`, replacing anything already there."""
+        return PlatformAPIRef(
+            capability="db",
+            args={"op": "set", "key": _action_arg(key), "value": _action_arg(value)},
+        )
+
+    @staticmethod
+    def get(key: Any, into: str) -> PlatformAPIRef:
+        """Read `key` into `State(into)` (`None` if the key doesn't exist)."""
+        return PlatformAPIRef(
+            capability="db",
+            args={"op": "get", "key": _action_arg(key), "into": into},
+        )
+
+    @staticmethod
+    def delete(key: Any) -> PlatformAPIRef:
+        """Remove `key`. Removing a key that doesn't exist does nothing."""
+        return PlatformAPIRef(capability="db", args={"op": "delete", "key": _action_arg(key)})
+
+    @staticmethod
+    def keys(into: str, prefix: Any = None) -> PlatformAPIRef:
+        """
+        Write the sorted list of stored keys into `State(into)`. With
+        `prefix`, only keys starting with it are included.
+        """
+        args: dict[str, Any] = {"op": "keys", "into": into}
+        if prefix is not None:
+            args["prefix"] = _action_arg(prefix)
+        return PlatformAPIRef(capability="db", args=args)
+
+
 class PlatformAPI:
     """
     A closed vocabulary of platform-supplied capabilities (`v0.065`,
@@ -867,6 +966,7 @@ class PlatformAPI:
 
         Button("Notify me", on_click=PlatformAPI.notify("Saved!", body="Your changes were saved."))
         Button("Copy link", on_click=PlatformAPI.clipboard_write("https://example.com"))
+        Button("Save", on_click=PlatformAPI.db.set("draft", Bind("text")))
 
     Unlike `Action.*(...)`, a `PlatformAPI.*(...)` call never targets a
     declared `State(...)` name -- it asks the *execution platform* to
@@ -876,16 +976,19 @@ class PlatformAPI:
     why `Action.geolocate` stayed an `Action` rather than becoming the
     first `PlatformAPI.*(...)` entry.
 
-    Deliberately a small, closed catalogue at acceptance (Section 23
-    of the proposal, "Initial scope"): two capabilities, both
-    implemented today by the Web backend (the reference/default
-    implementation, Section 5) and by neither the Android nor the
-    Linux Desktop backend yet (Section 6/22 -- earned progressively,
-    not granted because the backend exists). Requesting either of
-    these against `android`/`desktop` fails the build with a named
-    diagnostic rather than silently doing nothing -- see
+    Deliberately a small, closed catalogue (Section 23 of the
+    proposal, "Initial scope"): `notify` and `clipboard_write`, both
+    implemented by the Web backend only, and `db` (local key/value
+    storage, see `PlatformAPI.db`), implemented by the Web
+    backend. Nothing is implemented by the Android or Linux Desktop backends here
+    (Section 6/22 -- earned progressively, not granted because the
+    backend exists). Requesting a capability against a backend that
+    doesn't implement it fails the build with a named diagnostic rather
+    than silently doing nothing -- see
     `arklight.ir.platform_api.check_backend_support`.
     """
+
+    db = _PlatformDB
 
     @staticmethod
     def notify(title: str, body: str | None = None) -> PlatformAPIRef:
@@ -2389,6 +2492,19 @@ class Site:
         class as a site is built up, without needing a separate
         "update" method.
 
+        The same check, and the same `allow_redefine=True` escape
+        hatch, also applies to `name`s that collide with one of the
+        default stylesheet's own built-in utility classes (`RESERVED_UTILITY_CLASSES`
+        -- currently `.alert`, `.card`, `.center`, `.cluster`,
+        `.fluid-heading`, `.grid`, `.hidden`, `.muted`, `.nav`,
+        `.page`, `.reel`, `.sidebar`, `.switcher`). Without this, a
+        name like `"card"` -- an easy one to reach for -- would
+        register silently, and the two same-specificity `.card { }`
+        rules would merge property-by-property in the generated
+        stylesheet rather than the custom one fully replacing the
+        built-in, leaving a class that's neither fully the user's
+        design nor fully the default.
+
         A key may also be a pseudo-class-scoped property, written
         ":<pseudo>:<property>" (e.g. ":hover:background"), to reach a
         simple interactive state -- `site.style("btn", {"background":
@@ -2412,6 +2528,20 @@ class Site:
                 f"are colliding on the class name {name!r}; pick a "
                 "different name for one of them."
             )
+        if name in RESERVED_UTILITY_CLASSES and not allow_redefine:
+            raise DuplicateStyleNameError(
+                f"site.style({name!r}, ...) collides with a built-in "
+                f"utility class of the same name that ARKlight's default "
+                f"stylesheet already ships. Registering it anyway would "
+                f"silently merge with the built-in '.{name}' rule instead "
+                f"of replacing it -- both end up at equal CSS specificity, "
+                f"so your custom rules only win property-by-property, and "
+                f"any built-in property you didn't set leaks through "
+                f"uninvited. Pick a different name, or pass "
+                f"allow_redefine=True: site.style({name!r}, rules, "
+                f"allow_redefine=True) if you specifically mean to "
+                f"override ARKlight's own '.{name}' rules."
+            )
         if not isinstance(rules, dict) or not rules:
             raise ValueError(
                 f"site.style({name!r}, rules) needs a non-empty dict of "
@@ -2431,7 +2561,14 @@ class Site:
             self._validate_css_syntax(name, prop, value)
         self.custom_styles[name] = dict(rules)
 
-    def media_query(self, condition: str, class_name: str, rules: dict[str, str]) -> None:
+    def media_query(
+        self,
+        condition: str,
+        class_name: str,
+        rules: dict[str, str],
+        *,
+        allow_redefine: bool = False,
+    ) -> None:
         """
         EXPERIMENTAL (see `docs/Foundational/EXPERIMENTAL-APIS.md`) -- register a
         `@media` block: `.class_name { ... }` rendered inside
@@ -2457,7 +2594,15 @@ class Site:
         valid media-feature syntax is large; a malformed condition
         surfaces as broken generated CSS, the same failure mode
         hand-written `@media` would have. `class_name`/`rules` are
-        validated exactly like `style()`.
+        validated exactly like `style()` -- including the same
+        `DuplicateStyleNameError` protection: calling `media_query(...)`
+        again with the same `(condition, class_name)` pair raises
+        unless `allow_redefine=True` is passed, instead of silently
+        appending a second `@media (condition) { .class_name { ... } }`
+        block for the same pair. (Reusing `class_name` under a
+        *different* condition -- conditionally overriding a built-in
+        utility class at a breakpoint -- is unaffected; only an exact
+        `(condition, class_name)` repeat is checked.)
         """
         if not isinstance(condition, str) or not condition.strip():
             raise ValueError(
@@ -2470,6 +2615,25 @@ class Site:
                 f"class name -- letters, digits, hyphens, and underscores "
                 f"only, and it can't start with a digit."
             )
+        condition_key = condition.strip()
+        if not allow_redefine:
+            for existing_condition, existing_class_name, _existing_rules in (
+                self.custom_media_queries
+            ):
+                if existing_condition == condition_key and existing_class_name == class_name:
+                    raise DuplicateStyleNameError(
+                        f"site.media_query({condition!r}, {class_name!r}, ...) "
+                        "is already registered. Registering it again would "
+                        "add a second, silently-cascading @media block for "
+                        "the same condition and class -- if that's "
+                        "deliberate, pass allow_redefine=True: "
+                        f"site.media_query({condition!r}, {class_name!r}, "
+                        "rules, allow_redefine=True). Otherwise two "
+                        f"different calls are colliding on the same "
+                        f"(condition, class_name) pair; pick a different "
+                        f"class name, or a different condition, for one of "
+                        f"them."
+                    )
         if not isinstance(rules, dict) or not rules:
             raise ValueError(
                 f"site.media_query(..., {class_name!r}, rules) needs a "
@@ -2490,7 +2654,13 @@ class Site:
                 )
             self._validate_css_syntax(class_name, prop, value)
 
-        self.custom_media_queries.append((condition.strip(), class_name, dict(rules)))
+        if allow_redefine:
+            self.custom_media_queries = [
+                entry
+                for entry in self.custom_media_queries
+                if not (entry[0] == condition_key and entry[1] == class_name)
+            ]
+        self.custom_media_queries.append((condition_key, class_name, dict(rules)))
         self.experimental_usages.append(
             experimental.emit("css-media-queries")
         )
@@ -2648,7 +2818,9 @@ class Site:
             f"'& > .child' / '& + .child' / '& ~ .child' (combinator)."
         )
 
-    def style_selector(self, selector: str, rules: dict) -> None:
+    def style_selector(
+        self, selector: str, rules: dict, *, allow_redefine: bool = False
+    ) -> None:
         """
         Register CSS rules against an arbitrary *structural* selector --
         combinators (`.a > .b`), grouped selectors (`h1, h2`), a bare
@@ -2660,6 +2832,38 @@ class Site:
         can't reach. See docs/Foundational/DESIGN-NOTES.md ("CSS selector algebra +
         at-rule vocabulary") for why this is a separate method rather
         than widening `style()` itself.
+
+        Any branch of `selector` that is nothing but a single, bare
+        `.name` class -- `style_selector(".card", ...)`, or each side
+        of a grouped `style_selector(".card, .nav", ...)` -- gets the
+        same `DuplicateStyleNameError` protection `site.style(name,
+        ...)` has, and for the same reason: that shape emits exactly
+        the `.name { }` block `style()` itself would, so it can
+        silently collide with a `site.style(name, ...)` registration
+        or one of the default stylesheet's built-in utility classes
+        (`RESERVED_UTILITY_CLASSES`). Because both rules would land at
+        equal CSS specificity, the collision doesn't fail loudly on its
+        own -- the cascade lets the later rules win property-by-
+        property, so any property only the earlier rule set leaks
+        through into what looks like a single, fully custom class.
+        Re-registering the exact same selector text a second time is
+        guarded the same way, for the same "no accidental silent
+        replace" reason `style()` and `register_component(...)` are --
+        including a repeat `&`-nested registration (e.g. calling
+        `style_selector(".panel", {"&:hover": {...}})` twice): what's
+        actually checked is the fully-resolved selector each call is
+        about to add (`.panel:hover` in that example), not just the
+        base selector text passed in, since a call whose `rules` is
+        entirely `&`-nested never registers the base selector on its
+        own. Pass `allow_redefine=True` for any of these when the collision
+        or the re-registration is deliberate -- e.g. genuinely meaning
+        to override ARKlight's own `.card` rules, or intentionally
+        layering a second, deliberately-narrower rule set onto a
+        selector already registered earlier in the same site. A
+        selector that isn't a bare single class (`.card > img`,
+        `.card:hover`, a bare tag) is never checked against
+        `RESERVED_UTILITY_CLASSES`/`custom_styles` -- only an exact
+        bare-class match collides with what `style()` can emit.
 
         `selector` is parsed by `arklight.backend.css.selectors
         .parse_selector_list` -- a closed grammar, not a raw CSS
@@ -2686,7 +2890,7 @@ class Site:
 
         Example:
 
-            site.style_selector(".card", {
+            site.style_selector(".panel", {
                 "padding": "1rem",
                 "&:hover": {"box-shadow": "0 2px 8px rgba(0,0,0,.15)"},
                 "& > img": {"border-radius": "8px 8px 0 0"},
@@ -2706,10 +2910,113 @@ class Site:
             raise CSSSyntaxError(str(exc)) from exc
         canonical_selector = css_selectors.render_selector_list(selector_ast)
 
+        if not allow_redefine:
+            if canonical_selector in {sel for sel, _rules in self.selector_rules}:
+                raise DuplicateStyleNameError(
+                    f"site.style_selector({canonical_selector!r}, ...) is "
+                    "already registered. Registering it again would add a "
+                    "second, silently-cascading rule block for the same "
+                    "selector -- if that's deliberate, pass "
+                    f"allow_redefine=True: site.style_selector("
+                    f"{canonical_selector!r}, rules, allow_redefine=True). "
+                    "Otherwise two different calls are colliding on the "
+                    f"same selector; pick a different selector for one of "
+                    "them."
+                )
+            for name in _bare_class_names(selector_ast):
+                if name in RESERVED_UTILITY_CLASSES:
+                    raise DuplicateStyleNameError(
+                        f"site.style_selector({canonical_selector!r}, ...) "
+                        f"collides with a built-in utility class of the "
+                        f"same name that ARKlight's default stylesheet "
+                        f"already ships. Registering it anyway would "
+                        f"silently merge with the built-in '.{name}' rule "
+                        f"instead of replacing it -- both end up at equal "
+                        f"CSS specificity, so your rules only win property-"
+                        f"by-property, and any built-in property you "
+                        f"didn't set leaks through uninvited. Pick a "
+                        f"different name, or pass allow_redefine=True: "
+                        f"site.style_selector({canonical_selector!r}, "
+                        f"rules, allow_redefine=True) if you specifically "
+                        f"mean to override ARKlight's own '.{name}' rules."
+                    )
+                if name in self.custom_styles:
+                    raise DuplicateStyleNameError(
+                        f"site.style_selector({canonical_selector!r}, ...) "
+                        f"collides with an existing site.style({name!r}, "
+                        f"...) registration. Registering it anyway would "
+                        f"silently merge with those rules instead of "
+                        f"replacing them -- both end up at equal CSS "
+                        f"specificity, so your rules only win property-by-"
+                        f"property, and any property only the earlier "
+                        f"registration set leaks through uninvited. Pick a "
+                        f"different name, or pass allow_redefine=True: "
+                        f"site.style_selector({canonical_selector!r}, "
+                        f"rules, allow_redefine=True) if you specifically "
+                        f"mean to layer on top of that registration."
+                    )
+
         expanded = self._expand_style_selector_rules(canonical_selector, selector_ast, rules)
+
+        if not allow_redefine:
+            # The check above only catches a repeat of `canonical_selector`
+            # itself -- but when `rules` is entirely `&`-nested (no plain
+            # top-level properties), `canonical_selector` is never what
+            # ends up in `self.selector_rules`; only the desugared nested
+            # selector(s) `_expand_style_selector_rules` just resolved are.
+            # Without this second pass, a first call like
+            # `style_selector(".panel", {"&:hover": {...}})` stores only
+            # ".panel:hover", so the check above -- which only ever looks
+            # for ".panel" -- can never find it, and a second, colliding
+            # `style_selector(".panel", {"&:hover": {...}})` call sails
+            # through uncaught, silently appending a second, cascading
+            # ".panel:hover { }" block. Checking every selector this call
+            # is actually about to add against what's already stored closes
+            # that gap for every `&`-nesting shape (`&:hover`, `&.active`,
+            # `& .child`, `& > .child`, etc.), including multi-level
+            # nesting, while leaving the plain-selector case above alone
+            # (it already raises before execution ever reaches here).
+            existing_selectors = {sel for sel, _rules in self.selector_rules}
+            for resolved_selector, _resolved_rules in expanded:
+                if resolved_selector not in existing_selectors:
+                    continue
+                if resolved_selector == canonical_selector:
+                    # Same message/shape as the pre-expansion check above --
+                    # reachable here only if a future change to this method
+                    # lets execution get this far without raising earlier.
+                    raise DuplicateStyleNameError(
+                        f"site.style_selector({canonical_selector!r}, ...) "
+                        "is already registered. Registering it again would "
+                        "add a second, silently-cascading rule block for "
+                        "the same selector -- if that's deliberate, pass "
+                        f"allow_redefine=True: site.style_selector("
+                        f"{canonical_selector!r}, rules, "
+                        "allow_redefine=True). Otherwise two different "
+                        f"calls are colliding on the same selector; pick a "
+                        "different selector for one of them."
+                    )
+                raise DuplicateStyleNameError(
+                    f"site.style_selector({canonical_selector!r}, ...) "
+                    f"resolves (via '&'-nesting) to {resolved_selector!r}, "
+                    f"which is already registered -- either from an "
+                    f"earlier '&'-nested call on this same base selector, "
+                    f"or a direct site.style_selector({resolved_selector!r}, "
+                    f"...) call. Registering it again would add a second, "
+                    f"silently-cascading rule block for "
+                    f"{resolved_selector!r} -- if that's deliberate, pass "
+                    f"allow_redefine=True: site.style_selector("
+                    f"{canonical_selector!r}, rules, allow_redefine=True). "
+                    f"Otherwise two different calls are colliding on the "
+                    f"resolved selector {resolved_selector!r}; pick a "
+                    f"different '&'-nested key, or a different base "
+                    f"selector, for one of them."
+                )
+
         self.selector_rules.extend((sel, dict(r)) for sel, r in expanded)
 
-    def keyframes(self, name: str, frames: dict[str, dict[str, str]]) -> None:
+    def keyframes(
+        self, name: str, frames: dict[str, dict[str, str]], *, allow_redefine: bool = False
+    ) -> None:
         """
         Register a real `@keyframes name { ... }` block -- one of the
         gaps explicitly deferred in earlier design notes ("not silently
@@ -2723,6 +3030,15 @@ class Site:
         `style={"animation": "name 2s ease infinite"}` the same way any
         other `animation-name` value would be, since inline `style=` is
         already unrestricted for property *values*.
+
+        Calling this again with a `name` that's already registered
+        raises `DuplicateStyleNameError` unless `allow_redefine=True`
+        is passed -- `custom_keyframes` used to be a plain dict, so a
+        second call silently *replaced* the first with no error, the
+        same "last call wins" failure mode already retired for
+        `style()`/`register_component()`. Pass `allow_redefine=True`
+        for the legitimate case that used to rely on that: deliberately
+        redefining a keyframe sequence as a site is built up.
 
         `frames` is `{stop: {property: value}}`, where each `stop` is
         `"from"`, `"to"`, or a percentage like `"50%"` -- structured
@@ -2743,6 +3059,16 @@ class Site:
                 f"site.keyframes({name!r}, ...) needs a valid animation "
                 f"name -- letters, digits, hyphens, and underscores only, "
                 f"and it can't start with a digit."
+            )
+        if name in self.custom_keyframes and not allow_redefine:
+            raise DuplicateStyleNameError(
+                f"site.keyframes({name!r}, ...) is already registered. "
+                "Registering it again would silently replace the earlier "
+                "keyframe sequence -- if that's deliberate, pass "
+                f"allow_redefine=True: site.keyframes({name!r}, frames, "
+                "allow_redefine=True). Otherwise two different calls are "
+                f"colliding on the animation name {name!r}; pick a "
+                "different name for one of them."
             )
         if not isinstance(frames, dict) or not frames:
             raise ValueError(
@@ -2878,7 +3204,13 @@ class Site:
         self.font_faces.append(descriptor_rules)
 
     def container_query(
-        self, condition: str, selector: str, rules: dict, *, name: str | None = None
+        self,
+        condition: str,
+        selector: str,
+        rules: dict,
+        *,
+        name: str | None = None,
+        allow_redefine: bool = False,
     ) -> None:
         """
         Register a real `@container (condition) { selector { ... } }`
@@ -2903,7 +3235,12 @@ class Site:
         (e.g. `"min-width: 400px"`), validated the same
         non-empty/no-injection-characters way `site.media_query(...)`'s
         `condition` already is. `selector`/`rules` go through the same
-        grammar/validation as `style_selector(...)`.
+        grammar/validation as `style_selector(...)` -- including the
+        same collision protection: calling `container_query(...)` again
+        with the same `(name, condition, selector)` triple raises
+        `DuplicateStyleNameError` unless `allow_redefine=True` is
+        passed, instead of silently appending a second `@container`
+        block for the same triple.
         """
         if not isinstance(condition, str) or not condition.strip():
             raise ValueError(
@@ -2928,12 +3265,48 @@ class Site:
         except css_selectors.CSSSelectorSyntaxError as exc:
             raise CSSSyntaxError(str(exc)) from exc
         canonical_selector = css_selectors.render_selector_list(selector_ast)
+        condition_key = condition.strip()
+        if not allow_redefine:
+            for existing_name, existing_condition, existing_selector, _existing_rules in (
+                self.container_queries
+            ):
+                if (
+                    existing_name == name
+                    and existing_condition == condition_key
+                    and existing_selector == canonical_selector
+                ):
+                    raise DuplicateStyleNameError(
+                        f"site.container_query({condition!r}, "
+                        f"{canonical_selector!r}, ..., name={name!r}) is "
+                        "already registered. Registering it again would "
+                        "add a second, silently-cascading @container block "
+                        "for the same name/condition/selector -- if that's "
+                        "deliberate, pass allow_redefine=True: "
+                        f"site.container_query({condition!r}, "
+                        f"{canonical_selector!r}, rules, name={name!r}, "
+                        "allow_redefine=True). Otherwise two different "
+                        f"calls are colliding on the same container query; "
+                        f"pick a different selector, condition, or "
+                        f"container name for one of them."
+                    )
         clean_rules = self._validate_plain_rules(
             f"site.container_query(..., {canonical_selector!r}, ...)", rules
         )
-        self.container_queries.append((name, condition.strip(), canonical_selector, clean_rules))
+        if allow_redefine:
+            self.container_queries = [
+                entry
+                for entry in self.container_queries
+                if not (
+                    entry[0] == name
+                    and entry[1] == condition_key
+                    and entry[2] == canonical_selector
+                )
+            ]
+        self.container_queries.append((name, condition_key, canonical_selector, clean_rules))
 
-    def supports(self, condition: str, selector: str, rules: dict) -> None:
+    def supports(
+        self, condition: str, selector: str, rules: dict, *, allow_redefine: bool = False
+    ) -> None:
         """
         Register a real `@supports (condition) { selector { ... } }`
         feature-query block -- a progressive-enhancement gate ARKlight
@@ -2948,7 +3321,11 @@ class Site:
         that; a malformed condition surfaces as broken generated CSS,
         the same failure mode hand-written `@supports` would have.
         `selector`/`rules` go through the same grammar/validation as
-        `style_selector(...)`.
+        `style_selector(...)` -- including the same collision
+        protection: calling `supports(...)` again with the same
+        `(condition, selector)` pair raises `DuplicateStyleNameError`
+        unless `allow_redefine=True` is passed, instead of silently
+        appending a second `@supports` block for the same pair.
         """
         if not isinstance(condition, str) or not condition.strip():
             raise ValueError(
@@ -2966,10 +3343,33 @@ class Site:
         except css_selectors.CSSSelectorSyntaxError as exc:
             raise CSSSyntaxError(str(exc)) from exc
         canonical_selector = css_selectors.render_selector_list(selector_ast)
+        condition_key = condition.strip()
+        if not allow_redefine:
+            for existing_condition, existing_selector, _existing_rules in self.supports_rules:
+                if existing_condition == condition_key and existing_selector == canonical_selector:
+                    raise DuplicateStyleNameError(
+                        f"site.supports({condition!r}, {canonical_selector!r}, "
+                        "...) is already registered. Registering it again "
+                        "would add a second, silently-cascading @supports "
+                        "block for the same condition and selector -- if "
+                        "that's deliberate, pass allow_redefine=True: "
+                        f"site.supports({condition!r}, {canonical_selector!r}, "
+                        "rules, allow_redefine=True). Otherwise two "
+                        f"different calls are colliding on the same "
+                        f"(condition, selector) pair; pick a different "
+                        f"selector, or a different condition, for one of "
+                        f"them."
+                    )
         clean_rules = self._validate_plain_rules(
             f"site.supports(..., {canonical_selector!r}, ...)", rules
         )
-        self.supports_rules.append((condition.strip(), canonical_selector, clean_rules))
+        if allow_redefine:
+            self.supports_rules = [
+                entry
+                for entry in self.supports_rules
+                if not (entry[0] == condition_key and entry[1] == canonical_selector)
+            ]
+        self.supports_rules.append((condition_key, canonical_selector, clean_rules))
 
     def page_rule(self, rules: dict, *, pseudo: str | None = None) -> None:
         """
