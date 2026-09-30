@@ -62,6 +62,23 @@ def test_open_in_browser_swallows_launch_errors(tmp_path):
     assert opened is False
 
 
+def test_open_in_browser_returns_false_when_launch_fails_without_raising(tmp_path):
+    # The common headless-environment case: webbrowser.open() couldn't
+    # find a working browser (e.g. no DISPLAY, xdg-open has "no method
+    # available"), and signals that by returning False -- it does not
+    # raise. open_in_browser() must reflect that, not report success
+    # just because no exception happened to fire.
+    site_path = write_site(tmp_path)
+    out_dir = tmp_path / "dist"
+    result = build(site_path, out_dir)
+
+    with patch("arklight.cli.main.webbrowser.open", return_value=False) as mock_open:
+        opened = open_in_browser(result, out_dir)
+
+    assert opened is False
+    mock_open.assert_called_once()
+
+
 def test_cli_build_blocked_without_license_acceptance(tmp_path, monkeypatch):
     site_path = write_site(tmp_path)
     monkeypatch.delenv("ARKLIGHT_ACCEPT_LICENSE", raising=False)
@@ -148,6 +165,54 @@ def test_cli_build_without_verbose_prints_no_stage_lines(tmp_path, capsys):
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "[ARKlight]" not in captured.out
+
+
+NUDGE_SITE = """
+from arklight import *
+site = Site()
+site.import_style("https://fonts.googleapis.com/css2?family=Inter")
+site.import_style("https://fonts.googleapis.com/css2?family=Roboto")
+site.import_style("https://fonts.googleapis.com/css2?family=Lato")
+
+@site.page("/")
+def home():
+    return Page(Heading("Hi"))
+"""
+
+
+def write_nudge_site(tmp_path: Path) -> Path:
+    path = tmp_path / "site.py"
+    path.write_text(NUDGE_SITE)
+    return path
+
+
+def test_cli_build_shows_heavy_reliance_nudge_by_default(tmp_path, capsys):
+    site_path = write_nudge_site(tmp_path)
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
+    assert exit_code == 0
+    assert "[Rei]" in capsys.readouterr().out
+
+
+def test_cli_build_hides_heavy_reliance_nudge_via_config(tmp_path, capsys):
+    site_path = write_nudge_site(tmp_path)
+    (tmp_path / "arklight.config.py").write_text(
+        'CONFIG = {"experimental": {"heavy_reliance_nudge": False}}\n', encoding="utf-8"
+    )
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "[Rei]" not in out
+    # the per-feature warning blocks themselves are untouched by the
+    # config setting -- only the nudge is suppressed.
+    assert "Legacy API detected: css-import" in out
+
+
+def test_cli_build_invalid_config_fails_clearly(tmp_path, capsys):
+    site_path = write_nudge_site(tmp_path)
+    (tmp_path / "arklight.config.py").write_text("CONFIG = [1, 2]\n", encoding="utf-8")
+    exit_code = main(["build", str(site_path), "-o", str(tmp_path / "dist"), "--no-open"])
+    assert exit_code == 1
+    assert "ARKlight build failed" in capsys.readouterr().err
 
 
 def test_cli_build_debug_prints_full_traceback_on_failure(tmp_path, capsys):
@@ -244,6 +309,62 @@ def test_cli_search_name_and_serve_are_mutually_exclusive(capsys):
     assert "mutually exclusive" in captured.err
 
 
+def test_cli_search_retrieve_doc_prints_root_index(capsys):
+    exit_code = main(["search", "--retrieve-doc"])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("# ARKlight Documentation")
+    assert "--foundational" in captured.out
+
+
+def test_cli_search_retrieve_doc_folder_and_file(capsys):
+    exit_code = main(["search", "--retrieve-doc", "--foundational", "--file", "architecture"])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("# Foundational")
+    assert "docs/Foundational/ARCHITECTURE.md" in captured.out
+
+
+def test_cli_search_retrieve_doc_rejects_component_name(capsys):
+    exit_code = main(["search", "Picture", "--retrieve-doc"])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "doesn't look up a name" in captured.err
+
+
+def test_cli_search_retrieve_doc_and_serve_are_mutually_exclusive(capsys):
+    exit_code = main(["search", "--retrieve-doc", "--serve"])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "mutually exclusive" in captured.err
+
+
+def test_cli_search_retrieve_doc_file_without_folder_flag_errors(capsys):
+    exit_code = main(["search", "--retrieve-doc", "--file", "architecture"])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "--file requires a folder flag" in captured.err
+
+
+def test_cli_search_two_folder_flags_are_mutually_exclusive():
+    with pytest.raises(SystemExit):
+        main(["search", "--retrieve-doc", "--foundational", "--proposals"])
+
+
+def test_cli_search_folder_flag_without_retrieve_doc_is_ignored_with_notice(capsys):
+    exit_code = main(["search", "Picture", "--foundational"])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("Picture")
+    assert "--foundational only apply with --retrieve-doc" in captured.err
+
+
 def test_cli_pwa_icon_flag_adds_icons_to_manifest(tmp_path, capsys):
     import json
 
@@ -337,3 +458,119 @@ def test_cli_help_flag_lists_every_subcommand(capsys):
     captured = capsys.readouterr()
     for subcommand in ("build", "pack", "unpack", "pwa", "new", "search"):
         assert subcommand in captured.out
+
+
+# --- design-token overrides can't break out of their declaration ------------
+
+
+def _tiny_site(tmp_path, site_kwargs=""):
+    path = tmp_path / "site.py"
+    path.write_text(
+        "# include <stdlib.ARKlight>\n"
+        f"site = Site({site_kwargs})\n"
+        '@site.page("/")\n'
+        "def home():\n"
+        '    return Page(Heading("x"))\n'
+    )
+    return path
+
+
+@pytest.mark.parametrize("flag", ["--max-width", "--bg", "--font-family", "--button-text"])
+def test_cli_style_flag_with_css_breakout_is_refused(tmp_path, capsys, flag):
+    site = _tiny_site(tmp_path)
+    code = main(
+        [
+            "build",
+            str(site),
+            "-o",
+            str(tmp_path / "ARK"),
+            "--no-open",
+            flag,
+            "red; } body{display:none",
+        ]
+    )
+    assert code == 1
+    assert "Invalid design-token override" in capsys.readouterr().err
+    assert not (tmp_path / "ARK" / "styles.css").exists()
+
+
+def test_cli_style_flag_with_a_normal_value_still_builds(tmp_path):
+    site = _tiny_site(tmp_path)
+    code = main(["build", str(site), "-o", str(tmp_path / "ARK"), "--no-open", "--max-width", "90rem"])
+    assert code == 0
+    assert "--ark-max-width: 90rem;" in (tmp_path / "ARK" / "styles.css").read_text()
+
+
+def test_site_kwarg_with_css_breakout_is_refused():
+    from arklight import Site
+
+    with pytest.raises(ValueError, match="break out of its declaration"):
+        Site(max_width="red; } body{display:none")
+    with pytest.raises(ValueError, match="break out of its declaration"):
+        Site(bg="red\nbody{display:none}")
+
+
+# --- a misspelled component gets a "Did you mean" ----------------------------
+
+
+def _build_source(tmp_path, source):
+    from arklight.compiler.pipeline import CompileError
+
+    path = tmp_path / "site.py"
+    path.write_text(source)
+    with pytest.raises(CompileError) as excinfo:
+        build(path, tmp_path / "ARK")
+    return str(excinfo.value)
+
+
+_PAGE_TAIL = '@site.page("/")\ndef home():\n    return Page({body})\n'
+
+
+def test_misspelled_component_in_a_page_function_suggests_the_real_one(tmp_path):
+    message = _build_source(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nsite = Site()\n" + _PAGE_TAIL.format(body='Headingg("Hi")'),
+    )
+    assert "name 'Headingg' is not defined" in message
+    assert "Did you mean:" in message
+    assert "Heading" in message
+
+
+def test_misspelled_component_at_module_level_suggests_the_real_one(tmp_path):
+    message = _build_source(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nButon('x')\nsite = Site()\n"
+        + _PAGE_TAIL.format(body='Heading("x")'),
+    )
+    assert "name 'Buton' is not defined" in message
+    assert "Did you mean:" in message
+    assert "Button" in message
+
+
+def test_misspelled_lowercase_variable_gets_no_component_suggestion(tmp_path):
+    message = _build_source(
+        tmp_path,
+        "# include <stdlib.ARKlight>\nsite = Site()\n" + _PAGE_TAIL.format(body="Text(titel)"),
+    )
+    assert "name 'titel' is not defined" in message
+    assert "Did you mean" not in message
+
+
+# --- `arklight deploy site.py` gets a real fix, not "invalid choice" --------
+
+
+def test_deploy_site_file_without_a_provider_gets_the_fix_named(tmp_path, capsys):
+    site = _tiny_site(tmp_path)
+    with pytest.raises(SystemExit) as excinfo:
+        main(["deploy", str(site)])
+    assert excinfo.value.code == 2
+    err = capsys.readouterr().err
+    assert "looks like a site file, not a provider" in err
+    assert f"arklight deploy cloudflare {site}" in err
+
+
+def test_deploy_rejects_a_truly_unknown_provider(tmp_path, capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        main(["deploy", "netlify"])
+    assert excinfo.value.code == 2
+    assert "cloudflare" in capsys.readouterr().err

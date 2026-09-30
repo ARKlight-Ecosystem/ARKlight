@@ -138,19 +138,23 @@ def open_in_browser(result: BuildResult, output_dir: str | Path) -> bool:
     file paths by the HTML backend, so navigating between pages works
     correctly straight off disk -- no local server required.
 
-    Returns True if a browser launch was attempted, False if there was
-    nothing to open (e.g. no "/" route). Swallows browser-launch
-    failures (e.g. headless environments) rather than failing the
-    build -- the files are already written either way.
+    Returns True if a browser launch actually succeeded, False if there
+    was nothing to open (e.g. no "/" route) or the launch failed.
+    Swallows browser-launch failures (e.g. headless environments)
+    rather than failing the build -- the files are already written
+    either way. `webbrowser.open()` signals a failed launch by
+    returning False, not by raising, so that return value has to be
+    checked explicitly -- an unconditional `return True` after a bare
+    call would report success on every headless box that has no
+    exception to catch.
     """
     index_path = Path(output_dir) / "index.html"
     if not index_path.exists():
         return False
     try:
-        webbrowser.open(index_path.resolve().as_uri())
+        return bool(webbrowser.open(index_path.resolve().as_uri()))
     except Exception:  # noqa: BLE001 -- opening a browser is best-effort
         return False
-    return True
 
 
 def _stage_logger(message: str, *, mode: str) -> None:
