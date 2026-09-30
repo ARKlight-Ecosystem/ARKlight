@@ -188,19 +188,6 @@ def test_validate_live_streaming_rejects_a_bad_poll_interval(interval):
         validate_live_streaming({**_GOOD_LIVE, "poll_interval": interval})
 
 
-@pytest.mark.xfail(
-    reason=(
-        "`arklight.cli.live_streaming` doesn't call `validate_live_streaming` "
-        "yet -- a bad port currently falls through to the CLI's generic "
-        "unexpected-error handler instead of this clean message. Wiring "
-        "`live_streaming.py` up to the validator it's tested against here "
-        "is `cli/live_streaming.py` work -- explicitly Stage 10 scope "
-        "(`docs/syncing main with alpha branch/MAIN TO ALPHA V0.070.md`), "
-        "not this stage's. `validate_live_streaming` itself is fully "
-        "covered and green (see the tests above)."
-    ),
-    strict=True,
-)
 def test_live_streaming_command_reports_a_bad_port_instead_of_crashing(tmp_path, capsys):
     from arklight.cli.main import main
 

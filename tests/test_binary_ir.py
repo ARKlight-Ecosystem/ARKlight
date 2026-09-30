@@ -1,8 +1,6 @@
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from arklight.cli.main import main
 from arklight.compiler.pipeline import build
 from arklight.ir.binary import (
@@ -150,21 +148,6 @@ def test_cli_build_without_flag_does_not_write_arklight_file(tmp_path):
     assert not (out_dir / "site.arklight").exists()
 
 
-_EMIT_ARKLIGHT_NOT_WIRED_YET = pytest.mark.xfail(
-    reason=(
-        "`--emit-arklight` itself is exercised end-to-end here, but wiring "
-        "the flag into `arklight build`'s argparse setup is `cli/main.py` "
-        "work -- explicitly Stage 10 scope (`docs/syncing main with alpha "
-        "branch/MAIN TO ALPHA V0.070.md`), not this stage's. The underlying "
-        "`arklight.ir.binary` module this flag calls into is fully covered "
-        "and green (see the encode/decode/round-trip tests above)."
-    ),
-    strict=True,
-    raises=SystemExit,
-)
-
-
-@_EMIT_ARKLIGHT_NOT_WIRED_YET
 def test_cli_build_emit_arklight_bare_flag_writes_default_path(tmp_path, capsys):
     site_path = write_site(tmp_path)
     out_dir = tmp_path / "dist"
@@ -183,7 +166,6 @@ def test_cli_build_emit_arklight_bare_flag_writes_default_path(tmp_path, capsys)
     assert "binary IR" in out
 
 
-@_EMIT_ARKLIGHT_NOT_WIRED_YET
 def test_cli_build_emit_arklight_custom_path(tmp_path):
     site_path = write_site(tmp_path)
     out_dir = tmp_path / "dist"
@@ -205,7 +187,6 @@ def test_cli_build_emit_arklight_custom_path(tmp_path):
     assert not (out_dir / "site.arklight").exists()
 
 
-@_EMIT_ARKLIGHT_NOT_WIRED_YET
 def test_cli_build_emit_arklight_file_decodes_back(tmp_path):
     site_path = write_site(tmp_path, MULTI_PAGE_SITE)
     out_dir = tmp_path / "dist"

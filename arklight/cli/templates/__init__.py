@@ -4,7 +4,7 @@ In-package project templates for `arklight new`.
 Each template is a callable `name -> dict[relative_path, contents]`
 (plain string building, no templating dependency -- consistent with
 "no runtime dependencies beyond the build backend"), registered in
-`TEMPLATES` below. See docs/DESIGN-NOTES.md, "v0.004: CLI scaffolding
+`TEMPLATES` below. See docs/Foundational/DESIGN-NOTES.md, "v0.004: CLI scaffolding
 (`arklight new`)", for the full design this implements.
 
 - `simple`     -- `templates.simple.build`: a single `site.py`, the
