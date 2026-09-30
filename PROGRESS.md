@@ -25,29 +25,22 @@ for the architecture-level roadmap table, see
 | v0.036   | ARK Bundle spec v1 (`arklight pack`)                         | DONE    |
 | v0.037   | Sealed ARK Bundles (encrypted by default, `arklight unpack`) | DONE    |
 | v0.041   | CLI/pipeline/JS runtime hardening + stateful JS addenda I/II | DONE    |
+| v0.042   | `Site.style(...)` custom CSS classes, `arklight search`, `arklight --help` | DONE |
+| v0.048   | CSS `@media` (`responsive_style`) + structured `<head>` (`meta`/`links`) | DONE    |
 | 0.54.0   | Catch-up: CSS `@media`, HTML backend refactor, reactive JS core, search engine, live-streaming/CCTV -- see below | DONE |
 | 0.070.0  | Catch-up, code + docs: user-defined components, JS vocabulary ladder, `Provider`, Platform API IR (`db`, Web half), preamble system, Rei narrator, `arklight deploy`, htmx/CSP hardening -- see `docs/version history/v0.070.md` | DONE |
 | --       | Android/Desktop packaging backends (not part of `main`) | NOT SCHEDULED (needs more time) |
-| v0.100   | Alternate backends (Vue, Svelte)                             | PLANNED |
 | v1.0     | Stable compiler                                              | PLANNED |
 
-### Planned, not yet scheduled to a version
+### Nothing is queued without a version
 
-Design-sketched in `docs/Foundational/DESIGN-NOTES.md`, explicitly waiting on a
-go-ahead before implementation starts on any of these:
-
-- **Custom CSS class authoring.** Today `class_name=` only ever
-  selects from the fixed set of utility classes the CSS backend ships
-  (`.nav`, `.card`, `.stack`, ...) -- there's no way for a site author
-  to define a *new* class with its own rules; the whole stylesheet is
-  one constant (`arklight/backend/css/render.py`). Real per-node/
-  per-class CSS generation is a bigger design question than v0.048's
-  `@media`/`<head>` scope and isn't folded into it.
-- **`arklight --search <name>`** -- schema lookup for a component by
-  name (required props, children rules) against
-  `arklight.ir.schema.SCHEMA`, the same source of truth every compiler
-  stage already reads from. Read-only reflection, no new data format.
-- **`arklight --help`** -- standard CLI usage/help text.
+Everything this section used to list as unscheduled -- custom CSS class
+authoring (`Site.style(...)`), the component-schema lookup (`arklight
+search <name>`) and `arklight --help` -- shipped in `v0.042`. The
+alternate Vue/Svelte backends that `v0.100` once meant were dropped
+(Decision 2026-09-20 in `docs/Foundational/DESIGN-NOTES.md`); `v0.100` is
+the Desktop backend, which is not part of `main`. What remains ahead is
+`v1.0`, defined in `docs/Foundational/V1-DEFINITION.md`.
 
 ## v0.070 catch-up, closing pass: Stages 0, 14 and 15-17 (DONE)
 
@@ -686,12 +679,11 @@ the existing pipeline already produces. No changes to `normalize.py`/
 `validate.py`/`build.py`/the `Backend` interface/the IR, and a
 separate module (`arklight/packer/`) rather than logic folded into
 the compiler internals (per explicit request -- see
-`docs/Foundational/DESIGN-NOTES.md`). **Only `.html`/`.css`/`.js` files are
-inlined/packed** -- an `assets/` folder (images/audio/video/anything
-else) is detected and reported as skipped rather than packed; carrying
-those over is the next planned version, not this one. An
-`--encrypt`/password flag so the ZIP payload isn't inspectable without
-a password is planned for the version after that.
+`docs/Foundational/DESIGN-NOTES.md`). **Only `.html`/`.css`/`.js` files were
+inlined/packed in v1** -- an `assets/` folder was detected and
+reported as skipped rather than packed. `v0.037` (Sealed ARK Bundles)
+then carried `assets/` and every other file over, and added the
+`--encrypt`/password behavior (sealed by default).
 
 One implementation note worth flagging for future work in this area:
 the original design doc assumed manual ZIP-header offset patching
@@ -713,56 +705,31 @@ The stale note further down this file ("v0.0035 -- done; v0.004 --
 folder scaffolding only, logic not started") is superseded by this
 entry -- see the correction inline there.
 
-## v0.048 -- CSS `@media` queries + `<head>`/`<header>` extension (PLANNED)
+## v0.048 -- CSS `@media` queries + `<head>`/`<header>` extension (DONE)
 
 The other two pieces of the old "v0.004" heading, renumbered to their
-own milestone since they didn't land with the scaffolding above and
-are now the next scheduled release. Design is complete and unchanged;
-implementation has not started. Full writeup in
-[`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md) ("v0.048: CSS media
-queries + `<head>` extension").
+own milestone. Both stages shipped; the user-facing overview is
+[`docs/version history/v0.048.md`](./docs/version%20history/v0.048.md) and the design
+record is in [`docs/Foundational/DESIGN-NOTES.md`](./docs/Foundational/DESIGN-NOTES.md)
+("v0.048: CSS media queries + `<head>` extension").
 
-- [ ] `responsive_style={...}` prop -> real `@media` blocks in the CSS
-  backend. Not implemented yet -- `arklight/backend/css/render.py`
-  still emits one fixed stylesheet with no `@media`/`@container`
-  blocks, and `Page`/components never get a `<head>` hook at all.
-- [ ] `Page(meta=..., links=...)` -- a structured, non-arbitrary
-  `<head>` extension point (no raw HTML injection). Not implemented
-  yet.
-- [ ] Anything else that touches the generated `<header>` element as
-  part of this pass (the element, not the `<head>` extension above --
-  see `docs/Foundational/DESIGN-NOTES.md` for the distinction once design work
-  starts).
+- [x] Stage A: `Page(meta=..., links=...)` -- a structured, non-arbitrary
+  `<head>` extension point (no raw HTML injection).
+- [x] Stage B: `responsive_style={...}` prop, compiled to real `@media`
+  blocks by the CSS backend.
 
-**Explicitly out of scope for v0.048**, tracked separately below under
-"Planned, not yet scheduled":
+What the earlier PLANNED entry held out of scope also shipped, in
+`v0.042`: user-authored custom CSS classes (`Site.style(...)`) and the
+component schema lookup (`arklight search <name>`).
 
-- User-authored custom CSS classes/rules beyond the fixed
-  `class_name=` utility set.
-- `arklight --search <name>` component schema lookup.
+## v0.010 -- Components (user-defined, reusable) (SHIPPED AS v0.060)
 
-## v0.010 -- Components (user-defined, reusable) (PLANNED)
-
-Not started. Per `docs/Foundational/DESIGN-NOTES.md`, this is where "write a plain
-Python function" (today's `nav()` pattern) becomes a real, first-class
-reusable unit -- likely with its own default styling bundled in, which
-would be a genuine differentiator versus htpy/FastHTML (neither ships
-opinionated per-component CSS). Rough questions to resolve first:
-
-- What distinguishes a "component" from a plain helper function like
-  `nav()` today? If the answer is "nothing, syntactically" the
-  milestone may be more about a registration/discovery mechanism (so
-  the compiler *knows* about reusable components, e.g. for future
-  tooling) than a new runtime concept.
-- Should components be able to carry their own default `style=`/CSS
-  rules, shipped alongside the component definition rather than
-  relying entirely on the global stylesheet?
-- Note from the design-notes doc: this milestone does **not** by
-  itself move ARKlight toward "Svelte-like." The next real fork in the
-  road is whether a future milestone introduces state/event semantics
-  into the IR (a prerequisite this doc names for v0.100 to mean
-  anything beyond static output) -- worth deciding explicitly before
-  v0.100, not assuming it falls out of v0.010 or v0.100 automatically.
+This slot was never built under the `v0.010` number. User-defined,
+reusable components landed as `v0.060` (`@component`, `props=`,
+typo diagnostics, default styling, per-backend rendering,
+component-owned state); see
+[`docs/Foundational/USER-DEFINED-COMPONENTS.md`](./docs/Foundational/USER-DEFINED-COMPONENTS.md)
+and [`docs/version history/v0.060.md`](./docs/version%20history/v0.060.md).
 
 ## v0.003 -- vocabulary extension addendum I (DONE)
 
@@ -828,13 +795,9 @@ only as placeholder directories (`templates/simple/assets/`,
 wired into `arklight/cli/main.py` yet. That work is now done -- see
 "v0.004a -- CLI scaffolding (DONE)" above.
 
-Also documented, not implemented, in `docs/Foundational/DESIGN-NOTES.md`: two CLI
-helpers, `arklight --help` and `arklight --search <name>`, for looking
-up a component's schema by name once the vocabulary is large enough
-that recall becomes the bottleneck. Still not implemented as of this
-restructure -- see "Planned, not yet scheduled" near the top of this
-file. Explicitly held for a separate go-ahead signal, independent of
-v0.0035/v0.004a/v0.048.
+The two CLI helpers that were only documented at this point,
+`arklight --help` and the component-schema lookup, have since shipped
+in `v0.042` (the lookup as `arklight search <name>`, not `--search`).
 
 ## v0.041 -- stateful JS vocabulary addendum II: list actions (DONE)
 

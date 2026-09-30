@@ -74,8 +74,14 @@ Refer to [`docs/Foundational/EXPERIMENTAL-APIS.md`](https://github.com/ARKlight-
 ## Install
 
 ```bash
-pip install -e .
+pip install arklight
 ```
+
+The first `arklight` command asks you to accept the license terms once.
+From a source checkout, read `LICENSE`, then build with
+`pip install -e . --config-settings=yes-i-agree-to-arklight-license=1`
+(or set `ARKLIGHT_ACCEPT_LICENSE=1`); a plain `pip install -e .` stops
+at that gate.
 
 A runnable example, the Debian/Ubuntu package, upgrading an existing
 checkout, and everything else needed to get running:

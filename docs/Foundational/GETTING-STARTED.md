@@ -15,18 +15,29 @@ drifts out of sync with the real component API -- per
 ## Install
 
 ```bash
-pip install -e .
+pip install arklight
 ```
 
 This installs the `arklight` package and the `arklight` CLI command
-(defined in `pyproject.toml`).
+(defined in `pyproject.toml`). The first `arklight` command asks you to
+accept the license terms once.
+
+From a source checkout (read `LICENSE` first):
+
+```bash
+pip install -e . --config-settings=yes-i-agree-to-arklight-license=1
+```
+
+A source build is gated on the same terms, so a plain `pip install -e .`
+stops with a notice; `ARKLIGHT_ACCEPT_LICENSE=1` in the environment is
+the equivalent of the flag above.
 
 ### Debian/Ubuntu package
 
 ```bash
-curl -fsSL https://rae-ark.github.io/ARKlight/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/arklight.gpg
+curl -fsSL https://arklight-ecosystem.github.io/ARKlight/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/arklight.gpg
 sudo rm -f /etc/apt/sources.list.d/arklight.list
-echo "deb [signed-by=/usr/share/keyrings/arklight.gpg] https://rae-ark.github.io/ARKlight/ stable main" | sudo tee /etc/apt/sources.list.d/arklight.list
+echo "deb [signed-by=/usr/share/keyrings/arklight.gpg] https://arklight-ecosystem.github.io/ARKlight/ stable main" | sudo tee /etc/apt/sources.list.d/arklight.list
 sudo apt update
 sudo apt install arklight-installer
 ```
