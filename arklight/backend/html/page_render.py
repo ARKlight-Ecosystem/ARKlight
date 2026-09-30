@@ -26,8 +26,7 @@ already applied ahead of `htmx-1`.
 
 At the point this module was split out, that was zero behavior
 change: same recursion, same tag emission, same generated HTML
-byte-for-byte as before it existed. `htmx-4` (docs/Backends/
-REFACTOR-INDEX.md row 9) is the first stage to actually change what
+byte-for-byte as before it existed. `htmx-4` (docs/Backends/REFACTOR-INDEX.md row 9) is the first stage to actually change what
 `_render_page` emits -- see `_render_page`'s own docstring below for
 what `app_shell=True` adds. Every existing caller that doesn't pass
 `app_shell` gets the prior byte-for-byte output, unchanged.
@@ -39,16 +38,25 @@ that already imported them from there, same as Stages 1-4.
 from __future__ import annotations
 
 import json
+import math
+import re
 from html import escape
 
 from arklight.ast.nodes import ActionRef, ItemIndexRef, PredicateRef
 from arklight.backend.css.render import STYLESHEET_PATH
 from arklight.backend.html.attrs import _attr_string
+from arklight.backend.html.csp import _render_csp_meta_tag
 from arklight.backend.html.head_meta import _render_head_meta
 from arklight.backend.html.routing import _relative_asset_path
 from arklight.backend.html.tag_map import VOID_TAGS, _tag_for
 from arklight.backend.js.render import SCRIPT_PATH
 from arklight.ir.build import IRNode, IRPage
+from arklight.ir.js_predicate import PREDICATE_EVALUATORS
+from arklight.ir.js_string import from_units
+from arklight.ir.js_string import js_number_to_string as _js_number_to_string
+
+
+_LONE_SURROGATE = re.compile("[\ud800-\udfff]")
 
 
 def _render_bind(node: IRNode, *, page_state: dict) -> str:
@@ -61,21 +69,72 @@ def _render_bind(node: IRNode, *, page_state: dict) -> str:
     """
     name = node.props.get("name")
     value = page_state.get(name, "")
+    # `v0.064`: a math derivation can now produce a non-finite result
+    # (`Derive.sqrt` of a negative, `Derive.log` of zero). Python's
+    # `str()` spells those `nan`/`inf`; the client runtime's `String()`
+    # spells them `NaN`/`Infinity`, so pre-fill the JavaScript spelling.
+    #
+    # Bugfix: the same mismatch exists for ordinary *finite* floats --
+    # an integral result like `0.0` printed fine with Python's `str()`
+    # as `"0.0"`, but the client runtime's `String()` coercion (JS has
+    # only one number type) spells the identical value `"0"`, so the
+    # page briefly showed `0.0` on load before the reactive core's own
+    # next render corrected it to `0`. Route every float (finite or
+    # not) through the same JS-`String()`-accurate formatter the string
+    # derivation catalog already uses for this exact purpose (see
+    # `js_to_string` in `arklight/ir/js_string.py`), so the server-
+    # rendered initial value and the client-recomputed one always agree.
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            value = "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+        else:
+            value = _js_number_to_string(value)
+    # `v0.065`: the string catalog's boolean kinds (`is_empty`,
+    # `starts_with`, ...) make a `Computed(...)` value a `bool`, which
+    # Python spells `True`/`False` and the client's `String()` spells
+    # `true`/`false`.
+    if isinstance(value, bool):
+        value = "true" if value else "false"
+    # `v0.067`: `Derive.list_first`/`list_last` of an empty list is
+    # `None` (`null`). Python spells that `None`, the client's `String()`
+    # spells it `null`.
+    if value is None:
+        value = "null"
+    # `v0.065`: `Derive.char_at`/`slice_string` can cut an emoji in half,
+    # leaving a lone surrogate -- legal in a JavaScript string, but it
+    # can't be written out as UTF-8. The browser draws such a character
+    # as U+FFFD, so pre-fill that. Python never merges adjacent surrogate
+    # characters, but JavaScript does (`Derive.join` of a `char_at(0)` and
+    # a `char_at(1)` of an emoji is the emoji again), so recombine valid
+    # pairs first and only blank what is genuinely lone.
+    if isinstance(value, str):
+        value = _LONE_SURROGATE.sub("\ufffd", from_units(value))
     return f'<span data-ark-bind="{escape(str(name), quote=True)}">{escape(str(value))}</span>'
 
 
 def _evaluate_predicate(predicate: PredicateRef, *, page_state: dict) -> bool:
-    """`vdom-7`: the same truthy/falsy check `Predicate.*(...)`
-    describes, evaluated at build time against the page's initial
-    state -- see `arkEvalPredicate` in `arklight/backend/js/runtime/
-    show.py` for the client-side twin that re-runs this on every state
-    change."""
+    """`vdom-7`/`v0.062`/`v0.066`: the same check `Predicate.*(...)`
+    describes, evaluated at build time against the page's initial state
+    -- see `arkEvalPredicate` in `arklight/backend/js/runtime/show.py`
+    for the client-side twin that re-runs this on every state change.
+    The `v0.066` catalog kinds live in `arklight.ir.js_predicate`, which
+    reproduces JavaScript's truthiness/equality rules rather than
+    Python's."""
+    catalog_evaluator = PREDICATE_EVALUATORS.get(predicate.kind)
+    if catalog_evaluator is not None:
+        return catalog_evaluator(predicate.names, predicate.args, page_state.get)
+    if predicate.kind == "equals":
+        return page_state.get(predicate.names[0]) == page_state.get(predicate.names[1])
+    if predicate.kind == "gt":
+        return page_state.get(predicate.names[0]) > page_state.get(predicate.names[1])
+    if predicate.kind == "lt":
+        return page_state.get(predicate.names[0]) < page_state.get(predicate.names[1])
     value = page_state.get(predicate.names[0])
     return (not value) if predicate.kind == "falsy" else bool(value)
 
 
 def _render_show(
-    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict
+    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict, path: str = "root"
 ) -> str:
     """
     `vdom-7`: `Show(predicate, ...)` renders its children unconditionally
@@ -92,13 +151,20 @@ def _render_show(
     with `predicate` after that.
     """
     predicate = node.props["predicate"]
-    predicate_json = escape(
-        json.dumps({"kind": predicate.kind, "names": list(predicate.names)}), quote=True
-    )
+    spec = {"kind": predicate.kind, "names": list(predicate.names)}
+    if predicate.args:
+        # `v0.066`: `one_of`'s literal `values`. Only emitted when
+        # present, so every pre-existing kind's markup is unchanged.
+        spec["args"] = predicate.args
+    predicate_json = escape(json.dumps(spec), quote=True)
     visible = _evaluate_predicate(predicate, page_state=page_state)
     hidden_attr = "" if visible else " hidden"
     inner = _render_children(
-        node.children, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+        node.children,
+        current_route=current_route,
+        route_to_path=route_to_path,
+        page_state=page_state,
+        path=path,
     )
     return f'<div data-ark-show="{predicate_json}"{hidden_attr}>{inner}</div>'
 
@@ -181,7 +247,7 @@ def _repeat_template_spec(node: IRNode) -> dict:
 
 
 def _render_repeat(
-    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict
+    node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict, path: str = "root"
 ) -> str:
     """
     `vdom-7`: `Repeat(name, template=...)` renders one real copy of its
@@ -205,6 +271,7 @@ def _render_repeat(
             current_route=current_route,
             route_to_path=route_to_path,
             page_state=page_state,
+            path=f"{path}/item[{index}]",
         )
         for index, item in enumerate(items)
     )
@@ -215,14 +282,29 @@ def _render_repeat(
 
 
 def _render_children(
-    children: list, *, current_route: str, route_to_path: dict[str, str], page_state: dict
+    children: list,
+    *,
+    current_route: str,
+    route_to_path: dict[str, str],
+    page_state: dict,
+    path: str = "root",
 ) -> str:
     rendered = []
-    for child in children:
+    for i, child in enumerate(children):
         if isinstance(child, IRNode):
             rendered.append(
                 _render_node(
-                    child, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+                    child,
+                    current_route=current_route,
+                    route_to_path=route_to_path,
+                    page_state=page_state,
+                    # Same structural-path convention `arklight/ir/validate.py`'s
+                    # `validate_node` already uses ("{path}/{type}[{i}]") -- not
+                    # a source file:line (nothing downstream of `load_site()`
+                    # keeps that around), but enough for an author to find the
+                    # offending node again by counting siblings from the page
+                    # root. Used by `_attr_string`'s unknown-prop notice below.
+                    path=f"{path}/{child.type}[{i}]",
                 )
             )
         else:
@@ -230,18 +312,33 @@ def _render_children(
     return "".join(rendered)
 
 
-def _render_node(node: IRNode, *, current_route: str, route_to_path: dict[str, str], page_state: dict) -> str:
+def _render_node(
+    node: IRNode,
+    *,
+    current_route: str,
+    route_to_path: dict[str, str],
+    page_state: dict,
+    path: str = "root",
+) -> str:
     if node.type == "Bind":
         return _render_bind(node, page_state=page_state)
 
     if node.type == "Repeat":
         return _render_repeat(
-            node, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+            node,
+            current_route=current_route,
+            route_to_path=route_to_path,
+            page_state=page_state,
+            path=path,
         )
 
     if node.type == "Show":
         return _render_show(
-            node, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+            node,
+            current_route=current_route,
+            route_to_path=route_to_path,
+            page_state=page_state,
+            path=path,
         )
 
     tag = _tag_for(node)
@@ -251,13 +348,18 @@ def _render_node(node: IRNode, *, current_route: str, route_to_path: dict[str, s
         route_to_path=route_to_path,
         page_state=page_state,
         node_type=node.type,
+        path=path,
     )
 
     if tag in VOID_TAGS:
         return f"<{tag}{attrs} />"
 
     inner = _render_children(
-        node.children, current_route=current_route, route_to_path=route_to_path, page_state=page_state
+        node.children,
+        current_route=current_route,
+        route_to_path=route_to_path,
+        page_state=page_state,
+        path=path,
     )
     return f"<{tag}{attrs}>{inner}</{tag}>"
 
@@ -269,6 +371,8 @@ def _render_page(
     *,
     site_lang: str,
     app_shell: bool = False,
+    strict_csp: bool = True,
+    trusted_script_origins: list[str] | None = None,
 ) -> str:
     """
     `app_shell` (htmx-4, docs/Backends/REFACTOR-INDEX.md row 9):
@@ -298,6 +402,14 @@ def _render_page(
        marker first and falls back to the `<body>` attribute, so it
        handles both shapes without needing to know `app_shell` was
        set.
+
+    `strict_csp`/`trusted_script_origins` (runtime policy enforcement,
+    `arklight/backend/html/csp.py`): `Site(strict_csp=..., trusted_
+    script_origins=...)`'s straight passthrough. `strict_csp` defaults
+    to `True` -- unlike every other default in this docstring, that is
+    new output for an unconfigured site (one more `<head>` `<meta>`
+    tag), not a byte-for-byte-unchanged default; see `WebsiteIR.
+    strict_csp`'s comment (arklight/ir/build.py) for why.
     """
     title = page.root.props.get("title", site_name)
     lang = page.root.props.get("lang", site_lang)
@@ -311,7 +423,15 @@ def _render_page(
     # stay separate in the JSON hydration blob).
     render_state = {**page.state, **page.computed_initial}
     body_inner = _render_children(
-        page.root.children, current_route=page.route, route_to_path=route_to_path, page_state=render_state
+        page.root.children,
+        current_route=page.route,
+        route_to_path=route_to_path,
+        page_state=render_state,
+        # Matches `arklight/ir/validate.py`'s `validate_page`, which roots
+        # this same page's validation path at `f"page:{route}"` -- same
+        # convention, same route-qualified root, so a path in this stage's
+        # notices reads the same way a path in a build-failure message does.
+        path=f"page:{page.route}",
     )
     stylesheet_href = _relative_asset_path(
         STYLESHEET_PATH, current_route=page.route, route_to_path=route_to_path
@@ -371,23 +491,67 @@ def _render_page(
         if page.persist:
             persist_json = escape(json.dumps(page.persist), quote=True)
             persist_attr = f' data-ark-persist="{persist_json}"'
+        # `v0.063` (docs/version history/v0.063.md): `page.media` rides
+        # along as its own `data-ark-media` attribute, same reasoning
+        # as `data-ark-persist` above -- `[name, query]` pairs, no
+        # value of their own (`state_json` above already carries this
+        # key's server-rendered-guess initial value), read by
+        # `initState()` (`arklight/backend/js/runtime/state.py`) to
+        # override that guess with the real `matchMedia(query).matches`
+        # and keep it live after that. A page can only ever have
+        # `page.media` non-empty when `page.state` is too (`media=`
+        # only exists as a prop on a `State(...)` node), so it's always
+        # safe to place all five attributes on the same marker.
+        media_attr = ""
+        if page.media:
+            media_json = escape(json.dumps(page.media), quote=True)
+            media_attr = f' data-ark-media="{media_json}"'
+        # `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md):
+        # `page.query` rides along as its own `data-ark-query`
+        # attribute, same reasoning as `data-ark-media` above --
+        # `[name, param, type_tag, history_mode]` tuples, no value of
+        # their own (`state_json` above already carries this key's
+        # server-rendered initial value), read by `initState()`
+        # (`arklight/backend/js/runtime/state.py`) to override that
+        # value from `URLSearchParams(location.search)`, keep it live
+        # across `popstate` (`arklight/backend/js/runtime/query.py`),
+        # and write it back out via `history.replaceState`/
+        # `pushState` on every change. A page can only ever have
+        # `page.query` non-empty when `page.state` is too (`query=`
+        # only exists as a prop on a `State(...)` node), so it's
+        # always safe to place all six attributes on the same marker.
+        query_attr = ""
+        if page.query:
+            query_json = escape(json.dumps(page.query), quote=True)
+            query_attr = f' data-ark-query="{query_json}"'
         if app_shell:
             state_marker = (
                 f'<div id="ark-state" data-ark-state="{state_json}"'
-                f"{computed_attr}{watch_attr}{persist_attr} hidden></div>\n"
+                f"{computed_attr}{watch_attr}{persist_attr}{media_attr}{query_attr} hidden></div>\n"
             )
         else:
             body_attr_parts.append(
-                f' data-ark-state="{state_json}"{computed_attr}{watch_attr}{persist_attr}'
+                f' data-ark-state="{state_json}"{computed_attr}{watch_attr}'
+                f"{persist_attr}{media_attr}{query_attr}"
             )
     if app_shell:
         body_attr_parts.append(' hx-boost="true"')
     body_attrs = "".join(body_attr_parts)
+    # Runtime policy enforcement (arklight/backend/html/csp.py):
+    # charset stays the very first <head> tag (browsers sniff it before
+    # anything else), so CSP is the very next one -- applied as early as
+    # possible, before the stylesheet link or any other tag. Empty
+    # string when `strict_csp=False` (Site(strict_csp=False), the
+    # general escape valve -- see csp.py's module docstring), so a
+    # site that opts out gets exactly today's tag set back, byte for
+    # byte.
+    csp_meta = _render_csp_meta_tag(trusted_script_origins) if strict_csp else ""
     return (
         "<!DOCTYPE html>\n"
         f'<html lang="{escape(str(lang), quote=True)}">\n'
         "<head>\n"
         '  <meta charset="utf-8">\n'
+        f"{csp_meta}"
         '  <meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"  <title>{escape(str(title))}</title>\n"
         f'  <link rel="stylesheet" href="{escape(stylesheet_href, quote=True)}">\n'

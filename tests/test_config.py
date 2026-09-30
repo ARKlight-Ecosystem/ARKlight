@@ -52,3 +52,167 @@ def test_section_merges_project_values_over_defaults():
 def test_section_raises_when_section_not_a_dict():
     with pytest.raises(ConfigError):
         section({"live_streaming": "nope"}, "live_streaming", {})
+
+
+def test_section_experimental_heavy_reliance_nudge_defaults_true():
+    assert section({}, "experimental", {"heavy_reliance_nudge": True}) == {
+        "heavy_reliance_nudge": True
+    }
+
+
+def test_section_experimental_heavy_reliance_nudge_can_be_disabled():
+    config = {"experimental": {"heavy_reliance_nudge": False}}
+    merged = section(config, "experimental", {"heavy_reliance_nudge": True})
+    assert merged == {"heavy_reliance_nudge": False}
+
+
+# --- warnings for names that match nothing; live_streaming validation --------
+
+from arklight.config import (  # noqa: E402
+    _KNOWN_KEYS,
+    _KNOWN_SECTIONS,
+    config_warnings,
+    emit_config_warnings,
+    validate_live_streaming,
+)
+
+
+def _write_config(tmp_path, body: str) -> None:
+    (tmp_path / "arklight.config.py").write_text(body, encoding="utf-8")
+
+
+def test_a_correct_config_produces_no_warnings(tmp_path):
+    # `main` note: `alpha`'s own version of this test also includes an
+    # `"android": {...}` section -- dropped here since `android` is not
+    # a known config section on `main` (standing Android-exclusion
+    # policy; see `docs/syncing main with alpha branch/`), so including
+    # it would make `config_warnings` correctly flag it as unknown and
+    # break this test's own "no warnings" assertion.
+    _write_config(
+        tmp_path,
+        'CONFIG = {"live_streaming": {"port": 9001}, "csp": {"strict_csp": True}, '
+        '"rei": {"default_mode": "plain"}, '
+        '"overdrive": True}\n',
+    )
+    assert config_warnings(load_config(tmp_path), tmp_path) == []
+
+
+def test_unknown_section_warns_with_a_suggestion(tmp_path):
+    _write_config(tmp_path, 'CONFIG = {"live_streamin": {"port": 9001}}\n')
+    (message,) = config_warnings(load_config(tmp_path), tmp_path)
+    assert "unknown section 'live_streamin'" in message
+    assert "Did you mean 'live_streaming'?" in message
+
+
+def test_unknown_key_in_a_known_section_warns_with_a_suggestion(tmp_path):
+    _write_config(tmp_path, 'CONFIG = {"live_streaming": {"prot": 9001}}\n')
+    (message,) = config_warnings(load_config(tmp_path), tmp_path)
+    assert "unknown key 'prot' in section 'live_streaming'" in message
+    assert "Did you mean 'port'?" in message
+
+
+def test_the_overdrive_top_level_flag_is_never_flagged_as_an_unknown_section(tmp_path):
+    _write_config(tmp_path, 'CONFIG = {"overdrive": True}\n')
+    assert config_warnings(load_config(tmp_path), tmp_path) == []
+
+
+def test_unknown_names_are_still_passed_through_not_rejected(tmp_path):
+    """Forward compatibility is unchanged: warn, never fail or drop."""
+    _write_config(tmp_path, 'CONFIG = {"from_the_future": {"x": 1}}\n')
+    config = load_config(tmp_path)
+    assert config == {"from_the_future": {"x": 1}}
+    assert len(config_warnings(config, tmp_path)) == 1
+
+
+@pytest.mark.parametrize(
+    "name", ["config.js", "config.ts", "arklight.config.json", "arklight.config.toml"]
+)
+def test_a_foreign_config_file_without_arklight_config_py_warns(tmp_path, name):
+    (tmp_path / name).write_text("{}", encoding="utf-8")
+    (message,) = config_warnings(load_config(tmp_path), tmp_path)
+    assert name in message and "arklight.config.py" in message
+
+
+def test_a_foreign_config_file_is_quiet_when_a_real_config_exists(tmp_path):
+    _write_config(tmp_path, "CONFIG = {}\n")
+    (tmp_path / "config.js").write_text("{}", encoding="utf-8")
+    assert config_warnings(load_config(tmp_path), tmp_path) == []
+
+
+def test_emit_config_warnings_prints_to_stderr(tmp_path, capsys):
+    _write_config(tmp_path, 'CONFIG = {"nope": {}}\n')
+    emit_config_warnings(load_config(tmp_path), tmp_path)
+    err = capsys.readouterr().err
+    assert err.startswith("ARKlight warning: arklight.config.py: unknown section 'nope'")
+
+
+def test_known_key_table_matches_the_readers_own_defaults():
+    """The table is hand-maintained; this stops it drifting from the
+    modules that actually read each section.
+
+    `main` note: `alpha`'s own version of this test also checks the
+    `android`/`desktop` entries (`arklight.cli.android`/`desktop`).
+    Those backends are excluded from `main` as standing policy, so
+    `_KNOWN_KEYS` has no `"android"`/`"desktop"` entries to check here
+    -- only the `live_streaming` assertions apply.
+    """
+    from arklight.cli import live_streaming
+
+    assert _KNOWN_KEYS["live_streaming"] == {"host", "port", "poll_interval"}
+    assert live_streaming._DEFAULT_PORT and live_streaming._DEFAULT_HOST
+    assert set(_KNOWN_KEYS) <= _KNOWN_SECTIONS
+
+
+_GOOD_LIVE = {"host": "127.0.0.1", "port": 8347, "poll_interval": 0.5}
+
+
+def test_validate_live_streaming_accepts_the_defaults():
+    validate_live_streaming(dict(_GOOD_LIVE))
+
+
+@pytest.mark.parametrize("port", ["9001", 99999, 0, -1, True, 8347.5, None])
+def test_validate_live_streaming_rejects_a_bad_port(port):
+    with pytest.raises(ConfigError, match=r"\['port'\]` must be an integer from 1 to 65535"):
+        validate_live_streaming({**_GOOD_LIVE, "port": port})
+
+
+@pytest.mark.parametrize("host", ["", "  ", 5, None])
+def test_validate_live_streaming_rejects_a_bad_host(host):
+    with pytest.raises(ConfigError, match=r"\['host'\]` must be a non-empty string"):
+        validate_live_streaming({**_GOOD_LIVE, "host": host})
+
+
+@pytest.mark.parametrize("interval", [0, -1, "1", True, float("inf"), float("nan")])
+def test_validate_live_streaming_rejects_a_bad_poll_interval(interval):
+    with pytest.raises(ConfigError, match=r"\['poll_interval'\]` must be a positive number"):
+        validate_live_streaming({**_GOOD_LIVE, "poll_interval": interval})
+
+
+@pytest.mark.xfail(
+    reason=(
+        "`arklight.cli.live_streaming` doesn't call `validate_live_streaming` "
+        "yet -- a bad port currently falls through to the CLI's generic "
+        "unexpected-error handler instead of this clean message. Wiring "
+        "`live_streaming.py` up to the validator it's tested against here "
+        "is `cli/live_streaming.py` work -- explicitly Stage 10 scope "
+        "(`docs/syncing main with alpha branch/MAIN TO ALPHA V0.070.md`), "
+        "not this stage's. `validate_live_streaming` itself is fully "
+        "covered and green (see the tests above)."
+    ),
+    strict=True,
+)
+def test_live_streaming_command_reports_a_bad_port_instead_of_crashing(tmp_path, capsys):
+    from arklight.cli.main import main
+
+    (tmp_path / "site.py").write_text(
+        "# include <stdlib.ARKlight>\nsite = Site()\n"
+        '@site.page("/")\ndef home():\n    return Page(Heading("x"))\n'
+    )
+    _write_config(tmp_path, 'CONFIG = {"live_streaming": {"port": "9001"}}\n')
+
+    code = main(["live-streaming", "--subscribe", str(tmp_path / "site.py")])
+
+    assert code == 1
+    err = capsys.readouterr().err
+    assert "must be an integer from 1 to 65535" in err
+    assert "unexpected error" not in err

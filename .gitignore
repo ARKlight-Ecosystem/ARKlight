@@ -8,3 +8,4 @@ build/
 *.patch
 *.bundle
 *.txt
+ARK/

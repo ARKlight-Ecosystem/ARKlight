@@ -49,6 +49,30 @@ go-ahead before implementation starts on any of these:
   stage already reads from. Read-only reflection, no new data format.
 - **`arklight --help`** -- standard CLI usage/help text.
 
+## v0.070 catch-up, Stage 9 of 14: compiler hardening & supply-chain tooling (DONE, code)
+
+Ported `arklight/compiler/{asset_check,link_check,overdrive,sbom}.py`,
+`arklight/ir/binary.py`, `arklight/backend/script_extension.py`, and
+`arklight/backend/html/csp.py` from `alpha`'s `0df63e7`, per
+`docs/syncing main with alpha branch/MAIN TO ALPHA V0.070.md`. This is
+the stage that lands `ir/binary.py` -- **`import arklight` finally
+succeeds**, closing the gap every prior v0.070 stage since Stage 5 had
+to flag and defer.
+
+`arklight/capabilities.py` (the ACC/entry-point capability-discovery
+module `sbom.py` optionally lists installed packages from) is
+`alpha`-only and deliberately not carried over; `sbom.py`/
+`test_sbom.py` land with that one section trimmed out, everything else
+intact. Full details, every scope gap found and fixed along the way
+(`attrs.py`/`page_render.py`/`routing.py`/`head_meta.py`/`render.py`
+integration wiring, a real favicon/og_image URL-mangling bug, a
+recurring `CHANNEL` regression), and the complete triage of the ~86
+test failures this stage's working `import arklight` newly exposed in
+*other*, already-"ported" stages (all deferred to Stage 10's CLI
+wiring or Stage 14's full-verification pass, none caused by this
+stage) are in that plan doc's status table and this stage's patch
+notes.
+
 ## Docs reorg fix + Stage 8/9 verification (DONE)
 
 The v0.041 "docs reorg" commit had moved `CHANGELOG.md` into

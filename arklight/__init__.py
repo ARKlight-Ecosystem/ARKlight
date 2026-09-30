@@ -195,7 +195,7 @@ except PackageNotFoundError:  # pragma: no cover -- only when running from
 # checkout -- same one-line-per-branch discipline as every other
 # branch-specific constant in this file (mirrors `main`'s copy, set to
 # `"main"` there).
-CHANNEL = "alpha"
+CHANNEL = "main"
 
 __all__ = [
     "Site",

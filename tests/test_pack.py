@@ -109,7 +109,7 @@ def test_pack_plain_opt_out_produces_a_real_zip_tail(tmp_path):
     with zipfile.ZipFile(bundle_path) as zf:
         assert zf.testzip() is None
         names = set(zf.namelist())
-        assert names == {"index.html", "about.html", "styles.css", "arklight.js"}
+        assert names == {"index.html", "about.html", "styles.css", "arklight.js", "sbom.txt"}
         # The zip's copy of index.html is the *original*, un-inlined
         # build output -- extracting it should work exactly like a
         # normal `arklight build` folder.
@@ -168,7 +168,7 @@ def test_unpack_roundtrips_a_sealed_embedded_key_bundle(tmp_path):
 
     assert result.was_sealed is True
     assert set(result.extracted_paths) == {
-        "index.html", "about.html", "styles.css", "arklight.js", "assets/logo.png",
+        "index.html", "about.html", "styles.css", "arklight.js", "sbom.txt", "assets/logo.png",
     }
     assert (restored_dir / "index.html").exists()
     assert (restored_dir / "assets" / "logo.png").read_bytes() == b"\x89PNG fake"

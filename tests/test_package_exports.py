@@ -6,7 +6,7 @@ etc.) -- those were defined in `arklight/api.py` and reachable via
 the documented way users are told to import everything. Found while
 building the `production` scaffold template for `arklight new`, whose
 generated site.py relies on `from arklight import *` exclusively (see
-docs/DESIGN-NOTES.md, "v0.004: CLI scaffolding").
+docs/Foundational/DESIGN-NOTES.md, "v0.004: CLI scaffolding").
 """
 
 import arklight
