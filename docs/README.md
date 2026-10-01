@@ -54,6 +54,7 @@ record for the project, updated in place rather than removed.
 | [`PLATFORM-APIS.md`](Foundational/PLATFORM-APIS.md) | Settled design record for the platform API interface layer (`PlatformAPI.notify`/`.clipboard_write`, `v0.065`): terminology, compiler-owns-interface/backend-owns-implementation, Web-as-default, native-implementations-are-earned. |
 | [`ACC-CAPABILITIES.md`](Foundational/ACC-CAPABILITIES.md) | Settled design record for `arklight/capabilities.py`, the ACC (ARKlight Component Collections) capability-discovery hook -- the `arklight.capabilities` entry-point contract, diagnostics, and status against ACC's own five-stage implementation ladder. |
 | [`PROVIDER-SDK.md`](Foundational/PROVIDER-SDK.md) | Settled design record for `Provider` (`v0.065`-`v0.070`, six-rung ladder now fully SHIPPED) -- the barebones external-service interface, the finalized capability vocabulary plus its `custom:`-prefixed escape hatch, external script loading, and scope boundaries. |
+| [`CAPABILITY-MATRIX.md`](Foundational/CAPABILITY-MATRIX.md) | Every input/state/platform capability an interactive page might want -- Shipped, Planned, Excluded, Deferred, or Gap, and why. Not a feature-parity chart: a row earns a place only by passing the forcing-case filter in `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`. |
 
 ### [`docs/Backends/`](Backends/README.md) — working reference
 
