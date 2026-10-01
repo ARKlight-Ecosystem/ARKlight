@@ -5,6 +5,31 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: `v0.071` Input & Platform Primitives addendum + Capability Matrix
+
+**Added, docs only, no code.** Two dogfooding reports from
+Notepad-class apps elsewhere in the org (a text-caret-and-shortcuts
+editor, a KaiOS-style keypad target) converged on the same six gaps.
+Both are now accepted and staged, not yet built:
+
+- `docs/Foundational/CAPABILITY-MATRIX.md` (new): every input/state/
+  platform capability an interactive page might want, marked Shipped,
+  Planned, Excluded, Deferred, or Gap, with a reason for each -- not a
+  feature-parity chart (`SYSTEM-DESIGN-AGREEMENTS.md` section 17).
+- `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`
+  (new): the six-stage landing order for the rows that cleared the
+  forcing-case bar -- `Watch`/`on_click`/`on_reveal` with more than one
+  effect; `on_key=` (element-scoped) and `Hotkey(...)` (page-scoped)
+  key events; `State(..., selection=...)` plus `Derive.line_number`/
+  `Derive.column_number`; and two new `PlatformAPI` registry entries,
+  file open/save (text only, user-mediated) and a `confirm` dialog.
+  Shares the `v0.071` milestone slot with the already-accepted
+  `PROJECT-KNOWLEDGE-ADDENDUM.md` (`v0.071`-`v0.078`) -- same
+  interleaved-work-sharing-a-slot precedent as `v0.041`/`v0.065`.
+- `docs/README.md`, `docs/Foundational/README.md`,
+  `docs/Implementation/README.md`: index rows added for both new
+  files.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- `PlatformAPI.db`: local key/value storage (IndexedDB on Web, SQLite on Android)
 
 **Added.** One author-facing platform API, `PlatformAPI.db`, for persistent
