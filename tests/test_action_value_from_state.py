@@ -260,7 +260,7 @@ def test_watch_blob_carries_the_marker():
             Watch("draft", then=Action.set("last", Bind("draft"))),
         )
     )
-    assert ir.pages[0].watch[0]["then"]["args"] == {"value": {STATE_REF_KEY: "draft"}}
+    assert ir.pages[0].watch[0]["then"][0]["args"] == {"value": {STATE_REF_KEY: "draft"}}
     json.dumps(ir.pages[0].watch)  # serializable, no raw node anywhere
 
 
@@ -380,12 +380,12 @@ def test_node_watch_resolves_state_marker_at_dispatch_time_and_never_mutates_the
     {_STORE_STUB}
     {WIRE_WATCHERS_JS}
     var store = createState({{ src: "a", log: [] }});
-    var specs = [{{ name: "src", then: {{ action: "append", state: "log", args: {{ value: {{ "{STATE_REF_KEY}": "src" }} }} }} }}];
+    var specs = [{{ name: "src", then: [{{ action: "append", state: "log", args: {{ value: {{ "{STATE_REF_KEY}": "src" }} }} }}] }}];
     wireWatchers(store, specs);
     store.set("src", "b");
     store.set("src", "c");
     console.log(JSON.stringify(store.get("log")));
-    console.log(JSON.stringify(specs[0].then.args));
+    console.log(JSON.stringify(specs[0].then[0].args));
     """
     lines = _run_node(script).splitlines()
     # Each dispatch reads the value *then*; the second isn't stuck on the first.
