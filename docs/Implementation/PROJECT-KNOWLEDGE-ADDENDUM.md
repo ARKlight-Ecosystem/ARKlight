@@ -1,6 +1,7 @@
 # Project Knowledge Addendum: Staged Order, v0.071 -> v0.078
 
-**Status:** PLANNED -- stages 1-8 (`v0.071`-`v0.078`) not yet started.
+**Status:** IN PROGRESS -- stage 1 (`v0.071`) SHIPPED; stages 2-8
+(`v0.072`-`v0.078`) not yet started.
 This file turns the accepted
 [`PROJECT-KNOWELEDGE-PROPOSAL.md`](../Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md) into a
 trackable, eight-rung landing order, the same role
@@ -72,7 +73,7 @@ ladder follows the same shape, in the exact order the proposal's own
 
 ## The ladder
 
-### v0.071 -- `.arklight/` foundation
+### v0.071 -- `.arklight/` foundation (SHIPPED)
 
 Proposal §19, stage 1. Detect-or-create the directory, establish a
 minimal knowledge-format marker (`knowledge_format=1`, per §17), and
@@ -80,6 +81,11 @@ provide safe read/write helpers. The format stays human-readable
 (§4/§17) and nothing in the compiler depends on the directory's
 presence yet -- deleting it must be a no-op for buildability, per the
 proposal's core invariant (§2, §21.3).
+
+Shipped as the `arklight/knowledge/` package -- `KnowledgeStore`
+(`ensure()`/`status()`/`read()`/`write()`), still imported by nothing
+in the compiler. See `docs/version history/v0.071.md` for what it does
+and refuses to do.
 
 ### v0.072 -- Project Knowledge context
 
@@ -145,7 +151,7 @@ being predetermined now.
 
 | Stage | Covers | Status |
 | --- | --- | --- |
-| v0.071 | `.arklight/` foundation | PLANNED |
+| v0.071 | `.arklight/` foundation | SHIPPED (package version not yet bumped -- shares its slot) |
 | v0.072 | Project Knowledge context | PLANNED |
 | v0.073 | Git provider | PLANNED |
 | v0.074 | Persistent project context | PLANNED |

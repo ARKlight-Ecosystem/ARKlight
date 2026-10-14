@@ -89,6 +89,11 @@ arklight-framework/
                         vocabulary, `custom:`-prefixed escape hatch);
                         six-rung ladder fully SHIPPED as of `v0.070` --
                         see docs/Foundational/PROVIDER-SDK.md
+    knowledge/         Project Knowledge -- `KnowledgeStore`, the
+                        compiler-owned `.arklight/` directory (format
+                        marker, safe read/write helpers). Stage 1 of 8
+                        (`v0.071`); nothing in the compiler uses it yet
+                        -- see docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md
     ast/               ARK AST node type (ARKNode)
     parser/            Python Source -> Python AST -> (loaded) ARK AST
     ir/                Normalization, Validation, Website IR

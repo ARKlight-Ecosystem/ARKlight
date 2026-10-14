@@ -5,6 +5,51 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.071`: Project Knowledge stage 1 of 8, the `.arklight/` foundation
+
+**Added.** The directory and nothing else. `arklight/knowledge/` (new
+package) gives later Project Knowledge stages a safe way to keep derived,
+plain-text facts in a project-local `.arklight/` directory:
+
+```python
+from arklight.knowledge import KnowledgeStore
+
+store = KnowledgeStore(project_root)
+store.ensure()                       # create .arklight/ + PROJECT (knowledge_format=1)
+store.write("BUILD", {"last_result": "success"})
+store.read("BUILD")                  # {"last_result": "success"}
+```
+
+- `KnowledgeStore.ensure()`/`status()`/`read()`/`write()`; files are UTF-8
+  `key=value` lines (`#` comments), nestable (`"KNOWLEDGE/COMPONENTS"`).
+  `status()` reports `ABSENT`, `UNUSABLE`, `UNMARKED`, `CORRUPT`,
+  `CURRENT`, `OUTDATED` or `INCOMPATIBLE`; `ensure()` only ever creates and
+  leaves any existing, non-current directory exactly as found.
+- Treated as untrusted input (a cloned repo can ship its own): symlinks
+  are refused rather than followed, names cannot escape the directory,
+  writes are atomic, files over 1 MiB are refused, and nothing is written
+  into a directory of a different format.
+- Failures raise `KnowledgeError` (callers are to carry on without
+  persistent knowledge); caller mistakes raise plain `ValueError`/
+  `TypeError`.
+
+**Behavior change worth knowing: none.** Nothing in the compiler imports
+the package, so a build does not create, read or depend on `.arklight/`,
+and its output is byte-identical with the directory absent, populated or
+corrupt. Not exported from `arklight`.
+
+**Not included.** The providers/facts/observations abstraction (`v0.072`),
+Git (`v0.073`), persistence (`v0.074`), build history (`v0.075`),
+diagnostics (`v0.076`), observations (`v0.077`); any `.gitignore` handling
+or decision on when the directory is created during a build (proposal §20
+open questions). `pyproject.toml`'s version is unchanged -- the slot is
+shared with the still-PLANNED Input & Platform Primitives addendum.
+
+**Tests.** `tests/test_project_knowledge_v0071.py` (135 tests).
+Docs: `docs/version history/v0.071.md`,
+`docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md`, `PROGRESS.md`,
+`docs/Foundational/ARCHITECTURE.md` and `GETTING-STARTED.md` updated.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: `v0.071` Input & Platform Primitives addendum + Capability Matrix
 
 **Added, docs only, no code.** Two dogfooding reports from

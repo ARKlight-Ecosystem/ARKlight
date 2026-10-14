@@ -107,7 +107,8 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | (docs audit, part 3) | Docs-only: full drift re-audit -- checked `EXPERIMENTAL-APIS.md`/`DEPLOYMENT-CLI.md`/`PLATFORM-APIS.md`/`ARCHITECTURE.md` against their code/PROGRESS.md sources of truth (all clean); found and fixed one self-inflicted regression from the previous pass -- `docs/Foundational/README.md`'s index row for `AUTHORING-GUIDE.md` hadn't been updated to mention the new `Provider` section. No code changed; out-of-band, no roadmap slot | DONE |
 | (docs audit, part 2) | Docs-only: `docs/Foundational/AUTHORING-GUIDE.md` rewritten -- component-vocabulary section redone as a flat, function-grouped, user-facing reference (not a shipping-history lesson), a missing `Provider` section added, and a top-of-file version/commit provenance note added. No code changed; out-of-band, no roadmap slot | DONE |
 | (docs audit) | Docs-only: repository-layout drift fix -- `arklight/provider.py` added to `docs/Foundational/GETTING-STARTED.md`'s repository-layout tree (was missing despite `Provider`'s six-rung ladder being fully SHIPPED as of `v0.070`); everything else audited (doc-link/citation tests, CLI-REFERENCE vs. `--help`, full test suite, version-history PLANNED markers, `pyproject.toml` vs. `CHANGELOG.md`) came back clean. No code changed; out-of-band, no roadmap slot | DONE |
-| v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` | PLANNED |
+| v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` Stage 1 (`v0.071`, the `.arklight/` foundation) is SHIPPED -- see the `v0.071` row below; stages 2-8 are PLANNED | IN PROGRESS |
+| v0.071 **(draft -- version slot unconfirmed)** | Project Knowledge, stage 1 of 8: the `.arklight/` foundation -- `arklight/knowledge/` (new package), `KnowledgeStore(project_root)` with `ensure()` (detect-or-create the directory and its `PROJECT` marker, `knowledge_format=1`), `status()` (`ABSENT`/`UNUSABLE`/`UNMARKED`/`CORRUPT`/`CURRENT`/`OUTDATED`/`INCOMPATIBLE`), and `read(name)`/`write(name, facts)` -- plain UTF-8 `key=value` text, atomic writes, symlinks and out-of-directory names refused, 1 MiB cap, no writes into a non-current-format directory. Nothing in the compiler imports it: a build neither creates nor depends on `.arklight/`, and output is byte-identical with it absent, populated or corrupt. `tests/test_project_knowledge_v0071.py` (135 tests). `pyproject.toml` version not bumped -- the slot is shared with the still-PLANNED Input & Platform Primitives addendum | DONE |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
@@ -140,6 +141,76 @@ go-ahead before implementation starts on any of these:
   tier `docs/Far Future Concern/WINDOWS-PHONE-BACKEND.md`'s Windows
   Phone/UWP backend already sits at: a written, plausible design with
   no roadmap commitment behind it.
+
+## v0.071 -- Project Knowledge, stage 1 of 8: the `.arklight/` foundation (DONE)
+
+First rung of `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md`
+(proposal §19, stage 1). The slot is shared with the Input & Platform
+Primitives addendum, which has not started, so the package version in
+`pyproject.toml` is deliberately unchanged (`0.070.0`) -- closing a shared
+slot is the maintainer's call, same as `v0.06514`.
+
+**What went in.** `arklight/knowledge/store.py` and its `__init__.py`:
+`KnowledgeStore(project_root)`; `ensure()`, `status()`, `read(name)`,
+`write(name, facts, header=...)`; `KnowledgeStatus`, `KnowledgeError`
+(+ `KnowledgeFormatError`, `KnowledgeStateError`); and
+`parse_knowledge_text`/`render_knowledge_text`. Nothing else in the
+compiler changed -- no import, no CLI flag, no config key.
+
+**Decisions recorded.**
+1. **One marker file, `PROJECT`, `knowledge_format=1`.** The proposal's
+   §20 asks "one file per category or one structured file"; the layout in
+   its §4 is one file per category, so that is what the helpers support
+   (`"BUILD"`, `"KNOWLEDGE/COMPONENTS"`). The serialization is `key=value`
+   lines because §4's own examples are exactly that and an ordinary editor
+   is the only tool §4 requires.
+2. **Statuses instead of exceptions for "bad directory".** `status()`
+   returns `ABSENT`/`UNUSABLE`/`UNMARKED`/`CORRUPT`/`CURRENT`/`OUTDATED`/
+   `INCOMPATIBLE` -- §17's "current, readable but outdated, incompatible,
+   safely regeneratable" -- so a later stage can decide what to do about
+   each. Stage 1 only *reports*: `ensure()` creates a missing directory or
+   missing marker and never touches anything else. Regeneration (§17's
+   preferred recovery) is left to the stages that have something to
+   regenerate.
+3. **`.arklight/` is untrusted input.** A cloned repo can ship its own,
+   including a symlink to somewhere the compiler should not write. So the
+   directory and every component under it must be real (checked with
+   `lstat`), names are validated so they cannot leave it, files over 1 MiB
+   are refused, and nothing is written into a non-current-format directory.
+4. **Two error families on purpose.** Problems with the directory raise
+   `KnowledgeError` (callers: "carry on without it", proposal §14). Caller
+   mistakes raise plain `ValueError`/`TypeError`, so an `except
+   KnowledgeError` meant to keep a build non-fatal can never swallow a bug.
+5. **`write()` creates the directory lazily.** That is a helper
+   convenience, not an answer to §20's "automatically on every build, or
+   only when a feature needs it". Nothing calls it yet. Also unanswered,
+   and untouched: whether ARKlight adds `.arklight/` to `.gitignore`.
+6. **Not exported from `arklight`.** Compiler infrastructure, not
+   authoring vocabulary; a site file never needs it.
+
+**A bug the tests caught on the way.** The first draft validated keys and
+file names with `^...$`, and `$` also matches just before a trailing
+newline, so `"BUILD\n"` passed as a file name and `"k\n"` as a key. Now
+`\Z`; both are in the tests.
+
+**Verification.** `tests/test_project_knowledge_v0071.py` (135 tests):
+the text format, every status, read/write safety (symlinked directory,
+subdirectory, file and marker; oversize; non-UTF-8; atomic swap failure;
+name traversal), and the stage's central promise -- the same site built
+with `.arklight/` absent, populated, and hostile (`knowledge_format=99`
+plus garbage) produces byte-identical output and leaves the directory
+untouched. A guard fails if any other `arklight` module imports the
+package, so wiring it in (`v0.072`) is a deliberate change to that test.
+Seven deliberate breakages of `store.py` (following symlinks, writing into
+a non-current directory, dropping the size cap, last-duplicate-wins,
+allowing a marker overwrite, `ensure()` overwriting a non-current
+directory, dropping the intermediate-symlink check) each fail at least one
+test. Full suite: 3329
+passed, 1 skipped, 1 failed -- the failure,
+`test_scaffold.py::test_production_projects_own_tests_pass`, is
+environmental (it runs a scaffolded project's own tests, which needs
+ARKlight pip-installed past the license gate) and fails identically on an
+untouched `alpha` checkout.
 
 ## Version scheme migrated to `0.MMM.PP` (DONE)
 
