@@ -13,15 +13,18 @@ from a `store.subscribe` callback instead of a click listener.
 
 `wireWatchers(store, specs)` is called once, from `initState()`
 (`arklight/backend/js/runtime/state.py`), with the page's freshly
-constructed store and the `data-ark-watch` JSON blob
-(`IRPage.watch`, `[{"name": ..., "then": {"action": ..., "state": ...,
-"args": {...}, "modifiers": [...]}}, ...]`) already parsed. It
-snapshots each watched name's current value, then registers one more
-`store.subscribe` listener alongside the existing `renderBindings`/
-`renderClassBindings` pair: on every notification it re-reads each
-watched name and, for any that actually changed since the last
-snapshot, updates the snapshot *before* dispatching that watch's
-`then` action.
+constructed store and the `data-ark-watch` JSON blob (`IRPage.watch`,
+`[{"name": ..., "then": [{"action": ..., "state": ..., "args": {...},
+"modifiers": [...]}, ...]}, ...]`) already parsed. `then` is always a
+list -- a `Watch(..., then=Action.set(...))` with a single action
+compiles to a one-entry list, and `then=(Action.set(...), Action.
+set(...))` to a two-entry one; both run through the same loop below,
+in the order given. It snapshots each watched name's current value,
+then registers one more `store.subscribe` listener alongside the
+existing `renderBindings`/`renderClassBindings` pair: on every
+notification it re-reads each watched name and, for any that actually
+changed since the last snapshot, updates the snapshot *before*
+dispatching that watch's `then` action(s).
 
 Updating the snapshot before dispatch (not after) is deliberate, not
 incidental: `store.set`'s `listeners.forEach` call is synchronous, so
@@ -46,13 +49,13 @@ watchers behave the same way).
 at all: they're a *click-timing* concern (coalescing rapid clicks on
 one element), which has no equivalent for a state-change subscription
 that already only fires once per actual value change. `ir.validate`
-doesn't restrict a `Watch(...)`'s `then=` from carrying modifiers (the
-same `ActionRef` shape `on_click=` uses), but this fragment simply
-never reads `spec.then.modifiers`, so any present are silently inert
--- consistent with `actions[...]` fragments themselves never touching
-modifier tokens either (`wireClickInterceptor` reads `hx-trigger` at
-the *element* level, upstream of the actual `action(...)` call this
-fragment also makes).
+doesn't restrict any entry in a `Watch(...)`'s `then=` from carrying
+modifiers (the same `ActionRef` shape `on_click=` uses), but this
+fragment simply never reads `thenSpec.modifiers`, so any present are
+silently inert -- consistent with `actions[...]` fragments themselves
+never touching modifier tokens either (`wireClickInterceptor` reads
+`hx-trigger` at the *element* level, upstream of the actual
+`action(...)` call this fragment also makes).
 """
 
 from __future__ import annotations
@@ -67,12 +70,15 @@ WIRE_WATCHERS_JS = """  function wireWatchers(store, specs) {
         var current = store.get(spec.name);
         if (current === last[i]) return;
         last[i] = current;
-        try {
-          var action = actions[spec.then.action];
-          if (!action) return;
-          action(store, spec.then.state, resolveActionArgs(store, spec.then.args || {}));
-        } catch (err) {
-          arkReportError("Something went wrong updating this page -- an unsupported or unexpected case was hit.", err);
+        for (var j = 0; j < spec.then.length; j++) {
+          try {
+            var thenSpec = spec.then[j];
+            var action = actions[thenSpec.action];
+            if (!action) continue;
+            action(store, thenSpec.state, resolveActionArgs(store, thenSpec.args || {}));
+          } catch (err) {
+            arkReportError("Something went wrong updating this page -- an unsupported or unexpected case was hit.", err);
+          }
         }
       });
     });

@@ -794,10 +794,12 @@ def _extract_page_state(
             spec["deps"] = list(child.props.get("deps", ()))
             computed_defs[child.props["name"]] = spec
         elif isinstance(child, ARKNode) and child.type == "Watch":
+            then = child.props["then"]
+            then_actions = then if isinstance(then, tuple) else (then,)
             watch.append(
                 {
                     "name": child.props["name"],
-                    "then": _action_ref_to_spec(child.props["then"]),
+                    "then": [_action_ref_to_spec(action) for action in then_actions],
                 }
             )
         else:
