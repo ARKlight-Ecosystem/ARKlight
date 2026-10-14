@@ -147,12 +147,14 @@ def test_ir_build_watch_then_is_plain_dict_mirror_of_action_ref():
     entry = ir.pages[0].watch[0]
     assert entry == {
         "name": "count",
-        "then": {
-            "action": "set",
-            "state": "doubled",
-            "args": {"value": 0},
-            "modifiers": ["prevent"],
-        },
+        "then": [
+            {
+                "action": "set",
+                "state": "doubled",
+                "args": {"value": 0},
+                "modifiers": ["prevent"],
+            }
+        ],
     }
 
 
@@ -209,7 +211,7 @@ def test_html_render_watch_attribute_round_trips_as_json():
     watch_attr = re.search(r'data-ark-watch="([^"]*)"', html).group(1)
     watch_json = json.loads(unescape(watch_attr))
     assert watch_json == [
-        {"name": "count", "then": {"action": "set", "state": "doubled", "args": {"value": 0}, "modifiers": []}}
+        {"name": "count", "then": [{"action": "set", "state": "doubled", "args": {"value": 0}, "modifiers": []}]}
     ]
 
 

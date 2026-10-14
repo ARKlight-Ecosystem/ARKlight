@@ -1110,7 +1110,9 @@ def _validate_watch_declaration(
     `_validate_action`'s existing checks for `then` (an
     `Action.*(...)` reference is only ever valid against a real
     `State(...)`, never a `Computed(...)` -- the same restriction
-    `on_click=Action.*(...)` already enforces).
+    `on_click=Action.*(...)` already enforces). `then` may also be a
+    non-empty tuple of `Action.*(...)` references (run in the order
+    given) -- each entry gets the same check.
     """
     if not parent_is_page:
         raise ValidationError(
@@ -1129,12 +1131,17 @@ def _validate_watch_declaration(
             f"this page. State/Computed declared on this page: {known}."
         )
     then = node.props.get("then")
-    if not isinstance(then, ActionRef):
+    if isinstance(then, ActionRef):
+        then_actions: tuple[ActionRef, ...] = (then,)
+    elif isinstance(then, tuple) and then and all(isinstance(t, ActionRef) for t in then):
+        then_actions = then
+    else:
         raise ValidationError(
             f"Watch({name!r}) at {path} has then={then!r}, which isn't an "
-            f"Action.*(...) reference."
+            f"Action.*(...) reference or a non-empty tuple of them."
         )
-    _validate_action(then, path=path, mutable_state=mutable_state, page_state=page_state)
+    for action in then_actions:
+        _validate_action(action, path=path, mutable_state=mutable_state, page_state=page_state)
 
 
 def _validate_one_of_values(values: object, *, path: str) -> None:

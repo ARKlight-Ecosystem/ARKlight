@@ -508,7 +508,10 @@ def _collect_usage(
     # whether the *click interceptor* is needed -- a watch effect
     # never involves a click).
     used_watch_actions: set[str] = {
-        entry["then"]["action"] for page in ir.pages for entry in page.watch
+        action_spec["action"]
+        for page in ir.pages
+        for entry in page.watch
+        for action_spec in entry["then"]
     }
     used_actions = used_on_click_actions | used_watch_actions
 

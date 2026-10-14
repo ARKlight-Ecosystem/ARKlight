@@ -1730,7 +1730,7 @@ class Derive:
 # ---------------------------------------------------------------------------
 
 
-def Watch(name: str, *, then: "ActionRef") -> ARKNode:
+def Watch(name: str, *, then: "ActionRef | tuple[ActionRef, ...]") -> ARKNode:
     """
     Declare a page-scoped side effect: whenever the `State(...)`/
     `Computed(...)` named `name` changes value, run `then` -- an
@@ -1740,14 +1740,27 @@ def Watch(name: str, *, then: "ActionRef") -> ARKNode:
         State("fahrenheit", 32)
         Watch("celsius", then=Action.set("fahrenheit", ...))
 
+    `then` may also be a tuple of `Action.*(...)` references, run in
+    the order given, for a change that must do more than one thing:
+
+        Watch("open", then=(
+            Action.set("has_unsaved", False),
+            Action.set("last_closed_at", ...),
+        ))
+
+    A single `ActionRef` (the common case) and a tuple both work; a
+    single-entry call site compiles and runs exactly as before this
+    was added.
+
     Must appear as a direct child of `Page(...)`, same as `State(...)`/
     `Computed(...)` -- a `Watch(...)` is a declaration, not renderable
     content, and is compiled into the Website IR rather than reaching
     any backend as a component. `name` may be a `State(...)` or a
-    `Computed(...)` (anything `Bind(...)` could reference); `then`
-    must target a real `State(...)` on the same page, the same
-    restriction `Action.*(...)` already has when used as `on_click=` --
-    a `Computed(...)` has no independent value of its own to mutate.
+    `Computed(...)` (anything `Bind(...)` could reference); every entry
+    in `then` must target a real `State(...)` on the same page, the
+    same restriction `Action.*(...)` already has when used as
+    `on_click=` -- a `Computed(...)` has no independent value of its
+    own to mutate.
     """
     return ARKNode(
         type="Watch",
