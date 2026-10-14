@@ -107,6 +107,23 @@ PLATFORM_API_REGISTRY: dict[str, PlatformAPISpec] = {
             "Reads write their result into a State(...) named by `into`."
         ),
     ),
+    # Stage 6 of `docs/Implementation/
+    # INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`: a one-shot
+    # native confirm prompt, the same "write the result into a
+    # declared State(...) via `into=`" shape `db`'s reads and
+    # `Action.geolocate` already use -- see that doc's Stage 6 section
+    # for why this stayed its own entry instead of folding into a
+    # broader prompt/alert family.
+    "confirm": PlatformAPISpec(
+        version=1,
+        args=("message", "into"),
+        permissions=(),
+        description=(
+            "Show a native confirm prompt with `message`. Writes the "
+            "boolean result (OK=true, Cancel=false) into a State(...) "
+            "named by `into`."
+        ),
+    ),
 }
 
 KNOWN_PLATFORM_APIS = frozenset(PLATFORM_API_REGISTRY)
