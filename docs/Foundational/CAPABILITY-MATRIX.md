@@ -58,10 +58,10 @@ documented hole with no decision yet.
 ## Platform capabilities
 
 The interface layer is [`PLATFORM-APIS.md`](PLATFORM-APIS.md); the
-registry on this branch holds `notify`, `clipboard_write` and `db`,
-all three implemented on Web, with `db` also earned by Android
-(SQLite behind a narrow, origin-restricted bridge). Desktop implements
-none of the three yet.
+registry on this branch holds `notify`, `clipboard_write`, `db` and
+`confirm`, all four implemented on Web, with `db` also earned by
+Android (SQLite behind a narrow, origin-restricted bridge). Desktop
+implements none of the four yet.
 
 | Capability | Today | `v0.071` | Reason |
 | --- | --- | --- | --- |
@@ -72,7 +72,7 @@ none of the three yet.
 | Local key/value storage (`PlatformAPI.db`) | Shipped (Web, Android) | -- | |
 | Geolocation (`Action.geolocate`) | Shipped | -- | |
 | Open / save a file (user-mediated) | Gap | **Planned** (Stage 5 of 6, Web) | Text only, no paths -- the same user-mediated trust boundary `clipboard_write`/`notify` already sit behind. Replaces a hand-rolled file endpoint one dogfooding project had stood up as a workaround. |
-| Confirm dialog | Gap | **Planned** (Stage 6 of 6, Web) | Guards a destructive action; the weakest forcing case of the six, ordered last so it's the first thing cut if the milestone needs to close early. |
+| Confirm dialog (`PlatformAPI.confirm`) | Shipped (Web) | -- | Stage 6 of 6, the weakest forcing case of the six -- guards a destructive action; see `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`. |
 | Prompt / alert dialogs | Gap | No forcing case | `Input` + `bind_value=` and the in-page notice already exist. |
 | Device info, network status, share sheet | Gap | No forcing case | |
 | Window control, lifecycle events, native menus, tray | Gap | Deferred | Tied to the Android/Desktop backends; neither is far enough along to earn these capabilities yet ([`SYSTEM-DESIGN-AGREEMENTS.md`](SYSTEM-DESIGN-AGREEMENTS.md) section 12). |

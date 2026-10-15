@@ -204,7 +204,7 @@ textbook case a one-shot, user-mediated file dialog exists to serve,
 and replace a hand-rolled server-side file endpoint one of the
 reporting projects had stood up as a workaround.
 
-## Stage 6 -- Confirm dialog (PLANNED, Web -- weakest case, first to cut)
+## Stage 6 -- Confirm dialog (DONE, Web -- weakest case, first to cut)
 
 **The gap.** No dialog primitive of any kind is in the registry; a
 destructive action ("Delete this file?") has no sanctioned way to ask
@@ -236,7 +236,20 @@ later milestone without reopening anything Stages 1-5 already shipped.
 | 3 of 6 | `Hotkey(...)`, page-scoped key events, one delegated `window` listener | PLANNED |
 | 4 of 6 | `State(..., selection=...)` + `Derive.line_number`/`Derive.column_number` | PLANNED |
 | 5 of 6 | Platform API: open/save a file, text only, user-mediated (Web) | PLANNED |
-| 6 of 6 | Platform API: `confirm` dialog (Web) | PLANNED |
+| 6 of 6 | Platform API: `confirm` dialog (Web) | DONE |
+
+**Stage 6 implementation record.** `PLATFORM_API_REGISTRY["confirm"]`
+(`arklight/ir/platform_api.py`) plus `BACKEND_PLATFORM_API_SUPPORT["web"]`
+gaining `"confirm"`; `PlatformAPI.confirm(message, into)` (`arklight/api.py`);
+`_validate_platform_confirm` (`arklight/ir/validate.py`) enforcing a
+non-empty `message` and an `into` that names a declared `State(...)`;
+the Web fragment `arklight/backend/js/platform_apis/confirm.py`
+(`window.confirm`, falling back to `arkNotify` if it isn't callable or
+throws) wired into `PLATFORM_API_MODULES`
+(`arklight/backend/js/platform_apis/__init__.py`) -- dispatched by the
+existing `"platform:"` click-interceptor branch, no runtime changes
+needed. `tests/test_platform_api_confirm.py` (including a Node section
+running the shipped fragment against a stubbed `window.confirm`).
 
 See `docs/Foundational/CAPABILITY-MATRIX.md` for the full space this
 ladder was filtered out of, including the rows that did not clear the

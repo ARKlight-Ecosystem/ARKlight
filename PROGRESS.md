@@ -109,6 +109,7 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | (docs audit) | Docs-only: repository-layout drift fix -- `arklight/provider.py` added to `docs/Foundational/GETTING-STARTED.md`'s repository-layout tree (was missing despite `Provider`'s six-rung ladder being fully SHIPPED as of `v0.070`); everything else audited (doc-link/citation tests, CLI-REFERENCE vs. `--help`, full test suite, version-history PLANNED markers, `pyproject.toml` vs. `CHANGELOG.md`) came back clean. No code changed; out-of-band, no roadmap slot | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` Stage 1 (`v0.071`, the `.arklight/` foundation) is SHIPPED -- see the `v0.071` row below; stages 2-8 are PLANNED | IN PROGRESS |
 | v0.071 **(draft -- version slot unconfirmed)** | Project Knowledge, stage 1 of 8: the `.arklight/` foundation -- `arklight/knowledge/` (new package), `KnowledgeStore(project_root)` with `ensure()` (detect-or-create the directory and its `PROJECT` marker, `knowledge_format=1`), `status()` (`ABSENT`/`UNUSABLE`/`UNMARKED`/`CORRUPT`/`CURRENT`/`OUTDATED`/`INCOMPATIBLE`), and `read(name)`/`write(name, facts)` -- plain UTF-8 `key=value` text, atomic writes, symlinks and out-of-directory names refused, 1 MiB cap, no writes into a non-current-format directory. Nothing in the compiler imports it: a build neither creates nor depends on `.arklight/`, and output is byte-identical with it absent, populated or corrupt. `tests/test_project_knowledge_v0071.py` (135 tests). `pyproject.toml` version not bumped -- the slot is shared with the still-PLANNED Input & Platform Primitives addendum | DONE |
+| v0.071 **(draft -- version slot unconfirmed)**, Input & Platform Primitives stage 6 of 6 | Platform API: `confirm` -- a one-shot native confirm prompt, the weakest forcing case of `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`'s six-stage ladder, ordered last on purpose. `PLATFORM_API_REGISTRY["confirm"]` + `BACKEND_PLATFORM_API_SUPPORT["web"]` (`arklight/ir/platform_api.py`); `PlatformAPI.confirm(message, into)` (`arklight/api.py`); `_validate_platform_confirm` (`arklight/ir/validate.py`, non-empty `message`, `into` must be a declared `State(...)`); Web fragment `arklight/backend/js/platform_apis/confirm.py` (`window.confirm`, falls back to `arkNotify` if uncallable or throwing) wired into `PLATFORM_API_MODULES` -- dispatched by the existing `"platform:"` click-interceptor branch, zero runtime changes. Stages 1-5 of this addendum remain PLANNED (Stage 1, multi-action `Watch`/`on_click`/`on_reveal`, has code on this branch but is not yet documented as shipped here). `tests/test_platform_api_confirm.py`. `pyproject.toml` version not bumped -- the slot is shared with Project Knowledge's own `v0.071` row above | DONE |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
@@ -146,7 +147,8 @@ go-ahead before implementation starts on any of these:
 
 First rung of `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md`
 (proposal §19, stage 1). The slot is shared with the Input & Platform
-Primitives addendum, which has not started, so the package version in
+Primitives addendum (its own Stage 6 of 6 is now DONE, see below; Stages
+1-5 remain in progress/PLANNED), so the package version in
 `pyproject.toml` is deliberately unchanged (`0.070.0`) -- closing a shared
 slot is the maintainer's call, same as `v0.06514`.
 
@@ -397,6 +399,51 @@ Same class of omission `v0.0645` fixed for `capabilities.py` at the
 time. Fixed by adding a `provider.py` row in the same annotation
 style, pointing at `PROVIDER-SDK.md`. No code changed. Out-of-band,
 no roadmap slot -- this is a docs-correctness pass, not a feature.
+
+## v0.071 -- Input & Platform Primitives, stage 6 of 6: `confirm` dialog (DONE)
+
+Last rung of `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`,
+shipped out of sequence (ahead of Stages 2-5, which remain PLANNED) since
+it is the smallest, most self-contained row on the ladder -- one more
+`PLATFORM_API_REGISTRY` entry plus one backend fragment, no new IR node
+type or registry kind, same class of change `notify`/`clipboard_write`
+already landed as. Shares the `v0.071` slot with Project Knowledge stage
+1 (above); `pyproject.toml` stays at `0.070.0`.
+
+**What went in.**
+
+- `arklight/ir/platform_api.py`: `PLATFORM_API_REGISTRY["confirm"]`
+  (`args=("message", "into")`) and `BACKEND_PLATFORM_API_SUPPORT["web"]`
+  gaining `"confirm"` -- Android/Desktop still implement nothing for it.
+- `arklight/api.py`: `PlatformAPI.confirm(message, into)`, the same
+  "one-shot read lands in a declared `State(...)` via `into=`" shape
+  `PlatformAPI.db.get`/`Action.geolocate` already use.
+- `arklight/ir/validate.py`: `_validate_platform_confirm` -- `message`
+  must be a non-empty string, `into` must name a `State(...)` declared
+  on the page (a `Computed(...)` name is refused, same rule
+  `_validate_platform_db`'s own `into=` check already enforces).
+- `arklight/backend/js/platform_apis/confirm.py` (new): wraps
+  `window.confirm`, writes the boolean result via `store.set(args.into,
+  ...)`, falls back to `arkNotify` if `window.confirm` isn't callable or
+  throws -- never a thrown error, matching `notify`/`clipboard_write`/
+  `db`'s own posture. Wired into `PLATFORM_API_MODULES`
+  (`arklight/backend/js/platform_apis/__init__.py`); dispatched by the
+  click interceptor's existing `"platform:"` branch -- no changes to
+  `arklight/backend/js/render.py`'s generation logic or
+  `arklight/backend/js/runtime/dispatch.py` were needed.
+
+**Tests.** `tests/test_platform_api_confirm.py` -- factory, validation
+(missing/empty `message`, undeclared/`Computed` `into`, unexpected
+arguments), HTML attribute rendering, JS-backend only-ship-what's-used
+and dispatch wiring, backend-support checks, and a Node section running
+the shipped fragment against a stubbed `window.confirm` (OK, Cancel,
+missing, throwing, and no-store cases). Full suite: 3354 passed.
+
+**Not included.** Stages 1-5 of this addendum (`Watch(...)`/`on_click=`/
+`on_reveal=` multi-action, `on_key=`, `Hotkey(...)`, selection-as-`State`,
+user-mediated file open/save) -- Stage 1 has code on this branch (see
+`dd345c1`/`e7ff26a`) but isn't yet reflected as shipped in this file or
+in `docs/Foundational/CAPABILITY-MATRIX.md`; Stages 2-5 are untouched.
 
 ## v0.079 -- `arklight assistant` Miko MVP, Stage A (PLANNED)
 

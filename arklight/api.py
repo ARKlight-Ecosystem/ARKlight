@@ -977,7 +977,9 @@ class PlatformAPI:
     first `PlatformAPI.*(...)` entry.
 
     Deliberately a small, closed catalogue (Section 23 of the
-    proposal, "Initial scope"): `notify` and `clipboard_write`, both
+    proposal, "Initial scope"): `notify`, `clipboard_write` and
+    `confirm` (Stage 6 of `docs/Implementation/
+    INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`), all three
     implemented by the Web backend only, and `db` (local key/value
     storage, see `PlatformAPI.db`), implemented by the Web and Android
     backends. Nothing is implemented by the Linux Desktop backend yet
@@ -1017,6 +1019,31 @@ class PlatformAPI:
         isn't available rather than failing silently.
         """
         return PlatformAPIRef(capability="clipboard_write", args={"text": text})
+
+    @staticmethod
+    def confirm(message: str, into: str) -> PlatformAPIRef:
+        """
+        On click, asks the browser's native confirm prompt `message`,
+        then writes the boolean result (OK -> `True`, Cancel ->
+        `False`) into `State(into)` -- the same "one-shot read lands in
+        a declared State(...) via `into=`" shape `PlatformAPI.db.get`
+        and `Action.geolocate` already use. The Web implementation
+        (`arklight/backend/js/platform_apis/confirm.py`) falls back to
+        ARKlight's own in-page notice (`arkNotify`) if `window.confirm`
+        isn't callable, rather than leaving `into` unset with no
+        explanation.
+
+        Stage 6 of `docs/Implementation/
+        INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md` -- the
+        weakest forcing case of that ladder's six rows, kept as its
+        own entry rather than folded into a broader prompt/alert
+        family (that family has its own no-forcing-case verdict in
+        `docs/Foundational/CAPABILITY-MATRIX.md`).
+
+            State("really_delete", False)
+            Button("Delete", on_click=PlatformAPI.confirm("Delete this file?", into="really_delete"))
+        """
+        return PlatformAPIRef(capability="confirm", args={"message": message, "into": into})
 
 
 class Provider:

@@ -22,12 +22,13 @@ below -- never a change to `JSBackend`'s generation logic itself.
 
 from __future__ import annotations
 
-from arklight.backend.js.platform_apis import clipboard_write, db, notify
+from arklight.backend.js.platform_apis import clipboard_write, confirm, db, notify
 
 PLATFORM_API_MODULES = {
     notify.NAME: notify,
     clipboard_write.NAME: clipboard_write,
     db.NAME: db,
+    confirm.NAME: confirm,
 }
 
 # capability name -> that capability's JS dispatch-object entry (source text).
