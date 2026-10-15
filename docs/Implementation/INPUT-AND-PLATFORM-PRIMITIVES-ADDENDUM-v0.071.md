@@ -99,6 +99,23 @@ the shape `Computed(...)`'s own docstring says it will never do itself
 ("a `Computed(...)` only ever *derives* a value -- it can't dispatch
 an `Action.*(...)` of its own").
 
+**Stage 1 progress note.** The `Watch(...)` half of this stage has
+landed (`dd345c1`/`e7ff26a`): `then=` accepts either a single
+`ActionRef` (unchanged, zero cost for every existing call site) or a
+non-empty tuple of them, validated and dispatched in the order given
+-- `arklight/api.py`'s `Watch(...)`, `arklight/ir/build.py`'s
+`_extract_page_state`, `arklight/ir/validate.py`'s
+`_validate_watch_declaration`, and `arklight/backend/js/runtime/
+watch.py`'s `wireWatchers` (the `data-ark-watch` `then` field compiles
+to a list unconditionally, one entry for a single-action call site,
+so there is no wire-format change to detect). `tests/test_vdom_5.py`/
+`tests/test_action_value_from_state.py` cover it. The `on_click=`/
+`on_reveal=` half described above under "The fix" has not been
+started -- both still accept only a single `ActionRef`/`PlatformAPIRef`/
+named behavior, unchanged. Status stays PLANNED in the table below
+until both halves ship; see `CHANGELOG.md`/`PROGRESS.md` for the same
+note.
+
 ## Stage 2 -- `on_key=`, element-scoped key events (DONE)
 
 **The gap.** The closed vocabulary has no key-event surface at all --
@@ -231,7 +248,7 @@ later milestone without reopening anything Stages 1-5 already shipped.
 
 | Stage | Covers | Status |
 | --- | --- | --- |
-| 1 of 6 | `Watch(...)`/`on_click=`/`on_reveal=` accept more than one `Action.*(...)` | PLANNED |
+| 1 of 6 | `Watch(...)`/`on_click=`/`on_reveal=` accept more than one `Action.*(...)` | PLANNED (`Watch(...)` half done, see progress note above) |
 | 2 of 6 | `on_key=`, element-scoped key events, closed key enum, existing modifier tokens | DONE |
 | 3 of 6 | `Hotkey(...)`, page-scoped key events, one delegated `window` listener | PLANNED |
 | 4 of 6 | `State(..., selection=...)` + `Derive.line_number`/`Derive.column_number` | PLANNED |
