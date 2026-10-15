@@ -71,6 +71,8 @@ numbers or feature lists of its own, so it cannot fall out of date.
 
 Refer to [`docs/Foundational/EXPERIMENTAL-APIS.md`](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/docs/Foundational/EXPERIMENTAL-APIS.md) if you wished to use escape hatches.
 
+For AI Assisted Developer or Agent? Refer the [ARKlight Skills Collections](https://github.com/ARKlight-Ecosystem/Skills/) As it may help use ARKlight more effectively.
+
 ## Install
 
 ```bash
