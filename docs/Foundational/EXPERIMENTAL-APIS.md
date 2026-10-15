@@ -64,9 +64,17 @@ experimental API.** That currently means:
   (`<template>`/`<style>` are refused outright, not just warned).
   ARKlight lowers only that block to plain JS text and appends it to
   `arklight.js` -- never an arbitrary output file the way
-  `raw_postprocess` used to. Still gated: the JS itself is unchecked
-  (no `eval`, no `new Function`, but also no guarantee it's
-  syntactically valid). Usage is expected to carry a
+  `raw_postprocess` used to. Still gated: ARKlight cannot validate what
+  the JS *does* (no `eval`, no `new Function`, but no behavioral
+  guarantee either). It does refuse JS that doesn't parse: when Node
+  is on PATH the lowered script is parsed as a classic script (not
+  via `node --check`, whose grammar differs from a browser's -- see
+  `docs/Implementation/SCRIPT-EXTENSION-SYNTAX-CHECK-BUGFIX.md`) at
+  `register()` time and the combined `arklight.js` again at compile
+  time, and a syntax error raises `ScriptExtensionError` (failing the
+  build) instead of shipping a dead runtime. No Node on PATH only
+  warns; `check_syntax = False` on the subclass opts out. Usage is
+  expected to carry a
   `#include <expapilib.ARKlight>` marker comment in the subclass's own
   source file -- its absence doesn't block anything, it just adds one
   more warning on top of the normal experimental banner.

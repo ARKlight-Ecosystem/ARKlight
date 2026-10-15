@@ -148,8 +148,8 @@ FEATURES: dict[str, ExperimentalFeature] = {
         id="script-extension",
         inline_note=(
             "Hand-written JS, lowered from a Svelte-script-only subclass, "
-            "appended to arklight.js -- unchecked the way every other "
-            "escape hatch here is."
+            "appended to arklight.js -- syntax-checked by Node when "
+            "available, but otherwise unvalidated."
         ),
         detail_lines=[
             "ScriptExtension (arklight.backend.script_extension) is the",
@@ -160,10 +160,15 @@ FEATURES: dict[str, ExperimentalFeature] = {
             "Its surface is narrower than raw_postprocess's -- only the",
             "<script> portion of Svelte single-file-component syntax is",
             "accepted, and only arklight.js is ever touched, never an",
-            "arbitrary output file -- but the JS itself is still unchecked:",
-            "no eval, no new Function, but also no guarantee it's even",
-            "syntactically valid, the same as every other hand-written JS",
-            "surface ARKlight ships.",
+            "arbitrary output file -- and the JS is parsed by Node as a",
+            "classic script (the grammar a browser applies to arklight.js;",
+            "deliberately not 'node --check', whose CommonJS/ESM grammar",
+            "accepts export/import/top-level await) at register() time and",
+            "again on the combined arklight.js at compile time, so a",
+            "syntax error fails the build instead of shipping a dead",
+            "runtime. That is syntax only: ARKlight still can't tell you",
+            "what the JS does. With no Node on PATH the check is skipped",
+            "with a warning; set check_syntax = False to opt out.",
             "Usage is expected to carry a '#include <expapilib.ARKlight>'",
             "marker comment in the subclass's own source file. Missing it",
             "doesn't block the build -- it just adds one more warning on",
