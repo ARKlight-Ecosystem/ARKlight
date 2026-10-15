@@ -5,6 +5,24 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: drift fix, `CAPABILITY-MATRIX.md`'s stale Stage 1 (`Watch`) row
+
+**Fixed, docs only, no code.** `docs/Foundational/CAPABILITY-MATRIX.md`'s
+"More than one effect from one event" row still asserted "A
+`Watch(...)`'s `then=` takes exactly one `ActionRef`" -- true when the
+row was written, made false by `dd345c1`/`e7ff26a` (Stage 1's
+`Watch(...)` half, landed Oct 14), and left uncorrected even though
+this file's own Stage 2 and Stage 6 entries below already note the
+drift ("isn't yet reflected as shipped in `PROGRESS.md`/
+`CAPABILITY-MATRIX.md`"). The row's `Reason` text now describes what's
+actually shipped -- `Watch(...)` takes a tuple now, `on_click=`/
+`on_reveal=` still don't -- while its `Today`/`v0.071` columns stay
+Gap/Planned, since the capability as a whole isn't shipped yet.
+`docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`
+gains a matching "Stage 1 progress note" (same implementation-record
+style Stages 2/6 already use) and an annotation on its status table's
+Stage 1 row. `PROGRESS.md`: `(docs audit, part 8)`.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- `v0.071`: Input & Platform Primitives stage 2 of 6, `on_key=` element-scoped key events
 
 **Added.** `on_key=Key.on(<key>, Action.*(...))` on any element -- a
