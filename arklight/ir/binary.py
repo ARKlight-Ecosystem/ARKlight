@@ -104,6 +104,7 @@ from arklight.ast.nodes import (
     ActionRef,
     ClassBindSpec,
     DerivationRef,
+    KeyBinding,
     ModelBindSpec,
     PlatformAPIRef,
     PredicateRef,
@@ -448,6 +449,15 @@ _RECONSTRUCTABLE_TYPES: dict[str, type] = {
     "PlatformAPIRef": PlatformAPIRef,
     "DerivationRef": DerivationRef,
     "PredicateRef": PredicateRef,
+    # Stage 2 (`INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`):
+    # `on_key=Key.on(...)`'s flat `KeyBinding` -- deliberately flat
+    # rather than wrapping an `ActionRef` as a nested field for exactly
+    # the reason this table exists at all (see `arklight.ast.nodes
+    # .KeyBinding`'s own docstring): a dataclass nested inside another
+    # dataclass's field loses its `__ark_type__` tag during encoding,
+    # so a flat `KeyBinding` round-trips fully through `.arklight`
+    # binary while a nested shape would not have.
+    "KeyBinding": KeyBinding,
 }
 
 

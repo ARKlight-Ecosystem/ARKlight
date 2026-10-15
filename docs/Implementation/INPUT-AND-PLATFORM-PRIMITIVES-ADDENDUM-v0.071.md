@@ -99,7 +99,7 @@ the shape `Computed(...)`'s own docstring says it will never do itself
 ("a `Computed(...)` only ever *derives* a value -- it can't dispatch
 an `Action.*(...)` of its own").
 
-## Stage 2 -- `on_key=`, element-scoped key events (PLANNED)
+## Stage 2 -- `on_key=`, element-scoped key events (DONE)
 
 **The gap.** The closed vocabulary has no key-event surface at all --
 a project-wide search for `keydown`/`keyup` on this branch finds
@@ -232,11 +232,64 @@ later milestone without reopening anything Stages 1-5 already shipped.
 | Stage | Covers | Status |
 | --- | --- | --- |
 | 1 of 6 | `Watch(...)`/`on_click=`/`on_reveal=` accept more than one `Action.*(...)` | PLANNED |
-| 2 of 6 | `on_key=`, element-scoped key events, closed key enum, existing modifier tokens | PLANNED |
+| 2 of 6 | `on_key=`, element-scoped key events, closed key enum, existing modifier tokens | DONE |
 | 3 of 6 | `Hotkey(...)`, page-scoped key events, one delegated `window` listener | PLANNED |
 | 4 of 6 | `State(..., selection=...)` + `Derive.line_number`/`Derive.column_number` | PLANNED |
 | 5 of 6 | Platform API: open/save a file, text only, user-mediated (Web) | PLANNED |
 | 6 of 6 | Platform API: `confirm` dialog (Web) | DONE |
+
+**Stage 2 implementation record.** `KeyBinding` (`arklight/ast/nodes.py`)
+-- deliberately flat (`key`/`action`/`state`/`args`/`modifiers` inlined
+directly, not wrapping an `ActionRef`) so it round-trips through
+`.arklight` binary encoding without losing its type tag; `Key.on(key,
+action)` (`arklight/api.py`), accepting only an `Action.*(...)`
+reference, not a `PlatformAPIRef`/named behavior. `KNOWN_KEYS`
+(`arklight/ir/schema.py`) -- the closed enum (`Escape`, `Enter`, the
+four arrow keys, `Tab`, plus `SoftLeft`/`SoftRight` for the
+feature-phone-class forcing case). `_validate_key_props`
+(`arklight/ir/validate.py`) -- known key name, then the exact same
+action/state/modifiers/args checks `on_click=` gets via
+`_validate_action`, reused with `label="on_key"` so error messages say
+the right prop name; wired into both `validate_node` and
+`_validate_repeat_template` (the latter with `allow_item_index=False`,
+since a client-built `Repeat(...)` item added later by
+`Action.append(...)` only ever carries `on_click`). HTML compilation
+(`arklight/backend/html/attrs.py`) -- several plain `data-ark-on-key`/
+`-key-action`/`-key-action-state`/`-key-action-args` attributes,
+matched-pair with `on_click=`'s own shape rather than one combined JSON
+attribute, so one element can carry both without clobbering either;
+`data-ark-key-modifiers` is a plain comma-separated token list rather
+than a compiled `hx-trigger`, since HTMX's trigger syntax has no notion
+of "this key, on this element." The runtime fragment
+`arklight/backend/js/runtime/keys.py` (`wireKeyInterceptor`) -- one
+delegated `keydown` listener per page, walking up from `event.target`
+through `parentNode` (not `.closest()`, which only takes a selector,
+not a dynamic value to compare against the pressed key) to find the
+nearest ancestor whose compiled key matches; an unconditional guard
+against `Ctrl`/`Alt`/`Meta` combos and IME composition
+(`isComposing`/legacy `keyCode === 229`); `prevent` honored
+conditionally (unlike the click interceptor's unconditional
+`preventDefault()`), since a keydown is frequently the browser's own
+handling of that key too (Tab moving focus, arrows scrolling); `stop`/
+`once`/`debounce`/`throttle` otherwise identical in behavior to their
+`on_click=` counterparts in `runtime/dispatch.py`. Wired into
+`arklight/backend/js/render.py`'s `_collect_usage`/`_build_runtime_js`
+-- `has_key_binding` folds `on_key=`'s action into the shared
+`used_actions` set and gates `needs_key_interceptor` independently of
+`needs_click_interceptor` (a key-only page with no `on_click=`/named
+behavior anywhere ships no click listener at all), declared after the
+click interceptor when both are present, registered once at
+`DOMContentLoaded` alongside it. `arklight/ir/components.py`'s
+`_rewrite_component_state_refs` gained an `on_key=` branch, duck-typed
+against `KeyBinding`'s identical `state`/`args` shape, so a user-defined
+component's own local state used as an `on_key=` target is namespaced
+exactly like an `on_click=` target already is. `KeyBinding` registered
+in `arklight/ir/binary.py`'s `_RECONSTRUCTABLE_TYPES` for `.arklight`
+round-trip. `tests/test_on_key.py` (including a Node section running
+the shipped `wireKeyInterceptor` fragment against a stubbed
+`document`/`store` -- ancestor-walk matching, the Ctrl/Alt/Meta and IME
+guards, Shift+Tab still matching a plain `Tab` binding, and all four
+modifier tokens).
 
 **Stage 6 implementation record.** `PLATFORM_API_REGISTRY["confirm"]`
 (`arklight/ir/platform_api.py`) plus `BACKEND_PLATFORM_API_SUPPORT["web"]`
