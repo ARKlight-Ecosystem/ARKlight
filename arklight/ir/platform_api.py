@@ -171,7 +171,7 @@ DB_OPERATIONS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 # below for the diagnostic a build against an unsupported backend gets
 # instead of a silent no-op.
 BACKEND_PLATFORM_API_SUPPORT: dict[str, frozenset[str]] = {
-    "web": frozenset({"notify", "clipboard_write", "db"}),
+    "web": frozenset({"notify", "clipboard_write", "db", "confirm"}),
     "android": frozenset({"db"}),
     "desktop": frozenset(),
 }

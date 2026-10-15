@@ -5,6 +5,54 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.071`: Input & Platform Primitives stage 6 of 6, `confirm` dialog
+
+**Added.** `PlatformAPI.confirm(message, into)` -- a one-shot native
+confirm prompt, the last and weakest-forcing-case rung of
+`docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`'s
+six-stage ladder, shipped ahead of Stages 2-5 as the smallest,
+self-contained row on it:
+
+```python
+State("really_delete", False)
+Button("Delete", on_click=PlatformAPI.confirm("Delete this file?", into="really_delete"))
+```
+
+- New `PLATFORM_API_REGISTRY["confirm"]` entry (`arklight/ir/platform_api.py`,
+  `args=("message", "into")`) and `BACKEND_PLATFORM_API_SUPPORT["web"]`
+  gaining `"confirm"` -- Android/Desktop implement nothing for it yet.
+- `_validate_platform_confirm` (`arklight/ir/validate.py`): `message`
+  must be a non-empty string; `into` must name a `State(...)` declared
+  on the page (a `Computed(...)` name is refused), the same rule
+  `_validate_platform_db`'s own `into=` check already enforces.
+- New `arklight/backend/js/platform_apis/confirm.py`: wraps
+  `window.confirm`, writes the boolean result (`OK` -> `true`, `Cancel`
+  -> `false`) into the declared `State(...)` via `store.set(...)`,
+  falls back to ARKlight's own in-page `arkNotify` if `window.confirm`
+  isn't callable or throws -- never a thrown error, the same posture
+  `notify`/`clipboard_write`/`db` already hold. Dispatched by the
+  click interceptor's existing `"platform:"` branch; no changes to the
+  JS backend's generation logic or runtime dispatch were needed.
+
+**Behavior change worth knowing: none for existing sites.** Purely
+additive -- a site that never calls `PlatformAPI.confirm(...)` ships
+nothing new.
+
+**Not included.** Stages 1-5 of this addendum (`Watch(...)`/`on_click=`/
+`on_reveal=` accepting more than one `Action.*(...)`, `on_key=`,
+`Hotkey(...)`, selection as a `State(...)` source, user-mediated file
+open/save) -- Stage 1 has code on this branch (`dd345c1`/`e7ff26a`) but
+isn't yet reflected as shipped in `PROGRESS.md`/`CAPABILITY-MATRIX.md`;
+Stages 2-5 are untouched. `pyproject.toml`'s version is unchanged -- the
+slot is shared with Project Knowledge stage 1 (below).
+
+**Tests.** `tests/test_platform_api_confirm.py` (factory, validation,
+HTML rendering, JS-backend only-ship-what's-used + dispatch wiring,
+backend-support checks, and a Node section exercising the shipped
+fragment against a stubbed `window.confirm`). Full suite: 3354 passed.
+Docs: `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`,
+`docs/Foundational/CAPABILITY-MATRIX.md`, `PROGRESS.md` updated.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- `v0.071`: Project Knowledge stage 1 of 8, the `.arklight/` foundation
 
 **Added.** The directory and nothing else. `arklight/knowledge/` (new

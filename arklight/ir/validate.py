@@ -328,6 +328,8 @@ def _validate_platform_api(
             mutable_state=mutable_state,
             readable_state=mutable_state if page_state is None else page_state,
         )
+    elif ref.capability == "confirm":
+        _validate_platform_confirm(ref, path=path, mutable_state=mutable_state)
 
 
 def _validate_platform_db(
@@ -420,6 +422,31 @@ def _validate_platform_db(
                 f"on this page as State(...) (a Computed(...) name can't be a "
                 f"write target). State declared on this page: {known}."
             )
+
+
+def _validate_platform_confirm(
+    ref: PlatformAPIRef, *, path: str, mutable_state: frozenset[str]
+) -> None:
+    """
+    `PlatformAPI.confirm(...)` argument rules (Stage 6 of
+    `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`):
+    `message` must be a non-empty string, and `into` must name a
+    `State(...)` declared on this page -- a one-shot read has to land
+    somewhere, the same rule `_validate_platform_db` already enforces
+    for `db.get`/`db.keys`'s own `into=`.
+    """
+    label = f"on_click at {path} (PlatformAPI.confirm(...))"
+    message = ref.args.get("message")
+    if not isinstance(message, str) or not message:
+        raise ValidationError(f"{label} needs a non-empty string `message`.")
+    into = ref.args.get("into")
+    if not isinstance(into, str) or into not in mutable_state:
+        known = ", ".join(sorted(mutable_state)) or "(none declared)"
+        raise ValidationError(
+            f"{label} writes into {into!r}, which isn't declared on this page "
+            f"as State(...) (a Computed(...) name can't be a write target). "
+            f"State declared on this page: {known}."
+        )
 
 
 def _validate_action_args(
