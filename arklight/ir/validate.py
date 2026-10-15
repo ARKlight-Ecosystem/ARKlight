@@ -162,6 +162,8 @@ from arklight.ast.nodes import (
     ARKNode,
     ClassBindSpec,
     DerivationRef,
+    ItemIndexRef,
+    KeyBinding,
     ModelBindSpec,
     PlatformAPIRef,
     PredicateRef,
@@ -175,6 +177,7 @@ from arklight.ir.schema import (
     DERIVATION_REGISTRY,
     DIGITS_RANGES,
     KNOWN_BEHAVIORS,
+    KNOWN_KEYS,
     KNOWN_QUERY_HISTORY_MODES,
     KNOWN_REVEAL_BEHAVIORS,
     LIST_COMPARE_KINDS,
@@ -274,12 +277,18 @@ def _validate_modifier_tokens(modifiers: tuple[str, ...], *, path: str, label: s
             )
 
 
-def _validate_modifiers(action: ActionRef, *, path: str) -> None:
+def _validate_modifiers(action: ActionRef, *, path: str, label: str = "on_click") -> None:
     """Stage 3 ("Reactive-core vdom staging"): check each token in
     `action.modifiers` against `MODIFIER_REGISTRY` -- see
     `_validate_modifier_tokens` for the shared per-token check this
-    now delegates to (also used by `_validate_model_bind` below)."""
-    _validate_modifier_tokens(action.modifiers, path=path, label="on_click")
+    now delegates to (also used by `_validate_model_bind` below).
+
+    `label` defaults to `"on_click"` (every pre-existing call site is
+    unaffected) -- Stage 2's `on_key=` passes `label="on_key"` so an
+    error on a `KeyBinding`'s modifiers reads correctly instead of
+    claiming to be about a click. See `_validate_action`'s own `label`
+    parameter, which this is threaded from."""
+    _validate_modifier_tokens(action.modifiers, path=path, label=label)
 
 
 def _validate_platform_api(
@@ -450,7 +459,7 @@ def _validate_platform_confirm(
 
 
 def _validate_action_args(
-    action: ActionRef, *, path: str, readable_state: frozenset[str]
+    action: ActionRef, *, path: str, readable_state: frozenset[str], label: str = "on_click"
 ) -> None:
     """
     Capability fix (live-input -> action-value): checks each of an
@@ -475,10 +484,10 @@ def _validate_action_args(
     """
     spec = ACTION_REGISTRY[action.action]
     for arg_name, value in action.args.items():
-        label = f"on_click at {path} (Action.{action.action}(...), argument {arg_name!r})"
+        arg_label = f"{label} at {path} (Action.{action.action}(...), argument {arg_name!r})"
         if isinstance(value, ARKNode):
             raise ValidationError(
-                f"{label} holds a {value.type!r} node, which can't be serialized "
+                f"{arg_label} holds a {value.type!r} node, which can't be serialized "
                 f"as an action argument. Build the action with Action."
                 f"{action.action}(...) so Bind(\"name\") is converted, or pass "
                 f"a plain value."
@@ -488,7 +497,7 @@ def _validate_action_args(
         name = value[STATE_REF_KEY] if len(value) == 1 else None
         if not isinstance(name, str) or not name:
             raise ValidationError(
-                f"{label} uses the reserved key {STATE_REF_KEY!r} in a dict "
+                f"{arg_label} uses the reserved key {STATE_REF_KEY!r} in a dict "
                 f"that isn't a state reference. Use Bind(\"name\") to read "
                 f"state; {STATE_REF_KEY!r} can't appear in a literal dict "
                 f"argument."
@@ -498,14 +507,14 @@ def _validate_action_args(
                 f"{n}({', '.join(sp.state_args)})" for n, sp in ACTION_REGISTRY.items() if sp.state_args
             )
             raise ValidationError(
-                f"{label} was given Bind({name!r}), but Action.{action.action}'s "
+                f"{arg_label} was given Bind({name!r}), but Action.{action.action}'s "
                 f"{arg_name!r} argument can't be read from state. Actions that "
                 f"accept Bind(...) as an argument: {', '.join(accepting)}."
             )
         if name not in readable_state:
             known = ", ".join(sorted(readable_state)) or "(none declared)"
             raise ValidationError(
-                f"{label} reads Bind({name!r}), which isn't declared on this "
+                f"{arg_label} reads Bind({name!r}), which isn't declared on this "
                 f"page as State(...) or Computed(...). State/Computed declared "
                 f"on this page: {known}."
             )
@@ -517,28 +526,39 @@ def _validate_action(
     path: str,
     mutable_state: frozenset[str],
     page_state: frozenset[str] | None = None,
+    label: str = "on_click",
 ) -> None:
+    """`label` defaults to `"on_click"` -- every pre-existing call site
+    (on_click=Action.*(...), Watch(...)'s then=) is unaffected. Stage 2's
+    `_validate_key_props` passes `label="on_key"` so a KeyBinding's
+    action/state/modifier/arg errors read correctly instead of all
+    claiming to be about a click -- see `arklight.ast.nodes.KeyBinding`'s
+    docstring for why it's checked through this same function rather
+    than a parallel copy of these rules."""
     if action.action not in ACTION_REGISTRY:
         known = ", ".join(sorted(ACTION_REGISTRY))
         raise ValidationError(
-            f"on_click at {path} uses unknown action {action.action!r}. "
+            f"{label} at {path} uses unknown action {action.action!r}. "
             f"Known actions are: {known}."
         )
     if action.state not in mutable_state:
         known = ", ".join(sorted(mutable_state)) or "(none declared)"
         raise ValidationError(
-            f"on_click at {path} ({action.action!r}) targets state "
+            f"{label} at {path} ({action.action!r}) targets state "
             f"{action.state!r}, which isn't declared on this page as "
             f"State(...) (a Computed(...) name can't be an Action.*(...) "
             f"target -- it has no independent value of its own to mutate). "
             f"State declared on this page: {known}."
         )
-    _validate_modifiers(action, path=path)
+    _validate_modifiers(action, path=path, label=label)
     # `page_state` is the wider bindable set (State + Computed). Callers
     # that haven't been threaded it fall back to `mutable_state`, which
     # is always a subset -- stricter, never looser.
     _validate_action_args(
-        action, path=path, readable_state=mutable_state if page_state is None else page_state
+        action,
+        path=path,
+        readable_state=mutable_state if page_state is None else page_state,
+        label=label,
     )
 
 
@@ -822,6 +842,69 @@ def _validate_behavior_props(
             f"`behavior_target` prop (a CSS selector for the element(s) it "
             f"should act on)."
         )
+
+
+def _validate_key_props(
+    node: ARKNode,
+    *,
+    path: str,
+    mutable_state: frozenset[str],
+    page_state: frozenset[str] | None = None,
+    allow_item_index: bool = True,
+) -> None:
+    """
+    Stage 2 of `INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`:
+    `on_key=Key.on(<key>, Action.*(...))` -- a `KeyBinding` (see
+    `arklight.ast.nodes.KeyBinding`). Two checks of its own (`key`
+    against `KEY_REGISTRY`, duplicate `on_key` on one element -- the
+    latter is structurally impossible today since a node has at most
+    one `on_key` prop, same as `on_click`, so there's nothing further
+    to check there beyond what the type system already guarantees),
+    then the action/state/modifiers/args checks are the exact same
+    ones `on_click=Action.*(...)` already gets, via `_validate_action`
+    (duck-typed: `KeyBinding` carries the same `action`/`state`/
+    `args`/`modifiers` attribute names `ActionRef` does) with
+    `label="on_key"` so the error messages say the right prop name.
+
+    `allow_item_index=False` (passed by `_validate_repeat_template`
+    only) additionally rejects an `Item.index()` (`ItemIndexRef`)
+    anywhere in the binding's args: client-built `Repeat(...)` items
+    (`arklight/backend/html/page_render.py`'s `_repeat_template_spec`)
+    only ever carry `on_click`, not `on_key` -- an `on_key=` inside a
+    template would silently work for every server-rendered item but
+    vanish (or fail at `json.dumps`, for the raw `ItemIndexRef`
+    object specifically) for one added later by `Action.append(...)`.
+    Caught here at build time instead.
+    """
+    on_key = node.props.get("on_key")
+    if on_key is None:
+        return
+    if not isinstance(on_key, KeyBinding):
+        raise ValidationError(
+            f"{node.type!r} at {path} has on_key={on_key!r}, which isn't a "
+            f"Key.on(...) reference."
+        )
+    if on_key.key not in KNOWN_KEYS:
+        known = ", ".join(sorted(KNOWN_KEYS))
+        raise ValidationError(
+            f"on_key at {path} uses unknown key {on_key.key!r}. "
+            f"Known keys are: {known}."
+        )
+    if not allow_item_index and any(
+        isinstance(v, ItemIndexRef) for v in on_key.args.values()
+    ):
+        raise ValidationError(
+            f"on_key at {path} (inside a Repeat(...) template) uses "
+            f"Item.index() in its action's arguments. A client-built "
+            f"Repeat(...) item (one added later by Action.append(...)) "
+            f"only ever carries on_click, not on_key -- Item.index() "
+            f"inside on_key would silently stop working for such an "
+            f"item. Use on_click instead, or drop Item.index() from "
+            f"this on_key's action."
+        )
+    _validate_action(
+        on_key, path=path, mutable_state=mutable_state, page_state=page_state, label="on_key"
+    )
 
 
 def _validate_reveal_props(node: ARKNode, *, path: str) -> None:
@@ -1325,6 +1408,18 @@ def _validate_repeat_template(
             f"on_click at {path} uses unknown behavior {on_click!r}. "
             f"Known behaviors are: {known}."
         )
+    # Stage 2 (`on_key=`): same checks `validate_node`'s generic path
+    # runs, but with `allow_item_index=False` -- see
+    # `_validate_key_props`'s own docstring for why `Item.index()`
+    # inside a template's `on_key` is refused here rather than
+    # silently misbehaving for a client-built item later.
+    _validate_key_props(
+        node,
+        path=path,
+        mutable_state=mutable_state,
+        page_state=page_state,
+        allow_item_index=False,
+    )
     if not spec.allow_children and node.children:
         raise ValidationError(f"{node.type!r} at {path} must not have children.")
     for i, child in enumerate(node.children):
@@ -1443,6 +1538,7 @@ def validate_node(
             )
 
     _validate_behavior_props(node, path=path, mutable_state=mutable_state, page_state=page_state)
+    _validate_key_props(node, path=path, mutable_state=mutable_state, page_state=page_state)
     _validate_reveal_props(node, path=path)
     _validate_class_bind(node, path=path, page_state=page_state)
     _validate_model_bind(node, path=path, mutable_state=mutable_state)

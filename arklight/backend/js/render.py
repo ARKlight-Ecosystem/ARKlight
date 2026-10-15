@@ -313,7 +313,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from arklight.ast.nodes import ActionRef, ModelBindSpec, PlatformAPIRef
+from arklight.ast.nodes import ActionRef, KeyBinding, ModelBindSpec, PlatformAPIRef
 from arklight.backend.base import Backend
 from arklight.backend.js.actions import ACTION_FRAGMENTS
 from arklight.backend.js.behaviors import BEHAVIOR_FRAGMENTS
@@ -323,6 +323,7 @@ from arklight.backend.js.platform_apis import PLATFORM_API_FRAGMENTS
 from arklight.experimental import FEATURES
 from arklight.ir.platform_api import check_backend_support
 from arklight.backend.js.runtime import CLICK_INTERCEPTOR_JS as _CLICK_INTERCEPTOR_JS
+from arklight.backend.js.runtime import KEY_INTERCEPTOR_JS as _KEY_INTERCEPTOR_JS
 from arklight.backend.js.runtime import NAV_HIGHLIGHT_JS as _NAV_HIGHLIGHT_JS
 from arklight.backend.js.runtime import APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS as _APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS
 from arklight.backend.js.runtime import APP_SHELL_FILE_PROTOCOL_CHECK_JS as _APP_SHELL_FILE_PROTOCOL_CHECK_JS
@@ -377,6 +378,7 @@ def _collect_usage(
     bool,
     bool,
     set[str],
+    bool,
     bool,
 ]:
     """
@@ -435,6 +437,19 @@ def _collect_usage(
     the real "does this site need vendored HTMX for state" condition
     -- see `_build_runtime_js`'s `needs_htmx`, which used to use the
     broader (and wrong) `has_state` for this instead.
+
+    Also returns `has_key_binding` (Stage 2 of
+    `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`)
+    -- whether any node anywhere carries `on_key=Key.on(...)`
+    (`arklight.ast.nodes.KeyBinding`), gating `KEY_INTERCEPTOR_JS`/
+    `wireKeyInterceptor()` the same "only ship what's used" way
+    `has_reveal`/`has_repeat`/`has_show` gate their own runtime pieces.
+    Every `on_key=`'s action is folded into the same `used_actions` set
+    `on_click=`/`Watch(...)` already feed -- a key binding dispatches
+    through the exact same closed `actions` object, see
+    `arklight/backend/js/runtime/keys.py`'s module docstring -- so
+    there is no separate `used_key_actions` set for `_actions_object_js`
+    to read from.
     """
     # Deferred (function-body, not module-level) import: `attrs.py`
     # sits under `arklight.backend.html`, whose package `__init__`
@@ -476,6 +491,8 @@ def _collect_usage(
     has_repeat = False
     has_show = False
     has_reveal = False
+    has_key_binding = False
+    used_key_actions: set[str] = set()
 
     for page in ir.pages:
         for node in _walk(page.root):
@@ -488,6 +505,10 @@ def _collect_usage(
                     has_hx_trigger = True
             elif isinstance(on_click, PlatformAPIRef):
                 used_platform_apis.add(on_click.capability)
+            on_key = node.props.get("on_key")
+            if isinstance(on_key, KeyBinding):
+                has_key_binding = True
+                used_key_actions.add(on_key.action)
             if isinstance(node.props.get("bind_value"), str) and node.props.get("bind_value"):
                 has_model_binding = True
             elif isinstance(node.props.get("bind_value"), ModelBindSpec):
@@ -513,7 +534,7 @@ def _collect_usage(
         for entry in page.watch
         for action_spec in entry["then"]
     }
-    used_actions = used_on_click_actions | used_watch_actions
+    used_actions = used_on_click_actions | used_watch_actions | used_key_actions
 
     return (
         used_behaviors,
@@ -530,6 +551,7 @@ def _collect_usage(
         has_query,
         used_platform_apis,
         has_hx_trigger,
+        has_key_binding,
     )
 
 
@@ -572,6 +594,7 @@ def collect_used_runtime_features(ir: WebsiteIR) -> RuntimeUsage:
         _has_query,
         used_platform_apis,
         _has_hx_trigger,
+        _has_key_binding,
     ) = _collect_usage(ir)
     return RuntimeUsage(
         used_behaviors=frozenset(used_behaviors),
@@ -795,6 +818,7 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         has_query,
         used_platform_apis,
         has_hx_trigger,
+        has_key_binding,
     ) = _collect_usage(ir)
 
     # `v0.065`: every `PlatformAPI.*(...)` capability this site's IR
@@ -828,14 +852,23 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # never needs `needs_actions_object` the way a `Watch(...)` does.
     needs_click_interceptor = bool(used_behaviors) or bool(used_on_click_actions) or bool(used_platform_apis)
 
+    # Stage 2 (`on_key=`): `wireKeyInterceptor` ships whenever any node
+    # anywhere carries `on_key=Key.on(...)` -- independent of
+    # `needs_click_interceptor`, since a key-only page (no clickable
+    # on_click=/behavior anywhere, just e.g. a dialog's on_key="Escape")
+    # needs no click listener at all.
+    needs_key_interceptor = has_key_binding
+
     # vdom-5: `actions` is needed whenever the click interceptor is
     # (unchanged) *or* whenever any page declares a `Watch(...)` --
     # `wireWatchers` (`runtime/watch.py`) reads the same closed
     # dispatch object by closure. Split out from
     # `needs_click_interceptor` so a watch-only page (no clickable
     # Action.*(...)/behavior anywhere) ships `actions` without also
-    # shipping the click interceptor it would never use.
-    needs_actions_object = needs_click_interceptor or has_watch
+    # shipping the click interceptor it would never use. Stage 2:
+    # `needs_key_interceptor` joins this same condition -- `on_key=`'s
+    # action dispatches through the identical `actions` object.
+    needs_actions_object = needs_click_interceptor or has_watch or needs_key_interceptor
 
     # htmx-1 (REFACTOR-INDEX.md row 4) originally shipped
     # vendored HTMX whenever a page used a named behavior or declared
@@ -969,7 +1002,13 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
     # of arkNotify/arkReportError -- leaving `wireHtmxErrorHandling`/
     # `warnIfAppShellServedFromFileProtocol` below with nothing to call
     # into. See `notify.py`'s module docstring for both.
-    needs_notify = needs_click_interceptor or has_state or needs_htmx
+    # Stage 2: `wireKeyInterceptor` also calls `arkReportError` on a
+    # failed dispatch, same as the click interceptor -- so a key-only
+    # page (no has_state, no behaviors/on_click actions, no HTMX) still
+    # needs `_NOTIFY_JS`/`_ERROR_REPORT_JS` shipped for that call to
+    # resolve, same reasoning `needs_click_interceptor` already covers
+    # for the click side.
+    needs_notify = needs_click_interceptor or needs_key_interceptor or has_state or needs_htmx
     if needs_notify:
         parts.append(_NOTIFY_JS)
         parts.append("")
@@ -1036,6 +1075,14 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         parts.append(_behaviors_object_js(used_behaviors))
         parts.append(_platform_apis_object_js(used_platform_apis))
         parts.append(_CLICK_INTERCEPTOR_JS)
+        parts.append("")
+    if needs_key_interceptor:
+        # Stage 2 (`on_key=`): declared after the click interceptor
+        # (consistent ordering, not a dependency -- `_behaviors_object_js`/
+        # `_platform_apis_object_js` above are click-only and the key
+        # interceptor reads neither), before `arkInitPage()`/
+        # `ready_calls` below register it.
+        parts.append(_KEY_INTERCEPTOR_JS)
         parts.append("")
     if has_watch:
         parts.append(_WIRE_WATCHERS_JS)
@@ -1144,6 +1191,11 @@ def _build_runtime_js(ir: WebsiteIR) -> str:
         # no element carries data-ark-on-click="action:..." without
         # State(...) to act on).
         ready_calls.append(f"    wireClickInterceptor({getter});")
+    if needs_key_interceptor:
+        # Same "register exactly once, getter closure" contract as
+        # wireClickInterceptor above -- see that call's comment and
+        # runtime/keys.py's module docstring.
+        ready_calls.append(f"    wireKeyInterceptor({getter});")
     if has_model_binding:
         # Same "register exactly once, getter closure" contract as
         # wireClickInterceptor above -- has_model_binding implies

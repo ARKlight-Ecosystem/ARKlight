@@ -25,6 +25,7 @@ from arklight.ast.nodes import (
     ClassBindSpec,
     DerivationRef,
     ItemIndexRef,
+    KeyBinding,
     ModelBindSpec,
     PlatformAPIRef,
     PredicateRef,
@@ -892,6 +893,53 @@ class Action:
         updated and a small notice is shown -- never a thrown error.
         """
         return ActionRef(action="geolocate", state=name, args={})
+
+
+class Key:
+    """
+    Stage 2 of `INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`:
+    element-scoped key events. `Key.on(<key>, Action.*(...))` is used as
+    an `on_key=` value on any element, alongside `on_click=` --
+
+        Dialog(id="confirm", on_key=Key.on("Escape", Action.set("open", False)))
+        Button("-1", on_key=Key.on("ArrowDown", Action.decrement("count")))
+
+    Only fires while the carrying element itself has focus (or the
+    event bubbles up to it from a focused descendant) -- a page-scoped
+    equivalent that fires regardless of focus is Stage 3's
+    `Hotkey(...)`, not this. `key` is validated against
+    `arklight.ir.schema.KEY_REGISTRY` (unknown key name fails the
+    build) the same way `Action.*(...)`'s `action`/`state` are checked
+    against `ACTION_REGISTRY`/declared `State(...)` -- see
+    `arklight.ir.validate._validate_key_props`.
+
+    Only an `Action.*(...)` reference is accepted as `action` -- not a
+    `PlatformAPIRef`/named-behavior string the way `on_click=` accepts
+    those too. A `PlatformAPI.*(...)` call on a keypress, and a named
+    behavior triggered by key, are both real gaps but neither is a
+    forcing case in the addendum; left for a future stage rather than
+    widening Stage 2's scope. `.with_modifiers(...)`/`.debounce(...)`/
+    `.throttle(...)` on the returned `KeyBinding` attach the exact same
+    `MODIFIER_REGISTRY` tokens `Action.*(...)`'s own builder methods do
+    -- see `arklight.ast.nodes.KeyBinding`.
+    """
+
+    @staticmethod
+    def on(key: str, action: ActionRef) -> KeyBinding:
+        if not isinstance(action, ActionRef):
+            raise TypeError(
+                f"Key.on({key!r}, ...) needs an Action.*(...) reference as its "
+                f"second argument, got {type(action).__name__!r}. "
+                f"PlatformAPI.*(...) and named behaviors aren't supported as "
+                f"on_key= targets yet."
+            )
+        return KeyBinding(
+            key=key,
+            action=action.action,
+            state=action.state,
+            args=dict(action.args),
+            modifiers=action.modifiers,
+        )
 
 
 class _PlatformDB:
@@ -3649,6 +3697,9 @@ __all__ = [
     "Bind",
     "Action",
     "ActionRef",
+    # Stage 2 of INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md.
+    "Key",
+    "KeyBinding",
     "Computed",
     "Watch",
     "Derive",

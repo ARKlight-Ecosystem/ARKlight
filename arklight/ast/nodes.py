@@ -148,6 +148,58 @@ class ActionRef:
 
 
 @dataclass(frozen=True)
+class KeyBinding:
+    """
+    A reference to an element-scoped key event -- e.g.
+    `Key.on("Escape", Action.set(...))`. Used as an `on_key=` value on
+    any element (`INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`,
+    Stage 2).
+
+    Deliberately flat -- `action`/`state`/`args` inlined directly onto
+    this dataclass, rather than `KeyBinding(key, action: ActionRef)`
+    wrapping an `ActionRef` as a nested field -- because a dataclass
+    nested inside another dataclass's field loses its `__ark_type__`
+    tag during `.arklight` binary encoding (`dataclasses.asdict`
+    flattens it to a plain dict before `_json_default` ever sees it;
+    see `arklight/ir/binary.py`'s module docstring, "known gap"
+    paragraph, for the same issue already documented for `ItemIndexRef`
+    inside an `ActionRef.args` value). A flat `KeyBinding` round-trips
+    fully through that format instead of silently losing its action on
+    the way back.
+
+    `key` is checked against `arklight.ir.schema.KEY_REGISTRY` (the
+    closed key-name enum) at Validation, exactly as `ActionRef.action`/
+    `.state` are checked against `ACTION_REGISTRY`/declared `State(...)`
+    -- see `arklight.ir.validate._validate_key_props`. `modifiers`
+    reuses the exact same `MODIFIER_REGISTRY` tokens (`prevent`/`stop`/
+    `once`/`debounce`/`throttle`) an `ActionRef`'s `.with_modifiers(...)`/
+    `.debounce(...)`/`.throttle(...)` already produce -- no new modifier
+    vocabulary for Stage 2.
+    """
+
+    key: str
+    action: str
+    state: str
+    args: dict[str, Any] = field(default_factory=dict)
+    modifiers: tuple[str, ...] = field(default_factory=tuple)
+
+    def with_modifiers(self, *names: str) -> "KeyBinding":
+        """Attach one or more boolean modifiers -- same shape as
+        `ActionRef.with_modifiers`."""
+        return replace(self, modifiers=self.modifiers + tuple(names))
+
+    def debounce(self, ms: int) -> "KeyBinding":
+        """Same shape as `ActionRef.debounce` -- wait `ms` of silence
+        since the last matching keydown before running the action."""
+        return replace(self, modifiers=self.modifiers + (f"debounce:{ms}",))
+
+    def throttle(self, ms: int) -> "KeyBinding":
+        """Same shape as `ActionRef.throttle` -- run the action at
+        most once every `ms` while the matching key keeps firing."""
+        return replace(self, modifiers=self.modifiers + (f"throttle:{ms}",))
+
+
+@dataclass(frozen=True)
 class PlatformAPIRef:
     """
     A reference to a Platform API interface call (`v0.065`, accepted
