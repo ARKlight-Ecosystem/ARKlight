@@ -5,6 +5,104 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.071`: Input & Platform Primitives stage 2 of 6, `on_key=` element-scoped key events
+
+**Added.** `on_key=Key.on(<key>, Action.*(...))` on any element -- a
+closed key enum and one delegated `keydown` listener per page, the
+same "one listener, data-driven dispatch" shape `wireClickInterceptor`
+already established for clicks:
+
+```python
+State("open", True)
+Dialog(id="confirm", on_key=Key.on("Escape", Action.set("open", False)))
+```
+
+- `KeyBinding` (`arklight/ast/nodes.py`) -- deliberately flat
+  (`key`/`action`/`state`/`args`/`modifiers` inlined directly, not a
+  nested `ActionRef`) so it keeps its `__ark_type__` tag through
+  `.arklight` binary encoding, unlike a dataclass nested inside another
+  dataclass's field would. `Key.on(key, action)` (`arklight/api.py`)
+  only accepts an `Action.*(...)` reference -- a `PlatformAPIRef` or
+  named-behavior string raises `TypeError`, left for a future stage.
+- `KNOWN_KEYS` (`arklight/ir/schema.py`): `Escape`, `Enter`, the four
+  arrow keys, `Tab`, plus `SoftLeft`/`SoftRight` for the
+  feature-phone-class forcing case -- deliberately not a sweep of
+  every `KeyboardEvent.key` value, only what the two forcing cases
+  need. `Ctrl`/`Alt`/`Meta` combos are out of scope (Stage 3's
+  page-scoped `Hotkey(...)` owns those); `Shift` is allowed through
+  (`Shift+Tab` still reports `event.key === "Tab"`).
+- `_validate_key_props` (`arklight/ir/validate.py`): known key name,
+  then the exact same action/state/modifiers/args checks `on_click=`
+  gets, via `_validate_action` with `label="on_key"` (duck-typed --
+  `KeyBinding` carries the same `action`/`state`/`args`/`modifiers`
+  attribute names `ActionRef` does) so error messages name the right
+  prop. Wired into both `validate_node` and `_validate_repeat_template`
+  (the latter with `allow_item_index=False`: a client-built
+  `Repeat(...)` item added later by `Action.append(...)` only ever
+  carries `on_click`, so `Item.index()` inside a template's `on_key`
+  is refused at build time rather than silently misbehaving later).
+- HTML compilation (`arklight/backend/html/attrs.py`): several plain
+  `data-ark-on-key`/`-key-action`/`-key-action-state`/
+  `-key-action-args` attributes, matched-pair with `on_click=`'s own
+  several-attribute shape so one element can carry both without
+  clobbering either. `data-ark-key-modifiers` is a plain
+  comma-separated token list, not a compiled `hx-trigger` -- HTMX's
+  trigger syntax has no notion of "this key, on this element, bubbled
+  from keydown."
+- New `arklight/backend/js/runtime/keys.py` (`wireKeyInterceptor`):
+  walks up from `event.target` through `parentNode` (not `.closest()`,
+  which only takes a selector) to find the nearest ancestor element
+  whose compiled key matches the one pressed -- so nested elements can
+  each carry their own, different `on_key=` binding and the inner one
+  wins. Unconditional guards against `Ctrl`/`Alt`/`Meta` combos and IME
+  composition (`isComposing`, plus the legacy `keyCode === 229`
+  fallback). `prevent` is honored conditionally, unlike the click
+  interceptor's unconditional `preventDefault()` -- a keydown is
+  frequently the browser's own handling of that key too (Tab moving
+  focus, arrows scrolling), so only an explicit `.with_modifiers(
+  "prevent")` suppresses it. `stop`/`once`/`debounce`/`throttle`
+  otherwise match their `on_click=` counterparts exactly.
+- `arklight/backend/js/render.py`: `has_key_binding`/
+  `needs_key_interceptor` (`_collect_usage`/`_build_runtime_js`) --
+  shipped only on a page where at least one node carries `on_key=`,
+  independent of `needs_click_interceptor` (a key-only page with no
+  `on_click=`/named behavior anywhere ships no click listener at all).
+  `on_key=`'s action folds into the same shared `used_actions` set a
+  `Watch(...)`'s `then=` already does.
+- `arklight/ir/components.py`'s `_rewrite_component_state_refs` gained
+  an `on_key=` branch (duck-typed against `KeyBinding`), so a
+  user-defined component's own local state targeted by `on_key=` is
+  namespaced to its instance-scoped page key exactly like an
+  `on_click=` target already is.
+- `KeyBinding` registered in `arklight/ir/binary.py`'s
+  `_RECONSTRUCTABLE_TYPES` for `.arklight` binary round-trip.
+
+**Behavior change worth knowing: none for existing sites.** Purely
+additive -- a site that never sets `on_key=` ships no new runtime code
+at all (`wireKeyInterceptor` is gated the same "only ship what's used"
+way every other optional runtime fragment is).
+
+**Not included.** Stage 1 (`Watch(...)`/`on_click=`/`on_reveal=`
+accepting more than one `Action.*(...)`) has code on this branch but
+isn't yet reflected as shipped in `PROGRESS.md`/`CAPABILITY-MATRIX.md`.
+Stages 3-5 (`Hotkey(...)`, selection as a `State(...)` source,
+user-mediated file open/save) are untouched. `pyproject.toml`'s version
+is unchanged.
+
+**Tests.** `tests/test_on_key.py`: `Key.on(...)` factory, validation
+(known/unknown key, undeclared-state target, unknown action/modifier,
+`Item.index()` rejected inside a `Repeat(...)` template's `on_key`),
+HTML attribute rendering, JS-backend only-ship-what's-used + wiring
+(independent of the click interceptor), no `eval`/`new Function`
+anywhere in the shipped fragment, user-defined-component local-state
+renaming, `.arklight` binary round-trip, and a Node section running the
+shipped `wireKeyInterceptor` fragment against a stubbed
+`document`/`store` (ancestor-walk matching, the nearest-binding-wins
+case, the Ctrl/Alt/Meta and IME guards, Shift+Tab matching a plain
+`Tab` binding, and all four modifier tokens). Full suite: 3409 passed.
+Docs: `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`,
+`docs/Foundational/CAPABILITY-MATRIX.md`, `PROGRESS.md` updated.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- `v0.071`: Input & Platform Primitives stage 6 of 6, `confirm` dialog
 
 **Added.** `PlatformAPI.confirm(message, into)` -- a one-shot native

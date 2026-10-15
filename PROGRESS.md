@@ -109,7 +109,8 @@ table, see [`docs/Foundational/ARCHITECTURE.md`](./docs/Foundational/ARCHITECTUR
 | (docs audit) | Docs-only: repository-layout drift fix -- `arklight/provider.py` added to `docs/Foundational/GETTING-STARTED.md`'s repository-layout tree (was missing despite `Provider`'s six-rung ladder being fully SHIPPED as of `v0.070`); everything else audited (doc-link/citation tests, CLI-REFERENCE vs. `--help`, full test suite, version-history PLANNED markers, `pyproject.toml` vs. `CHANGELOG.md`) came back clean. No code changed; out-of-band, no roadmap slot | DONE |
 | v0.071-v0.078 | Project Knowledge, stages 1-8 of 8: compiler-owned `.arklight/` project-local knowledge directory (foundation, internal providers/facts/observations abstraction, Git as first provider, persistent project context, compiler build history, diagnostics integration, historical observations, future-provider open slot) -- `docs/Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md` Stage 1 (`v0.071`, the `.arklight/` foundation) is SHIPPED -- see the `v0.071` row below; stages 2-8 are PLANNED | IN PROGRESS |
 | v0.071 **(draft -- version slot unconfirmed)** | Project Knowledge, stage 1 of 8: the `.arklight/` foundation -- `arklight/knowledge/` (new package), `KnowledgeStore(project_root)` with `ensure()` (detect-or-create the directory and its `PROJECT` marker, `knowledge_format=1`), `status()` (`ABSENT`/`UNUSABLE`/`UNMARKED`/`CORRUPT`/`CURRENT`/`OUTDATED`/`INCOMPATIBLE`), and `read(name)`/`write(name, facts)` -- plain UTF-8 `key=value` text, atomic writes, symlinks and out-of-directory names refused, 1 MiB cap, no writes into a non-current-format directory. Nothing in the compiler imports it: a build neither creates nor depends on `.arklight/`, and output is byte-identical with it absent, populated or corrupt. `tests/test_project_knowledge_v0071.py` (135 tests). `pyproject.toml` version not bumped -- the slot is shared with the still-PLANNED Input & Platform Primitives addendum | DONE |
-| v0.071 **(draft -- version slot unconfirmed)**, Input & Platform Primitives stage 6 of 6 | Platform API: `confirm` -- a one-shot native confirm prompt, the weakest forcing case of `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`'s six-stage ladder, ordered last on purpose. `PLATFORM_API_REGISTRY["confirm"]` + `BACKEND_PLATFORM_API_SUPPORT["web"]` (`arklight/ir/platform_api.py`); `PlatformAPI.confirm(message, into)` (`arklight/api.py`); `_validate_platform_confirm` (`arklight/ir/validate.py`, non-empty `message`, `into` must be a declared `State(...)`); Web fragment `arklight/backend/js/platform_apis/confirm.py` (`window.confirm`, falls back to `arkNotify` if uncallable or throwing) wired into `PLATFORM_API_MODULES` -- dispatched by the existing `"platform:"` click-interceptor branch, zero runtime changes. Stages 1-5 of this addendum remain PLANNED (Stage 1, multi-action `Watch`/`on_click`/`on_reveal`, has code on this branch but is not yet documented as shipped here). `tests/test_platform_api_confirm.py`. `pyproject.toml` version not bumped -- the slot is shared with Project Knowledge's own `v0.071` row above | DONE |
+| v0.071 **(draft -- version slot unconfirmed)**, Input & Platform Primitives stage 2 of 6 | `on_key=Key.on(<key>, Action.*(...))`, element-scoped key events -- a closed key enum (`KNOWN_KEYS`: `Escape`/`Enter`/arrows/`Tab`/`SoftLeft`/`SoftRight`) and one delegated `keydown` listener per page (`wireKeyInterceptor`, `arklight/backend/js/runtime/keys.py`), the same "one listener, data-driven dispatch" shape `wireClickInterceptor` already established for clicks. `KeyBinding` (`arklight/ast/nodes.py`, deliberately flat so it round-trips through `.arklight` binary) + `Key.on` (`arklight/api.py`, accepts only `Action.*(...)`); `_validate_key_props` (`arklight/ir/validate.py`, reuses `_validate_action` with `label="on_key"`, wired into both `validate_node` and `_validate_repeat_template` with `Item.index()` refused inside a template's `on_key`); HTML compilation as several plain `data-ark-on-key`/`-key-action`/`-key-action-state`/`-key-action-args`/`-key-modifiers` attributes (`arklight/backend/html/attrs.py`), matched-pair with `on_click=`'s own shape; `has_key_binding`/`needs_key_interceptor` gating in `arklight/backend/js/render.py` (independent of the click interceptor); `on_key=` state-target renaming for user-defined components (`arklight/ir/components.py`); `KeyBinding` registered for `.arklight` binary round-trip (`arklight/ir/binary.py`). `tests/test_on_key.py` (55 tests, including a Node section exercising the shipped fragment). `pyproject.toml` version not bumped -- the slot is shared with Project Knowledge's own `v0.071` row above and Stage 6 below | DONE |
+| v0.071 **(draft -- version slot unconfirmed)**, Input & Platform Primitives stage 6 of 6 | Platform API: `confirm` -- a one-shot native confirm prompt, the weakest forcing case of `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`'s six-stage ladder, ordered last on purpose. `PLATFORM_API_REGISTRY["confirm"]` + `BACKEND_PLATFORM_API_SUPPORT["web"]` (`arklight/ir/platform_api.py`); `PlatformAPI.confirm(message, into)` (`arklight/api.py`); `_validate_platform_confirm` (`arklight/ir/validate.py`, non-empty `message`, `into` must be a declared `State(...)`); Web fragment `arklight/backend/js/platform_apis/confirm.py` (`window.confirm`, falls back to `arkNotify` if uncallable or throwing) wired into `PLATFORM_API_MODULES` -- dispatched by the existing `"platform:"` click-interceptor branch, zero runtime changes. Stages 1 and 3-5 of this addendum remain PLANNED (Stage 1, multi-action `Watch`/`on_click`/`on_reveal`, has code on this branch but is not yet documented as shipped here; Stage 2 is now DONE, see the row above). `tests/test_platform_api_confirm.py`. `pyproject.toml` version not bumped -- the slot is shared with Project Knowledge's own `v0.071` row above | DONE |
 | v0.079   | `arklight assistant` -- Miko MVP, Stage A of `docs/Proposals/ARKLIGHT-ASSISTANT-CLI-PROPOSAL.md`'s sequencing amendment: `--wake-up-miko` wraps the already-shipped `v0.064` `arklight search --retrieve-doc` in-process as her one sanctioned tool, no `.arklight/`/Project Knowledge access. Experimental CLI feature (same gated, loudly-labeled-provisional posture as `docs/Foundational/EXPERIMENTAL-APIS.md`'s build-time escape hatches); permanence undecided until `v0.080` ships. `--wake-up-raeliana` is a stub that logs Raeliana's current proposal stage rather than launching an assistant -- her implementation stays unauthorized until Stage A's dogfooding period trips the amendment's fabrication/inconsistency trigger | PLANNED |
 | v0.080   | Android backend (`arklight android` -- `androidx.webkit.WebViewAssetLoader` packaging, evolving the existing `ARKlight-Viewer-for-Android-Devices` app into the runtime) -- renumbered from v0.100; Stages 0-4 of the staged CLI ladder done (CI build/smoke-test/release-build), Stages 5/6/7 (the local-toolchain counterparts) not started | IN PROGRESS |
 | v0.100   | Desktop backend (`arklight desktop` packaging) -- renumbered from v0.080; Stages 1-4 (`arklight desktop scaffold`, Linux-only GTK3/WebKit2GTK native host; CI build/smoke-test/packaging) done, Stages 5-7 (the local-toolchain counterparts) not started | IN PROGRESS |
@@ -400,15 +401,135 @@ time. Fixed by adding a `provider.py` row in the same annotation
 style, pointing at `PROVIDER-SDK.md`. No code changed. Out-of-band,
 no roadmap slot -- this is a docs-correctness pass, not a feature.
 
+## v0.071 -- Input & Platform Primitives, stage 2 of 6: `on_key=` element-scoped key events (DONE)
+
+Second rung of `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`,
+shipped out of sequence (ahead of Stage 1, which has code on this branch
+but isn't yet reflected as shipped here, and ahead of Stages 3-5, which
+remain PLANNED) since the two forcing cases -- a text-editor-class app's
+`Escape`-closes-dialog, and a feature-phone-class target whose entire
+input model is `keydown` on a small fixed key set -- were the most
+urgent gap the addendum's dogfooding reports surfaced. Shares the
+`v0.071` slot with Project Knowledge stage 1 and Stage 6's `confirm`
+dialog (both above/below); `pyproject.toml` stays at `0.070.0`.
+
+**What went in.**
+
+- `arklight/ast/nodes.py`: `KeyBinding(key, action, state, args,
+  modifiers)` -- deliberately flat rather than wrapping an `ActionRef`
+  as a nested field, because a dataclass nested inside another
+  dataclass's field loses its `__ark_type__` tag during `.arklight`
+  binary encoding (the same "known gap" `ItemIndexRef` already
+  documents). `.with_modifiers(...)`/`.debounce(...)`/`.throttle(...)`
+  mirror `ActionRef`'s own builder methods.
+- `arklight/api.py`: `Key.on(key, action)` -- only accepts an
+  `Action.*(...)` reference; a `PlatformAPIRef` or named-behavior
+  string raises `TypeError` (left for a future stage, not a forcing
+  case here).
+- `arklight/ir/schema.py`: `KNOWN_KEYS` -- the closed enum (`Escape`,
+  `Enter`, the four arrow keys, `Tab`, plus `SoftLeft`/`SoftRight` for
+  the feature-phone-class case). `Ctrl`/`Alt`/`Meta` combos are
+  explicitly out of scope (Stage 3's page-scoped `Hotkey(...)` owns
+  those); `Shift` passes through untouched (`Shift+Tab` still reports
+  `event.key === "Tab"`).
+- `arklight/ir/validate.py`: `_validate_key_props` -- known key name,
+  then the same action/state/modifiers/args checks `on_click=` gets via
+  `_validate_action` (duck-typed against `KeyBinding`'s identical
+  `action`/`state`/`args`/`modifiers` attribute names), with
+  `label="on_key"` threaded through `_validate_action`/
+  `_validate_modifiers`/`_validate_action_args` so error messages name
+  the right prop instead of hardcoded `"on_click"` text. Wired into
+  both `validate_node` and `_validate_repeat_template` -- the latter
+  with `allow_item_index=False`, since a client-built `Repeat(...)`
+  item added later by `Action.append(...)` only ever carries
+  `on_click` (`page_render.py`'s `_repeat_template_spec`), so
+  `Item.index()` inside a template's `on_key` is refused at build time
+  rather than silently misbehaving for one such item later.
+- `arklight/backend/html/attrs.py`: `on_key=KeyBinding` compiles to
+  several plain `data-ark-on-key`/`-key-action`/`-key-action-state`/
+  `-key-action-args` attributes -- matched-pair with `on_click=`'s own
+  several-attribute shape (not one combined JSON attribute), so one
+  element can carry both `on_click` and `on_key` without either
+  clobbering the other's attribute slot. `data-ark-key-modifiers` is a
+  plain comma-separated token list, not a compiled `hx-trigger` --
+  HTMX's trigger syntax has no notion of "this key, on this element,
+  bubbled from keydown," and routing through it would make `keydown`
+  itself the compiled trigger event, firing for every keydown
+  regardless of which key was pressed.
+- New `arklight/backend/js/runtime/keys.py` (`KEY_INTERCEPTOR_JS` /
+  `wireKeyInterceptor`): one delegated `keydown` listener per page.
+  Walks up from `event.target` through `parentNode` (not `.closest()`,
+  which only takes a selector, not a dynamic value to compare against
+  the pressed key) to find the nearest ancestor whose compiled key
+  matches -- so two different elements nested inside each other can
+  each carry their own `on_key=` binding and the inner one wins.
+  Unconditional guards against `Ctrl`/`Alt`/`Meta` combos and IME
+  composition (`event.isComposing`, plus the legacy `keyCode === 229`
+  fallback for older WebKit/Android builds). `prevent` is honored
+  conditionally -- unlike the click interceptor's unconditional
+  `preventDefault()` -- since a keydown is frequently the browser's
+  own handling of that key too (Tab moving focus, arrows scrolling a
+  page or moving a caret); only `.with_modifiers("prevent")`
+  suppresses it. `stop`/`once`/`debounce`/`throttle` otherwise match
+  their `on_click=` counterparts in `runtime/dispatch.py` exactly
+  (same `WeakSet`/`WeakMap` bookkeeping, keyed by the matched element).
+- `arklight/backend/js/render.py`: `has_key_binding` (`_collect_usage`)
+  -- true when any node anywhere carries `on_key=`, folding its action
+  into the same shared `used_actions` set a `Watch(...)`'s `then=`
+  already does. `needs_key_interceptor` (`_build_runtime_js`) gates
+  `KEY_INTERCEPTOR_JS` independently of `needs_click_interceptor` -- a
+  key-only page (a dialog's `Escape` handler, nothing clickable
+  anywhere) ships no click listener at all, only the key one. Declared
+  after the click interceptor when both are present (consistent
+  ordering, not a dependency), registered once at `DOMContentLoaded`
+  alongside it.
+- `arklight/ir/components.py`: `_rewrite_component_state_refs` gained
+  an `on_key=` branch (duck-typed against `KeyBinding`, same shape the
+  existing `on_click=` branch already reads), so a user-defined
+  component's own local state used as an `on_key=` target -- and any
+  arg reading that same state via `Bind(...)` -- is namespaced to its
+  instance-scoped page key exactly like `on_click=` already is.
+- `arklight/ir/binary.py`: `KeyBinding` added to
+  `_RECONSTRUCTABLE_TYPES`, so an `on_key=` prop round-trips through
+  `.arklight` binary encoding back into a real `KeyBinding` instance.
+
+**Tests.** `tests/test_on_key.py` (55 tests) -- `Key.on(...)` factory;
+validation (every known key accepted, unknown key/action/modifier
+rejected, undeclared-state target rejected, `Item.index()` rejected
+inside a `Repeat(...)` template's `on_key` while still allowed inside
+the same template's `on_click`); HTML attribute rendering (both props
+on one element, modifiers present/absent, args JSON-encoded); JS-backend
+only-ship-what's-used and wiring (independent of the click interceptor,
+declared after it when both present, action folded into the shared
+`actions` object); no `eval`/`new Function` anywhere in the shipped
+fragment; user-defined-component local-state renaming (target and
+`Bind(...)`-sourced args, two instances independently namespaced, a
+non-local name left untouched); `.arklight` binary round-trip; and a
+Node section running the shipped `wireKeyInterceptor` fragment against
+a stubbed `document`/`store` -- ancestor-walk matching, bubbling from a
+focused descendant, the nearest-binding-wins case, non-matching keys,
+the Ctrl/Alt/Meta and IME-composition guards, Shift+Tab still matching
+a plain `Tab` binding, `prevent`/`stop`/`once`/`debounce`/`throttle`
+each exercised individually, no-store and unknown-action-name cases.
+Full suite: 3409 passed.
+
+**Not included.** Stage 1 of this addendum (`Watch(...)`/`on_click=`/
+`on_reveal=` accepting more than one `Action.*(...)`) has code on this
+branch but isn't yet reflected as shipped in this file or in
+`docs/Foundational/CAPABILITY-MATRIX.md`. Stages 3-5 (`Hotkey(...)`,
+selection as a `State(...)` source, user-mediated file open/save) are
+untouched.
+
 ## v0.071 -- Input & Platform Primitives, stage 6 of 6: `confirm` dialog (DONE)
 
 Last rung of `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`,
-shipped out of sequence (ahead of Stages 2-5, which remain PLANNED) since
-it is the smallest, most self-contained row on the ladder -- one more
-`PLATFORM_API_REGISTRY` entry plus one backend fragment, no new IR node
-type or registry kind, same class of change `notify`/`clipboard_write`
-already landed as. Shares the `v0.071` slot with Project Knowledge stage
-1 (above); `pyproject.toml` stays at `0.070.0`.
+shipped out of sequence (ahead of Stages 1 and 3-5, which remain PLANNED
+or undocumented-as-shipped) since it is the smallest, most self-contained
+row on the ladder -- one more `PLATFORM_API_REGISTRY` entry plus one
+backend fragment, no new IR node type or registry kind, same class of
+change `notify`/`clipboard_write` already landed as. Shares the
+`v0.071` slot with Project Knowledge stage 1 and Stage 2's `on_key=`
+(both above); `pyproject.toml` stays at `0.070.0`.
 
 **What went in.**
 
@@ -437,13 +558,17 @@ already landed as. Shares the `v0.071` slot with Project Knowledge stage
 arguments), HTML attribute rendering, JS-backend only-ship-what's-used
 and dispatch wiring, backend-support checks, and a Node section running
 the shipped fragment against a stubbed `window.confirm` (OK, Cancel,
-missing, throwing, and no-store cases). Full suite: 3354 passed.
+missing, throwing, and no-store cases). Full suite: 3354 passed at the
+time this stage landed (now 3409, with Stage 2's `on_key=` tests folded
+in -- see that stage's own section above).
 
-**Not included.** Stages 1-5 of this addendum (`Watch(...)`/`on_click=`/
-`on_reveal=` multi-action, `on_key=`, `Hotkey(...)`, selection-as-`State`,
-user-mediated file open/save) -- Stage 1 has code on this branch (see
-`dd345c1`/`e7ff26a`) but isn't yet reflected as shipped in this file or
-in `docs/Foundational/CAPABILITY-MATRIX.md`; Stages 2-5 are untouched.
+**Not included.** Stages 1 and 3-5 of this addendum (`Watch(...)`/
+`on_click=`/`on_reveal=` multi-action, `Hotkey(...)`,
+selection-as-`State`, user-mediated file open/save) -- Stage 1 has code
+on this branch (see `dd345c1`/`e7ff26a`) but isn't yet reflected as
+shipped in this file or in `docs/Foundational/CAPABILITY-MATRIX.md`;
+Stages 3-5 are untouched. Stage 2 (`on_key=`) is now DONE -- see that
+stage's own section above.
 
 ## v0.079 -- `arklight assistant` Miko MVP, Stage A (PLANNED)
 

@@ -38,7 +38,7 @@ documented hole with no decision yet.
 | Typed-text binding (`bind_value=Bind.model(...)`, debounce/throttle) | Shipped | -- | |
 | Scroll visibility (`on_reveal=`) | Shipped | -- | |
 | More than one effect from one event | Gap | **Planned** (Stage 1 of 6) | A `Watch(...)`'s `then=` takes exactly one `ActionRef`; chaining `Watch`es as a workaround is unconfirmed, and doesn't fix the same single-`ActionRef` limit on `on_click=`/`on_reveal=`. |
-| Key events, element-scoped (`on_key=`) | Gap | **Planned** (Stage 2 of 6) | Forcing cases: a keyboard-first editor, a keypad-only target whose input model is `keydown` and has no click surface at all. |
+| Key events, element-scoped (`on_key=`) | Shipped (Web) | -- | Stage 2 of 6. Forcing cases: a keyboard-first editor, a keypad-only target whose input model is `keydown` and has no click surface at all; see `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`. |
 | Key events, page-scoped (`Hotkey(...)`) | Gap | **Planned** (Stage 3 of 6) | `Escape` and modifier-combo shortcuts must fire regardless of where focus currently sits -- element scoping structurally can't reach that. |
 | `focus`, `blur`, `input`, `change` as event props | Gap | No forcing case | `bind_value=` + `Watch(...)` already react to typed text. |
 | Hold/release (`keyup`, held-key state) | Gap | No forcing case | |

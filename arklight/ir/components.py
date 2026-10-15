@@ -93,7 +93,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
-from arklight.ast.nodes import STATE_REF_KEY, ActionRef, ARKNode, ClassBindSpec, ModelBindSpec, is_state_ref
+from arklight.ast.nodes import STATE_REF_KEY, ActionRef, ARKNode, ClassBindSpec, KeyBinding, ModelBindSpec, is_state_ref
 from arklight.ir.schema import SCHEMA
 
 # A component render function: takes resolved keyword props, returns
@@ -793,8 +793,12 @@ def _rewrite_component_state_refs(value: Any, name_map: dict[str, str]) -> Any:
     v0.060, Stage 4: recursively rewrite every reference to one of
     `name_map`'s local component-state names -- a `Bind(name)` node, an
     `on_click=Action.*(...)` (`ActionRef.state`, and any arg fed from
-    state via `Bind(name)`, i.e. a `{"__state__": name}` marker), a
-    `bind_class=Bind.when(...)` (`ClassBindSpec.state`), or a
+    state via `Bind(name)`, i.e. a `{"__state__": name}` marker), an
+    `on_key=Key.on(...)` (Stage 2 of `INPUT-AND-PLATFORM-PRIMITIVES-
+    ADDENDUM-v0.071.md` -- a `KeyBinding` carries the exact same
+    `state`/`args` shape an `ActionRef` does, duck-typed the same way
+    `arklight.ir.validate._validate_key_props` reuses `_validate_action`
+    for it), a `bind_class=Bind.when(...)` (`ClassBindSpec.state`), or a
     `bind_value=Bind.model(...)` (a plain string prop) -- into that
     name's instance-namespaced page-state key. Runs once, on a
     `state=`-declaring component's own freshly rendered subtree, before
@@ -856,6 +860,35 @@ def _rewrite_component_state_refs(value: Any, name_map: dict[str, str]) -> Any:
                 on_click,
                 state=name_map.get(on_click.state, on_click.state),
                 args=rewritten_args,
+            )
+
+    on_key = new_props.get("on_key")
+    if isinstance(on_key, KeyBinding):
+        # Stage 2: same target-and-args rewrite as `on_click` just
+        # above, duck-typed against `KeyBinding`'s identical
+        # `state`/`args` shape -- a `Dialog(..., on_key=Key.on(
+        # "Escape", Action.set("open", False)))` inside a user-defined
+        # component must have "open" rewritten to its namespaced page
+        # key exactly like an `on_click` target would be, or
+        # Validation would reject the expanded page for targeting
+        # undeclared state.
+        rewritten_key_args = {
+            key: (
+                {STATE_REF_KEY: name_map[val[STATE_REF_KEY]]}
+                if is_state_ref(val) and val[STATE_REF_KEY] in name_map
+                else val
+            )
+            for key, val in on_key.args.items()
+        }
+        key_args_changed = rewritten_key_args != on_key.args
+        if on_key.state in name_map or key_args_changed:
+            if not props_changed:
+                new_props = dict(new_props)
+                props_changed = True
+            new_props["on_key"] = replace(
+                on_key,
+                state=name_map.get(on_key.state, on_key.state),
+                args=rewritten_key_args,
             )
 
     bind_class = new_props.get("bind_class")
