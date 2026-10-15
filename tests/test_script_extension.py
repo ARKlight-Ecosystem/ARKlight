@@ -8,6 +8,7 @@ arklight/backend/script_extension.py.
 
 from __future__ import annotations
 
+import shutil
 import warnings
 
 import pytest
@@ -18,6 +19,7 @@ from arklight.backend.script_extension import (
     REQUIRED_MARKER,
     ScriptExtension,
     ScriptExtensionError,
+    check_js_syntax,
     register,
 )
 
@@ -167,8 +169,8 @@ def test_missing_marker_warns_but_does_not_block(tmp_path):
     # The warning message itself always quotes REQUIRED_MARKER (it's
     # telling you what to add), so the real signal is that a warning
     # fired at all -- not a substring search over its text.
-    assert len(caught) == 1
-    assert "does not contain the required" in str(caught[0].message)
+    marker_warnings = [w for w in caught if "does not contain the required" in str(w.message)]
+    assert len(marker_warnings) == 1
     # Not blocked: the extension is still wired up.
     assert len(site.raw_postprocessors) == 1
 
@@ -188,4 +190,134 @@ def test_marker_present_in_source_suppresses_warning(tmp_path):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         register(site, module.Marked)
-    assert len(caught) == 0
+    assert not [w for w in caught if "does not contain the required" in str(w.message)]
+
+
+# ---------------------------------------------------------------------------
+# `node --check` syntax gate
+# ---------------------------------------------------------------------------
+
+needs_node = pytest.mark.skipif(shutil.which("node") is None, reason="node not on PATH")
+
+
+class _BrokenSyntax(ScriptExtension):
+    script = "<script>function broken( {\n  console.log('oops');\n</script>"
+
+
+class _Opaque(ScriptExtension):
+    script = "<script>const clash = 1;</script>"
+
+
+@needs_node
+def test_check_js_syntax_accepts_valid_js():
+    assert check_js_syntax("const a = 1;\nconsole.log(a);\n", label="t") is True
+
+
+@needs_node
+def test_check_js_syntax_rejects_invalid_js_and_names_the_label():
+    with pytest.raises(ScriptExtensionError) as exc:
+        check_js_syntax("function (", label="MyExt.script")
+    assert "MyExt.script" in str(exc.value)
+    assert "SyntaxError" in str(exc.value)
+    # the throwaway temp path must not leak into the message
+    assert "arklight-node-check-" not in str(exc.value)
+    # nor Node's internal stack frames / version footer
+    assert "node:internal" not in str(exc.value)
+    assert "Node.js v" not in str(exc.value)
+
+
+@needs_node
+def test_register_fails_fast_on_syntax_error():
+    site = Site(name="Test")
+    with pytest.raises(ScriptExtensionError) as exc:
+        register(site, _BrokenSyntax)
+    assert "_BrokenSyntax" in str(exc.value)
+    # nothing half-registered
+    assert site.raw_postprocessors == []
+    assert site.experimental_usages == []
+
+
+@needs_node
+def test_compile_step_catches_a_fragment_that_breaks_the_combined_file():
+    # `const clash` parses fine alone but is a redeclaration once appended
+    # after a runtime that already declares it at top level.
+    site = Site(name="Test")
+    register(site, _Opaque)
+    with pytest.raises(ScriptExtensionError) as exc:
+        site.raw_postprocessors[0]({SCRIPT_PATH: "const clash = 0;\n"})
+    assert SCRIPT_PATH in str(exc.value)
+    assert "_Opaque" in str(exc.value)
+
+
+@needs_node
+def test_compile_step_reports_a_broken_runtime_rather_than_swallowing_it():
+    site = Site(name="Test")
+    register(site, _Plain)
+    with pytest.raises(ScriptExtensionError):
+        site.raw_postprocessors[0]({SCRIPT_PATH: "function ("})
+
+
+def test_missing_node_warns_but_does_not_block(monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    site = Site(name="Test")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        register(site, _BrokenSyntax)  # would raise if node were found
+    assert any("syntax was NOT checked" in str(w.message) for w in caught)
+    assert len(site.raw_postprocessors) == 1
+    out = site.raw_postprocessors[0]({})
+    assert "function broken(" in out[SCRIPT_PATH]
+
+
+def test_check_syntax_false_opts_out(monkeypatch):
+    def _boom(*_a, **_k):
+        raise AssertionError("node must not be invoked when check_syntax is False")
+
+    monkeypatch.setattr("arklight.backend.script_extension.subprocess.run", _boom)
+
+    class _OptOut(_BrokenSyntax):
+        check_syntax = False
+
+    site = Site(name="Test")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        register(site, _OptOut)
+    assert not any("syntax was NOT checked" in str(w.message) for w in caught)
+    site.raw_postprocessors[0]({})  # combined check is skipped too
+
+
+# ---------------------------------------------------------------------------
+# Classic-script grammar (why this is not literally `node --check`).
+#
+# `node --check s.js` parses via lib/internal/main/check_syntax.js, which
+# picks CommonJS or ESM and compiles CJS as a function body. arklight.js is
+# loaded by a browser as a plain classic <script>, so each of these passes
+# `node --check` but is a fatal SyntaxError in the page.
+# ---------------------------------------------------------------------------
+
+_FATAL_IN_BROWSER_BUT_PASSES_NODE_CHECK = {
+    "export": "export const a = 1;",
+    "import": "import x from 'y';",
+    "top-level await": "await fetch('/x');",
+    "top-level return": "if (!window.ok) { return; }",
+    "new.target": "console.log(new.target);",
+}
+
+
+@needs_node
+@pytest.mark.parametrize("src", _FATAL_IN_BROWSER_BUT_PASSES_NODE_CHECK.values(), ids=list(_FATAL_IN_BROWSER_BUT_PASSES_NODE_CHECK))
+def test_rejects_syntax_that_node_check_accepts_but_a_browser_script_does_not(src):
+    with pytest.raises(ScriptExtensionError):
+        check_js_syntax(src, label="t")
+
+
+@needs_node
+@pytest.mark.parametrize("src", ["with (Math) { var y = PI; }", "var await = 1;"], ids=["with", "var-await"])
+def test_accepts_valid_sloppy_classic_script_that_a_module_goal_would_reject(src):
+    assert check_js_syntax(src, label="t") is True
+
+
+@needs_node
+def test_syntax_check_parses_but_never_executes_the_script():
+    # If this ran, the throw would surface as a non-SyntaxError failure.
+    assert check_js_syntax("throw new Error('must not run'); process.exit(3);", label="t") is True
