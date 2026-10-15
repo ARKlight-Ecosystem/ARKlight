@@ -79,7 +79,7 @@ import json
 import warnings
 from html import escape
 
-from arklight.ast.nodes import ActionRef, ClassBindSpec, ModelBindSpec, PlatformAPIRef
+from arklight.ast.nodes import ActionRef, ClassBindSpec, KeyBinding, ModelBindSpec, PlatformAPIRef
 from arklight.backend.html.routing import (
     ASSET_OR_ROUTE_AWARE_ATTRS,
     ROUTE_AWARE_ATTRS,
@@ -348,6 +348,53 @@ def _attr_string(
             # already rejects anything not in `KNOWN_BEHAVIORS` before
             # this code runs.
             parts.append(f' data-ark-on-click="behavior:{escape(value, quote=True)}"')
+            continue
+
+        if key == "on_key" and isinstance(value, KeyBinding):
+            # Stage 2 (`INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`):
+            # a KeyBinding's own attribute shape -- deliberately *not*
+            # the single-JSON-attribute shape an earlier sketch of this
+            # stage assumed, matched-pair instead with
+            # `on_click=Action.*(...)`'s several-plain-attributes shape
+            # just above (`data-ark-on-click`/`data-ark-action-state`/
+            # `data-ark-action-args`), so one element can carry both
+            # `on_click` and `on_key` without either clobbering the
+            # other's attribute slot. `data-ark-on-key` carries the key
+            # name itself (read by `arkWireKeyInterceptor`'s delegated
+            # `keydown` listener, `arklight/backend/js/runtime/keys.py`,
+            # to decide whether this element's binding matches the
+            # event that just fired); `data-ark-key-action`/
+            # `-key-action-state`/`-key-action-args` mirror the
+            # `on_click` action attributes exactly.
+            #
+            # Modifiers are the one real difference from `on_click=`:
+            # `_modifiers_to_hx_trigger` below compiles timing modifiers
+            # into HTMX's `hx-trigger` syntax, which only makes sense
+            # for an event HTMX's own attribute processing understands
+            # as a trigger (`click`, or a bare DOM event name) -- `hx-
+            # trigger` has no notion of "this key, on this element,
+            # bubbled from keydown", and reusing it here would mean
+            # `keydown` itself becomes the compiled trigger event,
+            # firing for *every* keydown on the element regardless of
+            # which key was pressed, defeating the whole point of a
+            # closed key enum. So `on_key`'s modifier tokens get their
+            # own plain `data-ark-key-modifiers` attribute instead --
+            # the exact shape `on_click`'s modifiers used before
+            # htmx-2 (the now-deleted `arkApplyModifiers`), parsed
+            # directly by `arkWireKeyInterceptor` the same way that
+            # function used to be parsed, rather than routed through
+            # HTMX at all. `MODIFIER_REGISTRY`'s token vocabulary is
+            # unchanged either way -- only which runtime piece reads it.
+            parts.append(f' data-ark-on-key="{escape(value.key, quote=True)}"')
+            parts.append(f' data-ark-key-action="{escape(value.action, quote=True)}"')
+            parts.append(f' data-ark-key-action-state="{escape(value.state, quote=True)}"')
+            if value.args:
+                parts.append(
+                    f' data-ark-key-action-args="{escape(json.dumps(value.args), quote=True)}"'
+                )
+            if value.modifiers:
+                modifiers_str = ",".join(value.modifiers)
+                parts.append(f' data-ark-key-modifiers="{escape(modifiers_str, quote=True)}"')
             continue
 
         if key == "on_reveal" and isinstance(value, str):

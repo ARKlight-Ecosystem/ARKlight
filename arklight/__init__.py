@@ -126,6 +126,13 @@ from arklight.api import (
     Bind,
     Action,
     ActionRef,
+    # Stage 2 of INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md
+    # (`on_key=`, element-scoped key events) -- same "defined in
+    # arklight/api.py, must also be re-exported here for `from
+    # arklight import *`" discipline the vdom-4..vdom-7 comment just
+    # below already explains for Computed/Watch/etc.
+    Key,
+    KeyBinding,
     PlatformAPI,
     PlatformAPIRef,
     Provider,
@@ -294,6 +301,8 @@ __all__ = [
     "Bind",
     "Action",
     "ActionRef",
+    "Key",
+    "KeyBinding",
     "PlatformAPI",
     "PlatformAPIRef",
     "Provider",

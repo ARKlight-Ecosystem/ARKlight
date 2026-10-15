@@ -83,6 +83,15 @@ are -- see `state.py`'s module docstring, "v0.064" section, for why
 the two halves of one feature are split across "always present, no-op
 when unused" vs. "only shipped when used" this way.
 
+Stage 2 of `docs/Implementation/INPUT-AND-PLATFORM-PRIMITIVES-
+ADDENDUM-v0.071.md` adds one more sibling the same way as `watch.py`/
+`repeat.py`/`show.py`: `keys.py` (`KEY_INTERCEPTOR_JS` /
+`wireKeyInterceptor`), for `on_key=Key.on(...)` element-scoped key
+events. Not folded into `STATE_CORE_JS` -- only shipped on a site
+where at least one node uses `on_key=` (`has_key_binding` in
+`arklight/backend/js/render.py`'s `_collect_usage`), same "only ship
+what's used" discipline.
+
 Three more exports -- `HTMX_ERROR_HANDLING_JS` (`wireHtmxErrorHandling`,
 including the real-navigation fallback for a dead boosted link),
 `APP_SHELL_FILE_PROTOCOL_BOOST_OFF_JS` (`disableBoostOnFileProtocol`)
@@ -105,6 +114,7 @@ from arklight.backend.js.runtime.bindings import (
     RENDER_CLASS_BINDINGS_JS,
 )
 from arklight.backend.js.runtime.dispatch import CLICK_INTERCEPTOR_JS
+from arklight.backend.js.runtime.keys import KEY_INTERCEPTOR_JS
 from arklight.backend.js.runtime.model import (
     RENDER_MODEL_BINDINGS_JS,
     WIRE_MODEL_BINDING_JS,
@@ -137,6 +147,7 @@ STATE_CORE_JS = (
 __all__ = [
     "STATE_CORE_JS",
     "CLICK_INTERCEPTOR_JS",
+    "KEY_INTERCEPTOR_JS",
     "NOTIFY_JS",
     "ERROR_REPORT_JS",
     "ERROR_BOUNDARY_JS",

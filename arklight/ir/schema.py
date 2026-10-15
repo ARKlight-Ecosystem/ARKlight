@@ -413,6 +413,44 @@ MODIFIER_REGISTRY: dict[str, ModifierSpec] = {
 KNOWN_MODIFIERS = frozenset(MODIFIER_REGISTRY)
 
 
+# Stage 2 of `INPUT-AND-PLATFORM-PRIMITIVES-ADDENDUM-v0.071.md`:
+# `on_key=Key.on(<key>, Action.*(...))`'s closed key-name enum --
+# element-scoped key events compiling to one delegated `keydown`
+# listener per page (`arkWireKeyInterceptor`, see
+# `arklight/backend/js/runtime/keys.py`), the same "one listener,
+# data-driven dispatch" shape `wireClickInterceptor` already
+# established for clicks. Deliberately starts with only the keys the
+# two forcing cases in the addendum actually need -- a text-editor-
+# class app's `Escape`-closes-dialog, and a keypad/remote-input
+# (feature-phone-class) target whose entire input model is `keydown`
+# on `SoftLeft`/`SoftRight`/`Enter`/the arrow keys -- not a sweep of
+# every key the DOM `KeyboardEvent.key` spec names. Each value here is
+# the exact `event.key` string the runtime compares against (no
+# translation layer), so `Key.on("Escape", ...)` and a raw
+# `event.key === "Escape"` check mean the same thing. `Ctrl+S`-style
+# modifier-combo shortcuts are explicitly out of scope here -- Stage 3's
+# page-scoped `Hotkey(...)` owns those (see the addendum's Stage 3
+# section); Stage 2's `on_key=` only ever fires for the bare key, with
+# `Shift` (but never `Ctrl`/`Alt`/`Meta`) allowed through, same as the
+# runtime's own IME-composition/modifier-combo guard.
+KNOWN_KEYS = frozenset(
+    {
+        "Escape",
+        "Enter",
+        "Tab",
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        # Feature-phone-class target (the addendum's second forcing
+        # case): a keypad/remote-input device with no pointer at all,
+        # whose soft keys report these two `event.key` values.
+        "SoftLeft",
+        "SoftRight",
+    }
+)
+
+
 # `v0.064` (docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md, `docs/
 # version history/v0.064.md`): `State(..., query=..., history=...)`'s
 # `history` prop names how a query-tracked key's writes affect the
