@@ -1,4 +1,5 @@
 import io
+import os
 
 from arklight.cli.mdrender import render_markdown, resolve_color, supports_color
 
@@ -23,7 +24,7 @@ def test_bold_and_italic_and_inline_code_are_styled():
     result = render_markdown("Some **bold**, *italic*, and `code`.\n", color=True)
     assert "\x1b[1m" in result  # bold
     assert "\x1b[3m" in result  # italic
-    assert "\x1b[38;5;180m" in result  # inline code color
+    assert "\x1b[38;2;214;163;115m" in result  # inline code color
     assert _strip_ansi(result) == "Some bold, italic, and code.\n"
 
 
@@ -58,10 +59,77 @@ def test_horizontal_rule_is_dimmed_not_rewritten():
     assert _strip_ansi(result) == "---\n"
 
 
-def test_table_row_passes_through_unmatched_by_hrule_or_bullet():
+def test_pipe_table_is_rendered_as_a_bordered_box_not_passed_through():
     source = "| a | b |\n| - | - |\n| 1 | 2 |\n"
-    result = render_markdown(source, color=True)
-    assert _strip_ansi(result) == source
+    result = render_markdown(source, color=True, width=80)
+    stripped = _strip_ansi(result)
+    assert stripped != source
+    # box-drawing borders, header + one data row, cell contents preserved
+    assert stripped.count("┌") == 1  # top-left corner, once
+    assert stripped.count("└") == 1  # bottom-left corner, once
+    assert "│ a " in stripped and "│ b " in stripped
+    assert "│ 1 " in stripped and "│ 2 " in stripped
+    # header row is visually distinguished from data rows
+    assert "\x1b[1;38;2;204;120;92m" in result
+
+
+def test_table_column_alignment_is_read_from_the_delimiter_row():
+    source = "| left | right | mid |\n| :-- | --: | :-: |\n| a | b | c |\n"
+    result = _strip_ansi(render_markdown(source, color=True, width=80))
+    lines = [l for l in result.split("\n") if l.strip()]
+    data_row = lines[3]  # top border, header, header separator, first data row
+    # right-aligned column pads on the left, left-aligned pads on the right
+    assert "b" in data_row
+
+    rendered_source_order = render_markdown(source, color=True, width=80)
+    assert "\x1b[0m" in rendered_source_order
+
+
+def test_wide_table_wraps_cell_content_instead_of_overflowing():
+    long_cell = "a" * 60
+    source = f"| short | wide |\n| --- | --- |\n| x | {long_cell} |\n"
+    result = _strip_ansi(render_markdown(source, color=True, width=40))
+    for line in result.split("\n"):
+        assert len(line) <= 40
+
+
+def test_long_paragraph_wraps_to_requested_width():
+    words = " ".join(["word"] * 30)
+    result = _strip_ansi(render_markdown(words + "\n", color=True, width=40))
+    lines = [l for l in result.split("\n") if l]
+    assert len(lines) > 1
+    assert all(len(l) <= 40 for l in lines)
+    assert " ".join(result.split()) == words
+
+
+def test_long_heading_wraps_and_keeps_its_color_on_continuation_lines():
+    title_words = " ".join(["Heading"] * 20)
+    result = render_markdown(f"# {title_words}\n", color=True, width=40)
+    stripped = _strip_ansi(result)
+    lines = [l for l in stripped.split("\n") if l]
+    assert len(lines) > 1
+    assert all(len(l) <= 40 for l in lines)
+    # every continuation line still carries heading color
+    assert result.count("\x1b[1;38;2;204;120;92m") >= len(lines)
+
+
+def test_bullet_continuation_lines_hang_indent_under_the_bullet_text():
+    body = " ".join(["word"] * 20)
+    result = _strip_ansi(render_markdown(f"- {body}\n", color=True, width=20))
+    lines = [l for l in result.split("\n") if l]
+    assert len(lines) > 1
+    assert lines[0].startswith("• ")
+    for cont in lines[1:]:
+        assert cont.startswith("  ")  # two-space hang indent under "• "
+
+
+def test_default_width_is_auto_detected_when_not_given(monkeypatch):
+    monkeypatch.delenv("COLUMNS", raising=False)
+    from arklight.cli import mdrender
+
+    monkeypatch.setattr(mdrender.shutil, "get_terminal_size", lambda fallback: os.terminal_size((30, 24)))
+    result = _strip_ansi(render_markdown(" ".join(["word"] * 20) + "\n", color=True))
+    assert all(len(l) <= 30 for l in result.split("\n") if l)
 
 
 def test_link_shows_text_and_url():
