@@ -18,6 +18,9 @@ on:
       - 'installer/packaging/**'
       - 'installer/linux/**'
 
+permissions:
+  contents: write  # softprops/action-gh-release needs this to create/attach to the release
+
 jobs:
   build:
     strategy:
