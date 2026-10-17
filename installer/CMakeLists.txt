@@ -18,7 +18,7 @@ project(arklight-installer NONE)
 # packaging-only change never needs to re-run the Neutralino build.
 # ---------------------------------------------------------------------------
 
-set(ARK_VERSION "1.0.0" CACHE STRING "ARKlight Installer version (mirrors installer/gui/neutralino.config.json)")
+set(ARK_VERSION "1.0.3" CACHE STRING "ARKlight Installer version (mirrors installer/gui/neutralino.config.json)")
 set(ARK_GUI_DIST "${CMAKE_CURRENT_SOURCE_DIR}/gui/dist/gui" CACHE PATH "Path to neu build output")
 set(ARK_BINARY_NAME "gui" CACHE STRING "cli.binaryName from neutralino.config.json")
 
