@@ -144,6 +144,62 @@ def test_plain_paragraph_with_no_markup_is_unchanged_after_stripping():
     assert _strip_ansi(render_markdown(source, color=True)) == source
 
 
+def test_wrapping_a_multi_word_link_never_leaves_dangling_markdown_syntax():
+    # A wrap boundary falling inside a multi-word link used to split the
+    # raw `[text](url)` syntax itself (wrapping ran on the raw markdown
+    # source, before `_style_inline` turned it into "text (url)"),
+    # leaving a bare "[" and/or "(" stranded on their own line. Styling
+    # first means a wrap boundary can only ever land between rendered
+    # words, same as a real markdown renderer.
+    source = "Some words before a [longer link label here](http://example.com/path) and after.\n"
+    result = render_markdown(source, color=True, width=30)
+    stripped = _strip_ansi(result)
+    lines = [l for l in stripped.split("\n") if l]
+    assert len(lines) > 1
+    assert all(len(l) <= 30 for l in lines)
+    # the raw `[`/`]` link syntax is gone entirely -- only the rendered
+    # "text (url)" form remains, however the wrap happened to fall
+    assert "[" not in stripped and "]" not in stripped
+    assert " ".join(stripped.split()) == "Some words before a longer link label here (http://example.com/path) and after."
+
+
+def test_table_with_a_link_column_keeps_borders_aligned():
+    # Table column widths and cell wrap/pad used to be computed on raw,
+    # syntax-laden cell text (`[text](url)`) before `_style_inline` ran,
+    # so the rendered ("text (url)") length didn't match what the
+    # border math assumed -- leaving the right border one column short
+    # on any row containing a link (or bold/code span).
+    source = "| Name | Link |\n| --- | --- |\n| a | [click here](http://example.com) |\n"
+    result = render_markdown(source, color=True, width=40)
+    box_lines = [
+        _strip_ansi(l) for l in result.split("\n") if l.strip() and _strip_ansi(l)[:1] in "┌│├└"
+    ]
+    widths = {len(l) for l in box_lines}
+    assert len(widths) == 1  # every border/content line is exactly the same visible width
+    stripped_all = _strip_ansi(result)
+    assert "[click" not in stripped_all
+    assert "here](" not in stripped_all
+
+
+def test_table_header_color_does_not_defeat_header_wrapping():
+    # Wrapping the whole header cell in `_TABLE_HEADER_COLOR` before
+    # word-wrapping used to fuse the color escape code and the header's
+    # first word into a single indivisible token, defeating the
+    # force-break/space-wrap logic entirely and corrupting the header
+    # text itself (e.g. "Name" truncated to just "Nam").
+    source = "| LongHeaderWord | b |\n| --- | --- |\n| x | y |\n"
+    result = render_markdown(source, color=True, width=18)
+    stripped = _strip_ansi(result)
+    box_lines = [l for l in stripped.split("\n") if l.strip()]
+    widths = {len(l) for l in box_lines}
+    assert len(widths) == 1  # borders stay aligned even with a force-broken header
+    # the header word survives whole, force-broken across two lines at the
+    # column budget -- not truncated, not left as one unbroken overflow
+    assert "LongHeader" in box_lines[1] and "Word" in box_lines[2]
+    # and the header color (bold clay) still applies to both wrapped lines
+    assert result.count("\x1b[1;38;2;204;120;92m") >= 2
+
+
 # ---------------------------------------------------------------------------
 # supports_color / resolve_color
 # ---------------------------------------------------------------------------
