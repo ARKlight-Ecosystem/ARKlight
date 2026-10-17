@@ -7,8 +7,13 @@ SemVer.
 
 ## [Unreleased]
 
-Docs-only consistency pass; no behavior change.
+## [0.070.1] -- README: point AI-assisted developers to the ARKlight Skills Collections
 
+Docs-only patch release; no behavior change.
+
+- `README.md`: added a pointer to the [ARKlight Skills
+  Collections](https://github.com/ARKlight-Ecosystem/Skills/) for AI
+  Assisted Developers/Agents, just above the Install section.
 - `PROGRESS.md`: removed the stale "Planned, not yet scheduled" list
   (custom CSS classes and `search` shipped in `v0.042`; `--help` too),
   marked `v0.048` DONE, retitled the `v0.010` entry as shipped in
