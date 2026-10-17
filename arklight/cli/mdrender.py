@@ -37,7 +37,6 @@ import os
 import re
 import shutil
 import sys
-import textwrap
 from typing import TextIO
 
 _RESET = "\x1b[0m"
@@ -132,25 +131,108 @@ def terminal_width(stream: TextIO | None = None) -> int:
     return max(columns, _MIN_WIDTH)
 
 
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _visible_len(text: str) -> int:
+    """The on-screen column width of (possibly already-styled) `text`
+    -- ANSI SGR escape codes are zero-width and excluded from the
+    count. Every width calculation below (wrapping, padding, column
+    sizing) measures with this, never with plain `len`, so it always
+    reflects what will actually be on screen rather than how long the
+    underlying markup happens to be."""
+    return len(_ANSI_ESCAPE.sub("", text))
+
+
+def _ansi_slice_width(text: str, width: int) -> tuple[str, str]:
+    """Split already-styled `text` into a prefix whose *visible*
+    length is at most `width` and the remainder, without ever cutting
+    an escape sequence in half. Any styling still active at the cut
+    point is closed at the end of the prefix and reopened at the
+    start of the remainder, so each half is independently valid ANSI
+    (used by `_wrap_cell` to force-break a single styled token that's
+    wider than its column)."""
+    out: list[str] = []
+    active: list[str] = []
+    visible = 0
+    i, n = 0, len(text)
+    while i < n:
+        m = _ANSI_ESCAPE.match(text, i)
+        if m:
+            code = m.group(0)
+            active = [] if code == _RESET else active + [code]
+            out.append(code)
+            i = m.end()
+            continue
+        if visible >= width:
+            break
+        out.append(text[i])
+        visible += 1
+        i += 1
+    prefix = "".join(out)
+    remainder = text[i:]
+    if remainder:
+        prefix += _RESET
+        remainder = "".join(active) + remainder
+    return prefix, remainder
+
+
+def _close_ansi_across_lines(lines: list[str]) -> list[str]:
+    """Make each wrapped line independently valid ANSI. A style
+    opened on one line but not yet closed when a word-wrap boundary
+    falls in the middle of it (e.g. a multi-word link or bold span
+    split across two lines) would otherwise bleed its formatting onto
+    whatever follows; this closes it at the end of that line and
+    reopens it at the start of the next, matching what `render_table`
+    already does per-cell and keeping every line self-contained."""
+    active: list[str] = []
+    out = []
+    for line in lines:
+        prefix = "".join(active)
+        for m in _ANSI_ESCAPE.finditer(line):
+            code = m.group(0)
+            active = [] if code == _RESET else active + [code]
+        out.append(prefix + (line + _RESET if active else line))
+    return out
+
+
 def _wrap_text(text: str, width: int) -> list[str]:
-    """Word-wrap one logical line of Markdown prose to `width`
-    columns, raw (pre-styling) text in, raw text out. Long words are
-    never force-broken: a URL or an unbroken identifier wider than
-    `width` is left on its own overflowing line rather than split
+    """Word-wrap one logical line of already inline-styled Markdown
+    prose (see `_style_inline`) to `width` *visible* columns -- ANSI
+    escape codes are zero-width and never counted against the budget
+    or split mid-sequence (see `_visible_len`). Operating on the
+    styled text, not the raw markdown source, is what keeps a link or
+    bold span from being torn apart at its raw `[`/`]`/`(`/`)`/`*`
+    syntax: by the time this runs, that syntax is already gone, so a
+    wrap boundary can only ever fall between whole rendered words,
+    the same place a real markdown renderer would wrap. Long words are
+    never force-broken: a styled link or an unbroken identifier wider
+    than `width` is left on its own overflowing line rather than split
     mid-word, since this is plain prose wrapping, not table-cell
     packing (`_wrap_cell` below does the opposite trade-off, on
     purpose). An empty/whitespace-only input always yields one empty
     line rather than zero lines, so callers never have to special-case
     "this block of content had nothing in it"."""
     width = max(width, 1)
-    wrapped = textwrap.wrap(
-        text,
-        width=width,
-        break_long_words=False,
-        break_on_hyphens=False,
-        drop_whitespace=True,
-    )
-    return wrapped if wrapped else [""]
+    tokens = re.split(r"\s+", text.strip())
+    if tokens == [""]:
+        return [""]
+    lines: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for token in tokens:
+        tok_len = _visible_len(token)
+        if not current:
+            current, current_len = [token], tok_len
+        elif current_len + 1 + tok_len <= width:
+            current.append(token)
+            current_len += 1 + tok_len
+        else:
+            lines.append(" ".join(current))
+            current, current_len = [token], tok_len
+    if current:
+        lines.append(" ".join(current))
+    return _close_ansi_across_lines(lines) if lines else [""]
 
 
 def _style_inline(text: str) -> str:
@@ -218,18 +300,53 @@ def _column_alignment(sep_cell: str) -> str:
 
 
 def _wrap_cell(text: str, width: int) -> list[str]:
-    """Word-wrap one table cell's raw text to `width` columns. Unlike
-    `_wrap_text`, long words *are* force-broken (`textwrap`'s default):
-    a table cell has a hard column budget it must not blow past, so a
-    single unbroken token wider than the column -- a long identifier,
-    a URL -- gets split rather than left to overflow the box."""
+    """Word-wrap one already inline-styled table cell (see
+    `_style_inline`) to `width` *visible* columns, measuring and
+    breaking only on visible characters -- ANSI escape codes are
+    zero-width and never split mid-sequence (see `_visible_len`,
+    `_ansi_slice_width`). Unlike `_wrap_text`, long tokens *are*
+    force-broken: a table cell has a hard column budget it must not
+    blow past, so a single unbroken visible token wider than the
+    column -- a long identifier, a URL -- gets split rather than left
+    to overflow the box."""
     width = max(width, 1)
-    wrapped = textwrap.wrap(text, width=width, drop_whitespace=True)
-    return wrapped if wrapped else [""]
+    tokens = re.split(r"\s+", text.strip())
+    if tokens == [""]:
+        return [""]
+    lines: list[str] = []
+    current = ""
+    current_len = 0
+    for token in tokens:
+        tok_len = _visible_len(token)
+        if tok_len > width:
+            if current:
+                lines.append(current)
+                current, current_len = "", 0
+            remaining = token
+            while _visible_len(remaining) > width:
+                piece, remaining = _ansi_slice_width(remaining, width)
+                lines.append(piece)
+            current, current_len = remaining, _visible_len(remaining)
+            continue
+        if not current:
+            current, current_len = token, tok_len
+        elif current_len + 1 + tok_len <= width:
+            current += " " + token
+            current_len += 1 + tok_len
+        else:
+            lines.append(current)
+            current, current_len = token, tok_len
+    if current:
+        lines.append(current)
+    return _close_ansi_across_lines(lines) if lines else [""]
 
 
 def _pad_cell(text: str, width: int, align: str) -> str:
-    pad = max(width - len(text), 0)
+    """Pad an already inline-styled cell line to `width` *visible*
+    columns (see `_visible_len`) -- so a cell holding a link, bold
+    text, or inline code lines up with its column exactly as wide as
+    what actually renders, not as wide as its raw markdown source."""
+    pad = max(width - _visible_len(text), 0)
     if align == "right":
         return " " * pad + text
     if align == "center":
@@ -246,8 +363,16 @@ def _table_column_widths(rows: list[list[str]], n_cols: int, width: int) -> list
     leftover-from-rounding column-width added to or trimmed from the
     single widest column so the columns' widths always sum to exactly
     the space available. Cell wrapping (`_wrap_cell`) is what actually
-    makes the shrunk columns' content still fit."""
-    natural = [max((len(row[c]) for row in rows), default=0) for c in range(n_cols)]
+    makes the shrunk columns' content still fit.
+
+    `rows` holds already inline-styled cells (see `_render_table`), so
+    each cell's natural width is measured with `_visible_len`, not
+    plain `len` -- a styled link or bold span renders shorter than its
+    raw `[text](url)`/`**text**` markdown, and sizing columns off the
+    longer raw length is what used to leave the right border one
+    column short wherever a styled cell was the widest in its
+    column."""
+    natural = [max((_visible_len(row[c]) for row in rows), default=0) for c in range(n_cols)]
     natural = [max(w, 3) for w in natural]
 
     overhead = 3 * n_cols + 1  # one "| " + " |" pair of margins per column, plus one more bar
@@ -281,6 +406,18 @@ def _table_hline(col_widths: list[int], left: str, mid: str, right: str) -> str:
 def _table_row_lines(
     cells: list[str], col_widths: list[int], aligns: list[str], *, is_header: bool
 ) -> list[str]:
+    """`cells` are already inline-styled (see `_render_table`) -- this
+    wraps and pads that *visible* text, measured with `_visible_len`,
+    never the raw markdown source, so a cell's wrap points and column
+    alignment always match what actually ends up on screen.
+
+    The header color is applied per finished, already-wrapped-and-
+    padded line, not around the whole cell before wrapping: wrapping
+    a single escape-coded blob first would fuse the color code and
+    the cell's first word into one indivisible token, defeating both
+    the normal space-wrap and the long-word force-break in
+    `_wrap_cell` -- the same per-line-after-wrap pattern `render_markdown`
+    already uses for headings, quotes, and bullets."""
     wrapped_cols = [_wrap_cell(cell, w) for cell, w in zip(cells, col_widths)]
     height = max(len(wc) for wc in wrapped_cols)
 
@@ -289,12 +426,11 @@ def _table_row_lines(
     for row_idx in range(height):
         rendered_cells = []
         for col_idx, wrapped in enumerate(wrapped_cols):
-            raw = wrapped[row_idx] if row_idx < len(wrapped) else ""
-            padded = _pad_cell(raw, col_widths[col_idx], aligns[col_idx])
-            styled = _style_inline(padded)
+            line = wrapped[row_idx] if row_idx < len(wrapped) else ""
+            padded = _pad_cell(line, col_widths[col_idx], aligns[col_idx])
             if is_header:
-                styled = f"{_TABLE_HEADER_COLOR}{styled}{_RESET}"
-            rendered_cells.append(styled)
+                padded = f"{_TABLE_HEADER_COLOR}{padded}{_RESET}"
+            rendered_cells.append(padded)
         out.append(f"{bar} " + f" {bar} ".join(rendered_cells) + f" {bar}")
     return out
 
@@ -304,7 +440,17 @@ def _render_table(table_lines: list[str], width: int) -> list[str]:
     zero or more data rows -- exactly what the caller already detected
     with `_is_table_separator`) as a bordered, column-aligned box that
     fits `width`, wrapping cell content onto extra lines rather than
-    overflowing when the table is wider than the terminal."""
+    overflowing when the table is wider than the terminal.
+
+    Cells are inline-styled once, here, before any width calculation
+    or wrapping -- not after, the way it used to be. Styling after
+    sizing/wrapping/padding meant every one of those measurements ran
+    on raw, syntax-laden markdown source (`[text](url)`, `**text**`)
+    whose length doesn't match what `_style_inline` actually renders,
+    which both misaligned the right border on any column whose widest
+    cell was styled and let wrap boundaries fall inside a link's or
+    bold span's raw syntax, leaving a dangling `[`/`(` on its own
+    line."""
     header = _split_table_row(table_lines[0])
     sep = _split_table_row(table_lines[1])
     data = [_split_table_row(line) for line in table_lines[2:]]
@@ -318,12 +464,15 @@ def _render_table(table_lines: list[str], width: int) -> list[str]:
     data = [pad_row(row) for row in data]
     aligns = [_column_alignment(sep[c]) if c < len(sep) else "left" for c in range(n_cols)]
 
-    col_widths = _table_column_widths([header, *data], n_cols, width)
+    styled_header = [_style_inline(cell) for cell in header]
+    styled_data = [[_style_inline(cell) for cell in row] for row in data]
+
+    col_widths = _table_column_widths([styled_header, *styled_data], n_cols, width)
 
     out = [_table_hline(col_widths, "┌", "┬", "┐")]
-    out.extend(_table_row_lines(header, col_widths, aligns, is_header=True))
+    out.extend(_table_row_lines(styled_header, col_widths, aligns, is_header=True))
     out.append(_table_hline(col_widths, "├", "┼", "┤"))
-    for row in data:
+    for row in styled_data:
         out.extend(_table_row_lines(row, col_widths, aligns, is_header=False))
     out.append(_table_hline(col_widths, "└", "┴", "┘"))
     return out
@@ -405,11 +554,12 @@ def render_markdown(text: str, *, color: bool = True, width: int | None = None) 
             title = heading_match.group(2)
             color_code = _HEADING_COLORS.get(level, _HEADING_DEFAULT_COLOR)
             prefix = f"{'#' * level} "
-            wrapped_title = _wrap_text(title, max(width - len(prefix), 10)) if title else [""]
-            out_lines.append(f"{color_code}{prefix}{_style_inline(wrapped_title[0])}{_RESET}")
+            styled_title = _style_inline(title) if title else ""
+            wrapped_title = _wrap_text(styled_title, max(width - len(prefix), 10)) if title else [""]
+            out_lines.append(f"{color_code}{prefix}{wrapped_title[0]}{_RESET}")
             indent = " " * len(prefix)
             for cont in wrapped_title[1:]:
-                out_lines.append(f"{color_code}{indent}{_style_inline(cont)}{_RESET}")
+                out_lines.append(f"{color_code}{indent}{cont}{_RESET}")
             i += 1
             continue
 
@@ -422,10 +572,11 @@ def render_markdown(text: str, *, color: bool = True, width: int | None = None) 
         if quote_match:
             indent, body = quote_match.groups()
             bar_prefix = f"{indent}{_QUOTE_COLOR}│ "
-            wrapped_body = _wrap_text(body, max(width - len(indent) - 2, 10)) if body else [""]
-            out_lines.append(f"{bar_prefix}{_style_inline(wrapped_body[0])}{_RESET}")
+            styled_body = _style_inline(body) if body else ""
+            wrapped_body = _wrap_text(styled_body, max(width - len(indent) - 2, 10)) if body else [""]
+            out_lines.append(f"{bar_prefix}{wrapped_body[0]}{_RESET}")
             for cont in wrapped_body[1:]:
-                out_lines.append(f"{bar_prefix}{_style_inline(cont)}{_RESET}")
+                out_lines.append(f"{bar_prefix}{cont}{_RESET}")
             i += 1
             continue
 
@@ -433,13 +584,14 @@ def render_markdown(text: str, *, color: bool = True, width: int | None = None) 
         if bullet_match:
             indent, _marker, gap, body = bullet_match.groups()
             prefix_width = len(indent) + 1 + len(gap)
-            wrapped_body = _wrap_text(body, max(width - prefix_width, 10)) if body else [""]
+            styled_body = _style_inline(body) if body else ""
+            wrapped_body = _wrap_text(styled_body, max(width - prefix_width, 10)) if body else [""]
             out_lines.append(
-                f"{indent}{_BULLET_COLOR}•{_RESET}{gap}{_style_inline(wrapped_body[0])}"
+                f"{indent}{_BULLET_COLOR}•{_RESET}{gap}{wrapped_body[0]}"
             )
             cont_indent = " " * prefix_width
             for cont in wrapped_body[1:]:
-                out_lines.append(f"{cont_indent}{_style_inline(cont)}")
+                out_lines.append(f"{cont_indent}{cont}")
             i += 1
             continue
 
@@ -447,18 +599,19 @@ def render_markdown(text: str, *, color: bool = True, width: int | None = None) 
         if numbered_match:
             indent, marker, gap, body = numbered_match.groups()
             prefix_width = len(indent) + len(marker) + len(gap)
-            wrapped_body = _wrap_text(body, max(width - prefix_width, 10)) if body else [""]
+            styled_body = _style_inline(body) if body else ""
+            wrapped_body = _wrap_text(styled_body, max(width - prefix_width, 10)) if body else [""]
             out_lines.append(
-                f"{indent}{_BULLET_COLOR}{marker}{_RESET}{gap}{_style_inline(wrapped_body[0])}"
+                f"{indent}{_BULLET_COLOR}{marker}{_RESET}{gap}{wrapped_body[0]}"
             )
             cont_indent = " " * prefix_width
             for cont in wrapped_body[1:]:
-                out_lines.append(f"{cont_indent}{_style_inline(cont)}")
+                out_lines.append(f"{cont_indent}{cont}")
             i += 1
             continue
 
-        for wrapped in _wrap_text(line, width):
-            out_lines.append(_style_inline(wrapped))
+        for wrapped in _wrap_text(_style_inline(line), width):
+            out_lines.append(wrapped)
         i += 1
 
     return "\n".join(out_lines)
