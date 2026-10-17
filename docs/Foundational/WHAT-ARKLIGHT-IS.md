@@ -326,6 +326,14 @@ inferred from Section 1's wording:
   closed vocabulary -- there is no expression evaluator anywhere in
   the emitted output for a frontend framework's runtime to be
   compared against in the first place.
+- **Not a full-stack framework**, ARKlight handles Python-authored frontend
+  development and static compilation, not server-side application logic,
+  authentication, or database access. It is designed to work alongside a
+  backend of your choice, not replace one. Flask is recommended for
+  developers who prioritize a consistent authoring experience, as its
+  Python-native, function-oriented syntax feels closer to ARKlight's
+  component-call model. This is a recommendation, not a requirement; any
+  backend that fits the application is valid.
 - **Not a UI framework**, in the component-library sense either. There
   is no persistent widget tree, no client-side instance lifecycle
   outside a page's own reactive `State`, and (at the Stage 0-1 level
