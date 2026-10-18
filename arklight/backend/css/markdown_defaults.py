@@ -24,9 +24,10 @@ is registered into `arklight.api.RESERVED_UTILITY_CLASSES` the same
 protected way `.card`/`.nav`/etc. already are (see that module's
 `RESERVED_UTILITY_CLASSES` definition, which reads `HOOK_CLASS_NAMES`
 below alongside `BASE_CSS_BODY`'s own classes). A first-class
-Markdown-theming surface -- the `light`/`dark`/`reading` presets --
-is `MARKDOWN-CONTENT-ADDENDUM.md`'s Stage M7, independent of this one
-and still unscheduled.
+Markdown-theming surface -- the `light`/`dark`/`reading` presets,
+`Site(markdown_theme=...)` -- is `MARKDOWN-CONTENT-ADDENDUM.md`'s
+Stage M7, independent of this one; see
+`arklight.backend.css.markdown_presets` for what it ships.
 
 Selector grammar note: `arklight.backend.css.selectors.parse_selector_list`
 (what `Site.style_selector(...)` validates against) has no `#id`

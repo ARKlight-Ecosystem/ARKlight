@@ -157,13 +157,34 @@ ARKlight ships default styling for all of them already
 about.md and content/guide.md look like out of the box, with nothing
 written here.
 
-DISCLAIMER: this is default styling only, for now. There is no
-dedicated, supported way yet to swap it out wholesale for your own
-Markdown theme -- only the same allow_redefine=True escape hatch every
-other built-in utility class (.card, .nav, ...) already has, since
-these classes are reserved the same protected way. Uncomment and edit
-whichever line below you want to try; a first-class theming surface
-(the light/dark/reading presets) is a later, unscheduled stage.
+THEMING: `Site(markdown_theme=...)` picks one of three built-in
+presets wholesale, no site.style_selector(...) needed at all
+(arklight/backend/css/markdown_presets.py):
+
+    "light"    ARKlight's stock bright/indigo default -- what you get
+               today even without setting markdown_theme at all.
+    "dark"     A near-black, warm-tinted background (#16140f) with
+               the exact clay/tan/taupe accent palette ARKlight's own
+               `arklight search` CLI already renders Markdown in at
+               the terminal (arklight/cli/mdrender.py) -- one-to-one
+               with that ANSI color scheme, not a separate invention.
+    "reading"  A pale amber/parchment background with dark warm ink
+               and a narrower measure + taller line-height for long-
+               form reading comfort -- its own design, not modeled on
+               light or dark.
+
+Set it in site.py:
+
+    site = Site(markdown_theme="reading")
+
+DISCLAIMER: beyond picking one of those three named presets, this is
+still default styling only, for now. There is no dedicated, supported
+way yet to hand-tune a preset's individual colors, or to swap in a
+*fourth*, fully custom Markdown theme -- only the same
+allow_redefine=True escape hatch every other built-in utility class
+(.card, .nav, ...) already has, since these classes are reserved the
+same protected way. Uncomment and edit whichever line below you want
+to try, on top of whichever markdown_theme (if any) you picked above:
 
     # site.style_selector(
     #     "ark-md-h1",

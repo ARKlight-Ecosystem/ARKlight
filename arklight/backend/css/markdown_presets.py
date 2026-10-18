@@ -63,15 +63,22 @@ different from `.card` overriding an earlier `.card` declaration.
   the same `--ark-button-text`/`--ark-accent` pairing concern
   `design_tokens.py`'s own comment documents for the stock palette.
 - **`reading`**: its own design, not modeled on `light` or `dark` --
-  a warm, paper-toned background and dark warm ink (not pure black/
-  white), a narrower measure than the stock default (reusing
-  `--ark-max-width`, the same token `Site(max_width=...)` already
-  exposes, rather than inventing a second width mechanism), and a
-  taller `body` line-height for long-form reading comfort (the one
-  property in this file with no existing `--ark-*` token to flow
-  through -- see the module docstring above for why overriding
-  `body`'s own rule directly, in cascade order, is still within the
-  "no new layout engine" constraint).
+  a pale amber/parchment background (`#f8efd6`, deliberately yellow-
+  leaning rather than a neutral off-white, the classic "sepia reader"
+  tone) with dark warm ink (`#352a16`, not pure black), a matching
+  amber accent (`#9c5017`, dark goldenrod, chosen dark enough to clear
+  WCAG AA's 4.5:1 for normal-size link text against `#f8efd6` -- not
+  just the headline body-text pairing `dark`'s own contrast check
+  covers -- and nowhere near `dark`'s clay/terracotta or `light`'s
+  indigo, so the three presets stay visually distinct from each
+  other), a narrower measure than the
+  stock default (reusing `--ark-max-width`, the same token
+  `Site(max_width=...)` already exposes, rather than inventing a
+  second width mechanism), and a taller `body` line-height for long-
+  form reading comfort (the one property in this file with no
+  existing `--ark-*` token to flow through -- see the module docstring
+  above for why overriding `body`'s own rule directly, in cascade
+  order, is still within the "no new layout engine" constraint).
 """
 
 from __future__ import annotations
@@ -111,13 +118,13 @@ PRESET_DARK = """\
 
 PRESET_READING = """\
 :root {
-  --ark-bg: #f6f1e7;
-  --ark-text: #2b2620;
-  --ark-muted: #6b6155;
-  --ark-accent: #a8572e;
-  --ark-accent-hover: #8f4725;
-  --ark-border: #e0d6c3;
-  --ark-button-text: #f6f1e7;
+  --ark-bg: #f8efd6;
+  --ark-text: #352a16;
+  --ark-muted: #7a6b4f;
+  --ark-accent: #9c5017;
+  --ark-accent-hover: #7a3f0f;
+  --ark-border: #e4d3a1;
+  --ark-button-text: #f8efd6;
   --ark-max-width: min(100% - 3rem, 42rem);
 }
 

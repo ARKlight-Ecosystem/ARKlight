@@ -128,3 +128,44 @@ def test_dark_preset_body_text_passes_wcag_aa_against_its_background():
 def test_dark_preset_values_in_module_match_what_this_test_checked():
     assert "--ark-text: #f2ece2;" in MARKDOWN_PRESETS["dark"]
     assert "--ark-bg: #16140f;" in MARKDOWN_PRESETS["dark"]
+
+
+# ---------------------------------------------------------------------------
+# light/reading presets: same AA bar, both body text and the link/accent
+# color -- not just dark's headline pairing.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "theme, text, accent, bg",
+    [
+        ("light", "#1a1a2e", "#4f46e5", "#ffffff"),
+        ("dark", "#f2ece2", "#cc785c", "#16140f"),
+        ("reading", "#352a16", "#9c5017", "#f8efd6"),
+    ],
+)
+def test_every_preset_body_text_and_accent_pass_wcag_aa_against_its_background(
+    theme, text, accent, bg
+):
+    assert f"--ark-text: {text};" in MARKDOWN_PRESETS[theme]
+    assert f"--ark-accent: {accent};" in MARKDOWN_PRESETS[theme]
+    assert f"--ark-bg: {bg};" in MARKDOWN_PRESETS[theme]
+    text_ratio = _contrast_ratio(text, bg)
+    accent_ratio = _contrast_ratio(accent, bg)
+    assert text_ratio >= 4.5, f"{theme} preset body text/background contrast is only {text_ratio:.2f}:1"
+    assert accent_ratio >= 4.5, f"{theme} preset accent/background contrast is only {accent_ratio:.2f}:1"
+
+
+def test_presets_use_visually_distinct_accent_hues():
+    # The whole point of three named presets is that they don't all
+    # converge on one safe color -- light stays ARKlight's stock
+    # indigo, dark stays mdrender's clay, reading is its own amber,
+    # no two sharing a hue family.
+    accents = {
+        "light": "#4f46e5",  # indigo
+        "dark": "#cc785c",  # clay/terracotta
+        "reading": "#9c5017",  # amber/goldenrod
+    }
+    for theme, accent in accents.items():
+        assert f"--ark-accent: {accent};" in MARKDOWN_PRESETS[theme]
+    assert len(set(accents.values())) == 3
