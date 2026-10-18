@@ -88,7 +88,7 @@ implements none of the four yet.
 | --- | --- | --- | --- |
 | Components with props (`@component`) | Shipped | -- | |
 | Slots / children for user-defined components | Gap | -- | Documented gap ([`WHAT-ARKLIGHT-IS.md`](WHAT-ARKLIGHT-IS.md) section 6); a separate compiler change, the size of `Repeat`/`Show`, not a fragment this ladder's filter admits. |
-| Fetch / HTTP | Gap | -- | By design for now; [`PROVIDER-SDK.md`](PROVIDER-SDK.md) is the accepted route for external services. |
+| Fetch / HTTP | Shipped, gated (partial) | -- | `Action.fetch_json(...)` ([`../Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md`](../Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md) stage 2, experimental) covers a click-triggered, same-origin-or-trusted-origin JSON GET/POST into `State(...)`. Load-triggered fetch (stage 3) remains a gap; [`PROVIDER-SDK.md`](PROVIDER-SDK.md) is still the accepted route for a full external service (auth, a hosted database). |
 | Hand-written widget code | Shipped, gated | -- | `ScriptExtension`, experimental ([`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md)); the JS itself is unchecked. |
 | A typed boundary for that hatch | Gap | Not admitted | A new subsystem (IR node, schema, Validation); needs its own proposal, same reasoning as the slots row above. |
 | Python-side page simulator | Gap | Not admitted | Derivations and predicates have Python mirrors; actions do not. Tooling, unscheduled. |

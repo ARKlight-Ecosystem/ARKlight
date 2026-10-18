@@ -185,11 +185,26 @@ entire point of gating, not incidental extra output.
 - No opinion on auth flows, token storage, or security rules -- that
   risk belongs entirely to whichever concrete `Provider` implementation
   a site chooses.
-- No client-side data-fetch orchestration (loading states, caching,
-  retries). That remains a separate, larger, still-open gap in the JS
-  vocabulary catalog (`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`)
-  -- `Provider` is meant to be the vendor-neutral boundary that feature
-  would eventually plug into, not a rebuild of it here.
+- No general client-side data-fetch orchestration (arbitrary caching,
+  retries, request cancellation, streaming). `Action.fetch_json(...)`
+  (`docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md`, stage 2;
+  gated `arklight.experimental.FEATURES["fetch-json"]`) is the first
+  concrete, closed-vocabulary slice of this: a click-triggered,
+  same-origin-or-`Site(trusted_fetch_origins=[...])`-checked GET/POST
+  that parses a JSON response and writes it into `State(...)`. It is
+  deliberately narrow on purpose -- one verb, one content type, no
+  retry/backoff policy, no response caching across calls -- so this
+  bullet is about what's still *missing* against a general-purpose
+  fetch orchestration layer (loading/in-flight state as a first-class
+  concept, request cancellation, streaming bodies, arbitrary headers),
+  not a claim that no request primitive exists at all. `Provider`
+  remains the vendor-neutral *boundary* a fuller version of this
+  would plug into; `fetch_json` is treated as sitting conceptually on
+  that boundary -- the concrete first answer to the "data-fetch
+  orchestration" gap this file and `WHAT-ARKLIGHT-IS.md` name -- even
+  though it is authored via `Action.*`, not `Provider.declare(...)`,
+  since a trusted-origin JSON request is a capability a site can use
+  with no external service declared at all.
 - No DOM hooks or `State(...)` keys wired to a capability -- there is
   no authoring surface for that yet; `window.ARKLIGHT_PROVIDER` only
   ever gains fields, it doesn't drive reactive state on its own.

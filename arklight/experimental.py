@@ -258,6 +258,47 @@ FEATURES: dict[str, ExperimentalFeature] = {
         # built-in feature.
         upstream_candidate=False,
     ),
+    "fetch-json": ExperimentalFeature(
+        id="fetch-json",
+        inline_note=(
+            "Issues a same-origin (or trusted-origin) JSON fetch at click time -- "
+            "the response body is outside anything ARKlight can validate ahead of time."
+        ),
+        detail_lines=[
+            "Action.fetch_json(...) (docs/Proposals/",
+            "FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md, stage 2) issues a GET/POST on",
+            "click, parses the response as JSON, and writes it into",
+            "State(...) via store.set(...).",
+            "The target url= must be same-origin or listed in",
+            "Site(trusted_fetch_origins=[...]) -- checked at build time for a",
+            "literal url=, and at runtime (arkIsTrustedFetchURL) for a",
+            "Bind(...)-sourced one -- but the response body itself is opaque",
+            "to ARKlight the same way a Provider's external service is:",
+            "whatever shape it arrives in is what State(...) gets, after",
+            "arkStripDangerousKeys strips __proto__/constructor/prototype",
+            "keys to block prototype pollution.",
+            "This is the first concrete authoring surface for the",
+            "data-fetch-orchestration gap arklight/provider.py names as",
+            "still open, without becoming a general fetch() escape hatch --",
+            "see the proposal doc for the full staged rollout.",
+        ],
+        legacy_note=(
+            "Not a legacy API -- this is new, gated the same way every "
+            "network-touching primitive here is. Action.fetch_json(...) is the "
+            "first stage-2 concrete authoring surface from "
+            "FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md; a later State(..., fetch=...) "
+            "(stage 3) would reuse the same trust/sanitization pair "
+            "(arkIsTrustedFetchURL, arkStripDangerousKeys) this stage already "
+            "ships."
+        ),
+        # Unlike provider-integration/provider-scripts, this *is* ARKlight's
+        # own attempt at closing the data-fetch-orchestration gap (the
+        # proposal doc's whole premise), so heavy use is a legitimate signal
+        # the built-in primitive needs to grow (e.g. toward stage 3,
+        # State(..., fetch=...)) rather than evidence of a permanent,
+        # deliberate boundary.
+        upstream_candidate=True,
+    ),
 }
 
 
