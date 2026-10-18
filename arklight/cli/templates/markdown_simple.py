@@ -14,6 +14,18 @@ least one non-draft `.md` file (`arklight/compiler/pipeline.py`), so a
 `site.py` with no decorators here is not a special case -- it is the
 same rule every project already follows, just satisfied a different
 way.
+
+Styling (Stage M6/M8 of the same addendum): every block a `content/
+*.md` file produces gets a stable `ark-md-*` `class_name` and
+ARKlight's own default styling for it automatically -- no setup, no
+file to write, nothing to opt into. `markdown-production` additionally
+writes `components/markdown_style.py`, a pure-documentation file
+listing those classes, specifically because that template already
+scaffolds a `components/` folder for its Python-authored side; this
+template has no such folder at all (`site.py`/`content/`/`assets/` is
+the whole layout), so the exact same default styling simply applies
+silently -- "implicitly handled by the compiler" is the whole story
+for `markdown-simple`, nothing more to see here.
 """
 
 from __future__ import annotations

@@ -348,6 +348,87 @@ stylesheet after the fixed defaults, so they can override base rules
 by cascade order. Calling `site.style()` again with an already-used
 name overwrites its rules (last call wins).
 
+## Markdown-authored content (`content/*.md`)
+
+A `content/` directory next to `site.py` turns on Markdown-as-content
+(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`): every non-draft
+`.md` file under it becomes a page -- `content/guide.md` → `/guide`,
+`content/index.md` → `/` -- with no `@site.page(...)` decorator
+written for it. Front matter (`title`/`description`/`route`/`draft`)
+overrides the filename-derived route and title; an explicit
+`@site.page(...)` route always wins over either.
+
+**This is not a second syntax for `Page(...)`.** A Markdown file can
+only ever produce what its parser understands -- headings, paragraphs,
+bold/italic/inline code, links, images, lists, fenced code blocks,
+blockquotes, horizontal rules, pipe tables -- and nothing else: no
+component props, no `State`/`Bind`/`Action`, no custom components, no
+anything from the rest of this guide. A page that needs any of that
+goes through a `@site.page(...)`-decorated function instead, same as
+always; mixing both in one project (`arklight new my-site --template
+markdown-production`) is the intended steady state, not a workaround.
+
+**Styling.** Every block a Markdown file produces gets a stable
+`class_name` automatically -- no setup, nothing to opt into -- under a
+fixed `ark-md-` prefix:
+
+| Construct | Class(es) |
+| --- | --- |
+| `# `..`###### ` headings | `ark-md-h1` .. `ark-md-h6`, plus a slugged, page-unique `id` for `[text](#fragment)` anchor links |
+| Paragraphs | `ark-md-p` |
+| Bullet / numbered lists | `ark-md-list` / `ark-md-ordered-list`, items `ark-md-item` |
+| Fenced code blocks | `ark-md-pre` (the block), `ark-md-code-block` (the code inside it) |
+| Blockquotes | `ark-md-blockquote` |
+| Horizontal rules | `ark-md-hr` |
+| A standalone image line, alone on its own line | `ark-md-img` |
+| Pipe tables | `ark-md-table`, `ark-md-thead`/`ark-md-tbody`, `ark-md-tr`, `ark-md-th`/`ark-md-td` |
+
+Bold/italic/inline code/links *inside* a paragraph, list item,
+blockquote, or table cell are not individually classed -- ARKlight's
+own default styling reaches them with an ordinary descendant selector
+(`.ark-md-p strong`, `.ark-md-p code`, `.ark-md-p a`, ...) instead. The
+one exception is a whole paragraph that is nothing but one of those
+(a line that reads only `**bold**`, with no wrapping paragraph
+element at all): that gets its own `ark-md-strong`/`ark-md-em`/
+`ark-md-code`/`ark-md-link` class so the class name doesn't claim to
+be a paragraph it isn't.
+
+ARKlight ships default styling for every class above, included in the
+generated stylesheet automatically whether or not a particular site
+has any Markdown content -- a `content/*.md` file looks reasonable
+with zero project CSS written. Every `ark-md-*` class is reserved the
+same protected way `.card`/`.nav`/every other built-in utility class
+already is (see "Custom CSS classes" above): a plain `site.style(
+"ark-md-h1", ...)` fails loudly with a naming-collision error instead
+of silently merging with ARKlight's own rules.
+
+> **Default styling only, for now.** There is no dedicated, supported
+> way yet to replace that default styling wholesale with a project's
+> own Markdown theme. The only lever today is the same generic
+> `allow_redefine=True` escape hatch every reserved utility class
+> already has:
+>
+> ```python
+> site.style_selector(
+>     "ark-md-h1",
+>     {"color": "#cc785c"},
+>     allow_redefine=True,
+> )
+> ```
+>
+> A first-class theming surface -- `light`/`dark`/`reading` presets --
+> is a later, unscheduled stage of the same addendum.
+
+`arklight new my-site --template markdown-production` additionally
+writes `components/markdown_style.py`, a reference-only file (nothing
+imported, nothing wired into the build) listing the table above and
+the override example, in that template's `components/` folder because
+that folder already exists there for the Python-authored side.
+`markdown-simple` has no `components/` folder at all, so the same
+hooks and default styling apply exactly as they do everywhere else,
+just without an equivalent visibility file -- see either template's
+own module docstring for the full reasoning.
+
 ## Responsive layout, without `@media` (platform-independent by construction)
 
 `Page` never gets a `<head>` hook (see

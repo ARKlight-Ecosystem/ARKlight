@@ -18,6 +18,16 @@ ContentCollisionError`, via `check_python_route_collisions`).
 
 Layout: `site.py`, `components/`, `pages/`, `content/`, `assets/` --
 exactly the five pieces named for this template in the addendum.
+
+Stage M8 of the same addendum adds one more file to `components/`:
+`markdown_style.py`, pure documentation (not imported, not wired into
+the build) listing the `ark-md-*` style-hook classes Stage M6 already
+attaches to every Markdown block automatically, and the default
+styling ARKlight already ships for them. This template is the one
+that gets it specifically *because* it already scaffolds a
+`components/` folder for the Python-authored side -- see that file's
+own docstring, and `markdown_simple.py`'s module docstring for why
+`markdown-simple` does not get an equivalent file.
 """
 
 from __future__ import annotations
@@ -33,6 +43,16 @@ def build(name: str) -> dict[str, str]:
         "components/__init__.py": _COMPONENTS_INIT_PY,
         "components/nav.py": _COMPONENTS_NAV_PY,
         "components/footer.py": _COMPONENTS_FOOTER_PY,
+        # Stage M8 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # this template is the one that gets this file, specifically
+        # because it already scaffolds a components/ folder --
+        # `markdown-simple` has nowhere equivalent to put it, so the
+        # same default styling reaches it silently instead (see that
+        # template's own comment). Not imported by site.py, not wired
+        # into the build -- Stage M6's hooks and default CSS are
+        # already applied unconditionally by the compiler; this file
+        # is purely "make what's available visible."
+        "components/markdown_style.py": _COMPONENTS_MARKDOWN_STYLE_PY,
         "pages/__init__.py": _PAGES_INIT_PY,
         "pages/home.py": _PAGES_HOME_PY.format(title=title),
         "content/about.md": _CONTENT_ABOUT_MD,
@@ -103,6 +123,58 @@ _COMPONENTS_FOOTER_PY = '''\
 def footer():
     """A plain-function component: no registration needed."""
     return Footer(Text("Built with ARKlight.", class_name="muted"))
+'''
+
+_COMPONENTS_MARKDOWN_STYLE_PY = '''\
+"""
+Reference only -- not imported anywhere, not required for anything to
+work. content/*.md already renders styled without this file; it exists
+purely so the classes ARKlight's Markdown pipeline uses are visible
+somewhere in this project, the same way components/nav.py and
+components/footer.py make the Python-authored side's pieces visible.
+
+Every block a content/*.md file produces gets one of these classes
+automatically (arklight.content.markdown, Stage M6 of
+docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md) -- nothing to write,
+nothing to opt into:
+
+    ark-md-h1 .. ark-md-h6    headings (each also gets a slugged id=,
+                              for [text](#fragment) anchor links)
+    ark-md-p                  paragraphs
+    ark-md-list               ark-md-ordered-list    ark-md-item
+    ark-md-pre                ark-md-code-block
+    ark-md-blockquote         ark-md-hr               ark-md-img
+    ark-md-table  ark-md-thead  ark-md-tbody  ark-md-tr
+    ark-md-th  ark-md-td
+    ark-md-strong  ark-md-em  ark-md-code  ark-md-link
+        (inline markup normally reached via a descendant selector off
+        the paragraph/cell/blockquote class above -- these three exist
+        for the rare case where a whole paragraph is just one of them,
+        e.g. a line that is only "**bold**")
+
+ARKlight ships default styling for all of them already
+(arklight/backend/css/markdown_defaults.py) -- that's what content/
+about.md and content/guide.md look like out of the box, with nothing
+written here.
+
+DISCLAIMER: this is default styling only, for now. There is no
+dedicated, supported way yet to swap it out wholesale for your own
+Markdown theme -- only the same allow_redefine=True escape hatch every
+other built-in utility class (.card, .nav, ...) already has, since
+these classes are reserved the same protected way. Uncomment and edit
+whichever line below you want to try; a first-class theming surface
+(the light/dark/reading presets) is a later, unscheduled stage.
+
+    # site.style_selector(
+    #     "ark-md-h1",
+    #     {"color": "#cc785c"},
+    #     allow_redefine=True,
+    # )
+
+Add that call (with your own `site = Site()` import) wherever site.py
+already calls other site.*(...) setup, not here -- this module is
+documentation, not wiring.
+"""
 '''
 
 _PAGES_INIT_PY = '''\
@@ -261,6 +333,8 @@ site.py               routes -- the one @site.page(...) decorator lives here
 components/
   nav.py                 a registered @component (checked "active" prop)
   footer.py               a plain function -- both work, mix freely
+  markdown_style.py       reference only -- the ark-md-* classes content/*.md
+                          already gets styled with, see its own docstring
 pages/
   home.py                 Python-authored: the "/" route
 content/

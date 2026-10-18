@@ -1,9 +1,14 @@
 # Markdown Content Addendum: Staged Landing Order
 
-**Status:** IN PROGRESS. Seven stages (`M1`-`M7`); **`M1`-`M5` SHIPPED,
-unreleased (`alpha`)**, `M6`-`M7` PLANNED. **No version slots
+**Status:** IN PROGRESS. Nine stages (`M1`-`M9`); **`M1`-`M6`, `M8`
+SHIPPED, unreleased (`alpha`)**, `M7`, `M9` PLANNED. **No version slots
 reserved** -- assigned when each remaining stage is actually
-scheduled, not here. This file turns the accepted
+scheduled, not here. `M6` and `M8` were inserted into the ladder after
+`M1`-`M5` shipped (see each stage's own section for why); the original
+preset stage and the original docs/tests rollup kept their own
+content but moved down to `M7`/`M9` to make room -- this file always
+reflects the order as shipped, not as first proposed. This file turns
+the accepted
 [`docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`](../Proposals/MARKDOWN-CONTENT-PROPOSAL.md)
 into a trackable landing order, the same role
 [`APP-SHELL-ADDENDUM.md`](APP-SHELL-ADDENDUM.md) plays for its
@@ -168,7 +173,83 @@ guard rail that makes mixing safe.
   then a real `arklight build` over the scaffolded output, which is
   this stage's own exit test).
 
-## Stage M6 -- `light` / `dark` / `reading` presets
+## Stage M6 -- Style hooks on Markdown-sourced nodes **(SHIPPED)**
+
+Inserted after `M1`-`M5` shipped, ahead of the presets stage below
+(renumbered to `M7` to make room): the presets stage styles whole
+pages via `Site(markdown_theme=...)`, but nothing before this stage
+gave a Markdown-authored block anything a *project's own* CSS
+(`Site.style(...)`/`Site.style_selector(...)`) could individually
+select -- a `Heading`/`Text`/`List`/... parsed out of `content/*.md`
+came out of Stage M2 with no `class_name` at all, indistinguishable
+from any other `Heading` only by its text. This stage closes that gap
+the same way the rest of this ladder closes gaps: by giving Markdown
+content the same hooks a Python-authored page already has access to
+(`Heading("...", class_name="...", id="...")` has always been legal
+`arklight.api` usage), not a new mechanism.
+
+- Every block `arklight.content.markdown.parse_markdown` produces gets
+  a stable `class_name` under a fixed `ark-md-*` prefix -- `ark-md-h1`
+  .. `ark-md-h6`, `ark-md-p`, `ark-md-list`/`ark-md-ordered-list`/
+  `ark-md-item`, `ark-md-pre`/`ark-md-code-block`, `ark-md-blockquote`,
+  `ark-md-hr`, `ark-md-img`, the full `ark-md-table`/`ark-md-thead`/
+  `ark-md-tbody`/`ark-md-tr`/`ark-md-th`/`ark-md-td` family, and
+  `ark-md-strong`/`ark-md-em`/`ark-md-code`/`ark-md-link` for the one
+  edge case where a whole paragraph collapses to a single bare inline
+  node (`_paragraph_node`, e.g. `**bold**` alone on a line). Every
+  `Heading` additionally gets a slugged `id`, unique within the page,
+  for `[text](#fragment)` anchor links -- not a styling hook (see the
+  next point), just a normal HTML `id`.
+- **Why `id`, not a CSS hook:** `arklight.backend.css.selectors`
+  (what `Site.style_selector(...)` validates against) has no `#id`
+  selector at all, only tag/class/attribute/pseudo -- so every styling
+  hook this stage adds is a `class_name`, on purpose, and `id` stays
+  scoped to its one existing HTML job.
+- **Default styling, shipped as part of this stage, not deferred to
+  `M7`:** `arklight.backend.css.markdown_defaults.MARKDOWN_CSS_BODY`
+  styles every `ark-md-*` class above, included in the generated
+  stylesheet unconditionally (same cascade tier as, and right after,
+  `BASE_CSS_BODY`) -- a `content/*.md` file looks reasonable out of the
+  box with zero project CSS written, the same posture every other
+  built-in component already has. Every `ark-md-*` class is folded into
+  `arklight.api.RESERVED_UTILITY_CLASSES` the same protected way
+  `.card`/`.nav`/etc. already are, so a plain `site.style("ark-md-h1",
+  ...)` collision fails loudly instead of silently merging.
+- **Disclaimer (this is the whole of this stage's styling story, for
+  now):** this only wires up ARKlight's own *default* styling. There is
+  no dedicated, supported way yet to replace it wholesale with a
+  project's own Markdown theme -- only the generic
+  `allow_redefine=True` escape hatch every reserved utility class
+  already has. A first-class Markdown-theming surface is `M7`
+  (independent of this stage, still unscheduled).
+- **Not feature parity, settled here:** `content/*.md` is not a
+  `Page(...)`-authored page in different syntax. The construct mapping
+  table in Stage M2 is the entire Markdown vocabulary this parser
+  understands -- no component props, no `State`/`Bind`/`Action`, no
+  custom components -- so a Markdown file can only ever produce, and
+  this stage can only ever style, what that table expresses. A page
+  that needs any of that goes through a `@site.page(...)`-decorated
+  function instead, same as always; mixing both in one project is what
+  `markdown-production` (Stage M5) is for.
+- **Exit test:** `style_hooks=True` tags every construct in Stage M2's
+  fixture with its documented class (and every heading with a unique
+  slugged `id`); `arklight.content.discovery.synthesize_page` applies
+  hooks with no `site.py` opt-in; the generated stylesheet always
+  contains `.ark-md-*` rules, whether or not the site has any Markdown
+  content; `site.style("ark-md-h1", ...)` raises the existing
+  duplicate-utility-class error, and `allow_redefine=True` overrides it.
+- **Touch points:** `arklight/content/markdown.py` (`style_hooks:
+  bool = False` kwarg on `parse_markdown`, defaulting to off so every
+  existing `tests/test_markdown.py` assertion is untouched -- Stage
+  M2-M4's own contract does not change); `arklight/content/
+  discovery.py` (`synthesize_page` always passes `style_hooks=True`);
+  `arklight/backend/css/markdown_defaults.py` (new, sibling to
+  `base_stylesheet.py`); `arklight/backend/css/render.py` (wires the
+  new module into the cascade); `arklight/api.py`
+  (`RESERVED_UTILITY_CLASSES` unioned with the new module's
+  `HOOK_CLASS_NAMES`). `tests/test_markdown_style_hooks.py` (new).
+
+## Stage M7 -- `light` / `dark` / `reading` presets
 
 Three preset stylesheets layered on `arklight/backend/css`'s existing
 intrinsic layout system -- no new layout engine, no breakpoint rules
@@ -198,33 +279,78 @@ beyond what already exists, per the proposal's own constraint.
   kwarg (naming to be confirmed at implementation time against
   `Site.__init__`'s existing kwarg conventions).
 
-## Stage M7 -- Docs and tests
+## Stage M8 -- `markdown-production` style-hook visibility **(SHIPPED)**
+
+Inserted alongside `M6`, same reasoning that moved the presets stage
+to `M7`: `M6` ships the hooks and the default styling, but gives an
+author no way to *see* what classes exist or that they're already
+styled, short of reading `markdown_defaults.py`'s source. `markdown-
+production` (Stage M5) already scaffolds a `components/` folder for
+its Python-authored side (`components/nav.py`, `components/
+footer.py`) -- this stage reuses that existing convention rather than
+inventing a new one: "the reason `markdown-production` gets this at
+all is that it has a `components/` folder defined at scaffolding time
+to put it in."
+
+- `markdown-production`'s `build(name)` writes one more file,
+  `components/markdown_style.py`: pure documentation (a module
+  docstring, nothing imported or wired into the build) listing every
+  `ark-md-*` class from `M6` and the default styling ARKlight already
+  ships for it, plus the same `allow_redefine=True` disclaimer `M6`
+  states, with a commented-out `site.style_selector(...)` example to
+  uncomment and edit.
+- **`markdown-simple` deliberately does not get an equivalent file:**
+  that template has no `components/` folder at all
+  (`site.py`/`content/`/`assets/` is its whole layout) -- there is
+  nowhere to put a visibility file without inventing a new top-level
+  convention this stage isn't scoped to add. `M6`'s hooks and default
+  styling still apply to a `markdown-simple` project exactly as they
+  do everywhere else; they're just not surfaced as a file there. This
+  is the "simple is implicitly handled by the compiler" half of the
+  stage, as opposed to `markdown-production`'s "visible as a
+  component" half.
+- **Exit test:** `markdown-production`'s scaffolded output contains
+  `components/markdown_style.py`; `markdown-simple`'s does not;
+  `arklight build` succeeds unmodified for both, same as `M5`'s own
+  exit test (this stage adds a file, it does not change build
+  behavior).
+- **Touch points:** `arklight/cli/templates/markdown_production.py`
+  (new file in `build(name)`'s output, module docstring updated);
+  `arklight/cli/templates/markdown_simple.py` (module docstring note
+  only, no file added). `tests/test_markdown_templates.py` extended.
+
+## Stage M9 -- Docs and tests
 
 `AUTHORING-GUIDE.md` gets a Markdown-authoring section; tests follow
 `tests/test_persist_global_scope.py`'s pattern -- unit coverage per
 stage (front matter, parser, discovery, asset resolution, templates,
-presets) plus one end-to-end fixture project exercised through a real
-`arklight build`. `CHANGELOG.md` gets one entry per stage as it ships,
-same as every other staged ladder in this folder.
+style hooks, presets, template visibility) plus one end-to-end fixture
+project exercised through a real `arklight build`. `CHANGELOG.md` gets
+one entry per stage as it ships, same as every other staged ladder in
+this folder.
 
 - **Exit test:** full test suite green, including the new Markdown
   suite; `AUTHORING-GUIDE.md` reviewed against the shipped behavior of
-  M1-M6, not the proposal's original wording.
+  `M1`-`M8`, not the proposal's original wording.
 
 ## Suggested order
 
-M1 → M2 → M3 → M4 → M5 → M6 → M7, in that order: each stage's exit
-test depends on the previous one's output (M2 needs M1's front matter,
-M3 needs M2's parser, M4 needs M3's discovered pages, M5 needs M2-M4
-working end to end to scaffold against, M6 is independent of M1-M5 and
-could run in parallel if useful, M7 closes every stage out). No stage
-here is scheduled against a version slot yet -- see Status above.
+M1 → M2 → M3 → M4 → M5 → M6 → M8 → M7 → M9, in roughly that order:
+each stage's exit test depends on the previous one's output (M2 needs
+M1's front matter, M3 needs M2's parser, M4 needs M3's discovered
+pages, M5 needs M2-M4 working end to end to scaffold against, M6 needs
+M2's node shapes and M5's templates to attach hooks to and scaffold
+against, M8 needs M5's `markdown-production` template and M6's hooks
+to document, M7 is independent of M1-M6/M8 and could in principle run
+in parallel, M9 closes every stage out). No stage here is scheduled
+against a version slot yet -- see Status above.
 
-`M1`-`M5` have landed in that order on `alpha`, unreleased; full suite
-green including the new Markdown tests (`tests/test_frontmatter.py`,
+`M1`-`M6` and `M8` have landed on `alpha`, unreleased; full suite green
+including the Markdown tests (`tests/test_frontmatter.py`,
 `tests/test_markdown.py`, `tests/test_content_discovery.py`,
-`tests/test_content_assets.py`, `tests/test_markdown_templates.py`).
-`M6` (presets) remains independent and unscheduled; `M7` (docs/tests
-rollup, `CHANGELOG.md`/`AUTHORING-GUIDE.md`) stays open until `M6`
-ships too, since M7's own exit test wants the full `M1`-`M6` surface
-reviewed in one pass rather than piecemeal.
+`tests/test_content_assets.py`, `tests/test_markdown_templates.py`,
+`tests/test_markdown_style_hooks.py`). `M7` (presets) remains
+independent and unscheduled; `M9` (docs/tests rollup,
+`CHANGELOG.md`/`AUTHORING-GUIDE.md`) stays open until `M7` ships too,
+since M9's own exit test wants the full `M1`-`M8` surface reviewed in
+one pass rather than piecemeal.
