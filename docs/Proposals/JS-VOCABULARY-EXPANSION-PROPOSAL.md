@@ -5,10 +5,13 @@ exhaustive scalar catalog, including §6.5) have been accepted and
 staged as a ten-rung implementation ladder --
 [`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md)
 (`v0.061`-`v0.070`), of which stages 1-7 (`v0.061`-`v0.067`) have
-shipped and stages 8-10 remain PLANNED. Tier 3 and Tier 4 (§7/§8
-below) remain unsettled proposals -- nothing in this file's
-acceptance covers either. The rest of this document is kept in full,
-unedited, as the source catalog that ladder was staged from.
+shipped and stages 8-10 remain PLANNED. The new Tier 3 (§7, added
+below) and the renumbered Tier 4/Tier 5 (§8/§9) remain unsettled
+proposals -- nothing in this file's acceptance covers any of them.
+The rest of this document is kept in full, unedited, as the source
+catalog that ladder was staged from, with Tier 3 inserted in place
+as a follow-up finding rather than folded into §6's catalog, for the
+reason given in §7's own rationale.
 
 **Origin:** an audit of `alpha` branch (`arklight/backend/js/*`,
 `arklight/ir/schema.py`, `PROGRESS.md`, `docs/Foundational/DESIGN-NOTES.md`)
@@ -25,7 +28,7 @@ of what Vue-3-style reactivity needs (state, computed values,
 watchers, two-way binding, list rendering, conditional rendering,
 persistence).
 
-This proposal covers four things, in ascending order of effort:
+This proposal covers five things, in ascending order of effort:
 
 1. **Tier 1 -- trivial gaps** already designed but never shipped
    (basic arithmetic, basic string casing, the comparison predicates)
@@ -45,11 +48,20 @@ This proposal covers four things, in ascending order of effort:
    what a closed-vocabulary scalar-derivation system can cover before
    reaching for a real evaluator, so the registry grows once, in a
    principled way, instead of by one-off requests forever.
-4. The **larger, IR-node-sized gaps** (client-side data fetching
-   chief among them) and the **out-of-scope bucket** that conflicts
-   with ARKlight's stated non-goals -- kept here because they're the
-   part of the original audit that actually needs a maintainer
-   decision, not just typing.
+4. **Tier 3 -- closed-vocabulary conditional/value-selection and
+   indexing primitives** (§7, new) -- `Derive.if_`/`Derive.select`,
+   arbitrary list indexing, and date/time arithmetic. These are
+   placed in their own tier, after §6's scalar catalog and before
+   the old Tier 3's IR-node-sized bucket (renumbered Tier 4 below),
+   because they're closed-arity and side-effect-free like §6's
+   entries, but every one of them needs a new `DerivationRef`/
+   `PredicateRef` shape rather than a same-shape registry line, so
+   they don't belong folded into §6's flat catalog either.
+5. The **IR-node-sized gaps** (client-side data fetching chief among
+   them, now Tier 4, §8) and the **out-of-scope bucket** (now Tier 5,
+   §9) that conflicts with ARKlight's stated non-goals -- kept here
+   because they're the part of the original audit that actually
+   needs a maintainer decision, not just typing.
 
 ---
 
@@ -261,7 +273,7 @@ Beyond those, common `v-if`-equivalent guards include:
 *named* states. These read `Array.prototype` methods but stay
 scalar-out, so they don't need the new "list-in, list-out" registry
 (`SORT_REGISTRY`/`FILTER_REGISTRY`) that sorting/filtering would --
-that stays in Tier 3 (§7) below.
+that stays in Tier 4 (§8) below.
 
 | Derivation | JS equivalent | Notes |
 |---|---|---|
@@ -311,13 +323,113 @@ as cheap as §6.1-6.4.
 combinators (`pairwise`, `batched`/`chunk`, `accumulate`/running-sum,
 `dedupe`/`unique`) are common across every language's "batteries
 included" story too, but they're list-*in*, list-*out* -- the same
-shape as sort/filter in Tier 3 (§7), not a scalar reduction like
+shape as sort/filter in Tier 4 (§8), not a scalar reduction like
 §6.4's `list_min`/`list_average`. They're flagged there instead of
 here so this section stays honest about what's actually
 registry-shaped today versus what needs the new list-transform
-registry Tier 3 already calls for.
+registry Tier 4 already calls for.
 
-## 7. Tier 3 -- New IR-node-sized features (kept from the original audit)
+## 7. Tier 3 -- Closed-vocabulary conditional/value-selection and indexing primitives
+
+Found in a follow-up pass over `DERIVATION_REGISTRY`/
+`PREDICATE_REGISTRY` against this file's own original audit, after
+Tier 1/Tier 2/§6 were accepted: a small set of entries that are
+closed-arity and side-effect-free -- the same test §2 and §6 already
+apply -- but that didn't surface in either the original audit or §6's
+pass, because none of them are a `Math`/`String`/`Array` built-in or a
+cross-language batteries-included idiom. They're placed in their own
+tier, between Tier 2 and the old Tier 3 (renumbered Tier 4, §8 below),
+rather than folded into §6, because every entry here costs a new
+`DerivationRef`/`PredicateRef` *shape*, not just a same-shape registry
+line -- which is exactly the "registry-filling exercise" vs. "genuine
+design decision" split §8 below already draws, just at a smaller
+scale than a full new IR node.
+
+### 7.1 `Derive.if_` -- two-branch conditional value selection
+
+The single most basic thing missing: "pick value A or value B based
+on a condition" -- Jinja's `{{ a if cond else b }}`, Liquid's
+`{% if %}`, Vue's ternary-in-text-binding. Today `Show(Predicate.*)`
+gates whether a whole *element* renders; nothing gates which *value* a
+binding resolves to. `compare` (§1) returns a bool, not a selection;
+`value_or`/`first_present` (§6.5) are null-coalescing only, not
+predicate-gated.
+
+```python
+Computed("price_label", deps=["qty"],
+    derive=Derive.if_(
+        Predicate.gt("qty", 10),     # condition -- reuses the existing,
+                                       # already-validated predicate vocabulary
+        "bulk price",                 # when_true
+        "regular price",              # when_false
+    ))
+```
+
+- **External precedent for the scope line:** JSONLogic ships
+  `{"if": [cond, then, else]}` as its one conditional primitive, with
+  the same "no setters, no loops, no functions, never `eval`"
+  discipline this file already cites for ARKlight's own ceiling (§2)
+  -- a widely-adopted precedent that closed-vocabulary conditional
+  value-selection is a different, safer mechanism than an open
+  expression, not a softened version of one.
+- **The actual design cost:** every existing `DerivationRef` keeps
+  `names` (state/computed references) and `args` (literal data)
+  strictly separate -- no kind mixes the two within one slot.
+  `when_true`/`when_false` each need to be *either* a literal or a
+  name, which is a new `DerivationRef` shape, not just a new `kind`
+  string in the existing one. That's the one real design decision
+  here; the conditional logic itself costs nothing new, since the
+  condition is just a `PredicateRef`, already fully specified by
+  `PREDICATE_REGISTRY`.
+- **Validation** follows the exact pattern `compare`'s `op` arg
+  already uses in `arklight/ir/validate.py`, extended to check each
+  branch value is either a literal or a declared `deps` name.
+- **Not pursued alongside this:** making `and`/`or` (§6.3)
+  value-returning the way JSONLogic's are, rather than boolean-only --
+  once `Derive.if_`/`Derive.select` exist, that's the more direct way
+  to express the cases JSONLogic covers through short-circuiting
+  `and`/`or`, so widening `and`/`or` on top would just be two ways to
+  write the same thing; left out to avoid that overlap.
+
+### 7.2 `Derive.select` -- multi-branch conditional (natural follow-on)
+
+Chained `(predicate, value)` pairs plus a default, same lineage as
+JSONLogic's `if` accepting more than three arguments as chained
+else-ifs. Ships *after* `Derive.if_` lands and sees real use --
+building the N-branch version first would mean guessing at the common
+branch count instead of observing it.
+
+### 7.3 `list_at` -- arbitrary list indexing
+
+`char_at` (§6.2) already reads one character out of a string at a
+literal index (`DerivationSpec(min_names=1, max_names=1,
+extra_args=("index",))`); nothing equivalent exists for a list-typed
+`State`/`Computed` value -- only `list_first`/`list_last` (§6.4), both
+fixed-position. `list_at(list, index)` is the direct list-side
+counterpart, same shape and same `LITERAL_ARG_RULES`-checked
+range-bound index as `char_at` already gets.
+
+### 7.4 Date/time arithmetic and formatting
+
+A `Time` component already exists in the IR, but `DERIVATION_REGISTRY`
+has no date-related kind at all -- not even a §6.5-style "batteries
+included" entry, despite that subsection explicitly sweeping JS's
+`Math`/`String`/`Number`/`Array` built-ins and their cross-language
+equivalents. Candidates: `date_add`/`date_diff` (closed unit argument:
+`"days"`/`"hours"`/... -- same closed-choice-not-raw-string shape
+`compare`'s `op` already establishes), and `format_date` (closed
+format-token argument, not a user-supplied strftime/ICU pattern
+string, for the same reason `replace_first`/`replace_all` (§6.2) take
+a literal substring and never a regex). **Flagged for explicit
+maintainer sign-off before implementation**, same as `pluralize`/
+`random_int` were in §6.5/§10 -- locale-aware date formatting in
+particular has enough surface area (timezones, calendar systems,
+locale-specific token sets) that it risks becoming its own
+`Intl.DateTimeFormat`-shaped subsystem rather than a one-file registry
+addition, and that scoping question should be settled before any code
+is written, not discovered partway through.
+
+## 8. Tier 4 -- New IR-node-sized features (kept from the original audit)
 
 These need a new IR node + schema + validation, the size of
 `Repeat`/`Show` when those landed. Listed here because they're the
@@ -347,7 +459,7 @@ registry-filling exercise:
   `FileReader`-based preview runtime module, and IR support for
   binding the preview into `Bind`.
 
-## 8. Tier 4 -- Out of scope (maintainer/design decision required)
+## 9. Tier 5 -- Out of scope (maintainer/design decision required)
 
 - **General arithmetic/string expressions** (`price * qty - discount`)
   -- exactly what the permanent non-goal in §2 rules out. However
@@ -365,7 +477,7 @@ registry-filling exercise:
   anti-pattern for the project's whole premise, not just a missing
   feature.
 
-## 9. Suggested order
+## 10. Suggested order
 
 1. Ship **Tier 1** (§4) first -- same day, closes the most-noticed
    gaps (basic math ops, the already-designed `Show` predicates).
@@ -378,11 +490,18 @@ registry-filling exercise:
    want §6.5's `lerp`) rather than shipping all of it reflexively.
    Flag `random_int` (§6.1), `replace_first`/`replace_all` (§6.2),
    and `pluralize` (§6.5) for explicit sign-off given their caveats.
-4. Treat §7's `DataSource`/client-side fetch as its own milestone
+4. Ship **Tier 3** (§7) next, in the order it's written: `Derive.if_`
+   (§7.1) first since it's the one other proposals/sites are already
+   asking for and the one new `DerivationRef` shape everything else in
+   this tier either reuses or doesn't need; `list_at` (§7.3) same day,
+   same shape as the already-shipped `char_at`; `Derive.select` (§7.2)
+   only once `Derive.if_` has real usage to generalize from; date/time
+   (§7.4) only after the explicit sign-off its own entry calls for.
+5. Treat §8's `DataSource`/client-side fetch as its own milestone
    (like `v0.054` was for reactivity) -- it's the actual answer to
    "the computation isn't enough," since today ARKlight genuinely
    cannot express "load this JSON and render it" without a full
    server round-trip via htmx.
-5. Leave §8 out of scope unless the "no eval, ever" and "static
+6. Leave §9 out of scope unless the "no eval, ever" and "static
    output only" invariants themselves are up for reconsideration --
    that's a philosophy call, not an engineering one.
