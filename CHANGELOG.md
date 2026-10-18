@@ -5,6 +5,40 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md` accepted, staged as `MARKDOWN-CONTENT-ADDENDUM.md`
+
+**Accepted, not built.** `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`'s
+Status line moves from "proposal" to "accepted," reasoned plainly:
+ARKlight calls itself a static site generator, and a static site
+generator that can't take Markdown as input is missing the one
+authoring format most people expect an SSG to have.
+
+Turned into a trackable seven-stage (`M1`-`M7`) landing order in the
+new `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`, following
+`APP-SHELL-ADDENDUM.md`'s shape: front matter parser, a Markdown-to-IR
+parser adapted from the already-vendored `arklight/cli/mdrender.py`
+terminal renderer (left untouched itself -- `arklight search
+--retrieve-doc` still wants ANSI, not IR), `content/`-directory
+discovery wired in as its own pipeline step ahead of
+`arklight.parser.discover`'s existing AST-only scan rather than inside
+it, asset/link resolution reusing `asset_check`/`link_check`
+unmodified, the `markdown-simple`/`markdown-production` templates, and
+the `light`/`dark`/`reading` presets. No version slots reserved yet --
+assigned when a stage is actually scheduled.
+
+Two of the original proposal's open questions are settled by the
+addendum rather than left open: the raw-HTML security policy is
+**escape, not strip or allow-list** (narrowest option, no allow-list
+to maintain), and `dark`'s background is fixed to `#16140f` against
+the `mdrender.py`-derived clay/tan/taupe accent palette, checked for
+AA contrast. The rest of the proposal's open questions carry over to
+their respective stage.
+
+- Docs: `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md` (Status line),
+  `docs/Proposals/README.md` (index row), `docs/Implementation/
+  MARKDOWN-CONTENT-ADDENDUM.md` (new), `docs/Implementation/README.md`
+  (index row), this entry. No code changes.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Bug fix: `State(..., persist=True, scope="global")`, site-wide persisted state
 
 **Shipped.** `docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md`'s

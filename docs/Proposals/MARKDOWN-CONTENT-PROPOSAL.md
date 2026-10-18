@@ -2,11 +2,22 @@
 
 ## Status
 
-**Proposal -- not yet accepted, not yet staged.** Per
-`docs/Proposals/README.md`'s own definition, this describes something
-that does not exist yet, may never be built as written, and could be
-rejected outright. Nothing below is implemented; every path named here
-is a *target*, not a change already made.
+**Accepted -- staged as a seven-rung implementation ladder (`M1`-
+`M7`, no version slots reserved).** Filed under `docs/Proposals/`
+following the format and conventions of the existing proposal
+documents there, and kept here with this Status line, same as the
+other accepted proposals in this folder. The content below is left as
+filed -- it's the design record this proposal was accepted on -- and
+is not rewritten to reflect in-progress implementation detail. See
+[`MARKDOWN-CONTENT-ADDENDUM.md`](../Implementation/MARKDOWN-CONTENT-ADDENDUM.md)
+for the rung-by-rung landing order, including where each open question
+below gets settled.
+
+**Reason for acceptance:** ARKlight calls itself a static site
+generator; not letting Markdown be used as an authoring format sits
+oddly against what that name leads people to expect. Nothing below is
+implemented yet -- every path named here is still a *target*, not a
+change already made; see the addendum for what has actually shipped.
 
 **Origin:** a `site.py` sketch pitching Markdown pages discovered from
 a `content/` directory, written to the same `@site.page(...)` mental
