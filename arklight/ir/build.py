@@ -24,9 +24,10 @@ from typing import Any, Callable
 
 import math
 import re
+from urllib.parse import urlsplit
 
 from arklight import experimental
-from arklight.ast.nodes import ActionRef, ARKNode, DerivationRef
+from arklight.ast.nodes import ActionRef, ARKNode, DerivationRef, is_state_ref
 from arklight.ir import js_list, js_numeric, js_string
 from arklight.ir.components import COMPONENT_ORIGIN_PROP_KEY, ComponentOrigin
 from arklight.provider import ProviderDeclaration
@@ -248,6 +249,23 @@ class WebsiteIR:
     # into "added an override" per CONFIGURABILITY.md's own rule.
     strict_csp: bool = True
     trusted_script_origins: list[str] = field(default_factory=list)
+    # EXPERIMENTAL (docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md,
+    # stage 1/2 of that proposal's own staged rollout): `Site(trusted_
+    # fetch_origins=...)`'s straight passthrough, the `connect-src`
+    # counterpart to `trusted_script_origins` above -- see
+    # `Site.__init__`'s comment (arklight/api.py) and
+    # `arklight/backend/html/csp.py`. `uses_fetch_json` is *not* a
+    # `Site(...)` kwarg -- it's computed here, during the tree walk
+    # (`_ark_node_to_ir_node`), the same "discovered by walking the
+    # tree" shape `responsive_rules`/`collector.experimental_usages`
+    # already use for `responsive_style`, since whether any page
+    # actually uses `Action.fetch_json(...)` isn't knowable until the
+    # walk runs. Both default to their zero value, so a site that
+    # never uses the feature ships a byte-identical `connect-src`-free
+    # CSP policy, same "zero cost when unused" discipline every other
+    # experimental feature in this file already holds.
+    trusted_fetch_origins: list[str] = field(default_factory=list)
+    uses_fetch_json: bool = False
     # Runtime policy enforcement, devtools mirror (arklight/backend/js/
     # render.py's `_experimental_console_reminder_js`): a compile-time
     # "[EXPERIMENTAL FEATURE ACTIVE]" banner (arklight/experimental.py)
@@ -302,6 +320,14 @@ class _ResponsiveStyleCollector:
     counter: int = 0
     rules: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
     experimental_usages: list = field(default_factory=list)
+    # EXPERIMENTAL (docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md):
+    # set `True` the moment any node anywhere carries
+    # `on_click=Action.fetch_json(...)` -- see `_ark_node_to_ir_node`
+    # below. Read back into `WebsiteIR.uses_fetch_json` once the whole
+    # tree has been walked (`build_website_ir`), the same "collector
+    # accumulates, caller reads it back after the walk" shape `rules`/
+    # `experimental_usages` already use.
+    uses_fetch_json: bool = False
 
     def collect(
         self,
@@ -325,6 +351,7 @@ def _ark_node_to_ir_node(
     *,
     collector: _ResponsiveStyleCollector,
     on_warning: Callable[[str], None] | None = None,
+    trusted_fetch_origins: tuple[str, ...] = (),
 ) -> IRNode:
     props = dict(node.props)
 
@@ -369,10 +396,53 @@ def _ark_node_to_ir_node(
             experimental.emit("provider-scripts", on_warning=on_warning, component="Page")
         )
 
+    # EXPERIMENTAL (docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md,
+    # stage 2): same "pop/inspect a prop during the walk, gate it"
+    # shape as the two checks above. `on_click=Action.fetch_json(...)`
+    # is *not* popped -- it's a real prop every other `ActionRef`
+    # already reaches the JS backend through unchanged -- only
+    # inspected here for two things a later stage can't do as cheaply:
+    # recording the experimental usage, and -- for a literal (not
+    # `Bind(...)`-sourced) `url=` -- checking it against
+    # `trusted_fetch_origins` at *build* time, the "resolve what the
+    # compiler can, ahead of time" half of the proposal's design (a
+    # `Bind(...)`-sourced `url=` gets the runtime check instead,
+    # `arkIsTrustedFetchURL` in `arklight/backend/js/render.py`, since
+    # the compiler can't see what it will hold until the click
+    # happens).
+    on_click = props.get("on_click")
+    if isinstance(on_click, ActionRef) and on_click.action == "fetch_json":
+        collector.uses_fetch_json = True
+        collector.experimental_usages.append(
+            experimental.emit("fetch-json", on_warning=on_warning, component=node.type)
+        )
+        url = on_click.args.get("url")
+        if isinstance(url, str) and not is_state_ref(url):
+            parsed = urlsplit(url)
+            same_origin = not parsed.netloc
+            origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else ""
+            if not same_origin and origin not in trusted_fetch_origins:
+                allowed = ", ".join(trusted_fetch_origins) or "(none)"
+                raise ValueError(
+                    f"Action.fetch_json(..., url={url!r}) at a {node.type!r} node "
+                    f"targets {origin!r}, which isn't same-origin and isn't listed "
+                    f"in Site(trusted_fetch_origins=[...]). Trusted fetch origins: "
+                    f"{allowed}. Either use a same-origin/relative url (e.g. "
+                    f'"/api/...") or add {origin!r} to '
+                    f"Site(trusted_fetch_origins=[...])."
+                )
+
     children: list[IRNode | str] = []
     for child in node.children:
         if isinstance(child, ARKNode):
-            children.append(_ark_node_to_ir_node(child, collector=collector, on_warning=on_warning))
+            children.append(
+                _ark_node_to_ir_node(
+                    child,
+                    collector=collector,
+                    on_warning=on_warning,
+                    trusted_fetch_origins=trusted_fetch_origins,
+                )
+            )
         else:
             children.append(str(child))
     return IRNode(type=node.type, props=props, children=children, component_origin=component_origin)

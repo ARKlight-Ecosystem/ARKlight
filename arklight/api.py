@@ -863,6 +863,35 @@ class Action:
         return ActionRef(action="reset", state=name, args={})
 
     @staticmethod
+    def fetch_json(name: str, *, url: Any, method: str = "GET") -> ActionRef:
+        """
+        EXPERIMENTAL (docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md,
+        stage 2 of that proposal's own staged rollout). Issues a
+        same-origin (or `Site(trusted_fetch_origins=[...])`-listed)
+        `fetch`, parses the response as JSON, and writes it into the
+        `State(...)` named `name` once it resolves:
+
+            State("weather", initial=None)
+            Button("Check weather", on_click=Action.fetch_json(
+                "weather", url="/api/weather",
+            ))
+
+        `url` may be a literal string -- checked against
+        `trusted_fetch_origins` at *build* time (`arklight/ir/build.py`)
+        -- or `Bind("some_state")`, checked at *runtime* instead
+        (`arkIsTrustedFetchURL`, `arklight/backend/js/render.py`), the
+        same capability `Action.set`'s `value` already has. `method`
+        is `"GET"` or `"POST"` only (validated at compile time); no
+        request body is sent for either -- see the proposal's \u00a73.3
+        for why that's deliberately left for a later stage.
+        """
+        return ActionRef(
+            action="fetch_json",
+            state=name,
+            args={"url": _action_arg(url), "method": method},
+        )
+
+    @staticmethod
     def append(name: str, value: Any) -> ActionRef:
         """Appends `value` to a list-valued `State(...)`."""
         return ActionRef(action="append", state=name, args={"value": _action_arg(value)})
@@ -2319,6 +2348,7 @@ class Site:
         app_shell: bool = False,
         strict_csp: bool = True,
         trusted_script_origins: list[str] | None = None,
+        trusted_fetch_origins: list[str] | None = None,
         provider: ProviderDeclaration | None = None,
     ) -> None:
         self.name = name
@@ -2537,6 +2567,46 @@ class Site:
                         "into script-src."
                     )
         self.trusted_script_origins: list[str] = list(trusted_script_origins or [])
+
+        # EXPERIMENTAL (docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md,
+        # stage 1 of that proposal's own staged rollout): the
+        # `connect-src` counterpart to `trusted_script_origins` above,
+        # for `Action.fetch_json(...)`'s `url=` (`arklight/ir/schema.py`'s
+        # `"fetch_json"` entry). Same validation discipline, same
+        # reason -- a value spliced verbatim into a CSP directive gets
+        # the same whitespace/`;`-injection and unsafe-token checks
+        # `trusted_script_origins` already has, so a single kwarg
+        # contract (CONFIGURABILITY.md) governs both. Unlike
+        # `trusted_script_origins`, an entry here is also checked
+        # against every literal (non-`Bind(...)`) `Action.fetch_json(url=...)`
+        # in the site at *build* time (`arklight/ir/build.py`) -- not
+        # just spliced into the CSP policy -- since the compiler can
+        # already see most `url=` values ahead of time, the same
+        # "resolve what it can, ahead of time" discipline the proposal's
+        # philosophy-fit checklist (\u00a74) commits to.
+        if trusted_fetch_origins is not None:
+            if not isinstance(trusted_fetch_origins, list) or not all(
+                isinstance(origin, str) and origin.strip() for origin in trusted_fetch_origins
+            ):
+                raise ValueError(
+                    "Site(trusted_fetch_origins=...) needs a list of non-empty strings "
+                    f"(connect-src origins), got {trusted_fetch_origins!r}."
+                )
+            for origin in trusted_fetch_origins:
+                if any(ch.isspace() for ch in origin) or ";" in origin:
+                    raise ValueError(
+                        "Site(trusted_fetch_origins=...) entries must be a single "
+                        "connect-src source with no whitespace or ';' -- "
+                        f"{origin!r} would split into multiple sources or inject a "
+                        "new CSP directive when rendered."
+                    )
+                if origin.strip("'\"").lower() in {"unsafe-inline", "unsafe-eval", "*"}:
+                    raise ValueError(
+                        "Site(trusted_fetch_origins=...) can't include "
+                        f"{origin!r} -- list specific origins a genuine backend "
+                        "lives at, not a wildcard or an unsafe-* token."
+                    )
+        self.trusted_fetch_origins: list[str] = list(trusted_fetch_origins or [])
 
         # EXPERIMENTAL (docs/Foundational/EXPERIMENTAL-APIS.md, feature
         # `provider-integration`; `v0.065` `Provider` stage 1): a site
