@@ -224,7 +224,8 @@ content the same hooks a Python-authored page already has access to
   project's own Markdown theme -- only the generic
   `allow_redefine=True` escape hatch every reserved utility class
   already has. A first-class Markdown-theming surface is `M7`
-  (independent of this stage, still unscheduled).
+  (independent of this stage; SHIPPED as `Site(markdown_theme=
+  "light"|"dark"|"reading")` -- see that stage's own section).
 - **Not feature parity, settled here:** `content/*.md` is not a
   `Page(...)`-authored page in different syntax. The construct mapping
   table in Stage M2 is the entire Markdown vocabulary this parser
