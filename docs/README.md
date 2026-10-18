@@ -106,6 +106,7 @@ README for the full rationale.
 
 | File | Covers |
 | --- | --- |
+| [`MARKDOWN-CONTENT-ADDENDUM.md`](Implementation/MARKDOWN-CONTENT-ADDENDUM.md) | Seven-stage (`M1`-`M7`, no version slots reserved) ladder for the accepted `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md` -- Markdown as a first-class authoring format. **IN PROGRESS** -- `M1`-`M5` (front matter, Markdown-to-IR parser, `content/` discovery, asset/link resolution, `markdown-simple`/`markdown-production` templates) SHIPPED, unreleased (`alpha`); `M6`-`M7` PLANNED. |
 | [`JS-VOCABULARY-ADDENDUM-v0.070.md`](Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md) | Staged, ten-rung (`v0.061`-`v0.070`) implementation ladder for the philosophy-compliant parts of `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`. |
 | [`PLATFORM-API-IR-ADDENDUM.md`](Implementation/PLATFORM-API-IR-ADDENDUM.md) | Two-stage implementation ladder for the accepted `docs/Proposals/PLATFORM-API-IR-PROPOSAL.md` -- Stage 1 (Web reference implementation) SHIPPED as `v0.065`; Stage 2 (Android/Desktop native implementations) PLANNED, unscheduled pending each backend's own maturity. |
 | [`PROJECT-KNOWLEDGE-ADDENDUM.md`](Implementation/PROJECT-KNOWLEDGE-ADDENDUM.md) | Staged, eight-rung (`v0.071`-`v0.078`) implementation ladder for the accepted `docs/Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md` -- `.arklight/` foundation through future-provider open slot, one version per stage. |
