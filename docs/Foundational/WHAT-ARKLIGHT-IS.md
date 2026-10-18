@@ -429,7 +429,8 @@ The following is the practical capability boundary for the current alpha. These 
 | Backend-driven application with authentication | No | ARKlight has no server runtime, authentication system, or account model. |
 | Database-backed application | No | There is no database/server integration in the current closed vocabulary. |
 | Checkout or payment application | No | No sanctioned backend/payment-service integration exists in the current compiler vocabulary. |
-| API-driven application requiring arbitrary HTTP requests | No | There is no `fetch`/HTTP primitive anywhere in ARKlight's closed vocabulary, and `PlatformAPI.db` does not change that -- it is local storage, not a network call. `Provider` (`Site(provider=Provider.declare(...))`) is the accepted, gated *boundary* for a site to declare it talks to an external service; the actual request -- "your own `fetch` calls" against a vendor SDK loaded via `Page(scripts=[...])`, in the maintainer's own words (`arklight/provider.py`) -- is the site author's hand-written JavaScript, never something ARKlight authors, generates, or validates. |
+| Simple API-backed widget (weather lookup, a search box hitting your own same-origin JSON endpoint, a "load more" button) | Yes (Experimental) | `Action.fetch_json(name, url=..., method=...)` (`docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md`, stage 2) issues a click-triggered GET/POST, parses the response as JSON, strips `__proto__`/`constructor`/`prototype` keys, and writes it into `State(...)`. The target must be same-origin or listed in `Site(trusted_fetch_origins=[...])`, checked at build time for a literal URL and at runtime for a `Bind(...)`-sourced one. Gated as an experimental feature (every use prints the standard warning); see the caveats below. |
+| API-driven application requiring arbitrary HTTP requests (any verb/header/body shape, load-triggered requests, streaming, request cancellation, response caching) | No | `Action.fetch_json(...)` closes a narrow slice of this (click-triggered JSON GET/POST, see above) -- it is not a general `fetch()` escape hatch. There is still no load-triggered request (`State(..., fetch=...)`, proposed stage 3, unimplemented), no non-JSON response handling, no custom headers/body beyond the one JSON `fetch_json` sends, and no request lifecycle (cancellation, retry/backoff, caching). `PlatformAPI.db` remains unrelated -- it is local storage, not a network call. `Provider` (`Site(provider=Provider.declare(...))`) is still the accepted, gated *boundary* for a site to declare it talks to a full external service (auth, a hosted database); the concrete implementation for anything beyond a trusted-origin JSON GET/POST -- "your own `fetch` calls" against a vendor SDK loaded via `Page(scripts=[...])`, in the maintainer's own words (`arklight/provider.py`) -- is still the site author's hand-written JavaScript, never something ARKlight authors, generates, or validates. |
 | Large SPA-shaped application | No | ARKlight does not provide a persistent application-level component tree, general client-side router, or fine-grained reactive dependency graph. |
 | Complex multi-view client application | Not currently targeted | Pages remain independently compiled documents; `app_shell=True` improves navigation behavior but does not turn the output into a conventional SPA. |
 | Arbitrary custom JavaScript | No | Client behavior is intentionally restricted to the closed vocabulary. There is no general JavaScript escape hatch in the normal authoring model. |
@@ -442,7 +443,9 @@ The current capability boundary can therefore be summarized as:
 
 **Possible but alpha:** Android and Linux desktop wrappers.
 
-**Outside the current model:** backend-heavy applications, authentication/account systems, database-backed applications, arbitrary API-driven applications, large SPA-shaped systems, and projects whose development model depends on unrestricted client-side JavaScript.
+**Possible but experimental:** simple, click-triggered, same-origin-or-trusted JSON API widgets (`Action.fetch_json(...)`) -- not a general HTTP client.
+
+**Outside the current model:** backend-heavy applications, authentication/account systems, database-backed applications, API-driven applications needing arbitrary verbs/headers/load-triggered requests/streaming/caching, large SPA-shaped systems, and projects whose development model depends on unrestricted client-side JavaScript.
 
 The purpose of this boundary is not to imply that the unsupported categories are inherently undesirable or impossible to implement. They require capabilities that ARKlight's current closed-vocabulary and compiler-first design does not provide.
 
@@ -450,29 +453,38 @@ For evaluation purposes, the important question is therefore not simply whether 
 
 ## 6. Honest, currently-unresolved gaps
 
-- **No fetch/HTTP primitive anywhere in the closed vocabulary** -- a
-  real, checkable wall (verified against `ACTION_REGISTRY` and
-  `DERIVATION_REGISTRY` directly, and still true after `PlatformAPI.db`
-  landed -- `db` is local storage, not a network call) that rules out a
-  whole class of common beginner projects (weather apps, anything
-  API-driven) until or unless a sanctioned, closed-vocabulary way to
-  fetch data is designed. `Provider` (`docs/Foundational/
-  PROVIDER-SDK.md`, six-rung `v0.065`-`v0.070` ladder fully shipped) is
-  the accepted *boundary* for external services -- it declares that a
-  site talks to one and can load its vendor script
-  (`Page(scripts=[...])`), but the actual request is the site author's
-  own hand-written code, never something ARKlight authors or
-  validates; `arklight/provider.py`'s own docstring names this
-  directly ("the real Firebase SDK, your own fetch calls"). A Platform
-  APIs layer (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`, accepted
-  and staged in `docs/Implementation/PLATFORM-API-IR-ADDENDUM.md`) is
-  a related but distinct answer for *execution-platform* capabilities
-  -- stage 1 of 2 (Web reference implementation, `notify`/
-  `clipboard_write`) shipped as of `v0.065`, and stage 2's first slice
-  (`db`, local key/value storage on Web + Android) has now landed in
-  source (`[Unreleased]` per `CHANGELOG.md`), narrowing but not closing
-  this gap: `db` reads and writes bytes a site already has, it still
-  doesn't put a byte on the wire. Section 25 of the Platform API
+- **No general fetch/HTTP primitive in the closed vocabulary -- now
+  partially closed.** `ACTION_REGISTRY` carries one narrow entry,
+  `Action.fetch_json` (`docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-
+  PROPOSAL.md`, stage 2; gated `arklight.experimental.
+  FEATURES["fetch-json"]`): a click-triggered, same-origin-or-
+  `Site(trusted_fetch_origins=[...])`-checked GET/POST that parses a
+  JSON response and writes it into `State(...)`. This closes the
+  single most common beginner request -- "hit an endpoint, show the
+  JSON" (a weather app, a simple search box) -- without becoming a
+  general escape hatch: it is click-only (no load-triggered request),
+  JSON-only (no other response/content type), and carries no request
+  lifecycle (no cancellation, retry/backoff, or caching). `Provider`
+  (`docs/Foundational/PROVIDER-SDK.md`, six-rung `v0.065`-`v0.070`
+  ladder fully shipped) remains the accepted *boundary* for a site to
+  declare it talks to a full external service (auth, a hosted
+  database) and can load its vendor script (`Page(scripts=[...])`);
+  for anything beyond a trusted-origin JSON GET/POST, the actual
+  request is still the site author's own hand-written code, never
+  something ARKlight authors or validates; `arklight/provider.py`'s
+  own docstring names this directly ("the real Firebase SDK, your own
+  fetch calls"). The proposal's stage 3, a load-triggered
+  `State(..., fetch=...)`, is still unimplemented -- that remains the
+  next real step before this gap is closed rather than narrowed. A
+  Platform APIs layer (`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`,
+  accepted and staged in `docs/Implementation/
+  PLATFORM-API-IR-ADDENDUM.md`) is a related but distinct answer for
+  *execution-platform* capabilities -- stage 1 of 2 (Web reference
+  implementation, `notify`/`clipboard_write`) shipped as of `v0.065`,
+  and stage 2's first slice (`db`, local key/value storage on Web +
+  Android) has now landed in source (`[Unreleased]` per
+  `CHANGELOG.md`); `db` reads and writes bytes a site already has, it
+  still doesn't put a byte on the wire. Section 25 of the Platform API
   proposal draws the line between the two layers explicitly.
 - **No slot/children-passing model for user-defined components** --
   `Card(Text("content"))` forwarding `"content"` into `Card`'s render

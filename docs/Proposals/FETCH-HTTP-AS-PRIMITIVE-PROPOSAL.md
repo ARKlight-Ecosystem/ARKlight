@@ -2,14 +2,38 @@
 
 ## Status
 
-**Proposal -- not yet accepted, not yet staged.** Follows the format
-and conventions of
+**Stage 1 (infra) and stage 2 (`Action.fetch_json`) accepted and
+shipped on `alpha`**, gated as
+`arklight.experimental.FEATURES["fetch-json"]`. Stage 3
+(`State(..., fetch=...)`, load-triggered) is still unbuilt and
+unstaged -- this document now describes a partially-implemented
+feature, not a purely hypothetical one; only the "## Stage 3" section
+below still fits `docs/Proposals/README.md`'s "does not exist yet, may
+never be built as written" definition. Followed the format and
+conventions of
 [`docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`](URL-STATE-AS-PRIMITIVE-PROPOSAL.md)
 and
-[`docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md`](APP-SHELL-CAPABILITY-PROPOSAL.md).
-Per `docs/Proposals/README.md`'s own definition, this describes
-something that does not exist yet, may never be built as written, and
-could be rejected outright.
+[`docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md`](APP-SHELL-CAPABILITY-PROPOSAL.md),
+both of which also graduated from proposal to shipped feature in
+place rather than being retired to `docs/Implementation/`.
+
+**Where this sits relative to `Provider`:** `fetch_json` is authored
+as `Action.fetch_json(...)`, not `Provider.declare(...)` -- it needs
+no external-service declaration at all, since a same-origin or
+explicitly trusted JSON endpoint is not "an external service" in the
+sense `Provider` means (a hosted database, an auth vendor). But it is
+the concrete, closed-vocabulary answer to the gap
+`docs/Foundational/PROVIDER-SDK.md`'s "Explicitly out of scope"
+section and `docs/Foundational/WHAT-ARKLIGHT-IS.md`'s gap list both
+name as "client-side data-fetch orchestration" -- treat it as sitting
+on the `Provider` boundary conceptually (the same "declare vs. act"
+line this document's TL;DR draws below), even though its authoring
+surface is `Action.*`. A `Provider`-declared external service that
+also happens to be same-origin or trusted-origin JSON can use
+`fetch_json` directly for the read/write half of that integration;
+anything else (auth headers, a vendor SDK's own request shape) still
+goes through the site author's own code, same as before this
+shipped.
 
 **Origin:** `docs/Foundational/CAPABILITY-MATRIX.md` lists Fetch / HTTP
 as a `Gap`, with the note "By design for now; `PROVIDER-SDK.md` is the
