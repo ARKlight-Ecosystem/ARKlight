@@ -41,6 +41,7 @@ from arklight.backend.css.custom_styles import (
     render_responsive_styles,
 )
 from arklight.backend.css.design_tokens import render_root_and_property_rules
+from arklight.backend.css.markdown_defaults import MARKDOWN_CSS_BODY, MARKDOWN_CSS_HEADER
 from arklight.ir.build import WebsiteIR
 
 # Where the HTML backend expects to find the generated stylesheet,
@@ -85,6 +86,21 @@ class CSSBackend(Backend):
         # simpler `custom_styles`/`media_queries`/`responsive_rules`
         # rule already does, and the newer/more specific mechanism
         # should get the final say in the cascade.
+        #
+        # Stage M6 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # `MARKDOWN_CSS_BODY` -- default styling for the `ark-md-*`
+        # classes `arklight.content.markdown`'s `style_hooks=True` pass
+        # attaches -- goes right after `BASE_CSS_BODY`, same cascade
+        # tier, always included whether or not this particular site has
+        # any Markdown content (same "always shipped, whether or not a
+        # page uses it" posture `BASE_CSS_BODY` already has for every
+        # other built-in component). Ordered ahead of `custom_styles`/
+        # `selector_rules` on purpose: the one sanctioned way to
+        # override one of these classes today, `site.style_selector(
+        # ".ark-md-...", {...}, allow_redefine=True)`, compiles into
+        # `selector_rules` and so still gets the final say -- see
+        # `markdown_defaults.py`'s module docstring for the "default
+        # styling only, for now" disclaimer this implements.
         css = (
             render_imports(ir.style_imports)
             + BASE_CSS_HEADER
@@ -92,6 +108,10 @@ class CSSBackend(Backend):
             + render_root_and_property_rules(ir.css_var_overrides)
             + "\n\n"
             + BASE_CSS_BODY
+            + "\n"
+            + MARKDOWN_CSS_HEADER
+            + "\n"
+            + MARKDOWN_CSS_BODY
             + render_custom_styles(ir.custom_styles)
             + render_media_queries(ir.media_queries)
             + render_responsive_styles(ir.responsive_rules)

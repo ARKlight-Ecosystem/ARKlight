@@ -139,6 +139,54 @@ whole line) are not handled by this stage -- they are not part of the
 mapping table above, and are left for a later stage if real projects
 need them. A standalone line containing nothing but one `![alt](src)`
 becomes a block-level `Image(...)`.
+
+**Style hooks (Stage M6, see
+`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`).** `style_hooks=True`
+runs a small post-pass (`_apply_style_hooks`, after the tree above is
+otherwise fully built) that attaches a stable `class_name` -- and, on
+every `Heading`, a slugged `id` -- to each block this parser produces,
+under a fixed `ark-md-*` prefix (`ark-md-h1`..`ark-md-h6`, `ark-md-p`,
+`ark-md-list`/`ark-md-ordered-list`/`ark-md-item`, `ark-md-pre`/
+`ark-md-code-block`, `ark-md-blockquote`, `ark-md-table` and its
+`ark-md-thead`/`ark-md-tbody`/`ark-md-tr`/`ark-md-th`/`ark-md-td`
+children, `ark-md-hr`, `ark-md-img`, plus `ark-md-strong`/`ark-md-em`/
+`ark-md-code`/`ark-md-link` for the rare case where a whole paragraph
+collapses to one bare inline node -- see `_paragraph_node`). This is
+what `Site.style(...)`/`Site.style_selector(...)` (CSS authored in
+`site.py`) has to hook into and style on. `arklight.backend.css.
+markdown_defaults.MARKDOWN_CSS_BODY` ships a baseline look for every
+one of these classes, always included in the generated stylesheet --
+**default styling only, for now.** There is no dedicated,
+supported way yet to swap that default out wholesale for Markdown
+content specifically; the only lever today is the same generic
+`allow_redefine=True` escape hatch `RESERVED_UTILITY_CLASSES` already
+gives every other built-in utility class (`.card`, `.nav`, ...), since
+each `ark-md-*` class is registered there too. A first-class
+Markdown-theming surface is a later, unscheduled stage -- see the
+addendum.
+
+The flag defaults to `False`: a bare `parse_markdown(...)` call (this
+stage's own direct callers in `tests/test_markdown.py`, and anyone
+calling this module outside the real build pipeline) gets the exact
+same tree Stage M2-M4 always produced, byte-for-byte -- no surprise
+`class_name`/`id` props appear unless asked for. The one caller that
+assembles real site pages, `arklight.content.discovery.
+synthesize_page`, always passes `style_hooks=True`: a Markdown-authored
+page gets these hooks automatically, with nothing to opt into in
+`site.py` -- see that module for why this is the "implicitly handled
+by the compiler" half of the stage, as opposed to the `markdown-
+production` template's `components/` visibility story (Stage M8, same
+addendum file).
+
+`content/*.md` is not a `Page(...)`-authored page re-expressed in a
+different syntax: it is not feature parity. The construct mapping
+table above is the entire Markdown vocabulary this parser understands
+-- no component props, no `State`/`Bind`/`Action`, no behaviors, no
+custom components -- so a Markdown file can only ever produce what
+that table can express, styled by what this stage adds. A page that
+needs any of that goes through a `@site.page(...)`-decorated function
+instead (mixing both in one project is Stage M5's own `markdown-
+production` template, and is the supported, intended way to get both).
 """
 
 from __future__ import annotations
@@ -456,12 +504,155 @@ def _resolve_references(
     walk(blocks)
 
 
+# ---------------------------------------------------------------------------
+# Style hooks (Stage M6) -- see the module docstring's "Style hooks" section
+# for the full rationale and the disclaimer. Every class name below must stay
+# in sync with `arklight.backend.css.markdown_defaults`, which is what
+# actually styles them by default, and with that module's own
+# `HOOK_CLASS_NAMES` export, which `arklight.api.RESERVED_UTILITY_CLASSES`
+# reads to protect them the same way `.card`/`.nav`/etc. already are.
+# ---------------------------------------------------------------------------
+
+_HEADING_HOOK_CLASS = "ark-md-h{level}"
+_PARAGRAPH_HOOK_CLASS = "ark-md-p"
+_LIST_HOOK_CLASS = "ark-md-list"
+_ORDERED_LIST_HOOK_CLASS = "ark-md-ordered-list"
+_ITEM_HOOK_CLASS = "ark-md-item"
+_PRE_HOOK_CLASS = "ark-md-pre"
+_CODE_BLOCK_HOOK_CLASS = "ark-md-code-block"
+_TABLE_HOOK_CLASS = "ark-md-table"
+_THEAD_HOOK_CLASS = "ark-md-thead"
+_TBODY_HOOK_CLASS = "ark-md-tbody"
+_TR_HOOK_CLASS = "ark-md-tr"
+_TH_HOOK_CLASS = "ark-md-th"
+_TD_HOOK_CLASS = "ark-md-td"
+
+# A whole paragraph can collapse to a single bare inline node
+# (`_paragraph_node`, e.g. `parse_markdown("**bold**")` ->
+# `[Strong("bold")]`) -- there is no wrapping paragraph element at all
+# in that case, so this gets its own class per inline type rather than
+# the generic `ark-md-p`, which would misname the actual `<strong>`/
+# `<em>`/`<code>`/`<a>` tag that's really there.
+_PARAGRAPH_COLLAPSE_HOOK_CLASSES = {
+    "Strong": "ark-md-strong",
+    "Em": "ark-md-em",
+    "Code": "ark-md-code",
+    "Link": "ark-md-link",
+}
+
+_SIMPLE_BLOCK_HOOK_CLASSES = {
+    "HorizontalRule": "ark-md-hr",
+    "Image": "ark-md-img",
+    "Blockquote": "ark-md-blockquote",
+}
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify(text: str) -> str:
+    """A heading's plain text -> a URL-fragment-safe `id`: lowercased,
+    runs of anything that isn't `[a-z0-9]` collapsed to one `-`, with
+    leading/trailing `-` stripped. Falls back to `"section"` for a
+    heading with no usable text (`### ` alone, or a heading that was
+    only punctuation) so `id` is never an empty string."""
+    slug = _SLUG_RE.sub("-", text.strip().lower()).strip("-")
+    return slug or "section"
+
+
+def _apply_style_hooks(blocks: list[ARKNode]) -> None:
+    """Stage M6 post-pass: attach `class_name` (and, on `Heading`,
+    `id`) to every block `parse_markdown` just built, in place --
+    `blocks` is freshly constructed by this call (never anything a
+    caller already holds a reference to and still wants hook-free), the
+    same assumption `_resolve_references` already makes. Only the
+    block-level list and the small, fixed structural shapes this
+    parser itself produces (table sections/rows/cells, list items, a
+    fenced block's inner `Code`) are walked -- deliberately *not* a
+    generic recursive walk into every inline run the way
+    `_resolve_references` does, since an inline `Text`/`Strong`/`Em`/
+    `Code`/`Link` run nested inside a multi-run paragraph's `Container`
+    is not itself a paragraph and classing it `ark-md-p` would be
+    wrong; default styling for those reaches them with ordinary
+    descendant selectors off the paragraph/cell/blockquote class
+    instead (see `markdown_defaults.MARKDOWN_CSS_BODY`).
+
+    `setdefault` throughout: idempotent if ever called twice, and never
+    clobbers a `class_name`/`id` this module itself may set some other
+    way in the future."""
+    seen_slugs: dict[str, int] = {}
+
+    def unique_id(text: str) -> str:
+        base = _slugify(text)
+        count = seen_slugs.get(base, 0)
+        seen_slugs[base] = count + 1
+        return base if count == 0 else f"{base}-{count + 1}"
+
+    def tag(target: ARKNode, class_name: str) -> None:
+        target.props.setdefault("class_name", class_name)
+
+    def tag_table(table: ARKNode) -> None:
+        tag(table, _TABLE_HOOK_CLASS)
+        for section in table.children:
+            if not isinstance(section, ARKNode):
+                continue
+            if section.type == "TableHead":
+                tag(section, _THEAD_HOOK_CLASS)
+            elif section.type == "TableBody":
+                tag(section, _TBODY_HOOK_CLASS)
+            for row in section.children:
+                if not isinstance(row, ARKNode) or row.type != "TableRow":
+                    continue
+                tag(row, _TR_HOOK_CLASS)
+                for cell in row.children:
+                    if not isinstance(cell, ARKNode):
+                        continue
+                    if cell.type == "TableHeaderCell":
+                        tag(cell, _TH_HOOK_CLASS)
+                    elif cell.type == "TableCell":
+                        tag(cell, _TD_HOOK_CLASS)
+
+    for block in blocks:
+        if not isinstance(block, ARKNode):
+            continue
+        if block.type == "Heading":
+            level = block.props.get("level", 1)
+            tag(block, _HEADING_HOOK_CLASS.format(level=level))
+            title = block.children[0] if block.children else ""
+            block.props.setdefault(
+                "id", unique_id(title if isinstance(title, str) else "")
+            )
+        elif block.type in ("Text", "Container"):
+            tag(block, _PARAGRAPH_HOOK_CLASS)
+        elif block.type == "List":
+            tag(block, _LIST_HOOK_CLASS)
+            for item in block.children:
+                if isinstance(item, ARKNode) and item.type == "Item":
+                    tag(item, _ITEM_HOOK_CLASS)
+        elif block.type == "OrderedList":
+            tag(block, _ORDERED_LIST_HOOK_CLASS)
+            for item in block.children:
+                if isinstance(item, ARKNode) and item.type == "Item":
+                    tag(item, _ITEM_HOOK_CLASS)
+        elif block.type == "Pre":
+            tag(block, _PRE_HOOK_CLASS)
+            for inner in block.children:
+                if isinstance(inner, ARKNode) and inner.type == "Code":
+                    tag(inner, _CODE_BLOCK_HOOK_CLASS)
+        elif block.type == "Table":
+            tag_table(block)
+        elif block.type in _SIMPLE_BLOCK_HOOK_CLASSES:
+            tag(block, _SIMPLE_BLOCK_HOOK_CLASSES[block.type])
+        elif block.type in _PARAGRAPH_COLLAPSE_HOOK_CLASSES:
+            tag(block, _PARAGRAPH_COLLAPSE_HOOK_CLASSES[block.type])
+
+
 def parse_markdown(
     source: str,
     *,
     filename: str = "<content>",
     content_path: str | None = None,
     page_routes: Mapping[str, str] | None = None,
+    style_hooks: bool = False,
 ) -> list[ARKNode]:
     """Parse a Markdown document's body into a list of block-level
     `ARKNode`s, built from `arklight.api`'s existing components --
@@ -483,6 +674,16 @@ def parse_markdown(
     every non-draft content file's such path to its route; it is what a
     link to another `.md` file is resolved through. With neither, the
     tree is returned with every reference exactly as written.
+
+    `style_hooks`, if `True` (Stage M6, see the module docstring's
+    "Style hooks" section), attaches a stable `class_name` -- and, on
+    every `Heading`, a slugged `id` -- to each block produced, under a
+    fixed `ark-md-*` prefix that `Site.style(...)`/`Site.style_selector(...)`
+    can target. Defaults to `False`, so a bare call (this is what every
+    test in `tests/test_markdown.py` makes) gets the exact tree Stage
+    M2-M4 always produced. `arklight.content.discovery.synthesize_page`,
+    the only caller that assembles real site pages, always passes
+    `True`.
 
     Raises `MarkdownSyntaxError` for a fenced code block that opens
     but never closes, and `MarkdownReferenceError` (a subclass) for a
@@ -611,4 +812,6 @@ def parse_markdown(
             content_path=content_path,
             page_routes=page_routes or {},
         )
+    if style_hooks:
+        _apply_style_hooks(blocks)
     return blocks

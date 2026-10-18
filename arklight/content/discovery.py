@@ -332,6 +332,13 @@ def synthesize_page(
         filename=page.relative_path,
         content_path=page.content_path,
         page_routes=page_routes,
+        # Stage M6 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # always on for a real, discovered Markdown page -- this is the
+        # "implicitly handled by the compiler" half of that stage, as
+        # opposed to Stage M8's `markdown-production` `components/`
+        # visibility story. No `site.py` opt-in needed; see
+        # `arklight.content.markdown.parse_markdown`'s `style_hooks` kwarg.
+        style_hooks=True,
     )
     return Page(*children, **props)
 
