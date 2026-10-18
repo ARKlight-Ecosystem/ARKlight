@@ -5,6 +5,51 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stages `M1`-`M5` of 7, `alpha` only
+
+**Shipped, unreleased.** `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`'s
+ladder, five rungs in: a restricted standard-library-only front matter
+reader (`arklight/content/frontmatter.py`, closed key set `title`/
+`description`/`route`/`draft`); a Markdown-to-IR parser adapted from
+`arklight/cli/mdrender.py`'s existing recognizers
+(`arklight/content/markdown.py`, raw HTML escaped to visible text per
+the addendum's Q4 answer, `mdrender.py` itself untouched); `content/`
+discovery and route synthesis wired in as its own early pipeline step
+ahead of `arklight.parser.discover`'s existing AST-only scan
+(`arklight/content/discovery.py`, `discover`/`load_site` each gained
+an opt-in `require_pages=False` keyword for the Markdown-only-routes
+case, defaulting to the prior behavior; `ContentCollisionError` for
+Q6's duplicate-route case, `draft: true` pages excluded from
+discovery entirely); asset/link resolution reusing the existing
+`asset_check`/`link_check` machinery unmodified, with only a Markdown
+file's own relative-path resolution added; and two new `arklight new`
+templates, `markdown-simple`/`markdown-production`, registered in
+`arklight.cli.templates.TEMPLATES` alongside `simple`/`production`
+(the latter answering Q7 -- mixing Python-authored and
+Markdown-authored pages in one project is the intended steady state).
+
+`tests/test_frontmatter.py`, `tests/test_markdown.py`,
+`tests/test_content_discovery.py`, `tests/test_content_assets.py`,
+`tests/test_markdown_templates.py` (new, 14 tests, following
+`tests/test_scaffold.py`'s file-presence-then-real-build pattern).
+Full suite green aside from two pre-existing, unrelated failures
+(`tests/test_action_value_from_state.py`,
+`tests/test_doc_links.py` -- both confirmed present before this
+patch, neither touched by it).
+
+`M6` (`light`/`dark`/`reading` presets) and `M7` (docs/tests rollup,
+`AUTHORING-GUIDE.md` Markdown-authoring section) remain PLANNED.
+
+- Docs: `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md` (Status
+  line and per-stage SHIPPED markers for `M1`-`M5`, `M3`'s touch
+  points corrected to match what actually landed), `docs/Implementation/
+  README.md` (index row, was stale at **PLANNED**), `docs/README.md`
+  (index row added -- previously missing entirely, the same
+  two-indexes-disagree drift this file's own `PROGRESS.md` "docs
+  audit" entries have caught before), this entry. No code changes in
+  this patch -- `M1`-`M5`'s code and tests landed in four prior
+  commits on `alpha`.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md` accepted, staged as `MARKDOWN-CONTENT-ADDENDUM.md`
 
 **Accepted, not built.** `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`'s

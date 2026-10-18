@@ -1,7 +1,8 @@
 # Markdown Content Addendum: Staged Landing Order
 
-**Status:** PLANNED. Seven stages (`M1`-`M7`), none started, **no
-version slots reserved** -- assigned when each stage is actually
+**Status:** IN PROGRESS. Seven stages (`M1`-`M7`); **`M1`-`M5` SHIPPED,
+unreleased (`alpha`)**, `M6`-`M7` PLANNED. **No version slots
+reserved** -- assigned when each remaining stage is actually
 scheduled, not here. This file turns the accepted
 [`docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`](../Proposals/MARKDOWN-CONTENT-PROPOSAL.md)
 into a trackable landing order, the same role
@@ -33,7 +34,7 @@ Verified against source on `alpha`, not taken from the proposal text:
 | `arklight.compiler.pipeline`'s own module docstring names the pipeline's stages explicitly: `Python Source -> Python AST -> ... -> IR -> backends` | `arklight/compiler/pipeline.py` |
 | `arklight/backend/css` is ARKlight's one layout system -- intrinsic, no viewport-keyed breakpoints by default (`css-media-queries` is a gated experimental feature, not the default posture) | `arklight/backend/css`, `arklight/experimental.py` |
 
-## Stage M1 -- Front matter parser
+## Stage M1 -- Front matter parser **(SHIPPED)**
 
 Settles the proposal's **Q3**. A restricted, standard-library-only
 `key: value` front matter reader -- not full YAML, consistent with
@@ -46,9 +47,12 @@ diagnostic, not a silent no-op.
   dataclass; a file with none parses to all-defaults; a malformed
   block (unterminated `---`, an unrecognized key) raises an actionable
   error naming the file and the key.
-- **Touch points:** new module, no existing file changed.
+- **Touch points:** new module, no existing file changed. Shipped as
+  `arklight/content/__init__.py`/`arklight/content/frontmatter.py`
+  (`KNOWN_KEYS = {"title", "description", "route", "draft"}`, matching
+  the closed set above exactly). `tests/test_frontmatter.py`.
 
-## Stage M2 -- Markdown-to-IR parser
+## Stage M2 -- Markdown-to-IR parser **(SHIPPED)**
 
 The core of the proposal. Extracts and adapts `mdrender.py`'s existing
 recognizers (headings, emphasis, fenced code, lists, links, tables,
@@ -76,8 +80,10 @@ shared recognizer core rather than one trying to serve both.
   never as a live element.
 - **Touch points:** new module (the parser), `arklight/ir/schema.py`
   untouched per the proposal's own "no new schema entries" framing.
+  Shipped as `arklight/content/markdown.py` (`parse_markdown(...)`).
+  `tests/test_markdown.py`.
 
-## Stage M3 -- `content/` discovery and route synthesis
+## Stage M3 -- `content/` discovery and route synthesis **(SHIPPED)**
 
 Settles **Q1** and **Q2**. Discovery of `.md` files under `content/`
 runs as its own step in `arklight/compiler/pipeline.py`, **before**
@@ -108,10 +114,18 @@ the proposal, unchanged.
   (one with a `route` override, one `draft: true`, one colliding with
   a `@site.page` route) produces exactly the two expected pages and
   the one expected collision error.
-- **Touch points:** `arklight/compiler/pipeline.py` (new early stage),
-  `arklight/parser/discover.py` (unchanged -- consumed, not modified).
+- **Touch points:** `arklight/compiler/pipeline.py` (new early stage);
+  `arklight/content/discovery.py` (new, `discover_content`/
+  `synthesize_pages`/`ContentCollisionError`). Corrected from the plan
+  above once implemented: `arklight/parser/discover.py` and
+  `arklight/parser/loader.py` each gained a `require_pages: bool =
+  True` keyword, defaulting to the long-standing behavior and passed
+  `False` only when Markdown content was already found under
+  `content/` -- `discover`'s AST-only-scan invariant itself is
+  unchanged, but the files are no longer byte-for-byte untouched as
+  first planned. `tests/test_content_discovery.py`.
 
-## Stage M4 -- Asset and link resolution
+## Stage M4 -- Asset and link resolution **(SHIPPED)**
 
 Wires Stage M2's output into the existing validation machinery rather
 than writing a second one. A Markdown-sourced `Image`/`Link` node is,
@@ -126,9 +140,12 @@ during Stage M2's own parse, before the tree is handed off.
   `Link(href="/typo")` already produces from a Python page; a present
   one resolves and copies through unchanged.
 - **Touch points:** Stage M2's parser only; `asset_check.py`/
-  `link_check.py` unchanged.
+  `link_check.py` unchanged. Shipped as extensions to
+  `arklight/content/markdown.py` (`content_path=` resolution,
+  `MarkdownReferenceError`) and `arklight/content/discovery.py`.
+  `tests/test_content_assets.py`.
 
-## Stage M5 -- `markdown-simple` / `markdown-production` templates
+## Stage M5 -- `markdown-simple` / `markdown-production` templates **(SHIPPED)**
 
 Two new entries in `arklight.cli.templates.TEMPLATES`, following
 `simple.py`/`production.py`'s existing `build(name) -> dict[str, str]`
@@ -146,7 +163,10 @@ guard rail that makes mixing safe.
 - **Touch points:** `arklight/cli/templates/markdown_simple.py`,
   `arklight/cli/templates/markdown_production.py` (new),
   `arklight/cli/templates/__init__.py` (registry entry). `simple.py`/
-  `production.py` untouched.
+  `production.py` untouched, as planned. `tests/test_markdown_templates.py`
+  (follows `tests/test_scaffold.py`'s pattern: file-presence checks,
+  then a real `arklight build` over the scaffolded output, which is
+  this stage's own exit test).
 
 ## Stage M6 -- `light` / `dark` / `reading` presets
 
@@ -199,3 +219,12 @@ M3 needs M2's parser, M4 needs M3's discovered pages, M5 needs M2-M4
 working end to end to scaffold against, M6 is independent of M1-M5 and
 could run in parallel if useful, M7 closes every stage out). No stage
 here is scheduled against a version slot yet -- see Status above.
+
+`M1`-`M5` have landed in that order on `alpha`, unreleased; full suite
+green including the new Markdown tests (`tests/test_frontmatter.py`,
+`tests/test_markdown.py`, `tests/test_content_discovery.py`,
+`tests/test_content_assets.py`, `tests/test_markdown_templates.py`).
+`M6` (presets) remains independent and unscheduled; `M7` (docs/tests
+rollup, `CHANGELOG.md`/`AUTHORING-GUIDE.md`) stays open until `M6`
+ships too, since M7's own exit test wants the full `M1`-`M6` surface
+reviewed in one pass rather than piecemeal.
