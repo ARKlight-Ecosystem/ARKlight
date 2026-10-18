@@ -13,6 +13,20 @@ Each template is a callable `name -> dict[relative_path, contents]`
 - `production` -- `templates.production.build`: a `site.py` +
   `components/` + `pages/` + `content/` + `assets/` layout for sites
   that outgrow one file.
+- `markdown-simple` -- `templates.markdown_simple.build`: `simple`'s
+  zero-thinking promise, but every page is a `.md` file under
+  `content/`, discovered automatically at build time
+  (`arklight.content.discovery`) instead of a decorated function in
+  `site.py`.
+- `markdown-production` -- `templates.markdown_production.build`: a
+  `site.py` + `components/` + `pages/` + `content/` + `assets/` layout
+  that mixes a Python-authored page with Markdown-authored content in
+  one project.
+
+(`markdown-simple`/`markdown-production` are Stage M5 of
+`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md` -- see that file,
+and `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`, for the design this
+pair implements.)
 
 Every template also writes an `arklight.config.py` (`templates.
 _common.ARKLIGHT_CONFIG_PY`) -- fully commented out, so it changes no
@@ -26,13 +40,15 @@ from __future__ import annotations
 
 from typing import Callable
 
-from arklight.cli.templates import production, simple
+from arklight.cli.templates import markdown_production, markdown_simple, production, simple
 
 TemplateBuilder = Callable[[str], dict[str, str]]
 
 TEMPLATES: dict[str, TemplateBuilder] = {
     "simple": simple.build,
     "production": production.build,
+    "markdown-simple": markdown_simple.build,
+    "markdown-production": markdown_production.build,
 }
 
 __all__ = ["TEMPLATES"]
