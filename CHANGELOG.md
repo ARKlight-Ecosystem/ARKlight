@@ -5,7 +5,7 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
-## [Unreleased -- draft, version slot unconfirmed] -- `Derive.list_at(name, index)`, Tier 3 SS7.3 of the JS vocabulary expansion proposal
+## [v0.071 **(draft -- version slot unconfirmed)**, JS Vocabulary Addendum Tier 3, stage 1 of 4] -- `Derive.list_at(name, index)`, Tier 3 SS7.3 of the JS vocabulary expansion proposal
 
 **Added.** `list_at(list, index)` -- arbitrary-position read into a
 list-valued `State(...)`/`Computed(...)`, the list-side counterpart of
@@ -34,9 +34,13 @@ Computed("second", deps=("items",), derive=Derive.list_at("items", 1))
 - `arklight/api.py` -- `Derive.list_at(name, index)`.
 
 This is `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` SS7.3
-(`list_at`), the first of Tier 3's three entries to ship; `Derive.if_`/
-`Derive.select` (SS7.1/SS7.2) and date/time arithmetic (SS7.4) remain
-unimplemented proposals. `tests/test_js_vocabulary_tier3_list_at.py`
+(`list_at`), stage 1 of 4 of the now-accepted Tier 3 ladder --
+`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.072.md` -- and the only
+stage of that ladder landing in the `v0.071` slot; `Derive.if_`/
+`Derive.select` (SS7.1/SS7.2) and date/time arithmetic (SS7.4) are
+accepted and staged as that ladder's remaining three stages, landing
+in the `v0.072` slot instead, not yet implemented.
+`tests/test_js_vocabulary_tier3_list_at.py`
 (new, 32 tests incl. a Node parity sweep); full suite otherwise
 unaffected (3 pre-existing, unrelated failures in this checkout: two in
 `tests/test_version.py` and one in `tests/test_scaffold.py`, both from
@@ -5178,7 +5182,7 @@ than a raw traceback" -- `arklight/cli/main.py` module docstring).
   and message, an explicit note that this isn't a documented/
   recommended failure path) instead of a raw traceback, and returns
   exit code `1` like every other failure mode. Points at
-  https://github.com/Rae-ARK/ARKlight/issues for reporting.
+  https://github.com/ARKlight-Ecosystem/ARKlight/issues for reporting.
 - **`OSError` guards around `build()`'s file-write loop and asset
   copy** (`arklight/compiler/pipeline.py`) -- previously neither step
   was guarded against filesystem failures (permissions, disk full, a
