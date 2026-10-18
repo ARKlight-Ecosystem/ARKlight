@@ -90,12 +90,22 @@ class _SiteVisitor(ast.NodeVisitor):
         return dec.args[0].value
 
 
-def discover(source: str, filename: str = "<arklight-site>") -> DiscoveredSite:
+def discover(
+    source: str, filename: str = "<arklight-site>", *, require_pages: bool = True
+) -> DiscoveredSite:
     """
     Statically analyze `source` and return the discovered Site variable
     name and page routes, without executing any user code.
 
     Raises SyntaxError if the source does not parse.
+
+    `require_pages` (default `True`, i.e. the long-standing behavior)
+    makes a file with a `Site()` but no `@<site_var>.page(...)` an
+    error. The compiler pipeline passes `False` only when it has
+    already found Markdown content under `content/` (Markdown-as-
+    content Stage M3) -- a site whose pages all come from `.md` files
+    legitimately registers none. Nothing else about discovery changes:
+    it is still a pure AST scan of the entry file.
     """
     tree = ast.parse(source, filename=filename)
     visitor = _SiteVisitor()
@@ -110,7 +120,7 @@ def discover(source: str, filename: str = "<arklight-site>") -> DiscoveredSite:
     # There should realistically be exactly one Site per file for v0.001.
     variable_name = sorted(visitor.site_variable_names)[0]
 
-    if not visitor.pages:
+    if require_pages and not visitor.pages:
         raise ValueError(
             f"No pages registered on `{variable_name}`. Add at least one "
             f'`@{variable_name}.page("/")` function.'
