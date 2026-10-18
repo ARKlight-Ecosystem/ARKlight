@@ -1086,6 +1086,72 @@ scaffolded alongside `README.md`. The generated config template lists
 all six known sections (commented out) and points at
 `arklight/config.py` instead of the nonexistent README section.
 
+### 75. "Site-level state" is two very different requests with two very different costs
+
+Raised directly: how much work is site-level (cross-page) `State(...)`,
+instead of today's page-level scoping, and does it collide with
+ARKlight's philosophy? The honest answer splits into two readings that
+get confused with each other in casual conversation, and only one of
+them is cheap.
+
+**What exists today:** `State(...)` is scoped per page by construction
+-- `IRPage.state` is one dict per compiled page (`arklight/ir/build.py`),
+and `persist=True` keys its `localStorage` entry
+`ark:<page-path>:<name>` (`arklight/api.py`'s `State` docstring,
+`arklight/backend/js/runtime/state.py`), namespaced by page path on
+purpose. `APP-SHELL-CAPABILITY-PROPOSAL.md`'s own philosophy-fit
+checklist calls this out explicitly: `State` re-initializing per page
+is named as "the current, correct behavior," not an oversight.
+
+**Reading A -- a shared *persisted default* across pages (small, in
+philosophy).** "Two pages both declare `State(cart_count=...)` and I
+want them reading/writing the same stored value" is a narrow,
+compiler-resolvable change: a `persist="site"` (or
+`Site(shared_state=[...])`) mode that drops the `<page-path>` segment
+from the generated `localStorage` key for just the named keys, so
+every page's independently-initialized `State(...)` happens to read
+back the same slot on load. No live sync while two tabs/pages are both
+open at once -- each page still only reads the stored value once, at
+its own `initState()`, same as `persist=True` already does. Rough
+size: a few hours to a day -- one new `persist=` value, one key-naming
+branch in `state.py`'s `INIT_STATE_JS`, a schema/validate check that
+the shared name doesn't collide across pages with different initial
+types, and a docs update. Fully compiler-first (the key name is still
+resolved statically at build time) and does not reopen any existing
+design agreement.
+
+**Reading B -- a live state object that survives navigation and stays
+reactive across pages (large, and already ruled out).** "Navigate from
+page A to page B and the same in-memory store, still subscribed,
+still pushing updates" is not a `persist=` variant -- it needs a
+persistent client-side runtime that outlives a page swap, which is
+exactly the SPA-shaped app shell `APP-SHELL-CAPABILITY-PROPOSAL.md`
+was written to draw a line around. That proposal's own "out of scope,
+permanently" list names this precisely: *"Component instances with
+state that survives across different pages (as opposed to `State`
+re-initializing per page, which is the current, correct behavior)."*
+It fails the same checklist `SYSTEM-DESIGN-AGREEMENTS.md` Section 3
+("Do Not Reimplement the Target Runtime") and
+`WHAT-ARKLIGHT-IS.md` Section 4 ("Not a client-side application
+framework") already apply to a general router: the only way to build
+it is a real client-side store plus the general dependency-tracking
+machinery to re-render whichever page is currently mounted when a
+*different* page's handler changes a shared value -- i.e., the thing
+the closed vocabulary and "compile away the runtime" philosophy exist
+to rule out, not a documentation gap waiting to be filled in. This
+reading is not "a few days of work"; it is a reversal of a standing,
+written design decision, and would need a maintainer to deliberately
+reopen `APP-SHELL-CAPABILITY-PROPOSAL.md`'s ruling first, the same way
+any other "permanently out of scope" item here would.
+
+**So:** "doesn't collide with the philosophy" is true for Reading A
+and false for Reading B, per ARKlight's own existing documents, not a
+judgment call being made fresh here. If what's wanted is "pages don't
+each start from zero for a value that should be a standing site
+default," Reading A gets there cheaply. If what's wanted is "it
+behaves like a single-page app's global store," that is the thing
+`app_shell` was explicitly designed to not become.
+
  most of these are not
 evidence that ARKlight's central idea is wrong. The genuinely dangerous
 ones are the places where the implementation violates its own existing

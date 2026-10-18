@@ -35,6 +35,30 @@ anything else (auth headers, a vendor SDK's own request shape) still
 goes through the site author's own code, same as before this
 shipped.
 
+**Direction being worked on: an optional real backend behind
+`fetch_json`, for devs who want one.** Nothing here forces a site to
+talk to a server -- `fetch_json` is as usable against a static,
+pre-built JSON file as against a live endpoint -- but for a dev who
+*does* stand up a real backend, testing the frontend means having some
+way to interface with it while iterating, not just at final deploy.
+ARKlight already has prior art for exactly that shape of problem:
+`arklight live-streaming --channel [PORT]` (`arklight/cli/channel.py`)
+is a dev-only, opt-in second server that serves one page's
+`State(...)` live over SSE/HTTP to any external client -- a Flask app,
+curl, a second browser tab -- for the length of a `--subscribe`
+session. It's not a production feature and it isn't `fetch_json`'s
+backend, but it's the same underlying need this proposal is reaching
+for: a sanctioned, closed-vocabulary way for the frontend half of a
+build to interface with something standing in for -- or actually
+being -- a real backend, instead of every dev reinventing that bridge
+by hand via `ScriptExtension`. Treat `--channel` as the dev-tool
+precedent, not the mechanism itself: the open question this direction
+still needs to answer is what a *production* `fetch_json` request
+against a dev's own backend should look like once `trusted_fetch_origins`
+already covers "is this origin allowed," which is a question about
+request shape (headers, auth, non-GET bodies) more than about the
+trust boundary itself.
+
 **Origin:** `docs/Foundational/CAPABILITY-MATRIX.md` lists Fetch / HTTP
 as a `Gap`, with the note "By design for now; `PROVIDER-SDK.md` is the
 accepted route for external services." This proposal is not a
