@@ -35,6 +35,7 @@ from arklight.ast.nodes import (
 from arklight.backend.css import selectors as css_selectors
 from arklight.backend.css.base_stylesheet import BASE_CSS_BODY
 from arklight.backend.css.markdown_defaults import HOOK_CLASS_NAMES as _MARKDOWN_HOOK_CLASS_NAMES
+from arklight.backend.css.markdown_presets import MARKDOWN_PRESETS
 from arklight.provider import ProviderDeclaration, register_provider
 
 # The default stylesheet ARKlight ships (`base_stylesheet.BASE_CSS_BODY`)
@@ -2388,6 +2389,7 @@ class Site:
         grid_space: str | None = None,
         center_gutter: str | None = None,
         reel_space: str | None = None,
+        markdown_theme: str | None = None,
         app_shell: bool = False,
         strict_csp: bool = True,
         trusted_script_origins: list[str] | None = None,
@@ -2482,6 +2484,26 @@ class Site:
         ):
             if value is not None:
                 self._set_css_var_override(kwarg_name, var_name, value)
+
+        # Stage M7 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # a first-class Markdown-theming surface, independent of the
+        # generic `css_var_overrides` plumbing above -- `light`/
+        # `dark`/`reading` are curated palettes
+        # (`arklight.backend.css.markdown_presets.MARKDOWN_PRESETS`),
+        # not a free-form CSS value, so this gets its own validated
+        # `str | None` attribute rather than another
+        # `_set_css_var_override(...)` call. Checked against
+        # `MARKDOWN_PRESETS`'s own keys (not a separately hand-written
+        # allowed-values list) so the two can never drift apart, same
+        # technique `RESERVED_UTILITY_CLASSES` already uses against
+        # `BASE_CSS_BODY`. `None` by default (unset), unchanged output
+        # for every site that doesn't pass it.
+        if markdown_theme is not None and markdown_theme not in MARKDOWN_PRESETS:
+            raise ValueError(
+                f"Site(markdown_theme=...) must be one of "
+                f"{sorted(MARKDOWN_PRESETS)!r}, got {markdown_theme!r}."
+            )
+        self.markdown_theme = markdown_theme
 
         # Structural addendum (see docs/Foundational/DESIGN-NOTES.md "CSS selector
         # algebra + at-rule vocabulary"): storage for the new
