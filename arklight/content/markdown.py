@@ -208,6 +208,7 @@ from arklight.api import (
     List,
     OrderedList,
     Pre,
+    Span,
     Strong,
     Table,
     TableBody,
@@ -299,22 +300,72 @@ def _inline_node_from_match(match: re.Match[str]) -> ARKNode:
     raise AssertionError(f"unreachable: unrecognized inline token {match.group(0)!r}")
 
 
-def _parse_inline(text: str) -> list[ARKNode]:
-    """Split `text` into an ordered list of inline run nodes: a plain
-    run becomes `Text(run)`, a recognized span becomes its matching
-    `Code`/`Link`/`Strong`/`Em` node. Always returns at least one node
-    (`Text("")` for empty input), so callers never have to special-case
-    zero runs."""
-    runs: list[ARKNode] = []
+def _parse_inline(text: str) -> list:
+    """Split `text` into an ordered list of inline runs: a plain run
+    stays a bare `str`, a recognized span becomes its matching
+    `Code`/`Link`/`Strong`/`Em` node. Always returns at least one run
+    (`""` for empty input), so callers never have to special-case zero
+    runs.
+
+    **Fragmentation bugfix (Stage M9 pass):** this used to wrap every
+    plain run in `Text(run)` right here. `Text` is a real, generic IR
+    node type that renders as its own `<p>` tag unconditionally
+    (`arklight.backend.html.tag_map.TAG_MAP["Text"] == "p"`) -- so a
+    paragraph like `"Some **bold** text"` produced *three* runs,
+    `[Text("Some "), Strong("bold"), Text(" text")]`, and rendered as
+    `<p>Some </p><strong>bold</strong><p> text</p>`: the sentence torn
+    across two sibling `<p>` elements with an inline `<strong>`
+    stranded between them, instead of one paragraph. The same
+    `TableHeaderCell(*_parse_inline(cell))`/`TableCell(*_parse_inline(cell))`
+    construction (just below, in `_parse_table`) meant any table cell
+    mixing plain text with inline markup got a stray `<p>` nested
+    inside its `<th>`/`<td>` the same way.
+
+    A bare run now stays a plain `str` here, deferring the "does this
+    need wrapping" decision to each caller -- because the honest
+    answer turned out to depend on the parent, not on `_parse_inline`
+    itself. `arklight.ir.normalize.normalize_children` wraps *any*
+    bare-string child of a non-text-only IR parent (`Container`,
+    `TableHeaderCell`, `TableCell` all qualify) in a `Text(...)` node
+    on its own, unconditionally -- that is deliberate, existing,
+    relied-upon behavior for ordinary hand-authored `site.py` trees
+    (`Container("Panel")` meaning "a one-paragraph panel";
+    `tests/test_normalize.py` pins it), so it cannot be changed or
+    special-cased for Markdown without breaking that. A lone run
+    (no inline markup at all) *should* still get `Text(...)`'s `<p>`
+    wrapping -- that's correct, and `_paragraph_node` below still asks
+    for it explicitly. Only the *multi-run* case needs a different
+    answer, and `_paragraph_node`/`_parse_table` supply it with
+    `_spanify`: wrapping each bare-string run in `Span(...)` before it
+    ever reaches `Container`/`TableHeaderCell`/`TableCell`, so
+    `normalize_children` finds no bare string left to wrap. `Span` is
+    the existing, already-registered closed-vocabulary inline tag
+    (`arklight.ir.schema.SCHEMA["Span"].text_only_children is True`,
+    `TAG_MAP["Span"] == "span"`) built for exactly this: text with no
+    semantic meaning of its own that must render inline, not as its
+    own block. No new `arklight.ir.schema.SCHEMA` entry, per this
+    module's own docstring constraint -- `Span` already existed."""
+    runs: list = []
     pos = 0
     for match in _INLINE_TOKEN.finditer(text):
         if match.start() > pos:
-            runs.append(Text(text[pos : match.start()]))
+            runs.append(text[pos : match.start()])
         runs.append(_inline_node_from_match(match))
         pos = match.end()
     if pos < len(text) or not runs:
-        runs.append(Text(text[pos:]))
+        runs.append(text[pos:])
     return runs
+
+
+def _spanify(runs: list) -> list[ARKNode]:
+    """Multi-run case only (see `_parse_inline`'s bugfix note): wrap
+    each bare `str` run in `Span(...)` so it survives
+    `arklight.ir.normalize.normalize_children`'s otherwise-correct
+    "bare string under a non-text-only parent becomes `Text(...)`"
+    pass without being fragmented into its own `<p>`. Inline element
+    runs (`Strong`/`Em`/`Code`/`Link`) pass through unchanged -- they
+    already render inline and were never the problem."""
+    return [Span(run) if isinstance(run, str) else run for run in runs]
 
 
 def _inline_plain_text(text: str) -> str:
@@ -340,16 +391,21 @@ def _inline_plain_text(text: str) -> str:
     return _INLINE_TOKEN.sub(_replace, text).strip()
 
 
-def _paragraph_node(runs: list[ARKNode]) -> ARKNode:
-    """One run collapses to that run directly (a plain-text-only
-    paragraph is `Text(...)`, matching the proposal's mapping table
-    exactly; an all-`**bold**` paragraph is `Strong(...)`, not a
-    one-child `Container`); more than one is wrapped in `Container`,
-    which (unlike `Text`) is a real container and can hold them as
-    ordinary siblings. See this module's docstring."""
+def _paragraph_node(runs: list) -> ARKNode:
+    """One run collapses to that run directly -- except a bare `str`
+    run (a plain-text-only paragraph, no inline markup at all) still
+    needs `Text(...)`'s own `<p>` wrapping, since `_parse_inline` no
+    longer wraps plain runs itself (see its docstring's bugfix note);
+    an all-`**bold**` paragraph collapses to `Strong(...)` directly,
+    not a one-child `Container`, matching the proposal's mapping table
+    exactly. More than one run is wrapped in `Container`, with every
+    bare-string run passed through `_spanify` first so normalization
+    can't fragment the paragraph into sibling `<p>`s around an inline
+    element -- see `_parse_inline`'s docstring for the full bugfix
+    story. See this module's docstring."""
     if len(runs) == 1:
-        return runs[0]
-    return Container(*runs)
+        return runs[0] if isinstance(runs[0], ARKNode) else Text(runs[0])
+    return Container(*_spanify(runs))
 
 
 # ---------------------------------------------------------------------------
@@ -384,9 +440,26 @@ def _build_table(table_lines: list[str]) -> ARKNode:
     def pad(row: list[str]) -> list[str]:
         return row + [""] * (n_cols - len(row))
 
-    header_row = TableRow(*[TableHeaderCell(*_parse_inline(cell)) for cell in pad(header)])
+    # Same single-vs-multi-run split as `_paragraph_node` above, and
+    # for the same reason (see `_parse_inline`'s docstring): a lone
+    # run that's a bare string (plain-text cell, no markup at all)
+    # still gets `Text(...)`'s own `<p>` wrapping -- matching
+    # `parse_markdown`'s pre-Stage-M9 raw-tree shape for this case
+    # exactly, since nothing about that case was ever broken. A lone
+    # run that's already an `ARKNode` (a cell that collapses to one
+    # bare inline element, e.g. a `**bold**`-only cell) passes through
+    # unchanged. Only the *multi*-run case -- a cell mixing plain text
+    # with inline markup -- needs `_spanify`, for the identical
+    # fragmentation reason a multi-run paragraph does.
+    def cell_runs(cell: str) -> list:
+        runs = _parse_inline(cell)
+        if len(runs) == 1:
+            return runs if isinstance(runs[0], ARKNode) else [Text(runs[0])]
+        return _spanify(runs)
+
+    header_row = TableRow(*[TableHeaderCell(*cell_runs(cell)) for cell in pad(header)])
     body_rows = [
-        TableRow(*[TableCell(*_parse_inline(cell)) for cell in pad(row)]) for row in data
+        TableRow(*[TableCell(*cell_runs(cell)) for cell in pad(row)]) for row in data
     ]
     return Table(TableHead(header_row), TableBody(*body_rows))
 
