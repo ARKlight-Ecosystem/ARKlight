@@ -377,6 +377,26 @@ ACTION_REGISTRY: dict[str, ActionSpec] = {
     # return value.
     # ------------------------------------------------------------------
     "geolocate": ActionSpec(),
+    # ------------------------------------------------------------------
+    # EXPERIMENTAL (docs/Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md,
+    # stage 2 of that proposal's own staging plan): `fetch_json` is the
+    # first concrete authoring surface for the gap `arklight/provider.py`
+    # names as still open -- "data-fetch orchestration" -- without
+    # becoming a general `fetch()` escape hatch. Same async "fire and
+    # forget" shape as `geolocate` above: issues a same-origin (or
+    # `Site(trusted_fetch_origins=[...])`-listed) GET/POST, parses the
+    # response as JSON, and writes the sanitized result into the target
+    # `State(...)`. Gated as `arklight.experimental.FEATURES["fetch-json"]`
+    # -- every use prints the same inline/summary warning every other
+    # experimental API gets (`arklight/ir/build.py`).
+    # `state_args=("url",)` lets the target come from `Bind(...)`
+    # (`Action.fetch_json("result", url=Bind("search_query"))`), same
+    # capability `Action.set`'s `value` already has; a literal `url=`
+    # is checked against the trusted-origin allowlist at *build* time
+    # (`arklight/ir/build.py`), a `Bind(...)`-sourced one at runtime
+    # (`arkIsTrustedFetchURL`, `arklight/backend/js/render.py`).
+    # ------------------------------------------------------------------
+    "fetch_json": ActionSpec(args=("url", "method"), state_args=("url",)),
 }
 
 KNOWN_ACTIONS = frozenset(ACTION_REGISTRY)
