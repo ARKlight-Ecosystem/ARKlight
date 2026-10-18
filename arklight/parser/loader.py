@@ -211,7 +211,10 @@ def _project_imports(
 
 
 def load_site(
-    path: str | Path, *, on_notice: Callable[[str], None] | None = None
+    path: str | Path,
+    *,
+    on_notice: Callable[[str], None] | None = None,
+    require_pages: bool = True,
 ) -> tuple[Site, DiscoveredSite]:
     """
     Read, statically discover, and execute the site file at `path`.
@@ -228,6 +231,12 @@ def load_site(
     `# include <stdlib.ARKlight>`. Nothing here prints on its own; the
     pipeline passes its stage logger, so this reaches the person
     running the build the same way every other notice does.
+
+    `require_pages` (default `True`) is passed through to `discover`
+    and also gates the "no registered pages" check at the end. The
+    pipeline sets it `False` only when Markdown content under
+    `content/` supplies the site's pages (Markdown-as-content Stage
+    M3); a site with neither still fails exactly as before.
     """
     file_path = Path(path)
     if not file_path.exists():
@@ -244,7 +253,9 @@ def load_site(
             raise SiteLoadError(str(exc)) from exc
 
         try:
-            discovered = discover(prepared.source, filename=filename)
+            discovered = discover(
+                prepared.source, filename=filename, require_pages=require_pages
+            )
         except SyntaxError as exc:
             raise SiteLoadError(f"Could not parse {file_path}: {exc}") from exc
         except ValueError as exc:
@@ -286,7 +297,7 @@ def load_site(
             f"running {file_path}, but got {type(site_obj).__name__!r}."
         )
 
-    if not site_obj.routes:
+    if require_pages and not site_obj.routes:
         raise SiteLoadError(f"Site `{discovered.variable_name}` has no registered pages.")
 
     return site_obj, discovered

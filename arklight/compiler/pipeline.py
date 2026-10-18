@@ -3,10 +3,16 @@ Compiler Pipeline.
 
 Ties every stage together, matching the architecture doc exactly:
 
+    content/*.md          (arklight.content.discovery -- Markdown-as-content
+                                 Stage M3: a filesystem walk that runs first
+                                 and never reads site code; a no-op for a
+                                 project with no .md files under content/)
     Python Source
         -> Python AST         (arklight.parser.discover, static analysis)
         -> ARK AST            (arklight.parser.loader executes the module;
-                                 Site.build_ark_ast() calls each page fn)
+                                 Site.build_ark_ast() calls each page fn;
+                                 synthesized Markdown pages are merged in
+                                 here, after a route-collision check)
         -> Component expansion (arklight.ir.components, v0.060 Stage 0 --
                                  user-defined component markers are
                                  spliced out here, before Normalization
@@ -46,6 +52,14 @@ from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
 from arklight.config import ConfigError, load_config, overdrive_enabled
+from arklight.content.discovery import (
+    ContentError,
+    check_python_route_collisions,
+    discover_content,
+    synthesize_pages,
+)
+from arklight.content.frontmatter import FrontMatterError
+from arklight.content.markdown import MarkdownSyntaxError
 from arklight.compiler.asset_check import (
     check_required_assets,
     collect_required_assets,
@@ -238,9 +252,28 @@ def compile_site_file(
     """
     log = on_stage or _noop_stage_logger
 
+    # Markdown-as-content Stage M3: a filesystem walk of `content/`
+    # next to the entry file, run *before* `load_site` -- and so
+    # before `arklight.parser.discover`'s AST scan, which it never
+    # touches. It reads no site code. It returns `[]` (and this whole
+    # block is a no-op) for any project with no `.md` files under
+    # `content/`, including `production`-template projects whose
+    # `content/` is a Python package. See `arklight.content.discovery`.
+    entry_file = Path(entry_path)
+    try:
+        content_pages = discover_content(entry_file.resolve().parent)
+    except (ContentError, FrontMatterError) as exc:
+        raise CompileError(str(exc)) from exc
+    if content_pages:
+        log(f"Found {len(content_pages)} Markdown page(s) under content/...")
+
     log("Discovering site and compiling AST trees...")
     try:
-        site, _discovered = load_site(entry_path, on_notice=log)
+        # A site whose pages all come from Markdown registers no
+        # `@site.page(...)`; only then is "no pages" not an error.
+        site, discovered = load_site(
+            entry_path, on_notice=log, require_pages=not content_pages
+        )
     except SiteLoadError as exc:
         raise CompileError(f"{exc}{_name_error_hint(str(exc))}") from exc
 
@@ -253,6 +286,22 @@ def compile_site_file(
         ) from exc
     except Exception as exc:  # noqa: BLE001 -- surface page-function errors clearly
         raise CompileError(f"Error while building page(s): {exc}") from exc
+
+    if content_pages:
+        # Q6: a Markdown route may not silently shadow (or be shadowed
+        # by) an `@site.page(...)` route. Labelled with file:line so
+        # the error can name both sources.
+        python_routes = {
+            page.route: f"{entry_file.name}:{page.lineno} (@site.page, function {page.function_name!r})"
+            for page in discovered.pages
+        }
+        for route in site.routes:
+            python_routes.setdefault(route, f"{entry_file.name} (@site.page)")
+        try:
+            check_python_route_collisions(content_pages, python_routes)
+            ark_ast = {**ark_ast, **synthesize_pages(content_pages)}
+        except (ContentError, MarkdownSyntaxError) as exc:
+            raise CompileError(str(exc)) from exc
 
     log("Expanding user-defined components...")
     used_components: set[str] = set()
