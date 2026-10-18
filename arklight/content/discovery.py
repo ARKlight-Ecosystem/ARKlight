@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Mapping
 
 from arklight.api import Page
@@ -123,6 +123,12 @@ class ContentPage:
     description: str | None
     front_matter: FrontMatter
     body: str
+
+    @property
+    def content_path(self) -> str:
+        """This file's POSIX path relative to `content/` (`docs/setup.md`)
+        -- the key Markdown-to-Markdown links are resolved through."""
+        return PurePosixPath(self.relative_path).relative_to(CONTENT_DIR_NAME).as_posix()
 
     @property
     def source_label(self) -> str:
@@ -301,25 +307,41 @@ def check_python_route_collisions(
 # ---------------------------------------------------------------------------
 
 
-def synthesize_page(page: ContentPage) -> ARKNode:
+def synthesize_page(
+    page: ContentPage, page_routes: Mapping[str, str] | None = None
+) -> ARKNode:
     """Build the `Page(...)` node for one discovered Markdown file:
     the parsed body (Stage M2) as children, the front matter /
     filename-derived title and optional description as props -- the
     same shape a `@site.page` function returns, so everything after
     this point treats it as any other page.
 
+    Local references in the body are resolved (Stage M4) as part of
+    that parse; `page_routes` is `{content_path: route}` for every
+    non-draft page, which a link to another `.md` file is resolved
+    through (see `synthesize_pages`).
+
     Raises `arklight.content.markdown.MarkdownSyntaxError` for a
-    construct that opens and never closes."""
+    construct that opens and never closes, and its subclass
+    `MarkdownReferenceError` for a reference that cannot be resolved."""
     props: dict[str, str] = {"title": page.title}
     if page.description is not None:
         props["description"] = page.description
-    children = parse_markdown(page.body, filename=page.relative_path)
+    children = parse_markdown(
+        page.body,
+        filename=page.relative_path,
+        content_path=page.content_path,
+        page_routes=page_routes,
+    )
     return Page(*children, **props)
 
 
 def synthesize_pages(pages: list[ContentPage]) -> dict[str, ARKNode]:
-    """`{route: Page node}` for every discovered page, in route order."""
-    return {page.route: synthesize_page(page) for page in pages}
+    """`{route: Page node}` for every discovered page, in route order.
+    Builds the `{content_path: route}` table once, from the whole
+    (draft-free) set, so a page can link to any other."""
+    page_routes = {page.content_path: page.route for page in pages}
+    return {page.route: synthesize_page(page, page_routes) for page in pages}
 
 
 __all__ = [

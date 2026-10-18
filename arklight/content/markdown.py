@@ -99,10 +99,39 @@ as a live element, with no Markdown-specific escaping logic needed
 here. This module's own job is just to never *mistake* that text for
 markup in the first place.
 
-Local references (`src=`, `href=`) are carried through exactly as
-written in the source -- no resolution against `assets/`, no route
-lookup. That is Stage M4's job (asset/link resolution); this stage
-only parses.
+**Local references (Stage M4).** When `parse_markdown` is told which
+content file it is parsing (`content_path=`), every `Image` `src` and
+`Link` `href` that names a local file is rewritten into the form the
+rest of the pipeline already understands, *before* the tree is handed
+off -- so `arklight.compiler.asset_check` / `link_check` see a
+Markdown-sourced reference exactly as they would a Python-authored one,
+and need no Markdown-specific code. Without `content_path=` nothing is
+rewritten (the Stage M2 behavior, which is what a bare `parse_markdown`
+call gets). The rules, in order:
+
+1. An external reference (`https:`, `mailto:`, `data:`, `//host`), a
+   bare `#fragment`, or a root-relative path (`/guide`,
+   `/assets/x.png`) is left exactly as written. Root-relative paths
+   name the output root on purpose, and are checked downstream.
+2. A relative link to a Markdown file (`Link`, path ending `.md`) is
+   resolved against the *linking file's own directory* inside
+   `content/` and replaced with that page's route (`?query`/`#fragment`
+   kept) -- so `[setup](./setup.md#install)` written in
+   `content/docs/index.md` becomes `/docs/setup#install`, honoring a
+   front matter `route` override. A target that is not a (non-draft)
+   page is a `MarkdownReferenceError`, never a silent dead link.
+3. Every other relative path -- every `Image`, and a `Link` to a file
+   such as a PDF -- is resolved against `assets/`: `./diagram.png` and
+   `diagram.png` both become `assets/diagram.png`. A path already
+   written as `assets/...` is left anchored (the spelling Python pages
+   use), and `..` is allowed only while the result stays under
+   `assets/` (so `../assets/logo.png`, the on-disk spelling from a
+   top-level content file, works). A path that climbs out of `assets/`
+   is a `MarkdownReferenceError`.
+
+Whether the resulting `assets/...` file actually exists is *not*
+decided here: that is `asset_check`'s job, and it reports a missing
+one with its usual report.
 
 Multi-paragraph list items, nested lists, and inline images (an
 `![alt](src)` embedded mid-paragraph rather than standing alone as a
@@ -114,7 +143,9 @@ becomes a block-level `Image(...)`.
 
 from __future__ import annotations
 
+import posixpath
 import re
+from typing import Mapping
 
 from arklight.api import (
     Blockquote,
@@ -188,6 +219,16 @@ class MarkdownSyntaxError(ValueError):
     "fails loudly instead of resolving silently" posture
     `arklight.content.frontmatter.FrontMatterError` already takes for
     a malformed front matter block."""
+
+
+class MarkdownReferenceError(MarkdownSyntaxError):
+    """Raised (Stage M4) for a local reference that cannot be resolved
+    at all: a link to a Markdown file that is not a page, or a path
+    that climbs out of `assets/`/`content/`. A subclass of
+    `MarkdownSyntaxError` so every caller already reporting that one
+    (the compiler pipeline) reports this the same way. A reference
+    that resolves fine but names a file that doesn't exist is *not*
+    this error -- `arklight.compiler.asset_check` owns that."""
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +364,105 @@ def _starts_new_block(line: str) -> bool:
     )
 
 
-def parse_markdown(source: str, *, filename: str = "<content>") -> list[ARKNode]:
+# ---------------------------------------------------------------------------
+# Local reference resolution (Stage M4)
+# ---------------------------------------------------------------------------
+
+_URL_SCHEME = re.compile(r"^[a-z][a-z0-9+.\-]*:", re.I)
+_ASSETS_DIR = "assets"
+
+
+def _split_suffix(value: str) -> tuple[str, str]:
+    """`"a/b.png?x=1#f"` -> `("a/b.png", "?x=1#f")`."""
+    cut = min((i for i in (value.find("?"), value.find("#")) if i != -1), default=len(value))
+    return value[:cut], value[cut:]
+
+
+def _resolve_reference(
+    raw: str,
+    *,
+    is_link: bool,
+    filename: str,
+    content_path: str,
+    page_routes: Mapping[str, str],
+) -> str:
+    """Rewrite one `src`/`href` per the rules in this module's
+    docstring. Returns `raw` unchanged for anything that isn't a
+    relative local path."""
+    value = raw.strip()
+    if not value or value.startswith(("#", "/")) or _URL_SCHEME.match(value):
+        return raw
+    path, suffix = _split_suffix(value)
+    if not path:
+        return raw
+
+    if is_link and path.lower().endswith(".md"):
+        target = posixpath.normpath(posixpath.join(posixpath.dirname(content_path), path))
+        if target == ".." or target.startswith("../"):
+            raise MarkdownReferenceError(
+                f"{filename}: link {raw!r} climbs out of content/ -- a link to a "
+                "Markdown page must point at a file under content/."
+            )
+        route = page_routes.get(target)
+        if route is None:
+            raise MarkdownReferenceError(
+                f"{filename}: link {raw!r} points at content/{target}, which is not a "
+                "page -- the file doesn't exist, is misspelled, or is marked "
+                "`draft: true` (drafts have no route)."
+            )
+        return route + suffix
+
+    rel = posixpath.normpath(path)
+    if rel == ".":
+        return raw
+    if rel == _ASSETS_DIR or rel.startswith(_ASSETS_DIR + "/"):
+        resolved = rel
+    else:
+        resolved = posixpath.normpath(f"{_ASSETS_DIR}/{rel}")
+    if not resolved.startswith(_ASSETS_DIR + "/"):
+        raise MarkdownReferenceError(
+            f"{filename}: reference {raw!r} climbs out of {_ASSETS_DIR}/ -- relative paths "
+            f"in Markdown are resolved against {_ASSETS_DIR}/, so the file has to live "
+            f"under it (write {_ASSETS_DIR}/... or a path below it)."
+        )
+    return resolved + suffix
+
+
+def _resolve_references(
+    blocks: list[ARKNode], *, filename: str, content_path: str, page_routes: Mapping[str, str]
+) -> None:
+    """Rewrite, in place, every `Image` `src` and `Link` `href` in the
+    freshly built `blocks` (nodes this module just created -- nothing
+    shared is mutated). Fenced code is untouched: a `Code` node holds
+    plain text, never an `Image`/`Link`."""
+
+    def walk(item: object) -> None:
+        if isinstance(item, ARKNode):
+            if item.type == "Image" and isinstance(item.props.get("src"), str):
+                item.props["src"] = _resolve_reference(
+                    item.props["src"], is_link=False, filename=filename,
+                    content_path=content_path, page_routes=page_routes,
+                )
+            elif item.type == "Link" and isinstance(item.props.get("href"), str):
+                item.props["href"] = _resolve_reference(
+                    item.props["href"], is_link=True, filename=filename,
+                    content_path=content_path, page_routes=page_routes,
+                )
+            walk(item.children)
+        elif isinstance(item, (list, tuple)):
+            for child in item:
+                walk(child)
+
+    walk(blocks)
+
+
+def parse_markdown(
+    source: str,
+    *,
+    filename: str = "<content>",
+    content_path: str | None = None,
+    page_routes: Mapping[str, str] | None = None,
+) -> list[ARKNode]:
     """Parse a Markdown document's body into a list of block-level
     `ARKNode`s, built from `arklight.api`'s existing components --
     `source` is expected to already have any front matter block
@@ -338,8 +477,16 @@ def parse_markdown(source: str, *, filename: str = "<content>") -> list[ARKNode]
     existing pipeline's job, so a Markdown-sourced page is checked by
     exactly the same rules a Python-authored one is.
 
+    `content_path`, if given, is this file's POSIX path relative to
+    `content/` (e.g. `"docs/setup.md"`) and turns on local reference
+    resolution (Stage M4, see the module docstring). `page_routes` maps
+    every non-draft content file's such path to its route; it is what a
+    link to another `.md` file is resolved through. With neither, the
+    tree is returned with every reference exactly as written.
+
     Raises `MarkdownSyntaxError` for a fenced code block that opens
-    but never closes.
+    but never closes, and `MarkdownReferenceError` (a subclass) for a
+    local reference that cannot be resolved.
     """
     lines = source.split("\n")
     n = len(lines)
@@ -457,4 +604,11 @@ def parse_markdown(source: str, *, filename: str = "<content>") -> list[ARKNode]
             i += 1
         blocks.append(_paragraph_node(_parse_inline(" ".join(para_lines))))
 
+    if content_path is not None:
+        _resolve_references(
+            blocks,
+            filename=filename,
+            content_path=content_path,
+            page_routes=page_routes or {},
+        )
     return blocks
