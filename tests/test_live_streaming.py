@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from arklight.cli import cctv, live_streaming as ls
+from arklight.cli import channel, live_streaming as ls
 
 
 class _FakeIR:
@@ -184,7 +184,7 @@ def test_changed_path_none_when_unchanged():
 
 # --------------------------------------------------------------------
 # --channel -- the unified CLI surface for what used to be the
-# separate `arklight cctv` subcommand (see test_cctv.py for the
+# separate `arklight cctv` subcommand (see test_channel.py for the
 # state/hub/backend/page-selection building blocks this drives).
 # --------------------------------------------------------------------
 
@@ -227,7 +227,7 @@ def test_add_subparser_channel_accepts_explicit_port():
 
 
 def test_bind_channel_server_explicit_port_fails_loud_on_collision():
-    handler_cls = cctv._make_handler(cctv._State({}), cctv._SSEHub())
+    handler_cls = channel._make_handler(channel._State({}), channel._SSEHub())
     blocker = ls._bind_channel_server(handler_cls, "127.0.0.1", 0)
     try:
         port = blocker.server_address[1]
@@ -238,7 +238,7 @@ def test_bind_channel_server_explicit_port_fails_loud_on_collision():
 
 
 def test_bind_channel_server_bare_flag_gets_a_free_port():
-    handler_cls = cctv._make_handler(cctv._State({}), cctv._SSEHub())
+    handler_cls = channel._make_handler(channel._State({}), channel._SSEHub())
     server = ls._bind_channel_server(handler_cls, "127.0.0.1", 0)
     try:
         # Port 0 asks the OS for any free port -- confirm we got a real,

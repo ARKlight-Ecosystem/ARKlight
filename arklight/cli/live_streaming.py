@@ -35,7 +35,7 @@ CLI entry point and one running process:
     filesystem access and can't invoke the compiler -- it is purely
     the passive receiving end of what this module pushes.
   - `--channel [PORT]`, when given, additionally binds
-    `arklight.cli.cctv`'s state/fragment SSE server -- see that
+    `arklight.cli.channel`'s state/fragment SSE server -- see that
     module's docstring -- on a *second* port, started once from the
     first successful build's IR and never reset by a rebuild (the
     channel server predates and outlives any single rebuild, same as
@@ -75,7 +75,7 @@ from pathlib import Path
 from typing import Any
 
 from arklight.backend.base import Backend
-from arklight.cli import cctv
+from arklight.cli import channel
 from arklight.compiler.pipeline import BuildResult, CompileError, build, default_backends
 from arklight.config import (
     ConfigError,
@@ -385,7 +385,7 @@ def _make_handler(session: _Session) -> type[http.server.SimpleHTTPRequestHandle
 
 def _bind_channel_server(
     handler_cls: type, host: str, requested_port: int
-) -> "cctv._CCTVHTTPServer":
+) -> "channel._ChannelHTTPServer":
     """`requested_port` is argparse's raw `--channel` value: `0` means
     "flag given with no port" (the `const=0` sentinel `add_subparser`
     wires up below) -- bind `:0` and let the OS choose. Any other
@@ -393,13 +393,13 @@ def _bind_channel_server(
     with a clear message if it's already in use."""
     if requested_port:
         try:
-            return cctv._CCTVHTTPServer((host, requested_port), handler_cls)
+            return channel._ChannelHTTPServer((host, requested_port), handler_cls)
         except OSError as exc:
             raise OSError(
                 f"--channel {requested_port} requested but couldn't bind "
                 f"{host}:{requested_port} -- {exc}"
             ) from exc
-    return cctv._CCTVHTTPServer((host, 0), handler_cls)
+    return channel._ChannelHTTPServer((host, 0), handler_cls)
 
 
 # --------------------------------------------------------------------
@@ -535,7 +535,7 @@ def _cmd_subscribe(args: argparse.Namespace) -> int:
     output = Path(args.output).resolve()
     backends = [*default_backends(), _LiveReloadBackend()]
     if args.channel is not None:
-        backends.append(cctv._CCTVBackend(route=args.route))
+        backends.append(channel._ChannelBackend(route=args.route))
 
     print(_DEV_ONLY_BANNER)
 
@@ -559,11 +559,11 @@ def _cmd_subscribe(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
-    channel_server: cctv._CCTVHTTPServer | None = None
+    channel_server: channel._ChannelHTTPServer | None = None
     channel_port: int | None = None
     if args.channel is not None:
         try:
-            page = cctv.select_page(initial_result.ir, args.route)
+            page = channel.select_page(initial_result.ir, args.route)
         except ValueError as exc:
             print(f"ARKlight live-streaming failed: {exc}", file=sys.stderr)
             return 1
@@ -571,9 +571,9 @@ def _cmd_subscribe(args: argparse.Namespace) -> int:
             print("ARKlight live-streaming failed: this site has no pages.", file=sys.stderr)
             return 1
 
-        channel_state = cctv._State(page.state)
-        channel_hub = cctv._SSEHub()
-        channel_handler_cls = cctv._make_handler(channel_state, channel_hub, bind_host=host)
+        channel_state = channel._State(page.state)
+        channel_hub = channel._SSEHub()
+        channel_handler_cls = channel._make_handler(channel_state, channel_hub, bind_host=host)
         try:
             channel_server = _bind_channel_server(channel_handler_cls, host, args.channel)
         except OSError as exc:
@@ -827,7 +827,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
         "command) on a second port -- PORT if given (e.g. --channel 2172; "
         "fails if PORT is already in use rather than picking another), or "
         "an OS-assigned random free port if --channel is given with no "
-        "value. Omit entirely to disable. See arklight.cli.cctv.",
+        "value. Omit entirely to disable. See arklight.cli.channel.",
     )
     parser.add_argument(
         "--route",

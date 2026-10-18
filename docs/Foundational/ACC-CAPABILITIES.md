@@ -6,7 +6,7 @@ _Current as of `v0.0645`._
 
 `arklight/capabilities.py` is the one piece of **ARKlight Component
 Collections** (ACC, a separate repository --
-[`Rae-ARK/ARKlight-Component-Collections`](https://github.com/Rae-ARK/ARKlight-Component-Collections))
+[`ARKlight-Ecosystem/ARKlight-Component-Collections`](https://github.com/ARKlight-Ecosystem/ARKlight-Component-Collections))
 that has to live in `alpha` itself, because it is compiler-side by
 definition: a way for `arklight build` to *discover* capabilities an
 installed ACC package (or any other distribution) advertises, without

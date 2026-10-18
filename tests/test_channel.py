@@ -1,5 +1,5 @@
 """
-Regression tests for `arklight.cli.cctv`.
+Regression tests for `arklight.cli.channel`.
 
 Deliberately unit-level, same philosophy as test_live_streaming.py:
 these lock the pieces most likely to silently break (state merge/bump
@@ -7,10 +7,11 @@ semantics, SSE broadcast + one-way field exclusion, page selection)
 rather than spinning up a real server/socket in every test -- that's
 covered by manual end-to-end verification.
 
-`cctv` is no longer its own CLI subcommand -- its port-binding and
-argparse wiring moved into `arklight.cli.live_streaming` as the
-`--channel` flag (see test_live_streaming.py's `--channel` tests for
-that coverage). This module still owns the state/hub/backend/
+This module was formerly `arklight.cli.cctv`: a one-time standalone
+CLI subcommand, then an internal module once that subcommand's
+port-binding and argparse wiring moved into `arklight.cli.live_streaming`
+as the `--channel` flag (see test_live_streaming.py's `--channel` tests
+for that coverage). This module still owns the state/hub/backend/
 page-selection building blocks `live_streaming` imports and drives.
 """
 
@@ -18,7 +19,7 @@ from __future__ import annotations
 
 import pytest
 
-from arklight.cli import cctv
+from arklight.cli import channel
 from arklight.ir.build import IRPage, IRNode, WebsiteIR
 
 
@@ -28,45 +29,45 @@ from arklight.ir.build import IRPage, IRNode, WebsiteIR
 
 
 def test_state_snapshot_is_a_copy_not_a_live_view():
-    state = cctv._State({"count": 0})
+    state = channel._State({"count": 0})
     snap = state.snapshot()
     snap["count"] = 999
     assert state.snapshot()["count"] == 0
 
 
 def test_state_merge_returns_only_changed_keys():
-    state = cctv._State({"count": 0, "name": "a"})
+    state = channel._State({"count": 0, "name": "a"})
     changed = state.merge({"count": 0, "name": "b"})
     assert changed == {"name": "b"}
     assert state.snapshot() == {"count": 0, "name": "b"}
 
 
 def test_state_merge_adds_new_keys():
-    state = cctv._State({})
+    state = channel._State({})
     changed = state.merge({"count": 1})
     assert changed == {"count": 1}
 
 
 def test_state_merge_no_op_returns_empty_dict():
-    state = cctv._State({"count": 5})
+    state = channel._State({"count": 5})
     assert state.merge({"count": 5}) == {}
 
 
 def test_state_bump_adds_to_numeric_field():
-    state = cctv._State({"count": 3})
+    state = channel._State({"count": 3})
     changed = state.bump("count", 2)
     assert changed == {"count": 5}
     assert state.snapshot()["count"] == 5
 
 
 def test_state_bump_defaults_missing_field_to_zero():
-    state = cctv._State({})
+    state = channel._State({})
     changed = state.bump("count", 1)
     assert changed == {"count": 1}
 
 
 def test_state_bump_rejects_non_numeric_field():
-    state = cctv._State({"name": "abc"})
+    state = channel._State({"name": "abc"})
     with pytest.raises(TypeError):
         state.bump("name", 1)
 
@@ -74,7 +75,7 @@ def test_state_bump_rejects_non_numeric_field():
 def test_state_bump_rejects_bool_field():
     # bool is technically an int subclass in Python -- explicitly excluded
     # since "bumping" a flag field is almost certainly a mistake, not intent.
-    state = cctv._State({"flag": True})
+    state = channel._State({"flag": True})
     with pytest.raises(TypeError):
         state.bump("flag", 1)
 
@@ -85,7 +86,7 @@ def test_state_bump_rejects_bool_field():
 
 
 def test_hub_broadcast_state_reaches_all_state_subscribers():
-    hub = cctv._SSEHub()
+    hub = channel._SSEHub()
     sub_a = hub.subscribe("state", "a")
     sub_b = hub.subscribe("state", "b")
     notified = hub.broadcast_state({"count": 1})
@@ -95,7 +96,7 @@ def test_hub_broadcast_state_reaches_all_state_subscribers():
 
 
 def test_hub_broadcast_fragment_skips_empty_after_exclusion():
-    hub = cctv._SSEHub()
+    hub = channel._SSEHub()
     sub = hub.subscribe("fragment", "a")
     hub.exclude_fields("a", ["count"])
     notified = hub.broadcast_fragment({"count": 1})
@@ -104,7 +105,7 @@ def test_hub_broadcast_fragment_skips_empty_after_exclusion():
 
 
 def test_hub_broadcast_fragment_delivers_unexcluded_fields():
-    hub = cctv._SSEHub()
+    hub = channel._SSEHub()
     sub = hub.subscribe("fragment", "a")
     hub.exclude_fields("a", ["count"])
     notified = hub.broadcast_fragment({"count": 1, "name": "x"})
@@ -113,7 +114,7 @@ def test_hub_broadcast_fragment_delivers_unexcluded_fields():
 
 
 def test_hub_exclude_fields_is_one_way():
-    hub = cctv._SSEHub()
+    hub = channel._SSEHub()
     hub.subscribe("fragment", "a")
     hub.exclude_fields("a", ["count"])
     hub.exclude_fields("a", [])  # no-op call shouldn't un-exclude anything
@@ -122,12 +123,12 @@ def test_hub_exclude_fields_is_one_way():
 
 
 def test_hub_exclude_fields_returns_false_for_unknown_client():
-    hub = cctv._SSEHub()
+    hub = channel._SSEHub()
     assert hub.exclude_fields("nope", ["count"]) is False
 
 
 def test_hub_unsubscribe_stops_further_broadcasts():
-    hub = cctv._SSEHub()
+    hub = channel._SSEHub()
     sub = hub.subscribe("state", "a")
     hub.unsubscribe("state", "a")
     notified = hub.broadcast_state({"count": 1})
@@ -136,7 +137,7 @@ def test_hub_unsubscribe_stops_further_broadcasts():
 
 
 def test_hub_subscriber_count():
-    hub = cctv._SSEHub()
+    hub = channel._SSEHub()
     assert hub.subscriber_count("state") == 0
     hub.subscribe("state", "a")
     hub.subscribe("state", "b")
@@ -155,14 +156,14 @@ def _fake_ir(*routes: str) -> WebsiteIR:
 
 def test_select_page_defaults_to_first_page():
     ir = _fake_ir("/", "/about")
-    page = cctv.select_page(ir, None)
+    page = channel.select_page(ir, None)
     assert page is not None
     assert page.route == "/"
 
 
 def test_select_page_finds_explicit_route():
     ir = _fake_ir("/", "/about")
-    page = cctv.select_page(ir, "/about")
+    page = channel.select_page(ir, "/about")
     assert page is not None
     assert page.route == "/about"
 
@@ -170,41 +171,41 @@ def test_select_page_finds_explicit_route():
 def test_select_page_raises_on_unknown_route():
     ir = _fake_ir("/", "/about")
     with pytest.raises(ValueError, match="no page with route"):
-        cctv.select_page(ir, "/missing")
+        channel.select_page(ir, "/missing")
 
 
 def test_select_page_returns_none_for_empty_site():
     ir = WebsiteIR(site_name="empty", pages=[])
-    assert cctv.select_page(ir, None) is None
+    assert channel.select_page(ir, None) is None
 
 
 # --------------------------------------------------------------------
-# _CCTVBackend -- render() contract (Backend.render never touches disk)
+# _ChannelBackend -- render() contract (Backend.render never touches disk)
 # --------------------------------------------------------------------
 
 
 def test_backend_render_emits_client_js_and_schema():
     ir = _fake_ir("/")
-    backend = cctv._CCTVBackend()
+    backend = channel._ChannelBackend()
     out = backend.render(ir)
-    assert cctv._CLIENT_JS_PATH.lstrip("/") in out
-    assert "__cctv_schema__.json" in out
-    assert "EventSource" in out[cctv._CLIENT_JS_PATH.lstrip("/")]
+    assert channel._CLIENT_JS_PATH.lstrip("/") in out
+    assert "__channel_schema__.json" in out
+    assert "EventSource" in out[channel._CLIENT_JS_PATH.lstrip("/")]
 
 
 def test_backend_render_schema_reflects_selected_page_state():
     ir = _fake_ir("/", "/about")
-    backend = cctv._CCTVBackend(route="/about")
+    backend = channel._ChannelBackend(route="/about")
     out = backend.render(ir)
-    assert '"route": "/about"' in out["__cctv_schema__.json"]
+    assert '"route": "/about"' in out["__channel_schema__.json"]
 
 
 def test_backend_render_on_empty_site_still_returns_files():
     ir = WebsiteIR(site_name="empty", pages=[])
-    backend = cctv._CCTVBackend()
+    backend = channel._ChannelBackend()
     out = backend.render(ir)
-    assert cctv._CLIENT_JS_PATH.lstrip("/") in out
-    assert '"route": null' in out["__cctv_schema__.json"]
+    assert channel._CLIENT_JS_PATH.lstrip("/") in out
+    assert '"route": null' in out["__channel_schema__.json"]
 
 
 # --- cross-origin writes (review finding: dev channel had no Origin check) ---
@@ -213,14 +214,14 @@ import http.client as _http_client  # noqa: E402
 import json as _json  # noqa: E402
 import threading as _threading  # noqa: E402
 
-from arklight.cli import cctv as _cctv  # noqa: E402
+from arklight.cli import channel as _channel  # noqa: E402
 
 
 def _serve(bind_host="127.0.0.1", initial=None):
-    state = _cctv._State(initial if initial is not None else {"minutes": 25})
-    hub = _cctv._SSEHub()
-    handler = _cctv._make_handler(state, hub, bind_host=bind_host)
-    server = _cctv._CCTVHTTPServer(("127.0.0.1", 0), handler)
+    state = _channel._State(initial if initial is not None else {"minutes": 25})
+    hub = _channel._SSEHub()
+    handler = _channel._make_handler(state, hub, bind_host=bind_host)
+    server = _channel._ChannelHTTPServer(("127.0.0.1", 0), handler)
     thread = _threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, state
@@ -408,8 +409,8 @@ def test_host_check_is_skipped_when_deliberately_bound_to_a_lan_address():
 
 
 def test_host_of_parses_every_header_shape():
-    assert _cctv._host_of("127.0.0.1:2172") == "127.0.0.1"
-    assert _cctv._host_of("localhost") == "localhost"
-    assert _cctv._host_of("[::1]:2172") == "::1"
-    assert _cctv._host_of("LocalHost:9") == "localhost"
-    assert _cctv._host_of(None) == ""
+    assert _channel._host_of("127.0.0.1:2172") == "127.0.0.1"
+    assert _channel._host_of("localhost") == "localhost"
+    assert _channel._host_of("[::1]:2172") == "::1"
+    assert _channel._host_of("LocalHost:9") == "localhost"
+    assert _channel._host_of(None) == ""
