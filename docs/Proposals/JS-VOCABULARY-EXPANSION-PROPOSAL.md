@@ -133,7 +133,7 @@ proposal's derivation catalog:
 | Client-side form validation beyond native HTML5 | Cross-field checks, async validation | Only native browser validation |
 | `IntersectionObserver` (lazy-load, reveal-on-scroll) | Common performance/animation pattern | Used internally by htmx, not exposed as an authoring primitive |
 | Web Share API, print-this-page, geolocation | Common small utilities | Not available |
-| WebSocket / Server-Sent Events (live data) | Common for dashboards, chat, live status | Only in dev-tooling (`live_streaming.py`, `cctv.py`), not authored sites |
+| WebSocket / Server-Sent Events (live data) | Common for dashboards, chat, live status | Only in dev-tooling (`live_streaming.py`, `channel.py`), not authored sites |
 | Sort/filter a rendered list client-side | Very common (tables, product grids) | `Repeat` has no sort/filter derivation |
 | ResizeObserver / `matchMedia`-driven state | JS-side responsive behavior beyond CSS | Not available |
 | File upload preview | Common on any upload form | Not available |

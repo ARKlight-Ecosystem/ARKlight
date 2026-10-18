@@ -25,7 +25,7 @@ Two families of content live here:
   direction" section rather than lifted from the Viewer repo.
 
 NOTICE: portions of this file are adapted from
-https://github.com/Rae-ARK/ARKlight-Viewer-for-Android-Devices,
+https://github.com/ARKlight-Ecosystem/ARKlight-Viewer-for-Android-Devices,
 licensed Apache License 2.0. See that repository's own LICENSE for
 the full text; this is not a redistribution of the whole project, only
 of the specific files ANDROID-BACKEND-IMPLEMENTATION.md's Stage 0
@@ -2079,7 +2079,7 @@ want it back.
   touches it (the database file isn't created until first use).
 - `ArkBundle.kt` / `ArkSeal.kt` / `MemoryGuard.kt` -- vendored from
   [ARKlight-Viewer-for-Android-Devices](
-  https://github.com/Rae-ARK/ARKlight-Viewer-for-Android-Devices)
+  https://github.com/ARKlight-Ecosystem/ARKlight-Viewer-for-Android-Devices)
   (Apache-2.0). Unused by the default unpacked-tree setup above; kept
   in case you want to swap in a sealed `.ark` bundle by hand later.
 - `.github/workflows/android-build.yml` -- builds a debug APK and

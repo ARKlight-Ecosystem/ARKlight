@@ -43,7 +43,7 @@ settled, by the maintainer, at three decisions:
 2. **From scratch, no third-party dependency.** As of `ee106ca`,
    `pyproject.toml` declares no runtime dependencies, and
    `arklight/search/` already uses stdlib `sqlite3` while
-   `arklight/cli/live_streaming.py` and `arklight/cli/cctv.py` already
+   `arklight/cli/live_streaming.py` and `arklight/cli/channel.py` already
    use stdlib `http.server`.
 3. **It must be possible in both Python and Rei.**
 

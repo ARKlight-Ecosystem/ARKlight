@@ -25,7 +25,7 @@ the stage number itself.
 
 ## The existing app this evolves
 
-**[`ARKlight-Viewer-for-Android-Devices`](https://github.com/Rae-ARK/ARKlight-Viewer-for-Android-Devices)**
+**[`ARKlight-Viewer-for-Android-Devices`](https://github.com/ARKlight-Ecosystem/ARKlight-Viewer-for-Android-Devices)**
 -- Apache-2.0, already a working Android `.ark`-bundle viewer built on
 AndroidX `WebView`. Per `DESIGN-NOTES.md`'s "Updated direction" note,
 this backend's job is **evolving that repo into ARKlight's Android

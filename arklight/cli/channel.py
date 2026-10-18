@@ -1,12 +1,15 @@
 """
-CCTV -- the state-channel building blocks behind `arklight
+Channel -- the state-channel building blocks behind `arklight
 live-streaming --channel`.
 
-This used to be its own `arklight cctv` subcommand; it's now folded
-into `arklight live-streaming` as an opt-in flag instead of a second
-CLI entry point (see `arklight.cli.live_streaming`'s module docstring
-for the unified surface: `--channel [PORT]`). The concepts here are
-unchanged, only where they're invoked from:
+This used to be its own `arklight cctv` subcommand, then an internal
+`arklight.cli.cctv` module once that subcommand folded into `arklight
+live-streaming` as an opt-in flag; it's now just `arklight.cli.channel`
+-- the name `cctv` never meant much once this stopped being a second
+CLI entry point, so it's gone (see `arklight.cli.live_streaming`'s
+module docstring for the unified surface: `--channel [PORT]`). The
+concepts here are unchanged, only the names and where they're invoked
+from:
 
     arklight live-streaming --subscribe site.py --channel        # random free port
     arklight live-streaming --subscribe site.py --channel 2172   # bind exactly 2172
@@ -35,15 +38,15 @@ CCTV-BACKEND-PROPOSAL.md draws in its own SS1/SS2.
 
 Two halves, same split the C proposal calls for (SS2/SS3):
 
-  - `_CCTVBackend` (`Backend` subclass, same contract every other
+  - `_ChannelBackend` (`Backend` subclass, same contract every other
     backend implements) is the one-shot half: `render()` walks the
-    selected page's `IRPage.state` dict and emits `cctv.js` (a small
+    selected page's `IRPage.state` dict and emits `channel.js` (a small
     SSE client, same "fixed vocabulary" spirit as the JS backend's own
     generated runtime) plus a state-schema descriptor. Registered as
     an *optional* extra backend, the same way
     `live_streaming._LiveReloadBackend` is -- not part of
     `default_backends()`.
-  - The actual server (the `_CCTVHTTPServer`/`_make_handler` pair
+  - The actual server (the `_ChannelHTTPServer`/`_make_handler` pair
     below) is a separate, long-running object `live_streaming`'s
     `--channel` handling binds and serves on its own thread --
     never inside a `postprocess()` that's expected to return (the C
@@ -94,14 +97,14 @@ from arklight.ir.build import IRPage, WebsiteIR
 
 _QUEUE_POLL_SECONDS = 1.0
 
-_CLIENT_JS_PATH = "/__arklight_cctv__/client.js"
+_CLIENT_JS_PATH = "/__arklight_channel__/client.js"
 
 _CLIENT_JS = """\
-// ARKlight CCTV client -- listens on /state/stream, dispatches a
+// ARKlight channel client -- listens on /state/stream, dispatches a
 // CustomEvent("arklight:state", { detail: <state> }) on window for
 // page code to subscribe to. Deliberately dumb: no DOM writes of its
 // own -- ARKVM.js-style field-promotion/latency logic is explicitly
-// out of scope for cctv itself (CCTV-BACKEND-PROPOSAL.md \xa76).
+// out of scope for this module itself (CCTV-BACKEND-PROPOSAL.md \xa76).
 (function () {
   var es = new EventSource("/state/stream");
   es.addEventListener("state", function (ev) {
@@ -224,14 +227,15 @@ class _SSEHub:
 
 
 # --------------------------------------------------------------------
-# `_CCTVBackend` -- the one-shot `render()` half. See module docstring
-# and CCTV-BACKEND-PROPOSAL.md SS2/SS3 for why this is intentionally
-# thin: it contributes static scaffolding only, never the server.
+# `_ChannelBackend` -- the one-shot `render()` half. See module
+# docstring and CCTV-BACKEND-PROPOSAL.md SS2/SS3 for why this is
+# intentionally thin: it contributes static scaffolding only, never
+# the server.
 # --------------------------------------------------------------------
 
 
-class _CCTVBackend(Backend):
-    name = "cctv"
+class _ChannelBackend(Backend):
+    name = "channel"
 
     def __init__(self, route: str | None = None) -> None:
         self._route = route
@@ -244,7 +248,7 @@ class _CCTVBackend(Backend):
         }
         return {
             _CLIENT_JS_PATH.lstrip("/"): _CLIENT_JS,
-            "__cctv_schema__.json": json.dumps(schema, indent=2, sort_keys=True),
+            "__channel_schema__.json": json.dumps(schema, indent=2, sort_keys=True),
         }
 
 
@@ -262,7 +266,9 @@ def select_page(ir: WebsiteIR, route: str | None) -> IRPage | None:
         if page.route == route:
             return page
     known = ", ".join(p.route for p in ir.pages) or "(no pages)"
-    raise ValueError(f"cctv: no page with route {route!r} in this site -- known routes: {known}")
+    raise ValueError(
+        f"channel: no page with route {route!r} in this site -- known routes: {known}"
+    )
 
 
 # --------------------------------------------------------------------
@@ -270,7 +276,7 @@ def select_page(ir: WebsiteIR, route: str | None) -> IRPage | None:
 # --------------------------------------------------------------------
 
 
-class _CCTVHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+class _ChannelHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
@@ -324,7 +330,7 @@ def _make_handler(
             foreign page from *reading* a reply -- but a `text/plain`
             POST needs no CORS preflight ("simple request"), so
             without this a page at `evil.example` could still *write*
-            state with no visible response. (The CCTV channel is
+            state with no visible response. (This channel is
             opt-in, dev-only, and localhost-bound by default, so the
             impact is limited to someone's dev preview, not a
             production site -- still worth closing.)
@@ -378,7 +384,7 @@ def _make_handler(
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Connection", "keep-alive")
-            self.send_header("X-ARKlight-CCTV-Client-Id", client_id)
+            self.send_header("X-ARKlight-Channel-Client-Id", client_id)
             self.end_headers()
             try:
                 if channel == "state":

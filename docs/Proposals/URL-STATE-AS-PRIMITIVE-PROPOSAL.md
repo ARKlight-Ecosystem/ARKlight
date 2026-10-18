@@ -22,7 +22,7 @@ Confirmed by exhaustive grep of `arklight/` for `location.search`,
 `URLSearchParams`, and any query-string handling: the only hits are
 inside the vendored `htmx.py` (used internally for htmx's own request
 plumbing, never exposed as an authored feature) and the dev-only
-`cctv.py`. This is a genuine, unaddressed gap — not a case where the
+`channel.py`. This is a genuine, unaddressed gap — not a case where the
 static-compilation model dissolves the problem the way it does for
 routing, layouts, or metadata.
 

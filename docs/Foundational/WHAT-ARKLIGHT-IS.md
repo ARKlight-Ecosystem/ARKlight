@@ -285,7 +285,7 @@ version-by-version breakdown):
 - **ACC capability discovery** (`arklight/capabilities.py`, documented
   at `v0.0645`): the one piece of **ARKlight Component Collections**
   (a separate repository,
-  [`Rae-ARK/ARKlight-Component-Collections`](https://github.com/Rae-ARK/ARKlight-Component-Collections))
+  [`ARKlight-Ecosystem/ARKlight-Component-Collections`](https://github.com/ARKlight-Ecosystem/ARKlight-Component-Collections))
   that has to live in `alpha` itself, since it's the compiler's own
   side of discovering capabilities an installed ACC package
   advertises, without the compiler depending on ACC to exist. See

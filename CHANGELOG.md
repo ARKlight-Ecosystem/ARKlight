@@ -5,7 +5,43 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
-## [v0.071 **(draft -- version slot unconfirmed)**, JS Vocabulary Addendum Tier 3, stage 1 of 4] -- `Derive.list_at(name, index)`, Tier 3 SS7.3 of the JS vocabulary expansion proposal
+## [Docs/internal-only, out-of-band] -- `arklight.cli.cctv` renamed to `arklight.cli.channel`
+
+**Renamed.** The internal module behind `arklight live-streaming
+--channel` moves from `arklight/cli/cctv.py` to
+`arklight/cli/channel.py` (`tests/test_cctv.py` ->
+`tests/test_channel.py` alongside it). `cctv` stopped naming a CLI
+subcommand back when it folded into `arklight live-streaming` as the
+`--channel` flag; keeping that name on the module it folded into was
+just inertia. No behavior changes -- this is a pure rename, not a
+reimplementation.
+
+- `_CCTVBackend` -> `_ChannelBackend` (`name = "cctv"` ->
+  `name = "channel"`); `_CCTVHTTPServer` -> `_ChannelHTTPServer`.
+- `/__arklight_cctv__/client.js` -> `/__arklight_channel__/client.js`;
+  the `__cctv_schema__.json` scaffold key -> `__channel_schema__.json`;
+  the `X-ARKlight-CCTV-Client-Id` response header ->
+  `X-ARKlight-Channel-Client-Id`.
+- `arklight/cli/live_streaming.py` -- `from arklight.cli import cctv`
+  -> `from arklight.cli import channel`, and every `cctv.*` call site
+  updated to `channel.*`.
+- Doc cross-references updated to the new filename/module path:
+  `docs/Far Future Concern/POCKETBASE-REIMPLEMENTATION-PROPOSAL.md`,
+  `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`,
+  `docs/Proposals/URL-STATE-AS-PRIMITIVE-PROPOSAL.md`.
+- The external C project's own proposal document,
+  `CCTV-BACKEND-PROPOSAL.md`, is a different project's file and keeps
+  its own name -- not touched, not ours to rename.
+- **Deliberately not touched, same as the `[0.06508]` entry's own
+  list:** the `cctv.py` prototype credit in that entry, and any other
+  historical log entry (including the `[Unreleased...]` -- External
+  review fixes -- entry above and Issue 72 in
+  `docs/Proposals/ARKlight-ISSUE-REGISTER.md`) that describes the
+  module under its name at the time. Rewriting past entries to use a
+  name that didn't exist yet would misrepresent the history they
+  record.
+
+
 
 **Added.** `list_at(list, index)` -- arbitrary-position read into a
 list-valued `State(...)`/`Computed(...)`, the list-side counterpart of
@@ -2240,7 +2276,7 @@ contract, `Capability`/`CapabilityError`/`discover_capabilities`/
 `require_capability`, `arklight/compiler/sbom.py` as its one current
 caller, and status against ACC's own `docs/design/
 IMPLEMENTATION-LADDER.md` (Stage 1 landed here; Stages 2-5 tracked in
-the separate `Rae-ARK/ARKlight-Component-Collections` repository).
+the separate `ARKlight-Ecosystem/ARKlight-Component-Collections` repository).
 
 **Changed:** `docs/Foundational/V1-DEFINITION.md` Section 5 -- removed
 the now-stale "no design doc yet, not-yet-proposed concept" framing
