@@ -11,6 +11,11 @@ ships:
   route synthesis. This is the first stage wired into
   `arklight.compiler.pipeline`: an early step, before the entry file's
   AST scan, that turns `.md` files under `content/` into pages.
+- Stage M4 lives inside `arklight.content.markdown` (reference
+  resolution: relative `Image`/`Link` paths against `assets/`, links
+  between `.md` files to routes) and is driven by `discovery`'s page
+  synthesis. The existing `asset_check`/`link_check` then judge those
+  references like any other; neither was changed.
 
 A project with no `.md` files under `content/` -- every existing
 `simple`/`production` project -- never triggers any of it.
