@@ -170,6 +170,16 @@ def js_list_last(value: Any) -> Any:
     return items[-1] if items else None
 
 
+def js_list_at(value: Any, index: int) -> Any:
+    """The element at the literal, non-negative `index`, as it is, or
+    `None` (`null`) when `index` is past the end -- the list-side
+    counterpart of `arklight.ir.js_string.js_char_at`, same out-of-range
+    behaviour, never wrapping from the end (`list_first`/`list_last`
+    above are the fixed-position reads; this is arbitrary-position)."""
+    items = _as_list(value)
+    return items[index] if 0 <= index < len(items) else None
+
+
 def js_list_includes(value: Any, literal: Any) -> bool:
     """`Array.prototype.includes(literal)` over `===` equality."""
     return any(js_strict_equal(item, literal) for item in _as_list(value))
