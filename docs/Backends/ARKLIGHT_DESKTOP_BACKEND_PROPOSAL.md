@@ -51,7 +51,7 @@ The runtime should do everything required to render and run the generated site, 
 
 ## 2. Existing ARKlight direction
 
-The `alpha` branch already separates authoring, compilation, backend rendering, and packaging. ARKlight is a Python-first compiler whose output is ordinary HTML/CSS/JavaScript and static assets. The generated website does not require Python, Node.js, npm, or a server at runtime. [ARKlight `alpha`](https://github.com/Rae-ARK/ARKlight/tree/alpha)
+The `alpha` branch already separates authoring, compilation, backend rendering, and packaging. ARKlight is a Python-first compiler whose output is ordinary HTML/CSS/JavaScript and static assets. The generated website does not require Python, Node.js, npm, or a server at runtime. [ARKlight `alpha`](https://github.com/ARKlight-Ecosystem/ARKlight/tree/alpha)
 
 The relevant conceptual boundary is:
 
@@ -76,7 +76,7 @@ Website IR
             static artifact
 ```
 
-ARKlight also already has a packaging concept for completed output through the `.ark` bundle format. Packaging belongs after site generation, which makes the desktop target naturally a deployment/package layer rather than another compiler backend. [ARKlight `alpha` docs](https://github.com/Rae-ARK/ARKlight/tree/alpha)
+ARKlight also already has a packaging concept for completed output through the `.ark` bundle format. Packaging belongs after site generation, which makes the desktop target naturally a deployment/package layer rather than another compiler backend. [ARKlight `alpha` docs](https://github.com/ARKlight-Ecosystem/ARKlight/tree/alpha)
 
 The desktop target therefore should not change the semantics of the web backend. It should consume the same completed artifact that can already be deployed as a static website.
 
@@ -320,7 +320,7 @@ This avoids adding a localhost server solely to deliver immutable packaged resou
 
 ## 9. Routing and navigation
 
-ARKlight's compiler already resolves internal links into generated relative paths. The desktop runtime should preserve those semantics and must not introduce a second route compiler. [ARKlight `alpha`](https://github.com/Rae-ARK/ARKlight/tree/alpha)
+ARKlight's compiler already resolves internal links into generated relative paths. The desktop runtime should preserve those semantics and must not introduce a second route compiler. [ARKlight `alpha`](https://github.com/ARKlight-Ecosystem/ARKlight/tree/alpha)
 
 The division of responsibility is:
 
@@ -364,7 +364,7 @@ The first desktop release should expose **zero custom native JavaScript APIs**.
 
 This is an intentional design constraint, not an omission.
 
-ARKlight's current programming model already generates constrained JavaScript behavior from its own source model rather than requiring arbitrary application JavaScript to cross into native code. [ARKlight `alpha`](https://github.com/Rae-ARK/ARKlight/tree/alpha)
+ARKlight's current programming model already generates constrained JavaScript behavior from its own source model rather than requiring arbitrary application JavaScript to cross into native code. [ARKlight `alpha`](https://github.com/ARKlight-Ecosystem/ARKlight/tree/alpha)
 
 Native APIs should appear only when a specific ARKlight feature proves that a platform capability is necessary.
 
@@ -936,7 +936,7 @@ That is a better fit for ARKlight than making Neutralino the center of the archi
 
 ## 23. Sources
 
-- ARKlight `alpha` repository: <https://github.com/Rae-ARK/ARKlight/tree/alpha>
+- ARKlight `alpha` repository: <https://github.com/ARKlight-Ecosystem/ARKlight/tree/alpha>
 - ARKlight's former Neutralino integration document, superseded by this proposal and since removed from the repo (see the `alpha` branch history for its last revision)
 - Neutralino architecture: <https://neutralino.js.org/docs/contributing/architecture/>
 - Neutralino CLI and embedded-resource builds: <https://neutralino.js.org/docs/cli/neu-cli/>

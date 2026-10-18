@@ -4,13 +4,25 @@
 exhaustive scalar catalog, including §6.5) have been accepted and
 staged as a ten-rung implementation ladder --
 [`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md)
-(`v0.061`-`v0.070`), of which stages 1-7 (`v0.061`-`v0.067`) have
-shipped and stages 8-10 remain PLANNED. The new Tier 3 (§7, added
-below) and the renumbered Tier 4/Tier 5 (§8/§9) remain unsettled
-proposals -- nothing in this file's acceptance covers any of them.
-The rest of this document is kept in full, unedited, as the source
-catalog that ladder was staged from, with Tier 3 inserted in place
-as a follow-up finding rather than folded into §6's catalog, for the
+(`v0.061`-`v0.070`) -- **DONE**: all ten stages have shipped, stage 10
+(the capstone, `pluralize` + `random_int`) landed as `v0.070`; this is
+past news, kept here only so the status line stays an accurate index.
+Tier 3 (§7) has since also been accepted and staged, as
+[`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.072.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.072.md)
+(four stages, split across two milestone slots): `list_at` (§7.3)
+shipped first per §10's suggested order, landing in the `v0.071` slot
+alongside Project Knowledge and Input & Platform Primitives, and is
+DONE. `Derive.if_` (§7.1), `Derive.select` (§7.2), and date/time
+arithmetic (§7.4) are accepted and PLANNED, staged in that order,
+landing in the `v0.072` slot instead. §7.4 carries forward its own
+entry's explicit
+"flagged for maintainer sign-off before implementation" caveat --
+accepted into the ladder, not exempted from that sign-off. The
+renumbered Tier 4/Tier 5 (§8/§9) remain unsettled proposals -- nothing
+in this file's acceptance covers either of them. The rest of this
+document is kept in full, unedited, as the source catalog both
+ladders were staged from, with Tier 3 inserted in place as a
+follow-up finding rather than folded into §6's catalog, for the
 reason given in §7's own rationale.
 
 **Origin:** an audit of `alpha` branch (`arklight/backend/js/*`,
