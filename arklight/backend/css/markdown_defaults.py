@@ -38,6 +38,17 @@ links (`[Install](#install)`, already resolvable per
 accessibility, never a CSS hook -- every *styling* hook below is a
 class, on purpose.
 
+**Theming bugfix (Stage M9 pass):** this module's link/code-background
+rules used to read `var(--ark-link, ...)`/`var(--ark-code-bg, ...)` --
+`--ark-code-bg` was never declared anywhere (fixed by adding it to
+`design_tokens.ROOT_VAR_DEFAULTS` and every `markdown_presets.py`
+preset), and `--ark-link` was never a real token at all (no preset
+ever declared it either) when `--ark-accent` already is that token
+site-wide. Both hooks always rendered their hardcoded per-use
+fallback and silently ignored `Site(markdown_theme=...)` as a result.
+Fixed by pointing `.ark-md-link`/`.ark-md-code` at `--ark-accent`/
+`--ark-code-bg` respectively, same as every other themed rule below.
+
 Cascade position (`arklight.backend.css.render.CSSBackend.render`):
 right after `BASE_CSS_BODY`, before `site.style(...)`'s custom classes
 and well before `site.style_selector(...)`'s structural rules -- so
@@ -95,14 +106,14 @@ MARKDOWN_CSS_BODY = """\
 .ark-md-p code, .ark-md-blockquote code, .ark-md-item code,
 .ark-md-th code, .ark-md-td code, .ark-md-code {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  background: var(--ark-code-bg, rgba(127, 127, 127, 0.15));
+  background: var(--ark-code-bg, rgba(127, 127, 127, 0.12));
   border-radius: 0.25em;
   padding: 0.1em 0.35em;
 }
 
 .ark-md-p a, .ark-md-blockquote a, .ark-md-item a,
 .ark-md-th a, .ark-md-td a, .ark-md-link {
-  color: var(--ark-link, #cc785c);
+  color: var(--ark-accent, #4f46e5);
   text-decoration: underline;
 }
 
@@ -159,7 +170,7 @@ MARKDOWN_CSS_BODY = """\
 
 .ark-md-th {
   font-weight: 700;
-  background: var(--ark-code-bg, rgba(127, 127, 127, 0.08));
+  background: var(--ark-code-bg, rgba(127, 127, 127, 0.12));
 }
 """
 

@@ -33,6 +33,18 @@ ROOT_VAR_DEFAULTS: dict[str, str] = {
     "--ark-accent": "#4f46e5",
     "--ark-accent-hover": "#4338ca",
     "--ark-border": "#e5e5f0",
+    # Theming bugfix (Stage M9 pass, docs/Implementation/MARKDOWN-
+    # CONTENT-ADDENDUM.md): `markdown_defaults.py`'s inline-code/code-
+    # block/table-header backgrounds read `var(--ark-code-bg, ...)`,
+    # but no `--ark-code-bg` var was ever declared here or in any
+    # `markdown_presets.py` preset -- so every Markdown code span/block
+    # always rendered its hardcoded per-use fallback (three different
+    # literal opacities, never a single value) and never actually
+    # followed `Site(markdown_theme=...)`. Same `--ark-*` token
+    # mechanism as every other color here, now a real var the three
+    # presets each override, with a stock default matching the old
+    # `.ark-md-pre` fallback (the middle of the three stray literals).
+    "--ark-code-bg": "rgba(127, 127, 127, 0.12)",
     # `button`'s text color, previously a literal `#ffffff` decoupled
     # from `--ark-accent` (its own `background`) -- fine while accent
     # stayed the stock indigo, but any site choosing a *light* accent
@@ -96,6 +108,7 @@ ROOT_VAR_SYNTAX: dict[str, str] = {
     "--ark-accent": '"<color>"',
     "--ark-accent-hover": '"<color>"',
     "--ark-border": '"<color>"',
+    "--ark-code-bg": '"<color>"',
     "--ark-button-text": '"<color>"',
     "--ark-max-width": '"<length-percentage>"',
     "--ark-stack-space": '"<length>"',

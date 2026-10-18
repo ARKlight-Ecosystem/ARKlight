@@ -60,6 +60,23 @@ def _render_head_meta(
         only once `description` or any `og_*` prop is supplied (so a
         page that touches none of this renders exactly as before);
         og_title/og_description then fall back to title/description
+
+    Stage M9 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+      a self-referential `<link rel="canonical">`, pointing at this
+      page's own route, is added under the exact same opt-in gate as
+      the `og_*` tags above (`description` or any `og_*` prop) rather
+      than unconditionally -- no prop of its own, since the route
+      alone is always enough to build it, but gating it on the same
+      "has this page touched the SEO surface at all" check as `og_*`
+      keeps a page that touches none of it rendering byte-for-byte
+      identically to before this stage, the same guarantee `og_*`
+      already gives (see `test_no_optional_props_renders_empty_
+      string`). Resolved through the same `_relative_asset_path`
+      every other `<head>` href already uses, pointed at the page's
+      own output path -- which, since that path's own directory is
+      always its own dirname, always resolves to just that path's
+      basename (`index.html` self-referencing from `/`, `post.html`
+      self-referencing from `/blog/post`, etc.).
       meta  -- v0.048 Stage A: dict[str, str] of name -> content pairs,
         each rendered as <meta name="..." content="...">. Structured,
         not a raw HTML string -- matches every other extension point
@@ -107,7 +124,8 @@ def _render_head_meta(
     # feature renders byte-for-byte identically to before this change.
     og_title = og_description = og_image = None
     og_opt_in_keys = ("description", "og_title", "og_description", "og_image")
-    if any(page.root.props.get(key) is not None for key in og_opt_in_keys):
+    seo_opt_in = any(page.root.props.get(key) is not None for key in og_opt_in_keys)
+    if seo_opt_in:
         og_title = page.root.props.get("og_title", title)
         og_description = page.root.props.get("og_description", description)
         og_image = page.root.props.get("og_image")
@@ -139,6 +157,15 @@ def _render_head_meta(
             )
         )
         tags.append(f'  <meta property="og:image" content="{escape(og_image_href, quote=True)}">\n')
+    if seo_opt_in:
+        # Stage M9: self-referential canonical link -- see the
+        # docstring above for why this is gated on `seo_opt_in` rather
+        # than unconditional.
+        current_path = route_to_path[current_route]
+        canonical_href = _relative_asset_path(
+            current_path, current_route=current_route, route_to_path=route_to_path
+        )
+        tags.append(f'  <link rel="canonical" href="{escape(canonical_href, quote=True)}">\n')
 
     # v0.048 Stage A: structured <head> extension points -- see the
     # docstring above. Both are fully opt-in and additive, same as

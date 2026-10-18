@@ -101,6 +101,7 @@ PRESET_LIGHT = """\
   --ark-accent-hover: #4338ca;
   --ark-border: #e5e5f0;
   --ark-button-text: #ffffff;
+  --ark-code-bg: rgba(79, 70, 229, 0.08);
 }
 """
 
@@ -113,6 +114,7 @@ PRESET_DARK = """\
   --ark-accent-hover: #d6a373;
   --ark-border: #828282;
   --ark-button-text: #16140f;
+  --ark-code-bg: rgba(242, 236, 226, 0.08);
 }
 """
 
@@ -126,6 +128,7 @@ PRESET_READING = """\
   --ark-border: #e4d3a1;
   --ark-button-text: #f8efd6;
   --ark-max-width: min(100% - 3rem, 42rem);
+  --ark-code-bg: rgba(53, 42, 22, 0.08);
 }
 
 body {

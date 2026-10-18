@@ -255,7 +255,13 @@ def test_synthesize_pages_builds_the_route_table_from_discovered_pages(tmp_path)
     _write(tmp_path, "content/index.md", "# Home\n\n[setup](docs/setup.md)\n")
     _write(tmp_path, "content/docs/setup.md", "---\nroute: /install\n---\n# S\n")
     pages = synthesize_pages(discover_content(tmp_path))
-    assert _first([pages["/"]], "Link").props["href"] == "/install"
+    # Stage M9 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+    # `pages["/"]`'s children now open with the automatic nav (itself
+    # full of `Link`s, one per discovered page) and close with the
+    # automatic footer -- skip past the nav to reach the body's own
+    # markdown-resolved link, same as before this stage.
+    body = pages["/"].children[1:]
+    assert _first(body, "Link").props["href"] == "/install"
 
 
 def test_synthesize_pages_rejects_a_link_to_a_draft(tmp_path):
