@@ -543,6 +543,9 @@ _LIST_WITH_ARGS: dict[str, Callable[[Any, dict[str, Any]], Any]] = {
     "list_includes": lambda v, a: js_list.js_list_includes(v, a["value"]),
     "list_any": lambda v, a: js_list.js_list_any(v, a["op"], a["value"]),
     "list_all": lambda v, a: js_list.js_list_all(v, a["op"], a["value"]),
+    # `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` SS7.3: the
+    # list-side counterpart of `_STRING_WITH_ARGS["char_at"]` above.
+    "list_at": lambda v, a: js_list.js_list_at(v, a["index"]),
 }
 
 

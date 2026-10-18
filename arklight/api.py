@@ -1624,6 +1624,15 @@ class Derive:
         return DerivationRef(kind="list_last", names=(name,))
 
     @staticmethod
+    def list_at(name: str, index: int) -> DerivationRef:
+        """`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` SS7.3
+        (Tier 3): the item at the literal `index`, as it is -- `None`
+        (`null`) past the end. `index` is `>= 0` (`list_at` never wraps
+        around from the end, same as `Derive.char_at`; use
+        `list_first`/`list_last` for the two fixed ends)."""
+        return DerivationRef(kind="list_at", names=(name,), args={"index": index})
+
+    @staticmethod
     def list_includes(name: str, value: Any) -> DerivationRef:
         """`v0.067`: `True` when the list holds `value` -- a literal str,
         bool, `None` or finite number. Strict (`===`), so `1` matches

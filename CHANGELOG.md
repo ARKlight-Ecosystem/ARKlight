@@ -5,6 +5,44 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- `Derive.list_at(name, index)`, Tier 3 SS7.3 of the JS vocabulary expansion proposal
+
+**Added.** `list_at(list, index)` -- arbitrary-position read into a
+list-valued `State(...)`/`Computed(...)`, the list-side counterpart of
+the already-shipped `char_at(string, index)`. `index` is a literal,
+non-negative integer (same `STRING_INDEX_LIMIT` ceiling and
+`LITERAL_ARG_RULES`-checked shape `char_at` already uses); an
+out-of-range index, or a value that isn't a list, reads as `None`/
+`null` rather than wrapping from the end -- `list_first`/`list_last`
+remain the fixed-position reads.
+
+```python
+State("items", ["a", "b", "c"])
+Computed("second", deps=("items",), derive=Derive.list_at("items", 1))
+```
+
+- `arklight/ir/schema.py` -- new `DERIVATION_REGISTRY["list_at"]`
+  entry (`min_names=1, max_names=1, extra_args=("index",)`) and
+  `LITERAL_ARG_RULES["list_at"]`, reusing `char_at`'s own
+  `LiteralArgRule("int", 0, STRING_INDEX_LIMIT)` shape.
+- `arklight/ir/js_list.py` -- new `js_list_at(value, index)`, the
+  build-time Python mirror of the runtime fragment below.
+- `arklight/ir/build.py` -- `list_at` wired into `_LIST_WITH_ARGS`.
+- `arklight/backend/js/derivations/list_at.py` (new module) -- the
+  runtime JS fragment, plus `arklight/backend/js/derivations/
+  __init__.py` wiring it into `DERIVATION_MODULES`/`DERIVATION_FRAGMENTS`.
+- `arklight/api.py` -- `Derive.list_at(name, index)`.
+
+This is `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` SS7.3
+(`list_at`), the first of Tier 3's three entries to ship; `Derive.if_`/
+`Derive.select` (SS7.1/SS7.2) and date/time arithmetic (SS7.4) remain
+unimplemented proposals. `tests/test_js_vocabulary_tier3_list_at.py`
+(new, 32 tests incl. a Node parity sweep); full suite otherwise
+unaffected (3 pre-existing, unrelated failures in this checkout: two in
+`tests/test_version.py` and one in `tests/test_scaffold.py`, both from
+`arklight` not being `pip install`-ed in this environment, not from
+this change).
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: drift fix, `CAPABILITY-MATRIX.md`'s stale Stage 1 (`Watch`) row
 
 **Fixed, docs only, no code.** `docs/Foundational/CAPABILITY-MATRIX.md`'s

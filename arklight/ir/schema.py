@@ -628,6 +628,16 @@ DERIVATION_REGISTRY: dict[str, DerivationSpec] = {
     # random_int.py` for why that's still a valid `Computed(...)`.
     "pluralize": DerivationSpec(min_names=2, max_names=2),
     "random_int": DerivationSpec(min_names=0, max_names=0, extra_args=("min", "max")),
+    # `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` SS7.3 (Tier 3):
+    # the list-side counterpart of `char_at` (SS6.2) -- `char_at` already
+    # reads one character out of a string at a literal index
+    # (`DerivationSpec(min_names=1, max_names=1, extra_args=("index",))`);
+    # nothing equivalent existed for a list-typed `State`/`Computed`
+    # value, only the fixed-position `list_first`/`list_last` above.
+    # Same shape, and the same `LITERAL_ARG_RULES`-checked, non-negative,
+    # range-bound index `char_at` already gets (see `LITERAL_ARG_RULES`
+    # below).
+    "list_at": DerivationSpec(min_names=1, max_names=1, extra_args=("index",)),
 }
 
 KNOWN_DERIVATIONS = frozenset(DERIVATION_REGISTRY)
@@ -729,6 +739,13 @@ LITERAL_ARG_RULES["saturating_subtract"] = {"min": _SATURATING_BOUND, "max": _SA
 # `saturating_add`/`saturating_subtract`'s own check -- not expressible
 # as a single-argument `LiteralArgRule`.
 LITERAL_ARG_RULES["random_int"] = {"min": _SATURATING_BOUND, "max": _SATURATING_BOUND}
+
+# `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` SS7.3: `list_at`'s
+# `index` -- the exact same rule object `char_at` uses above (non-negative,
+# `STRING_INDEX_LIMIT` ceiling): `list_at` never wraps from the end any
+# more than `char_at` does, so an out-of-range index reads as `null`
+# rather than indexing from the back.
+LITERAL_ARG_RULES["list_at"] = {"index": LiteralArgRule("int", 0, STRING_INDEX_LIMIT)}
 
 
 # `vdom-7` (REFACTOR-INDEX.md row 15): `Show(...)`'s

@@ -45,6 +45,7 @@ from arklight.backend.js.derivations import (
     lerp,
     list_all,
     list_any,
+    list_at,
     list_average,
     list_first,
     list_includes,
@@ -194,6 +195,10 @@ DERIVATION_MODULES = {
     # before they could ship as written.
     pluralize.NAME: pluralize,
     random_int.NAME: random_int,
+    # Tier 3, SS7.3 of `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`
+    # (follow-up, not part of the `v0.061`-`v0.070` addendum ladder above)
+    # -- the list-side counterpart of `char_at`.
+    list_at.NAME: list_at,
 }
 
 DERIVATION_FRAGMENTS: dict[str, str] = {
