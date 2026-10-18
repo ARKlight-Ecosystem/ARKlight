@@ -14,6 +14,7 @@ from arklight.api import (
     OrderedList,
     Page,
     Pre,
+    Span,
     Strong,
     Table,
     TableBody,
@@ -83,14 +84,21 @@ def test_link_only_paragraph():
 
 
 def test_mixed_inline_paragraph_wraps_in_container():
+    # Bugfix (Stage M9 pass): plain-text runs inside a multi-run
+    # paragraph are `Span(...)`, not `Text(...)` -- `Text` renders as
+    # its own `<p>` unconditionally, which used to fragment this one
+    # paragraph into sibling `<p>`s around each `Strong`/`Em`. `Span`
+    # is the existing closed-vocabulary inline tag; see
+    # `arklight.content.markdown._parse_inline`'s docstring for the
+    # full story.
     blocks = parse_markdown("A **bold** and *italic* word.")
     assert blocks == [
         Container(
-            Text("A "),
+            Span("A "),
             Strong("bold"),
-            Text(" and "),
+            Span(" and "),
             Em("italic"),
-            Text(" word."),
+            Span(" word."),
         )
     ]
 
@@ -239,15 +247,15 @@ def test_fixture_round_trips_to_the_expected_ir_tree():
     assert blocks == [
         Heading("Getting Started", level=1),
         Container(
-            Text("Welcome to "),
+            Span("Welcome to "),
             Strong("ARKlight"),
-            Text(" -- this paragraph has "),
+            Span(" -- this paragraph has "),
             Em("italic"),
-            Text(", "),
+            Span(", "),
             Code("inline code"),
-            Text(", and a "),
+            Span(", and a "),
             Link("link", href="https://arklight.example/docs"),
-            Text(" in it."),
+            Span(" in it."),
         ),
         Heading("Features", level=2),
         List(
