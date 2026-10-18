@@ -139,8 +139,13 @@ def test_js_backend_persist_reads_and_writes_are_each_own_try_catch():
     # distinct from the outer initState() try/catch that guards JSON
     # parsing of the hydration blob itself -- a localStorage failure
     # must degrade quietly, never trip arkNotify's page-wide warning.
-    assert js.count("localStorage.getItem(") == 1
-    assert js.count("localStorage.setItem(") == 1
+    # Two pairs, not one: plain path-scoped persist (always shipped,
+    # same as before) *and* the App-Shell Capability Proposal's
+    # scope="global" persistence, also unconditionally shipped on any
+    # stateful page regardless of whether this particular page uses
+    # it -- see test_js_backend_ships_persist_global_read_and_write_on_any_stateful_page.
+    assert js.count("localStorage.getItem(") == 2
+    assert js.count("localStorage.setItem(") == 2
 
 
 # ---------------------------------------------------------------------------

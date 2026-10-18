@@ -145,6 +145,23 @@ the fine-grained-tracking candidate was narrowed:
   scope="global")`) -- `persist=True` keys are path-prefixed today, so
   a value does not follow the visitor between pages. Serializable
   values only; live non-serializable objects stay out of scope.
+  **Shipped**, across the API, Validation, the IR (`IRPage.
+  persist_global`, kept as its own list rather than a richer shape on
+  `IRPage.persist` so a page using only plain `persist=True` keeps
+  byte-for-byte identical output to before this), the HTML backend
+  (`data-ark-persist-global`), and the JS backend (`initState()`'s
+  global-scoped read-override/write-back pair, same shape plain
+  `persist` already uses, just keyed `"ark:global:<name>"` instead of
+  `"ark:" + persistPath + ":<name>"`). Still *not* a live cross-page
+  store -- `State` re-initializes fresh on every navigation exactly as
+  it always has, same as the "out of scope, permanently" list above
+  still holds; a `scope="global"` key just re-reads a storage slot
+  every other page already shares, nothing more. Works with or without
+  `app_shell=True` -- the read/write only ever happens at
+  `initState()` time, which runs on a plain full-page reload exactly
+  as it does on a boosted swap, so gating this behind `app_shell`
+  would have excluded the common case (a site with no `app_shell` at
+  all) for no actual reason.
 - **Static-params routes** -- build-time enumeration of a finite page
   set from one route definition. Explicitly not a runtime matcher.
 - **Fine-grained tracking** is scoped to the *lookup* step (key-scoped

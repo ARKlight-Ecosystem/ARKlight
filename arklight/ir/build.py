@@ -106,6 +106,25 @@ class IRPage:
     # `initState()`). Empty for pages that declare no persisted
     # `State(...)`.
     persist: list[str] = field(default_factory=list)
+    # App-Shell Capability Proposal (docs/Proposals/APP-SHELL-
+    # CAPABILITY-PROPOSAL.md), "Amendments on acceptance": names of
+    # the `State(...)` keys declared with `persist=True, scope=
+    # "global"`, in declaration order -- a separate list from `persist`
+    # above rather than a `(name, scope)` shape on that one list, so a
+    # page using only plain `persist=True` keeps byte-for-byte
+    # identical `data-ark-persist` output to before this (`SYSTEM-
+    # DESIGN-AGREEMENTS.md`'s "byte-for-byte unaffected when opted
+    # out"). Carries no value of its own, same reasoning as `persist`
+    # -- the JS runtime (`arklight/backend/js/runtime/state.py`) reads
+    # an override for each name here from `localStorage["ark:global:
+    # <name>"]` (no page-path segment, unlike plain `persist`'s
+    # `"ark:<page-path>:<name>"`) and writes back to that same
+    # unprefixed key on every change. A name can only ever appear in
+    # one of `persist`/`persist_global`, never both -- `scope=` is a
+    # property of a single `State(...)` declaration, not two competing
+    # ones. Empty for pages that declare no global-scoped persisted
+    # `State(...)`.
+    persist_global: list[str] = field(default_factory=list)
     # `v0.063` (docs/version history/v0.063.md): `(name, query)` pairs
     # for every `State(..., media=...)` on this page, in declaration
     # order -- the same marker/`<body>`-attribute duality every other
@@ -814,15 +833,16 @@ def _extract_page_state(
     dict[str, Any],
     list[dict[str, Any]],
     list[str],
+    list[str],
     list,
     list[tuple[str, str, str, str]],
 ]:
     """
     Split a validated Page node's children into (state, computed,
-    computed_initial, watch, persist, media, query, remaining
-    children). `State(...)`/`Computed(...)`/`Watch(...)` nodes are
-    declarations, not renderable content -- they must never reach the
-    HTML backend as a child.
+    computed_initial, watch, persist, persist_global, media, query,
+    remaining children). `State(...)`/`Computed(...)`/`Watch(...)`
+    nodes are declarations, not renderable content -- they must never
+    reach the HTML backend as a child.
 
     `computed` is returned in dependency order (see
     `_topological_order_computed`); `computed_initial` is each
@@ -834,7 +854,12 @@ def _extract_page_state(
     also declaration order, and is simply the `name` of every
     `State(...)` on this page whose `persist` prop is `True` -- no
     dependency graph, no value of its own, same reasoning as `watch`.
-    `media` (`v0.063`) is declaration order too: `(name, query)` for
+    `persist_global` is the same, but for every `State(...)` on this
+    page whose `persist` prop is `True` *and* whose `scope` prop is
+    `"global"` -- such a name is appended here instead of to `persist`
+    (Validation already guarantees `scope` never appears without
+    `persist=True`, so there's no third case to handle). `media`
+    (`v0.063`) is declaration order too: `(name, query)` for
     every `State(...)` on this page whose `media` prop is set. `query`
     (`v0.064`) is declaration order too: `(name, param, type_tag,
     history_mode)` for every `State(...)` on this page whose `query`
@@ -845,6 +870,7 @@ def _extract_page_state(
     computed_defs: dict[str, dict[str, Any]] = {}
     watch: list[dict[str, Any]] = []
     persist: list[str] = []
+    persist_global: list[str] = []
     media: list[tuple[str, str]] = []
     query: list[tuple[str, str, str, str]] = []
     remaining: list = []
@@ -854,7 +880,10 @@ def _extract_page_state(
             initial = child.props.get("initial")
             state[name] = initial
             if child.props.get("persist"):
-                persist.append(name)
+                if child.props.get("scope") == "global":
+                    persist_global.append(name)
+                else:
+                    persist.append(name)
             media_condition = child.props.get("media")
             if media_condition:
                 media.append((name, media_condition))
@@ -890,7 +919,7 @@ def _extract_page_state(
         computed_initial[name] = _evaluate_derivation(computed_defs[name], get=_get)
 
     computed = [(name, computed_defs[name]) for name in order]
-    return state, computed, computed_initial, watch, persist, media, query, remaining
+    return state, computed, computed_initial, watch, persist, persist_global, media, query, remaining
 
 
 def build_website_ir(
@@ -984,9 +1013,17 @@ def build_website_ir(
     collector = _ResponsiveStyleCollector()
     ir_pages = []
     for route, page in pages.items():
-        state, computed, computed_initial, watch, persist, media, query, remaining_children = (
-            _extract_page_state(page)
-        )
+        (
+            state,
+            computed,
+            computed_initial,
+            watch,
+            persist,
+            persist_global,
+            media,
+            query,
+            remaining_children,
+        ) = _extract_page_state(page)
         root_page = ARKNode(type=page.type, props=page.props, children=remaining_children)
         ir_pages.append(
             IRPage(
@@ -997,6 +1034,7 @@ def build_website_ir(
                 computed_initial=computed_initial,
                 watch=watch,
                 persist=persist,
+                persist_global=persist_global,
                 media=media,
                 query=query,
             )

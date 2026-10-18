@@ -59,6 +59,7 @@ def test_state_query_and_history_round_trip_into_props():
         "name": "page",
         "initial": 1,
         "persist": False,
+        "scope": None,
         "media": None,
         "query": "page",
         "history": "push",
