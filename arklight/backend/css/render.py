@@ -42,6 +42,7 @@ from arklight.backend.css.custom_styles import (
 )
 from arklight.backend.css.design_tokens import render_root_and_property_rules
 from arklight.backend.css.markdown_defaults import MARKDOWN_CSS_BODY, MARKDOWN_CSS_HEADER
+from arklight.backend.css.markdown_presets import MARKDOWN_PRESETS, MARKDOWN_PRESETS_HEADER
 from arklight.ir.build import WebsiteIR
 
 # Where the HTML backend expects to find the generated stylesheet,
@@ -101,6 +102,18 @@ class CSSBackend(Backend):
         # `selector_rules` and so still gets the final say -- see
         # `markdown_defaults.py`'s module docstring for the "default
         # styling only, for now" disclaimer this implements.
+        #
+        # Stage M7: `ir.markdown_theme` (`Site(markdown_theme=...)`)
+        # selects one of `MARKDOWN_PRESETS`, emitted right after
+        # `MARKDOWN_CSS_BODY` -- same cascade tier as that block, and
+        # for the same reason: a preset only ever overrides `:root`
+        # vars (plus `reading`'s one `body` rule, see
+        # `markdown_presets.py`), never a `.ark-md-*` class directly,
+        # so it must still lose to a later `site.style_selector(
+        # ".ark-md-...", {...}, allow_redefine=True)` override the
+        # same way `MARKDOWN_CSS_BODY` itself does. `None` (the
+        # default -- no `markdown_theme` set) emits nothing extra,
+        # byte-identical output to every pre-M7 build.
         css = (
             render_imports(ir.style_imports)
             + BASE_CSS_HEADER
@@ -112,6 +125,11 @@ class CSSBackend(Backend):
             + MARKDOWN_CSS_HEADER
             + "\n"
             + MARKDOWN_CSS_BODY
+            + (
+                MARKDOWN_PRESETS_HEADER + "\n" + MARKDOWN_PRESETS[ir.markdown_theme] + "\n"
+                if ir.markdown_theme is not None
+                else ""
+            )
             + render_custom_styles(ir.custom_styles)
             + render_media_queries(ir.media_queries)
             + render_responsive_styles(ir.responsive_rules)

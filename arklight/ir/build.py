@@ -205,6 +205,16 @@ class WebsiteIR:
     # "--ark-max-width") -> value. Empty for sites that pass neither,
     # in which case `CSSBackend` falls back to its own defaults.
     css_var_overrides: dict[str, str] = field(default_factory=dict)
+    # Stage M7 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+    # straight passthrough of `Site(markdown_theme=...)` -- one of
+    # `arklight.backend.css.markdown_presets.MARKDOWN_PRESETS`'s keys
+    # ("light"/"dark"/"reading"), or `None` (unset). `CSSBackend`
+    # reads this to decide whether to emit an extra `:root` override
+    # block after the Markdown default stylesheet -- see
+    # `arklight/backend/css/render.py`. `None` by default, so a site
+    # that never sets `markdown_theme` builds byte-identical output to
+    # every pre-M7 release.
+    markdown_theme: str | None = None
     # Sitewide default for <html lang="...">. Previously this was a
     # literal "en" baked into the HTML backend with no override path
     # at all -- wrong for every non-English site, and there was no way
@@ -930,6 +940,7 @@ def build_website_ir(
     media_queries: list | None = None,
     experimental_usages: list | None = None,
     css_var_overrides: dict[str, str] | None = None,
+    markdown_theme: str | None = None,
     lang: str = "en",
     on_warning: Callable[[str], None] | None = None,
     selector_rules: list | None = None,
@@ -1003,6 +1014,14 @@ def build_website_ir(
     `strict_csp` there's no `Site(...)` kwarg feeding this one, only
     the config file.
 
+    `markdown_theme` is `Site(markdown_theme=...)`'s straight
+    passthrough (Stage M7, docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md
+    -- see `WebsiteIR.markdown_theme`'s own comment). Defaults to
+    `None`, unchanged output for existing callers. Callers are
+    expected to have already validated it against
+    `arklight.backend.css.markdown_presets.MARKDOWN_PRESETS` the same
+    way `Site.__init__` does.
+
     `provider` is `Site(provider=...)`'s straight passthrough
     (`Provider` stage 2 of 6, `v0.066` -- see `WebsiteIR.provider`'s
     own comment). Defaults to `None`, unchanged output for existing
@@ -1047,6 +1066,7 @@ def build_website_ir(
         experimental_usages=(list(experimental_usages) if experimental_usages else [])
         + collector.experimental_usages,
         css_var_overrides=dict(css_var_overrides) if css_var_overrides else {},
+        markdown_theme=markdown_theme,
         lang=lang,
         responsive_rules=collector.rules,
         selector_rules=list(selector_rules) if selector_rules else [],

@@ -1,14 +1,17 @@
 # Markdown Content Addendum: Staged Landing Order
 
-**Status:** IN PROGRESS. Nine stages (`M1`-`M9`); **`M1`-`M6`, `M8`
-SHIPPED, unreleased (`alpha`)**, `M7`, `M9` PLANNED. **No version slots
+**Status:** IN PROGRESS. Ten stages (`M1`-`M10`); **`M1`-`M8` SHIPPED,
+unreleased (`alpha`)**, `M9`, `M10` PLANNED. **No version slots
 reserved** -- assigned when each remaining stage is actually
 scheduled, not here. `M6` and `M8` were inserted into the ladder after
-`M1`-`M5` shipped (see each stage's own section for why); the original
-preset stage and the original docs/tests rollup kept their own
-content but moved down to `M7`/`M9` to make room -- this file always
-reflects the order as shipped, not as first proposed. This file turns
-the accepted
+`M1`-`M5` shipped, and `M9` (automatic nav/footer/SEO defaults) was
+inserted after `M7` shipped (see each stage's own section for why);
+the original docs/tests rollup kept its own content but moved down to
+`M10` to make room -- this file always reflects the order as shipped,
+not as first proposed. `M9`'s own override/opt-out surface (turning
+the nav/footer/SEO defaults off or replacing them) is explicitly out
+of `M9`'s scope and will ship later as its own follow-up stage, not
+tracked by a stage number here yet. This file turns the accepted
 [`docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`](../Proposals/MARKDOWN-CONTENT-PROPOSAL.md)
 into a trackable landing order, the same role
 [`APP-SHELL-ADDENDUM.md`](APP-SHELL-ADDENDUM.md) plays for its
@@ -249,7 +252,7 @@ content the same hooks a Python-authored page already has access to
   (`RESERVED_UTILITY_CLASSES` unioned with the new module's
   `HOOK_CLASS_NAMES`). `tests/test_markdown_style_hooks.py` (new).
 
-## Stage M7 -- `light` / `dark` / `reading` presets
+## Stage M7 -- `light` / `dark` / `reading` presets **(SHIPPED)**
 
 Three preset stylesheets layered on `arklight/backend/css`'s existing
 intrinsic layout system -- no new layout engine, no breakpoint rules
@@ -274,10 +277,19 @@ beyond what already exists, per the proposal's own constraint.
   zero custom CSS from the project, matching acceptance criterion 5;
   a contrast-ratio check on `dark`'s body text against `#16140f`
   passes AA.
-- **Touch points:** new stylesheet modules under `arklight/backend/
-  css/`; `Site(...)` gains a `markdown_theme="light"|"dark"|"reading"`
-  kwarg (naming to be confirmed at implementation time against
-  `Site.__init__`'s existing kwarg conventions).
+- **Touch points:** `arklight/backend/css/markdown_presets.py` (new
+  module, sibling to `base_stylesheet.py`/`markdown_defaults.py`);
+  `arklight/backend/css/render.py` (`CSSBackend.render` emits the
+  selected preset right after `MARKDOWN_CSS_BODY`); `arklight/ir/
+  build.py` (`WebsiteIR.markdown_theme` + `build_website_ir(
+  markdown_theme=...)`); `arklight/api.py` (`Site(markdown_theme=
+  "light"|"dark"|"reading")` kwarg, validated against `MARKDOWN_
+  PRESETS`'s own keys); `arklight/compiler/pipeline.py` (straight
+  passthrough into `build_website_ir`). `tests/test_markdown_
+  presets.py` is the exit test: the fixture-page-under-all-three-
+  presets check, the `dark`/`#16140f` WCAG AA contrast-ratio
+  computation, and a check that an unset `markdown_theme` builds
+  byte-identical output to every pre-`M7` release.
 
 ## Stage M8 -- `markdown-production` style-hook visibility **(SHIPPED)**
 
@@ -319,38 +331,104 @@ to put it in."
   `arklight/cli/templates/markdown_simple.py` (module docstring note
   only, no file added). `tests/test_markdown_templates.py` extended.
 
-## Stage M9 -- Docs and tests
+## Stage M9 -- Automatic nav/footer/SEO defaults **(PLANNED)**
+
+Inserted after `M7` shipped, same reasoning that inserted `M6`/`M8`
+into the ladder: a freshly scaffolded Markdown site (`markdown-
+simple`/`markdown-production`, Stage M5) still renders with no page
+navigation, no footer, and none of the baseline SEO `<head>` surface
+(`<meta name="description">`, `<meta property="og:*">`, a canonical
+link) unless an author writes that Python themselves -- out of step
+with "beginner friendly" and "Flask-like simplicity" for the one
+authoring path (Markdown) that's explicitly meant to need the least
+Python. This stage's scope is the *default*, free-by-default half of
+that gap only; the override surface below is its own, separately
+scheduled follow-up.
+
+- **Nav:** synthesized from `arklight.content.discovery`'s already-
+  resolved route table (Stage M3) -- one link per discovered page, in
+  route order -- rendered with the existing `.nav` utility class
+  (`base_stylesheet.BASE_CSS_BODY`), so it picks up whichever
+  `markdown_theme` (`M7`) preset, if any, the site selected with no
+  extra styling work.
+- **Footer:** a minimal, site-name-plus-build-year default footer,
+  same "something sensible, not nothing" posture as the nav default
+  above -- not configurable copy at this stage, just present instead
+  of absent.
+- **SEO:** per-page `description` already flows from Stage M1 front
+  matter into `Page(description=...)` today; this stage adds the
+  `<head>` tags that front-matter value should have been populating
+  all along (`<meta name="description">`, `og:title`/`og:description`
+  mirroring the page's existing `title`/`description`, a self-
+  referential canonical link from the page's own route) -- no new
+  front-matter keys, just wiring the ones `M1` already parses all the
+  way to the rendered `<head>`.
+- **Override, explicitly out of scope for this stage:** none of the
+  three defaults above gets an opt-out or a replacement surface yet
+  (no `Site(nav=False)`, no custom footer component slot, no per-page
+  SEO override beyond what `M1`'s front matter already exposes) --
+  **that override surface ships later, as its own follow-up stage**,
+  the same "default now, override as a separate, independent landing"
+  split `M6`/`M7` already drew between default `.ark-md-*` styling and
+  a first-class theming surface. Until that follow-up lands, a project
+  that wants different nav/footer/SEO has the same escape hatch every
+  other default in this ladder already has: author the page's own
+  `Nav`/`Container`/`<head>`-adjacent nodes directly in Python instead
+  of relying on Markdown-content synthesis for that page.
+- **Exit test:** a fixture Markdown site with two or more discovered
+  pages builds, via a real `arklight build`, HTML containing a `.nav`
+  block with one link per page and a footer block on every page, plus
+  a `<head>` carrying `description`/`og:title`/`og:description`/
+  canonical tags sourced from that page's own front matter; a single-
+  page fixture still gets a footer and SEO tags but a `.nav` with
+  exactly one (self) link, not an empty or omitted block.
+- **Touch points:** `arklight/content/discovery.py` (nav link
+  synthesis, reusing the route table `M3` already builds);
+  `arklight/compiler/pipeline.py` or `arklight/ir/build.py` (where the
+  synthesized nav/footer nodes and `<head>` tags actually get spliced
+  into each page's IR -- exact stage to be confirmed at implementation
+  time against the pipeline's existing stage boundaries);
+  `arklight/backend/html/page_render.py` (new `<head>` tag emission).
+  New test file, same naming convention as `tests/test_markdown_
+  presets.py`.
+
+## Stage M10 -- Docs and tests
 
 `AUTHORING-GUIDE.md` gets a Markdown-authoring section; tests follow
 `tests/test_persist_global_scope.py`'s pattern -- unit coverage per
 stage (front matter, parser, discovery, asset resolution, templates,
-style hooks, presets, template visibility) plus one end-to-end fixture
-project exercised through a real `arklight build`. `CHANGELOG.md` gets
-one entry per stage as it ships, same as every other staged ladder in
-this folder.
+style hooks, presets, template visibility, nav/footer/SEO defaults)
+plus one end-to-end fixture project exercised through a real `arklight
+build`. `CHANGELOG.md` gets one entry per stage as it ships, same as
+every other staged ladder in this folder.
 
 - **Exit test:** full test suite green, including the new Markdown
   suite; `AUTHORING-GUIDE.md` reviewed against the shipped behavior of
-  `M1`-`M8`, not the proposal's original wording.
+  `M1`-`M9`, not the proposal's original wording.
 
 ## Suggested order
 
-M1 → M2 → M3 → M4 → M5 → M6 → M8 → M7 → M9, in roughly that order:
-each stage's exit test depends on the previous one's output (M2 needs
-M1's front matter, M3 needs M2's parser, M4 needs M3's discovered
-pages, M5 needs M2-M4 working end to end to scaffold against, M6 needs
-M2's node shapes and M5's templates to attach hooks to and scaffold
-against, M8 needs M5's `markdown-production` template and M6's hooks
-to document, M7 is independent of M1-M6/M8 and could in principle run
-in parallel, M9 closes every stage out). No stage here is scheduled
-against a version slot yet -- see Status above.
+M1 → M2 → M3 → M4 → M5 → M6 → M8 → M7 → M9 → M10, in roughly that
+order: each stage's exit test depends on the previous one's output (M2
+needs M1's front matter, M3 needs M2's parser, M4 needs M3's
+discovered pages, M5 needs M2-M4 working end to end to scaffold
+against, M6 needs M2's node shapes and M5's templates to attach hooks
+to and scaffold against, M8 needs M5's `markdown-production` template
+and M6's hooks to document, M7 is independent of M1-M6/M8 and could in
+principle run in parallel, M9 needs M3's route table for nav synthesis
+and benefits from M7 already existing so its nav/footer defaults
+render sensibly under any preset, M10 closes every stage out). No
+stage here is scheduled against a version slot yet -- see Status
+above.
 
-`M1`-`M6` and `M8` have landed on `alpha`, unreleased; full suite green
+`M1`-`M8` have landed on `alpha`, unreleased; full suite green
 including the Markdown tests (`tests/test_frontmatter.py`,
 `tests/test_markdown.py`, `tests/test_content_discovery.py`,
 `tests/test_content_assets.py`, `tests/test_markdown_templates.py`,
-`tests/test_markdown_style_hooks.py`). `M7` (presets) remains
-independent and unscheduled; `M9` (docs/tests rollup,
-`CHANGELOG.md`/`AUTHORING-GUIDE.md`) stays open until `M7` ships too,
-since M9's own exit test wants the full `M1`-`M8` surface reviewed in
-one pass rather than piecemeal.
+`tests/test_markdown_style_hooks.py`, `tests/test_markdown_
+presets.py`). `M9` (automatic nav/footer/SEO defaults) is PLANNED, not
+yet implemented -- its own override/opt-out surface is explicitly
+deferred past M9 itself, to be scheduled as its own follow-up once M9
+ships. `M10` (docs/tests rollup, `CHANGELOG.md`/`AUTHORING-GUIDE.md`)
+stays open until `M9` ships too, since M10's own exit test wants the
+full `M1`-`M9` surface reviewed in one pass rather than piecemeal.

@@ -374,6 +374,11 @@ def compile_site_file(
         media_queries=site.custom_media_queries,
         experimental_usages=site.experimental_usages,
         css_var_overrides=merged_css_var_overrides,
+        # Stage M7 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # straight passthrough, same shape as `css_var_overrides`
+        # above -- `Site.__init__` already validated this against
+        # `MARKDOWN_PRESETS`, so nothing left to check here.
+        markdown_theme=site.markdown_theme,
         lang=lang if lang is not None else site.lang,
         # v0.048 Stage B: `responsive_style={...}` usages are only
         # discovered while building the IR (see `build_website_ir`'s
