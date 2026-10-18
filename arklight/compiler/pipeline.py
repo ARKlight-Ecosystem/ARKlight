@@ -299,7 +299,11 @@ def compile_site_file(
             python_routes.setdefault(route, f"{entry_file.name} (@site.page)")
         try:
             check_python_route_collisions(content_pages, python_routes)
-            ark_ast = {**ark_ast, **synthesize_pages(content_pages)}
+            # Stage M9: `site.name` threads through so every discovered
+            # Markdown page's default footer (`discovery._build_footer`)
+            # reads the real site name instead of `synthesize_pages`'s
+            # own fallback default.
+            ark_ast = {**ark_ast, **synthesize_pages(content_pages, site_name=site.name)}
         except (ContentError, MarkdownSyntaxError) as exc:
             raise CompileError(str(exc)) from exc
 

@@ -55,10 +55,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Mapping
 
-from arklight.api import Page
+from arklight.api import Footer, Link, Nav, Page
 from arklight.content.frontmatter import FrontMatter, parse_front_matter
 from arklight.content.markdown import parse_markdown
 from arklight.ast.nodes import ARKNode
@@ -306,9 +307,40 @@ def check_python_route_collisions(
 # Synthesis
 # ---------------------------------------------------------------------------
 
+#: `Site(name=...)`'s own default (`arklight.api.Site.__init__`) --
+#: mirrored here as a fallback for `synthesize_page`/`synthesize_pages`
+#: callers that don't pass `site_name` explicitly (e.g. direct unit
+#: tests), so the default footer never renders an empty site name.
+_DEFAULT_SITE_NAME = "arklight-site"
+
+
+def _build_nav(pages: list[ContentPage]) -> ARKNode:
+    """Stage M9 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+    one `Link` per discovered page, in route order, wrapped in the
+    existing `.nav` utility class (`base_stylesheet.BASE_CSS_BODY`) so
+    it picks up whichever `markdown_theme` (Stage M7) preset, if any,
+    the site selected, with no extra styling work. `pages` is the same
+    list for every page on the site (including a single-page site,
+    which gets a `.nav` with exactly one self-link rather than an
+    empty/omitted block -- M9's own exit test)."""
+    return Nav(*(Link(page.title, href=page.route) for page in pages), class_name="nav")
+
+
+def _build_footer(site_name: str) -> ARKNode:
+    """Stage M9: a minimal, site-name-plus-build-year default footer --
+    "something sensible, not nothing", same posture as `_build_nav`
+    above. Not configurable copy at this stage -- see the addendum's
+    M9 section for why the override surface is a separate follow-up."""
+    year = datetime.now(timezone.utc).year
+    return Footer(f"\u00a9 {year} {site_name}", class_name="footer")
+
 
 def synthesize_page(
-    page: ContentPage, page_routes: Mapping[str, str] | None = None
+    page: ContentPage,
+    page_routes: Mapping[str, str] | None = None,
+    *,
+    nav_pages: list[ContentPage] | None = None,
+    site_name: str | None = None,
 ) -> ARKNode:
     """Build the `Page(...)` node for one discovered Markdown file:
     the parsed body (Stage M2) as children, the front matter /
@@ -320,6 +352,14 @@ def synthesize_page(
     that parse; `page_routes` is `{content_path: route}` for every
     non-draft page, which a link to another `.md` file is resolved
     through (see `synthesize_pages`).
+
+    `nav_pages`/`site_name` are Stage M9's nav/footer defaults
+    (`_build_nav`/`_build_footer` above): both default to `None`, in
+    which case neither is added and this function's output is
+    byte-for-byte what it always was -- the shape every existing
+    direct caller of `synthesize_page` (unit tests included) already
+    relies on. `synthesize_pages` below is the one real caller that
+    passes both, for every page it builds.
 
     Raises `arklight.content.markdown.MarkdownSyntaxError` for a
     construct that opens and never closes, and its subclass
@@ -340,15 +380,33 @@ def synthesize_page(
         # `arklight.content.markdown.parse_markdown`'s `style_hooks` kwarg.
         style_hooks=True,
     )
-    return Page(*children, **props)
+    body: list = list(children)
+    if nav_pages is not None:
+        body = [_build_nav(nav_pages), *body]
+    if site_name is not None:
+        body = [*body, _build_footer(site_name)]
+    return Page(*body, **props)
 
 
-def synthesize_pages(pages: list[ContentPage]) -> dict[str, ARKNode]:
+def synthesize_pages(
+    pages: list[ContentPage], *, site_name: str = _DEFAULT_SITE_NAME
+) -> dict[str, ARKNode]:
     """`{route: Page node}` for every discovered page, in route order.
     Builds the `{content_path: route}` table once, from the whole
-    (draft-free) set, so a page can link to any other."""
+    (draft-free) set, so a page can link to any other.
+
+    Stage M9: every page returned here also gets the automatic nav
+    (one `Link` per discovered page, built from this same `pages`
+    list) and footer (`site_name` plus the build year) default --
+    `arklight.compiler.pipeline.compile_site_file` passes `site.name`
+    through as `site_name`; direct callers that don't care about M9
+    (or want the pre-M9 shape) should call `synthesize_page` directly
+    instead, which defaults to adding neither."""
     page_routes = {page.content_path: page.route for page in pages}
-    return {page.route: synthesize_page(page, page_routes) for page in pages}
+    return {
+        page.route: synthesize_page(page, page_routes, nav_pages=pages, site_name=site_name)
+        for page in pages
+    }
 
 
 __all__ = [
