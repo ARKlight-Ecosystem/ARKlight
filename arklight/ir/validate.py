@@ -178,6 +178,7 @@ from arklight.ir.schema import (
     DIGITS_RANGES,
     KNOWN_BEHAVIORS,
     KNOWN_KEYS,
+    KNOWN_PERSIST_SCOPES,
     KNOWN_QUERY_HISTORY_MODES,
     KNOWN_REVEAL_BEHAVIORS,
     LIST_COMPARE_KINDS,
@@ -951,6 +952,30 @@ def _validate_state_declaration(node: ARKNode, *, path: str, parent_is_page: boo
         raise ValidationError(
             f"State(...) at {path} has persist={persist!r}, which must be a bool."
         )
+    # App-Shell Capability Proposal, "Amendments on acceptance":
+    # `scope` defaults to `None` (unset, today's per-page-path
+    # `persist=True` behavior -- unchanged) but a value that *is*
+    # provided must be a known scope, same closed-set discipline
+    # `history`'s check below holds, and only ever makes sense
+    # alongside `persist=True` -- a `scope=` with no `persist=True`
+    # would silently do nothing at runtime (there's no key to
+    # namespace), so this is caught here instead, same reasoning
+    # `history`'s own `query=`-required check already uses.
+    scope = node.props.get("scope")
+    if scope is not None:
+        if not isinstance(scope, str) or scope not in KNOWN_PERSIST_SCOPES:
+            known = ", ".join(sorted(KNOWN_PERSIST_SCOPES))
+            raise ValidationError(
+                f"State(...) at {path} has scope={scope!r}, which isn't a "
+                f"recognized persistence scope. Known scopes are: {known}."
+            )
+        if not persist:
+            raise ValidationError(
+                f"State(...) at {path} has scope={scope!r} but no "
+                f"persist=True -- scope= only changes which localStorage "
+                f"key a persisted value lives under, so it needs "
+                f"persist=True alongside it."
+            )
     # `v0.063`: `media` defaults to `None` (unset, plain state --
     # unchanged behavior) but a value that *is* provided must be a
     # non-empty string -- the raw text ARKlight hands straight to

@@ -589,6 +589,7 @@ def State(
     name: str,
     initial: Any = None,
     persist: bool = False,
+    scope: str | None = None,
     media: str | None = None,
     query: str | None = None,
     history: str | None = None,
@@ -611,6 +612,36 @@ def State(
     browsing, quota, a hand-edited non-JSON value) degrade to "this key
     just doesn't persist" -- never a page-breaking error. Off by
     default, unchanged behavior for existing `State(...)` calls.
+
+    `scope="global"` (`docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md`,
+    "Amendments on acceptance") only matters alongside `persist=True`,
+    and changes *which* `localStorage` key that persisted value lives
+    under: the unmarked default keys it per page
+    (`localStorage["ark:<page-path>:<name>"]`, the behavior described
+    above), so a value saved on one page is invisible on another.
+    `scope="global"` drops the page path from that key
+    (`localStorage["ark:global:<name>"]` instead), so the *same* key is
+    read on init and written on change no matter which page is
+    current -- a value set on one page is already there the next time
+    any other page on the site reads that name, including across a
+    plain full-page navigation (`app_shell` isn't required: a reload
+    re-runs `initState()` either way, and that's the only point this
+    value is ever read from storage).
+
+        State("cart_count", 0, persist=True, scope="global")
+
+    This is still *not* the same thing as a value surviving in memory
+    while the visitor is on the page -- `State` re-initializes fresh on
+    every navigation (boosted or not) the same as it always has; a
+    `scope="global"` key just re-reads the same storage slot every
+    other page already wrote to, same "override on init, write on
+    change" shape plain `persist=True` already uses, just with one
+    fewer part in the key. Only JSON-serializable values round-trip
+    through `localStorage` this way, same limitation plain
+    `persist=True` already has. Raises at build time if given without
+    `persist=True`, or with a value other than `"global"`. `None` (the
+    default) means this key keeps today's per-page-path persistence
+    behavior, unchanged for existing `State(..., persist=True)` calls.
 
     `media="(min-width: 768px)"` (`v0.063`) opts this key into
     `matchMedia`-driven boolean state: as soon as the shipped runtime
@@ -704,6 +735,7 @@ def State(
             "name": name,
             "initial": initial,
             "persist": persist,
+            "scope": scope,
             "media": media,
             "query": query,
             "history": history,

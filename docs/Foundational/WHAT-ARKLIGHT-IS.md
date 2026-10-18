@@ -489,7 +489,12 @@ For evaluation purposes, the important question is therefore not simply whether 
 - **No slot/children-passing model for user-defined components** --
   `Card(Text("content"))` forwarding `"content"` into `Card`'s render
   function the way React/Vue `children`/`<slot>` works does not exist
-  yet.
+  yet, and neither does the smaller set of prop-passthrough gaps that
+  tend to surface alongside it once children do (forwarding an
+  unrecognized `class=`/`id=`/`data-*`/`aria-*` or an event prop onto
+  a component's own root, rather than every such need becoming a new
+  named `Prop`). Scoped as a staged proposal:
+  `docs/Proposals/COMPONENT-CHILDREN-AND-PASSTHROUGH-PROPOSAL.md`.
 - **`main`/PyPI still lag `alpha` significantly, though the gap is
   narrower than it once was.** The published package (`0.54.1` as of
   this check against PyPI, not the `0.42.2` an earlier revision of

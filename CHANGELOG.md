@@ -5,6 +5,105 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Bug fix: `State(..., persist=True, scope="global")`, site-wide persisted state
+
+**Shipped.** `docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md`'s
+"Amendments on acceptance" item, "Global-scope persistence," built as
+a small, self-contained fix rather than reopening the proposal's
+"permanently out of scope" cross-page-component-state ruling (that
+ruling is unaffected by this -- see the addendum this entry updates).
+
+`persist=True` (`vdom-8`) keys a saved value to the current page's
+path -- `localStorage["ark:<page-path>:<name>"]` -- so a value set on
+one page is invisible on any other page of the same site, even though
+nothing about `localStorage` itself requires that. `scope="global"`
+drops the path segment (`localStorage["ark:global:<name>"]` instead),
+so the same key is read on init and written on change no matter which
+page is current:
+
+    State("cart_count", 0, persist=True, scope="global")
+
+Not a live, in-memory value surviving navigation -- `State` still
+re-initializes fresh on every page load, boosted or not, exactly as
+before. A `scope="global"` key just re-reads the same storage slot
+every other page on the site already shares, the same "override on
+init, write on change" shape plain `persist=True` already uses, one
+fewer part in the key. Works identically with or without
+`Site(app_shell=True)`: the read/write only ever happens at
+`initState()` time, which runs on a plain full-page reload exactly as
+it does on a boosted swap, so this isn't an `app_shell`-only
+capability (unlike a live cross-page store would be, which *would*
+only make sense once `app_shell` is already avoiding the reload --
+that bigger ask is exactly what stays ruled out).
+
+- `arklight/api.py` -- `State(...)` gains `scope: str | None = None`.
+  `None` (default) keeps today's per-page-path behavior, byte-for-byte
+  unchanged for every existing `persist=True` call site.
+- `arklight/ir/schema.py` -- `KNOWN_PERSIST_SCOPES = frozenset({"global"})`,
+  the one recognized value, same closed-set discipline
+  `KNOWN_QUERY_HISTORY_MODES` already holds.
+- `arklight/ir/validate.py` -- `scope` must be a known value, and
+  raises if given without `persist=True` (same "would silently do
+  nothing at runtime" discipline `history=` without `query=` already
+  has).
+- `arklight/ir/build.py` -- `IRPage` gains `persist_global: list[str]`,
+  a **separate** list from `persist`, not a richer `(name, scope)`
+  shape on that one list -- so a page using only plain `persist=True`
+  keys emits exactly the `data-ark-persist` output it always has.
+- `arklight/backend/html/page_render.py` -- a new
+  `data-ark-persist-global` hydration attribute, alongside
+  `data-ark-persist`, on the same state marker/`<body>` attributes
+  every other piece of hydration state already rides on.
+- `arklight/backend/js/runtime/state.py` -- `initState()` reads
+  `data-ark-persist-global` and runs the same read-override-on-init /
+  write-on-change pair `persist` already runs, keyed
+  `"ark:global:" + key` instead of path-prefixed. Unconditionally
+  shipped on any stateful page (a no-op loop when unused), same as
+  plain `persist` already is -- not gated behind a has-usage flag the
+  way `wireWatchers`/`renderRepeat`/etc. are.
+- Tests: `tests/test_persist_global_scope.py` (API, Validation, IR,
+  HTML backend, JS backend, and Node end-to-end coverage, mirroring
+  `tests/test_vdom_8.py`'s layout) plus two existing-test updates
+  (`tests/test_vdom_8.py`'s try/catch count now expects the two pairs
+  this adds; `tests/test_url_query_state.py`'s exact-`props`-dict
+  assertion now includes the new `scope` key).
+- Docs: this entry; `docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md`'s
+  amendment marked shipped; `docs/Foundational/CAPABILITY-MATRIX.md`'s
+  "Persisted state" row updated.
+
+**Next up, not part of this fix:** the other long-standing component
+gap devs keep tripping on -- no slot/children-passing model for
+user-defined components (`Card(Text("content"))` forwarding
+`"content"` into `Card`'s own render function), and the smaller
+prop-passthrough gaps (`class=`/`id=`/`data-*`/`aria-*`, event props)
+that surface alongside it. Scoped as a staged proposal in this same
+pass rather than built outright -- see
+`docs/Proposals/COMPONENT-CHILDREN-AND-PASSTHROUGH-PROPOSAL.md` and
+the entry below.
+
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: staged proposal for component children/slots + prop passthrough
+
+**Proposal filed, not accepted, not built.** Adds
+`docs/Proposals/COMPONENT-CHILDREN-AND-PASSTHROUGH-PROPOSAL.md`,
+scoping the gap `docs/Foundational/WHAT-ARKLIGHT-IS.md` section 6 and
+`docs/Foundational/CAPABILITY-MATRIX.md`'s "Slots / children for
+user-defined components" row have named, undesigned, for a while:
+`Card(Text("content"))` has no way to forward `"content"` into
+`Card`'s own render function the way `children`/`<slot>` does
+elsewhere, and a handful of smaller passthrough gaps (an unrecognized
+`class=`/`id=`/`data-*`/`aria-*` or an event prop onto a component's
+own root) tend to surface right alongside it once a dev reaches for
+children at all.
+
+Both `docs/Foundational/WHAT-ARKLIGHT-IS.md` (section 6) and
+`docs/Foundational/CAPABILITY-MATRIX.md` (Authoring structure and
+tooling) now point at the new proposal instead of describing the gap
+inline with no next step. Filed in `docs/Proposals/`, not
+`docs/Implementation/`, per `docs/Proposals/README.md`'s own
+distinction -- nothing here is accepted or staged yet, this is the
+"audit that ends in a recommendation" step a maintainer still has to
+pick up.
+
 ## [Docs/internal-only, out-of-band] -- `arklight.cli.cctv` renamed to `arklight.cli.channel`
 
 **Renamed.** The internal module behind `arklight live-streaming

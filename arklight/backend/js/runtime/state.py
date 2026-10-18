@@ -200,6 +200,47 @@ needs either -- the same "no separate module, no separate lookup
 path" reasoning `persist`'s inline read/write steps already follow,
 just with a coercion step `persist`'s plain `JSON.parse`/`JSON.
 stringify` round trip never needed.
+
+`docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md`, "Amendments on
+acceptance": `initState()` also reads a sibling `data-ark-persist-
+global` attribute (`IRPage.persist_global`, same marker/`<body>`-
+attribute duality every other `data-ark-*` piece of hydration state
+already uses) -- a plain list of `State(..., persist=True, scope=
+"global")` names, kept in its own attribute rather than folded into
+`data-ark-persist` so a page using only plain `persist=True` keys
+hydrates with byte-for-byte the same JS output as before this. Exactly
+the same two-step "override on init, write on change" shape plain
+`persist` already establishes, with one difference: the `localStorage`
+key skips the page-path segment entirely (`"ark:global:" + key`
+instead of `"ark:" + persistPath + ":" + key`), so the same key is
+read/written no matter which page is current, instead of each page
+having its own isolated slot.
+
+1. *Read*, before `createState` is called: for each global-scoped
+   persisted key, look up `localStorage["ark:global:<key>"]` and, if
+   present and JSON-parseable, use it to override that key's server-
+   rendered initial value -- so a value set on *any* page is already
+   there the next time *any* page (including a different one) reads
+   this key, surviving both a boosted `app_shell` nav and a plain full
+   page load alike (this read only ever happens at `initState()` time,
+   which runs on every navigation either way).
+2. *Write*, as one more `store.subscribe` listener (registered only
+   when `persistGlobal.length`, same "don't pay for an empty forEach"
+   discipline plain `persist`'s own write listener already holds): on
+   every change, `JSON.stringify` each global-scoped key's current
+   value back out to `localStorage["ark:global:<key>"]`.
+
+Same `try`/`catch`-per-step degrade-quietly discipline plain
+`persist`'s `localStorage` access already holds -- a failure here
+means this key just doesn't persist, never a page-wide error. Still
+*not* a live, in-memory cross-page store (`docs/Foundational/WHAT-
+ARKLIGHT-IS.md` Section 4 / `SYSTEM-DESIGN-AGREEMENTS.md` Section 3
+rule that out regardless of `app_shell`): `State` keeps re-
+initializing fresh on every navigation exactly as it always has, this
+just means the fresh initial value it re-reads can now come from a
+storage slot other pages also read and write, same as plain `persist`
+always could -- just without the page-path segment narrowing it to
+one page's own slot.
 """
 
 from __future__ import annotations
@@ -257,6 +298,9 @@ INIT_STATE_JS = """  function initState() {
     var rawPersist = marker
       ? marker.getAttribute("data-ark-persist")
       : document.body.getAttribute("data-ark-persist");
+    var rawPersistGlobal = marker
+      ? marker.getAttribute("data-ark-persist-global")
+      : document.body.getAttribute("data-ark-persist-global");
     var rawMedia = marker
       ? marker.getAttribute("data-ark-media")
       : document.body.getAttribute("data-ark-media");
@@ -289,6 +333,7 @@ INIT_STATE_JS = """  function initState() {
       var computed = rawComputed ? JSON.parse(rawComputed) : [];
       var watch = rawWatch ? JSON.parse(rawWatch) : [];
       var persist = rawPersist ? JSON.parse(rawPersist) : [];
+      var persistGlobal = rawPersistGlobal ? JSON.parse(rawPersistGlobal) : [];
       var media = rawMedia ? JSON.parse(rawMedia) : [];
       var query = rawQuery ? JSON.parse(rawQuery) : [];
       var initial = JSON.parse(raw);
@@ -315,6 +360,20 @@ INIT_STATE_JS = """  function initState() {
           // Private browsing, quota, or a hand-edited non-JSON value:
           // fall back to the server-rendered initial value for this
           // key alone -- never a page-wide failure.
+        }
+      });
+      // App-Shell Capability Proposal, "Amendments on acceptance":
+      // same override step as plain `persist` just above, but the
+      // key skips `persistPath` entirely -- that's the whole
+      // difference between a page-local and a site-wide persisted
+      // value, see this file's module docstring.
+      persistGlobal.forEach(function (key) {
+        try {
+          var savedGlobal = localStorage.getItem("ark:global:" + key);
+          if (savedGlobal !== null) { initial[key] = JSON.parse(savedGlobal); }
+        } catch (err) {
+          // Same degrade-quietly discipline as plain `persist`'s own
+          // override step above -- this key just doesn't persist.
         }
       });
       media.forEach(function (entry) {
@@ -371,6 +430,23 @@ INIT_STATE_JS = """  function initState() {
           persist.forEach(function (key) {
             try {
               localStorage.setItem("ark:" + persistPath + ":" + key, JSON.stringify(store.get(key)));
+            } catch (err) {
+              // Private browsing or quota exceeded: this key just
+              // doesn't persist, same degrade-quietly discipline as
+              // the read side above.
+            }
+          });
+        });
+      }
+      if (persistGlobal.length) {
+        // App-Shell Capability Proposal, "Amendments on acceptance":
+        // same write-back shape as plain `persist` just above, same
+        // key-skips-`persistPath` difference the read side already
+        // established.
+        store.subscribe(function () {
+          persistGlobal.forEach(function (key) {
+            try {
+              localStorage.setItem("ark:global:" + key, JSON.stringify(store.get(key)));
             } catch (err) {
               // Private browsing or quota exceeded: this key just
               // doesn't persist, same degrade-quietly discipline as

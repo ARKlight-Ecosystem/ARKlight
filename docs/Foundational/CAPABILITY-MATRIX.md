@@ -47,7 +47,7 @@ documented hole with no decision yet.
 
 | Capability | Today | `v0.071` | Reason |
 | --- | --- | --- | --- |
-| Persisted state (`persist=True`, `localStorage`) | Shipped | -- | |
+| Persisted state (`persist=True`, `localStorage`) | Shipped | -- | `scope="global"` (`docs/Proposals/APP-SHELL-CAPABILITY-PROPOSAL.md`, "Amendments on acceptance") now also shipped: opts a persisted key out of the default per-page-path `localStorage` namespace so the same value follows the visitor between pages, `app_shell` or not. |
 | Viewport state (`media=`) | Shipped | -- | |
 | URL query state (`query=`, `history=`) | Shipped | -- | |
 | Text selection / caret (`selection=`) | Gap | **Planned** (Stage 4 of 6) | Only the browser knows it; a fourth, independent member of the existing `persist=`/`media=`/`query=` `State(...)` source family. |
@@ -87,7 +87,7 @@ implements none of the four yet.
 | Capability | Today | `v0.071` | Reason |
 | --- | --- | --- | --- |
 | Components with props (`@component`) | Shipped | -- | |
-| Slots / children for user-defined components | Gap | -- | Documented gap ([`WHAT-ARKLIGHT-IS.md`](WHAT-ARKLIGHT-IS.md) section 6); a separate compiler change, the size of `Repeat`/`Show`, not a fragment this ladder's filter admits. |
+| Slots / children for user-defined components | Gap | -- | Documented gap ([`WHAT-ARKLIGHT-IS.md`](WHAT-ARKLIGHT-IS.md) section 6); a separate compiler change, the size of `Repeat`/`Show`, not a fragment this ladder's filter admits. Scoped as a staged proposal: [`../Proposals/COMPONENT-CHILDREN-AND-PASSTHROUGH-PROPOSAL.md`](../Proposals/COMPONENT-CHILDREN-AND-PASSTHROUGH-PROPOSAL.md) (children/slots, plus the smaller prop-passthrough gaps devs hit alongside it -- `class`/`id`/`data-*`/`aria-*` and event-prop forwarding onto a component's root). Not accepted, no version slot requested. |
 | Fetch / HTTP | Shipped, gated (partial) | -- | `Action.fetch_json(...)` ([`../Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md`](../Proposals/FETCH-HTTP-AS-PRIMITIVE-PROPOSAL.md) stage 2, experimental) covers a click-triggered, same-origin-or-trusted-origin JSON GET/POST into `State(...)`. Load-triggered fetch (stage 3) remains a gap; [`PROVIDER-SDK.md`](PROVIDER-SDK.md) is still the accepted route for a full external service (auth, a hosted database). |
 | Hand-written widget code | Shipped, gated | -- | `ScriptExtension`, experimental ([`EXPERIMENTAL-APIS.md`](EXPERIMENTAL-APIS.md)); the JS itself is unchecked. |
 | A typed boundary for that hatch | Gap | Not admitted | A new subsystem (IR node, schema, Validation); needs its own proposal, same reasoning as the slots row above. |

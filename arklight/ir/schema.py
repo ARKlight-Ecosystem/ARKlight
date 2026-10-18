@@ -489,6 +489,20 @@ KNOWN_KEYS = frozenset(
 KNOWN_QUERY_HISTORY_MODES = frozenset({"replace", "push"})
 
 
+# App-Shell Capability Proposal (docs/Proposals/APP-SHELL-CAPABILITY-
+# PROPOSAL.md), "Amendments on acceptance": `State(..., persist=True,
+# scope="global")`. Plain `persist=True` keys are path-prefixed
+# (`localStorage["ark:<page-path>:<name>"]`) so a value doesn't follow
+# the visitor between pages -- `scope="global"` drops the path prefix
+# (`localStorage["ark:global:<name>"]`) instead, so the same key is
+# read/written no matter which page is current. A small, closed set,
+# same discipline `KNOWN_QUERY_HISTORY_MODES` above holds -- scope is a
+# per-`State(...)`-declaration property, not a general namespace
+# string, so only the one recognized value is accepted rather than any
+# caller-supplied string.
+KNOWN_PERSIST_SCOPES = frozenset({"global"})
+
+
 # `vdom-4` (REFACTOR-INDEX.md row 12; docs/Foundational/
 # DESIGN-NOTES.md "Computed/derived state"): closed-vocabulary derived
 # state, the same shape discipline as `ACTION_REGISTRY`/
