@@ -5,6 +5,80 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stages `M6`, `M8` of 9, `alpha` only
+
+**Shipped, unreleased.** Two more rungs of
+`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`'s ladder, inserted
+after `M1`-`M5` (below) rather than appended -- the original `M6`
+(presets) and `M7` (docs/tests) kept their content but moved down to
+`M7`/`M9` to make room; the addendum's own Status line and "Suggested
+order" section explain why in full.
+
+`M6` -- style hooks on Markdown-sourced nodes: `arklight/content/
+markdown.py`'s `parse_markdown` gains a `style_hooks: bool = False`
+kwarg (default off, so every existing `tests/test_markdown.py`
+assertion is untouched byte-for-byte); when on, every block gets a
+stable `class_name` under a fixed `ark-md-*` prefix, and every
+`Heading` a slugged, page-unique `id` for `#fragment` anchor links.
+`arklight/content/discovery.py`'s `synthesize_page` always passes
+`style_hooks=True`, so a real Markdown-authored page gets this
+automatically -- nothing to opt into in `site.py`. New sibling module
+`arklight/backend/css/markdown_defaults.py` (`MARKDOWN_CSS_BODY`,
+following `base_stylesheet.py`'s own documented "computed CSS lives in
+its own sibling module" convention) ships default styling for every
+`ark-md-*` class, wired into `arklight/backend/css/render.py`'s
+cascade right after `BASE_CSS_BODY`, always included. Every `ark-md-*`
+class is folded into `arklight.api.RESERVED_UTILITY_CLASSES` the same
+protected way `.card`/`.nav`/etc. already are. **Disclaimer, carried
+through the code, the addendum, and `AUTHORING-GUIDE.md`: default
+styling only, for now** -- the only override lever today is the
+generic `allow_redefine=True` escape hatch every reserved utility
+class already has; a first-class Markdown-theming surface is `M7`
+(independent, still unscheduled). Also settled here: `content/*.md` is
+not feature parity with a `Page(...)`-authored page -- no component
+props, no `State`/`Bind`/`Action`, no custom components, only what
+Stage M2's construct-mapping table expresses.
+
+`M8` -- `markdown-production` style-hook visibility: that template's
+`build(name)` writes one more file, `components/markdown_style.py` --
+pure documentation (nothing imported, nothing wired into the build)
+listing `M6`'s `ark-md-*` classes and its own default styling, with
+the same disclaimer and a commented-out override example. Reuses the
+template's existing `components/` scaffolding convention rather than
+inventing a new one -- the whole reason this file lands in
+`markdown-production` and not `markdown-simple` is that the former
+already has a `components/` folder to put it in; `markdown-simple` has
+no equivalent folder at all, so `M6`'s hooks and default styling still
+apply there, just silently ("implicitly handled by the compiler").
+
+`tests/test_markdown_style_hooks.py` (new, 17 tests: every construct's
+hook class, heading-id slugging and uniqueness, `style_hooks`'s
+default-off/discovery-always-on split, the default stylesheet always
+present, `RESERVED_UTILITY_CLASSES` protection and its
+`allow_redefine=True` override, the "no `#id` selectors" invariant).
+`tests/test_markdown_templates.py` extended for `M8`'s new file (and
+`markdown-simple`'s deliberate absence of one). Full suite green aside
+from five pre-existing, unrelated failures, each confirmed present and
+unaffected both before and after this patch:
+`tests/test_action_value_from_state.py` and
+`tests/test_doc_links.py` (both already noted in the `M1`-`M5` entry
+below), plus `tests/test_scaffold.py::test_production_projects_own_tests_pass`
+and `tests/test_version.py`'s two package-metadata checks -- all three
+of the latter are environmental (need a real `pip install`, not a bare
+checkout, to pass) rather than code issues this patch could fix.
+
+- Code: `arklight/content/markdown.py`, `arklight/content/
+  discovery.py`, `arklight/backend/css/markdown_defaults.py` (new),
+  `arklight/backend/css/render.py`, `arklight/api.py`,
+  `arklight/cli/templates/markdown_production.py`,
+  `arklight/cli/templates/markdown_simple.py`.
+- Docs: `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md` (Status
+  line, new `M6`/`M8` sections inserted, old `M6`→`M7`/`M7`→`M9`
+  renumbered in place, "Suggested order" updated), `docs/Implementation/
+  README.md` and `docs/README.md` (index rows), `docs/Foundational/
+  AUTHORING-GUIDE.md` (new Markdown-authored-content section), this
+  entry.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stages `M1`-`M5` of 7, `alpha` only
 
 **Shipped, unreleased.** `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`'s

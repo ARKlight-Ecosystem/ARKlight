@@ -34,6 +34,7 @@ from arklight.ast.nodes import (
 )
 from arklight.backend.css import selectors as css_selectors
 from arklight.backend.css.base_stylesheet import BASE_CSS_BODY
+from arklight.backend.css.markdown_defaults import HOOK_CLASS_NAMES as _MARKDOWN_HOOK_CLASS_NAMES
 from arklight.provider import ProviderDeclaration, register_provider
 
 # The default stylesheet ARKlight ships (`base_stylesheet.BASE_CSS_BODY`)
@@ -47,9 +48,19 @@ from arklight.provider import ProviderDeclaration, register_provider
 # nothing to warn about it. Derived from `BASE_CSS_BODY` itself, rather
 # than hand-copied into a second list, so the two can never drift apart
 # as utility classes are added to the default stylesheet.
+#
+# Stage M6 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md): unioned
+# with `markdown_defaults.HOOK_CLASS_NAMES` -- the `ark-md-*` classes
+# `arklight.content.markdown`'s `style_hooks=True` pass attaches --
+# for the exact same reason and the exact same protection. This is the
+# whole of today's "default styling only, for now" guarantee: nothing
+# stops a `site.style_selector("ark-md-h1", ..., allow_redefine=True)`
+# override (same escape hatch `.card` already has), but a plain
+# `site.style("ark-md-h1", ...)` call fails loudly instead of silently
+# merging with ARKlight's own markdown defaults.
 RESERVED_UTILITY_CLASSES = frozenset(
     re.findall(r"(?m)^\.([a-zA-Z][a-zA-Z0-9_-]*)\s*\{", BASE_CSS_BODY)
-)
+) | _MARKDOWN_HOOK_CLASS_NAMES
 
 
 def _bare_class_names(selector_ast) -> set[str]:

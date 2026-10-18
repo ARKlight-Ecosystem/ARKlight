@@ -1,10 +1,13 @@
 """Markdown-as-content Stage M5: `markdown-simple`/`markdown-production`
-templates (`arklight.cli.templates.markdown_simple`/`markdown_production`).
+templates (`arklight.cli.templates.markdown_simple`/`markdown_production`),
+plus Stage M8's `components/markdown_style.py` visibility file, added
+to this same module rather than a new one since it only extends what
+Stage M5 already scaffolds.
 
 Follows `tests/test_scaffold.py`'s pattern for the existing `simple`/
 `production` templates -- file-presence checks, then a real
 `arklight build` over the scaffolded output, which is the addendum's
-own exit test for this stage ("both layouts build successfully from a
+own exit test for Stage M5 ("both layouts build successfully from a
 fresh `arklight new` scaffold")."""
 
 from pathlib import Path
@@ -53,6 +56,7 @@ def test_new_markdown_production_writes_expected_files(tmp_path):
         "components/__init__.py",
         "components/nav.py",
         "components/footer.py",
+        "components/markdown_style.py",
         "pages/__init__.py",
         "pages/home.py",
         "content/about.md",
@@ -63,6 +67,29 @@ def test_new_markdown_production_writes_expected_files(tmp_path):
         "arklight.config.py",
     ]:
         assert (project / rel).exists(), rel
+
+
+def test_markdown_production_style_hook_visibility_file_is_reference_only(tmp_path):
+    # Stage M8: components/markdown_style.py documents the Stage M6
+    # ark-md-* hook classes, but is pure documentation -- it is never
+    # imported, and never changes build behavior.
+    result = new_project("my_site", template="markdown-production", dest_dir=tmp_path)
+    source = (result.project_dir / "components" / "markdown_style.py").read_text(encoding="utf-8")
+    assert "ark-md-h1" in source
+    assert "allow_redefine=True" in source
+    for rel in result.project_dir.rglob("*.py"):
+        if rel.name == "markdown_style.py":
+            continue
+        assert "markdown_style" not in rel.read_text(encoding="utf-8")
+
+
+def test_markdown_simple_has_no_components_folder_or_visibility_file(tmp_path):
+    # Stage M8: markdown-simple gets no equivalent file -- it has no
+    # components/ folder at all, so Stage M6's hooks and default
+    # styling apply silently instead ("implicitly handled by the
+    # compiler").
+    result = new_project("my_site", template="markdown-simple", dest_dir=tmp_path)
+    assert not (result.project_dir / "components").exists()
 
 
 def test_markdown_production_mixes_python_and_markdown_routes(tmp_path):
