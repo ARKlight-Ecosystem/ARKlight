@@ -328,6 +328,17 @@ class WebsiteIR:
     # capability (see `arklight/experimental.py`'s `raw-postprocess`
     # entry). Empty for sites that never register a ScriptExtension.
     raw_postprocessors: list = field(default_factory=list)
+    # Stage M9 pass (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+    # straight passthroughs of `Site(author=..., base_url=...)`, the
+    # two inputs `arklight.backend.seo.SEOBackend` needs that nothing
+    # else already exposed -- same shape as `markdown_theme`/`lang`
+    # above. Both `None` by default: a site that sets neither still
+    # gets the always-on `robots.txt`/default `og-image.svg`, just
+    # without a byline/`<meta name="author">` (`author`) and without
+    # `sitemap.xml` (`base_url` -- see `SEOBackend`'s own docstring for
+    # why a missing origin means "skip it", not "guess one").
+    author: str | None = None
+    base_url: str | None = None
 
 
 @dataclass
@@ -956,6 +967,8 @@ def build_website_ir(
     trusted_script_origins: list | None = None,
     devtools_console_reminder: bool = True,
     provider: ProviderDeclaration | None = None,
+    author: str | None = None,
+    base_url: str | None = None,
 ) -> WebsiteIR:
     """
     Build the Website IR from a normalized + validated ARK AST.
@@ -1028,6 +1041,14 @@ def build_website_ir(
     callers. Callers are expected to have already run
     `arklight.ir.validate.validate_provider` on it, the same ordering
     `validate_ark_ast` already has relative to this function.
+
+    `author`/`base_url` are `Site(author=..., base_url=...)`'s straight
+    passthroughs (Stage M9 pass, docs/Implementation/MARKDOWN-CONTENT-
+    ADDENDUM.md -- see `WebsiteIR.author`/`WebsiteIR.base_url`'s own
+    comment). Both default to `None`, unchanged meaning for existing
+    callers: `arklight.backend.seo.SEOBackend` is what actually reads
+    them. `Site.__init__` already validated both, same "nothing left
+    to check here" shape `markdown_theme` has.
     """
     collector = _ResponsiveStyleCollector()
     ir_pages = []
@@ -1082,4 +1103,6 @@ def build_website_ir(
         trusted_script_origins=list(trusted_script_origins) if trusted_script_origins else [],
         devtools_console_reminder=devtools_console_reminder,
         provider=provider,
+        author=author,
+        base_url=base_url,
     )

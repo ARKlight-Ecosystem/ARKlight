@@ -434,8 +434,15 @@ def test_build_no_inline_banner_or_output_change_from_deprecated_raw_postprocess
     result = build(site_file, out_dir, on_stage=messages.append)
     banners = [m for m in messages if m.startswith("\u26a0")]
     assert banners == []
-    # Never runs -- robots.txt is never added.
-    assert "robots.txt" not in result.output_files
+    # The deprecated function's body never runs -- `robots.txt` still
+    # exists in the output (Stage M9 pass, `arklight.backend.seo.
+    # SEOBackend`, adds one to every build regardless), but with
+    # `SEOBackend`'s own always-permissive content, never the
+    # deprecated function's "Disallow:" text. This is a coincidental
+    # filename collision between this test's example and
+    # `SEOBackend`'s real default, not a sign the deprecated path ran.
+    assert result.output_files["robots.txt"] == "User-agent: *\nAllow: /\n"
+    assert "Disallow" not in result.output_files["robots.txt"]
 
 
 def test_raw_postprocess_summary_mentions_shoot_yourself_in_the_foot(capsys):

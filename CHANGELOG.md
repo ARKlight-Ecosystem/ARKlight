@@ -5,6 +5,50 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stage `M9` of 9, `alpha` only
+
+**Shipped, unreleased.** The last rung of
+`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`'s ladder before the
+docs/tests rollup (`M10`): automatic nav/footer/SEO defaults. Nav,
+footer, and per-page `description`/`og:title`/`og:description`/
+canonical `<head>` tags were already wired through `arklight/backend/
+html/head_meta.py` in the two commits before this one; this entry adds
+the site-wide half of that gap -- the pieces a single page's own front
+matter can't carry because they need the whole site, not one page's
+IR node.
+
+New module `arklight/backend/seo.py` (`SEOBackend`), added to
+`arklight.compiler.pipeline.default_backends()` as a fourth backend
+alongside HTML/CSS/JS, using `Backend.postprocess()` exactly the way
+its own docstring and this file's `[0.043]` entry already described
+("injecting analytics/OG tags computed from data the HTML backend
+already rendered" / "sitemap generation"): `robots.txt` (always,
+`User-agent: * / Allow: /`), `sitemap.xml` (only when the new
+`Site(base_url=...)` is set -- sitemap `<loc>` entries must be
+absolute, and there's no way to derive a real origin from the build
+alone), and a generated default `og-image.svg` -- the ARKlight mark,
+the site name, and, if the new `Site(author=...)` is set, a byline,
+GitHub-social-preview-card style. SVG, not a raster format: no image-
+encoding library exists anywhere in this dependency-free project, same
+reason `arklight new`'s scaffolded `assets/icon.svg` is hand-drawn SVG
+rather than a shipped PNG. `SEOBackend.postprocess()` injects a
+default `<meta property="og:image">` (and, when `Site(author=...)` is
+set, `<meta name="author">`) into every already-rendered page that
+doesn't already carry one -- an explicit `Page(og_image=...)` always
+wins. Two new `Site(...)` kwargs, both optional and `None` by default:
+`author` (free string) and `base_url` (validated as a bare
+`scheme://host`, no trailing slash, no path).
+
+Every build now writes two more files than before by default
+(`robots.txt`, `og-image.svg`) -- `tests/test_pipeline_end_to_end.py`,
+`tests/test_arklight_file_roundtrip.py`, `tests/test_pack.py`, and
+`tests/test_experimental_apis.py`'s exact output-file-set/count
+assertions updated accordingly. New `tests/test_seo_backend.py` (24
+tests: `robots.txt`/`sitemap.xml`/`og-image.svg` content, the
+`base_url`-gated sitemap, default-tag injection vs. an explicit
+`Page(og_image=...)` winning, `Site(author=..., base_url=...)`
+validation).
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stages `M6`, `M8` of 9, `alpha` only
 
 **Shipped, unreleased.** Two more rungs of

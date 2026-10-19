@@ -22,13 +22,21 @@ Ties every stage together, matching the architecture doc exactly:
         -> Validation         (arklight.ir.validate)
         -> Website IR         (arklight.ir.build)
         -> Backend Interface  (arklight.backend.base.Backend)
-        -> HTML + CSS Backends (arklight.backend.html / arklight.backend.css)
+        -> HTML + CSS + JS + SEO Backends (arklight.backend.html /
+                                 arklight.backend.css / arklight.backend.js /
+                                 arklight.backend.seo -- the last of
+                                 these, Stage M9 pass, docs/Implementation/
+                                 MARKDOWN-CONTENT-ADDENDUM.md, contributes
+                                 robots.txt/sitemap.xml/og-image.svg via
+                                 render() and injects default SEO <head>
+                                 tags into already-rendered HTML via
+                                 postprocess())
         -> index.html, styles.css (+ other routes)
 
 As of v0.002, `build()` runs *multiple* backends over the same Website
-IR by default (HTML and CSS) and merges their output files -- this is
-exactly the fan-out the architecture doc describes under "Backend
-Interface": each backend consumes the
+IR by default (HTML and CSS, later joined by JS and SEO) and merges
+their output files -- this is exactly the fan-out the architecture doc
+describes under "Backend Interface": each backend consumes the
 same IR and contributes its own output files.
 
 `build()` also copies a top-level `assets/` folder (next to the site's
@@ -51,6 +59,7 @@ from arklight.backend.base import Backend
 from arklight.backend.css.render import CSSBackend
 from arklight.backend.html.render import HTMLBackend
 from arklight.backend.js.render import JSBackend
+from arklight.backend.seo import SEOBackend
 from arklight.config import ConfigError, load_config, overdrive_enabled
 from arklight.content.discovery import (
     ContentError,
@@ -188,8 +197,14 @@ ASSETS_DIR_NAME = "assets"
 
 
 def default_backends() -> list[Backend]:
-    """The backends a normal `arklight build` runs: HTML + CSS + JS."""
-    return [HTMLBackend(), CSSBackend(), JSBackend()]
+    """The backends a normal `arklight build` runs: HTML + CSS + JS +
+    SEO. `SEOBackend` (Stage M9 pass,
+    docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md) runs last, since
+    its `postprocess()` is what injects default `<meta
+    property="og:image">`/`<meta name="author">` tags into the HTML
+    `HTMLBackend` already rendered -- see `arklight.backend.seo` for
+    the full picture."""
+    return [HTMLBackend(), CSSBackend(), JSBackend(), SEOBackend()]
 
 
 @dataclass
@@ -431,6 +446,13 @@ def compile_site_file(
         # validated by `validate_provider` a few lines up, in this same
         # `build` call, before this IR-build stage runs.
         provider=site.provider,
+        # Stage M9 pass (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # straight passthroughs of `Site(author=..., base_url=...)`,
+        # same shape as `markdown_theme`/`lang` above -- already
+        # validated by `Site.__init__`. `arklight.backend.seo.
+        # SEOBackend` is the only reader.
+        author=site.author,
+        base_url=site.base_url,
     )
 
 
