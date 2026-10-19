@@ -9,6 +9,7 @@ from arklight.parser.preamble import (
     PreambleCollisionError,
     PreambleError,
     find_retired_star_imports,
+    includes_markdown_authoring,
     normalize_preamble,
     parse_preamble,
     resolve_preamble,
@@ -54,6 +55,51 @@ def test_directives_after_first_statement_are_ignored():
 # ---------------------------------------------------------------------------
 # malformed / unresolvable directives
 # ---------------------------------------------------------------------------
+
+
+def test_markdown_include_resolves_to_no_bindings():
+    # It's a pure opt-in flag for Markdown-as-content (see
+    # arklight.compiler.pipeline), not a vocabulary source -- unlike
+    # stdlib, it binds nothing into the module namespace.
+    assert resolve_preamble("# include <markdown.ARKlight>\n") == {}
+
+
+def test_markdown_include_combines_cleanly_with_stdlib():
+    bindings = resolve_preamble(
+        "# include <stdlib.ARKlight>\n# include <markdown.ARKlight>\n"
+    )
+    import arklight
+
+    assert bindings["Page"] is arklight.Page
+
+
+def test_includes_markdown_authoring_true_when_present():
+    assert includes_markdown_authoring(
+        "# include <stdlib.ARKlight>\n# include <markdown.ARKlight>\n\nsite = Site()\n"
+    )
+
+
+def test_includes_markdown_authoring_false_when_absent():
+    assert not includes_markdown_authoring(
+        "# include <stdlib.ARKlight>\n\nsite = Site()\n"
+    )
+
+
+def test_includes_markdown_authoring_false_for_empty_source():
+    assert not includes_markdown_authoring("")
+
+
+def test_includes_markdown_authoring_ignores_the_directive_after_code_starts():
+    # Phase-1 parsing only looks at the leading-comment preamble, same
+    # as every other directive -- a later, non-preamble comment that
+    # merely looks like the directive doesn't opt a project in.
+    source = "# include <stdlib.ARKlight>\n\nsite = Site()\n# include <markdown.ARKlight>\n"
+    assert not includes_markdown_authoring(source)
+
+
+def test_unknown_include_label_mentions_markdown_label():
+    with pytest.raises(PreambleError, match=r"markdown\.ARKlight"):
+        resolve_preamble("# include <nonsense>\n")
 
 
 def test_unknown_include_label_raises():

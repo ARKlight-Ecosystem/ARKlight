@@ -350,13 +350,21 @@ name overwrites its rules (last call wins).
 
 ## Markdown-authored content (`content/*.md`)
 
-A `content/` directory next to `site.py` turns on Markdown-as-content
-(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`): every non-draft
-`.md` file under it becomes a page -- `content/guide.md` → `/guide`,
+Markdown-as-content (`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`)
+is opt-in: put `# include <markdown.ARKlight>` in `site.py`'s own
+preamble, alongside `# include <stdlib.ARKlight>`, the same "mandatory,
+not a comment" directive stdlib already uses. With that include
+present, every non-draft `.md` file under a `content/` directory next
+to `site.py` becomes a page -- `content/guide.md` → `/guide`,
 `content/index.md` → `/` -- with no `@site.page(...)` decorator
 written for it. Front matter (`title`/`description`/`route`/`draft`)
 overrides the filename-derived route and title; an explicit
-`@site.page(...)` route always wins over either.
+`@site.page(...)` route always wins over either. Both built-in
+templates below (`markdown-simple`, `markdown-production`) scaffold
+`site.py` with the include already in place. Without it, `content/*.md`
+files are left alone -- `arklight build --verbose` logs a one-line
+pointer at the missing include if it finds any, rather than building
+them silently or failing with no explanation.
 
 **This is not a second syntax for `Page(...)`.** A Markdown file can
 only ever produce what its parser understands -- headings, paragraphs,
@@ -402,22 +410,41 @@ already is (see "Custom CSS classes" above): a plain `site.style(
 "ark-md-h1", ...)` fails loudly with a naming-collision error instead
 of silently merging with ARKlight's own rules.
 
-> **Default styling only, for now.** There is no dedicated, supported
-> way yet to replace that default styling wholesale with a project's
-> own Markdown theme. The only lever today is the same generic
-> `allow_redefine=True` escape hatch every reserved utility class
-> already has:
->
-> ```python
-> site.style_selector(
->     "ark-md-h1",
->     {"color": "#cc785c"},
->     allow_redefine=True,
-> )
-> ```
->
-> A first-class theming surface -- `light`/`dark`/`reading` presets --
-> is a later, unscheduled stage of the same addendum.
+**Presets.** `Site(markdown_theme="light" | "dark" | "reading")` swaps
+the default `ark-md-*` styling above for one of three built-in
+themes -- still just CSS layered ahead of the fixed defaults, nothing
+that touches the IR a Markdown file produces. Leaving `markdown_theme`
+unset (the default) keeps today's plain default styling. For anything
+a preset doesn't cover, the same generic `allow_redefine=True` escape
+hatch every reserved utility class already has still applies on top of
+whichever preset (or no preset) is active:
+
+```python
+site = Site(markdown_theme="dark")
+
+site.style_selector(
+    "ark-md-h1",
+    {"color": "#cc785c"},
+    allow_redefine=True,
+)
+```
+
+**Nav, footer, and SEO defaults.** A Markdown-authored site renders
+with a nav (one link per discovered page, in route order, the existing
+`.nav` utility class) and a minimal site-name-plus-build-year footer
+with no Python written for either. Per-page front matter
+(`description`) flows into `<meta name="description">`,
+`og:title`/`og:description`, and a self-referential canonical link;
+`Site(author=...)` adds a sitewide `<meta name="author">`.
+`arklight build` always writes `robots.txt` and a generated
+`og-image.svg` (the ARKlight mark, the site name, and the byline if
+`author` is set); `sitemap.xml` is written only once `Site(base_url=
+"https://example.com")` (bare origin, no path or trailing slash) is
+set, since a sitemap's `<loc>` entries must be absolute and ARKlight
+has no way to guess a real origin on its own. None of this has an
+opt-out or a replacement surface yet -- a page that wants different
+nav/footer/SEO authors those nodes directly in Python instead of
+relying on Markdown-content synthesis for that one page.
 
 `arklight new my-site --template markdown-production` additionally
 writes `components/markdown_style.py`, a reference-only file (nothing

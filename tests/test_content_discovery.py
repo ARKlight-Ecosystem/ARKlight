@@ -330,6 +330,36 @@ def test_discover_require_pages_false_still_requires_a_site():
 
 
 # ---------------------------------------------------------------------------
+# Opt-in gate: `# include <markdown.ARKlight>`
+# ---------------------------------------------------------------------------
+
+
+def test_build_fails_with_no_pages_when_gate_is_missing(tmp_path):
+    # EMPTY_SITE carries the gate; a site.py without it registers no
+    # @site.page(...) of its own, and the content/*.md below is never
+    # discovered -- so the project genuinely has no pages.
+    _write(tmp_path, "site.py", "# include <stdlib.ARKlight>\n\nsite = Site()\n")
+    _write(tmp_path, "content/guide.md", "# Guide\n")
+    with pytest.raises(CompileError, match="No pages registered"):
+        build(tmp_path / "site.py", tmp_path / "ARK")
+
+
+def test_build_succeeds_once_gate_is_added(tmp_path):
+    _write(tmp_path, "site.py", EMPTY_SITE)
+    _write(tmp_path, "content/guide.md", "# Guide\n")
+    result = build(tmp_path / "site.py", tmp_path / "ARK")
+    assert "/guide" in {page.route for page in result.ir.pages}
+
+
+def test_missing_gate_is_a_no_op_for_a_project_with_no_markdown(tmp_path):
+    # No content/ at all: whether or not the gate is present, a plain
+    # Python-only project builds exactly as it always has.
+    site = _write(tmp_path, "site.py", PY_SITE)
+    result = build(site, tmp_path / "ARK")
+    assert "/about" in {page.route for page in result.ir.pages}
+
+
+# ---------------------------------------------------------------------------
 # End to end through a real build()
 # ---------------------------------------------------------------------------
 
