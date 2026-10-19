@@ -104,9 +104,21 @@ runs as its own step in `arklight/compiler/pipeline.py`, **before**
 runs" invariant is left completely intact; Markdown discovery is a
 filesystem walk that happens first and hands the rest of the pipeline
 a synthesized set of pages, the same shape `DiscoveredPage` already
-is. Trigger: presence of a `content/` directory next to `site.py` --
-no opt-in flag required, since a `content/`-free project never
-triggers this step at all (Stage M3's exit test covers that directly).
+is. Trigger, **as of `M10`**: a `content/` directory next to `site.py`
+holding `.md` files, *and* `# include <markdown.ARKlight>` present in
+the entry file's own preamble
+(`arklight.parser.preamble.includes_markdown_authoring`) -- the same
+"mandatory, not a comment" posture `# include <stdlib.ARKlight>`
+already has, checked with a plain Phase-1 preamble read before
+`discover_content` is even called. A `content/`-free project never
+triggers this step either way (Stage M3's exit test covers that
+directly); a `content/` directory with `.md` files but no include logs
+a one-line pointer at the missing directive instead of building (or
+silently skipping) them. Originally shipped with no opt-in flag at all
+(the walk ran the moment a `.md` file existed) -- `M10`'s docs/tests
+review treated the missing gate as a drift from every other preamble-
+vocabulary feature's own posture and closed it as part of that stage
+rather than leaving it for an eleventh rung.
 
 Route derivation: `content/guide.md` → `/guide`, `content/index.md` →
 `/`, overridden by front matter `route`, overridden by explicit
@@ -438,19 +450,41 @@ scheduled follow-up.
   own inputs). New test files: `tests/test_seo_backend.py`, same
   naming convention as `tests/test_markdown_presets.py`.
 
-## Stage M10 -- Docs and tests
+## Stage M10 -- Docs and tests **(SHIPPED)**
 
-`AUTHORING-GUIDE.md` gets a Markdown-authoring section; tests follow
-`tests/test_persist_global_scope.py`'s pattern -- unit coverage per
-stage (front matter, parser, discovery, asset resolution, templates,
-style hooks, presets, template visibility, nav/footer/SEO defaults)
-plus one end-to-end fixture project exercised through a real `arklight
-build`. `CHANGELOG.md` gets one entry per stage as it ships, same as
-every other staged ladder in this folder.
+`AUTHORING-GUIDE.md`'s Markdown-authoring section rewritten against
+the shipped behavior of `M1`-`M9` (it had drifted: it still described
+`M7`'s presets as "a later, unscheduled stage" and said nothing about
+`M9`'s nav/footer/SEO defaults, even though both had already shipped).
+Per-stage unit coverage already existed (`tests/test_frontmatter.py`,
+`test_markdown.py`, `test_content_discovery.py`, `test_content_
+assets.py`, `test_markdown_templates.py`, `test_markdown_style_
+hooks.py`, `test_markdown_presets.py`, `test_seo_backend.py`); this
+stage adds the one end-to-end fixture project the ladder's exit test
+calls for, exercised through a real `arklight build`
+(`tests/test_markdown_end_to_end.py`): front matter, every `M2`
+construct, discovery/route synthesis, asset and link resolution, the
+`markdown-production` shape, style hooks under a `markdown_theme`
+preset, and the automatic nav/footer/SEO defaults, all in one project,
+plus a negative counterpart with no pages at all.
+
+This review also surfaced a real gap, not just a docs one: unlike
+every other preamble-vocabulary feature (`# include <stdlib.ARKlight>`
+being the standing example), Markdown-as-content had no opt-in flag at
+all -- a `.md` file under `content/` turned it on by itself. Closed as
+part of this stage rather than carried forward as an eleventh rung:
+`# include <markdown.ARKlight>` (`arklight/parser/preamble.py`,
+`arklight/compiler/pipeline.py`), covered by its own unit tests
+(`tests/test_preamble.py`, `tests/test_content_discovery.py`) and
+exercised by the end-to-end fixture above. `M3`'s own section (further
+up this file) and `docs/Foundational/AUTHORING-GUIDE.md`'s Markdown
+section both reflect the new trigger. See `CHANGELOG.md` for the
+entry.
 
 - **Exit test:** full test suite green, including the new Markdown
   suite; `AUTHORING-GUIDE.md` reviewed against the shipped behavior of
-  `M1`-`M9`, not the proposal's original wording.
+  `M1`-`M9`, not the proposal's original wording. Both satisfied: see
+  the full-suite run noted in `CHANGELOG.md`'s `M10` entry.
 
 ## Suggested order
 
