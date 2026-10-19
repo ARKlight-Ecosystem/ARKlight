@@ -23,6 +23,7 @@ from arklight.parser.discover import discover
 
 PY_SITE = """\
 # include <stdlib.ARKlight>
+# include <markdown.ARKlight>
 
 site = Site()
 
@@ -31,7 +32,11 @@ def about():
     return Page(Heading("Python about"), title="About")
 """
 
-EMPTY_SITE = "# include <stdlib.ARKlight>\n\nsite = Site()\n"
+EMPTY_SITE = (
+    "# include <stdlib.ARKlight>\n"
+    "# include <markdown.ARKlight>\n\n"
+    "site = Site()\n"
+)
 
 
 def _write(root: Path, rel: str, text: str) -> Path:
@@ -351,7 +356,7 @@ def test_exit_test_fixture_produces_the_one_expected_collision(tmp_path):
         build(site, tmp_path / "ARK")
     message = str(exc.value)
     assert "content/about.md" in message
-    assert "site.py:6" in message
+    assert "site.py:7" in message
     assert "'/about'" in message
     # Exactly one collision: the override and the draft are not in it.
     assert "/start" not in message

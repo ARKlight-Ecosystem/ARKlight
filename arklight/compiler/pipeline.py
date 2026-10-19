@@ -83,6 +83,7 @@ from arklight.ir.components import ComponentError, collect_default_styles, expan
 from arklight.ir.normalize import normalize_ark_ast
 from arklight.ir.validate import ValidationError, validate_ark_ast, validate_provider
 from arklight.parser.loader import SiteLoadError, load_site
+from arklight.parser.preamble import includes_markdown_authoring
 from arklight.search.engine import default_engine
 from arklight.search.feedback import record_name_error_feedback, record_validation_feedback
 
@@ -270,17 +271,55 @@ def compile_site_file(
     # Markdown-as-content Stage M3: a filesystem walk of `content/`
     # next to the entry file, run *before* `load_site` -- and so
     # before `arklight.parser.discover`'s AST scan, which it never
-    # touches. It reads no site code. It returns `[]` (and this whole
-    # block is a no-op) for any project with no `.md` files under
-    # `content/`, including `production`-template projects whose
-    # `content/` is a Python package. See `arklight.content.discovery`.
+    # touches. It reads no site code (beyond the one-line preamble
+    # check just below). It returns `[]` (and this whole block is a
+    # no-op) for any project with no `.md` files under `content/`,
+    # including `production`-template projects whose `content/` is a
+    # Python package. See `arklight.content.discovery`.
+    #
+    # Gated behind `# include <markdown.ARKlight>` in the entry file's
+    # own preamble -- the same "mandatory, not a comment" posture
+    # `# include <stdlib.ARKlight>` already has (see
+    # `arklight.parser.preamble`), applied to this feature too, rather
+    # than content/*.md silently turning itself on the moment a file
+    # shows up there. The directive is checked with a plain Phase-1
+    # preamble read (`includes_markdown_authoring`), not the full
+    # `load_site` preamble resolution -- that happens moments later and
+    # still reports every other preamble problem exactly as before.
     entry_file = Path(entry_path)
     try:
-        content_pages = discover_content(entry_file.resolve().parent)
+        entry_source = entry_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise CompileError(f"{entry_file}: could not read entry file: {exc}") from exc
+
+    try:
+        content_pages = (
+            discover_content(entry_file.resolve().parent)
+            if includes_markdown_authoring(entry_source)
+            else []
+        )
     except (ContentError, FrontMatterError) as exc:
         raise CompileError(str(exc)) from exc
+
     if content_pages:
         log(f"Found {len(content_pages)} Markdown page(s) under content/...")
+    elif not includes_markdown_authoring(entry_source):
+        # Tell the author if they have Markdown sitting there unused,
+        # instead of a build that silently never looks at it -- same
+        # "don't let a missing directive look like success" stance as
+        # gotcha #1 (`name 'X' is not defined` for a missing
+        # `# include <stdlib.ARKlight>`). This is a cheap directory
+        # probe (not the full `discover_content` walk, which front
+        # matter / route validation could make expensive or error-prone
+        # on files nobody opted into processing yet).
+        content_dir = entry_file.resolve().parent / "content"
+        if content_dir.is_dir() and any(content_dir.rglob("*.md")):
+            log(
+                "content/ has .md file(s), but the entry file has no "
+                "`# include <markdown.ARKlight>` -- Markdown authoring is "
+                "off, so they will not become pages. Add that include to "
+                "opt in."
+            )
 
     log("Discovering site and compiling AST trees...")
     try:

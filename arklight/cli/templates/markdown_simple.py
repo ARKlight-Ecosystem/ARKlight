@@ -4,9 +4,10 @@
 Stage M5 of the Markdown-as-first-class-content landing order
 (`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`). Mirrors
 `simple.py`'s "zero-thinking path" promise, but for Markdown: every
-page is a plain `.md` file under `content/`, discovered automatically
-at build time (`arklight.content.discovery`, Stage M3) -- `site.py`
-itself registers no `@site.page(...)` routes at all. That is legitimate
+page is a plain `.md` file under `content/`, discovered at build time
+(`arklight.content.discovery`, Stage M3) once `site.py` opts in with
+`# include <markdown.ARKlight>` (this template's `site.py` already
+does) -- `site.py` itself registers no `@site.page(...)` routes at all. That is legitimate
 exactly because Markdown content exists next to it:
 `arklight.parser.discover` is only called with `require_pages=False`
 when `arklight.content.discovery.discover_content` already found at
@@ -46,6 +47,7 @@ def build(name: str) -> dict[str, str]:
 
 _SITE_PY = '''\
 # include <stdlib.ARKlight>
+# include <markdown.ARKlight>
 
 # Every page in this project comes from content/*.md -- there is
 # nothing to register by hand here. Add a new page by adding a new
@@ -53,6 +55,9 @@ _SITE_PY = '''\
 # (content/guide.md -> /guide, content/index.md -> /) unless a
 # `route:` line in its own front matter says otherwise. See
 # content/index.md and content/about.md for the front matter shape.
+# The `# include <markdown.ARKlight>` above is what turns content/*.md
+# into pages at all -- remove it and this project builds with no
+# pages, since site.py registers none of its own either.
 
 site = Site()
 '''

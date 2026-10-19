@@ -67,6 +67,7 @@ def build(name: str) -> dict[str, str]:
 
 _SITE_PY = '''\
 # include <stdlib.ARKlight>
+# include <markdown.ARKlight>
 
 from pages.home import home
 
@@ -78,10 +79,13 @@ site = Site()
 # entry file's own source. "/about" and "/guide" are NOT registered
 # here on purpose: they come from content/about.md and content/guide.md
 # instead, discovered at build time
-# (arklight.content.discovery.discover_content). Registering a route
-# here that a Markdown file under content/ already claims is a build
-# error naming both sources, not a silent override -- see
-# content/about.md's comment and the README's "Adding a page" section.
+# (arklight.content.discovery.discover_content), enabled by the
+# `# include <markdown.ARKlight>` above -- remove that line and these
+# two pages stop building, with a log line pointing at it, rather than
+# silently vanishing. Registering a route here that a Markdown file
+# under content/ already claims is a build error naming both sources,
+# not a silent override -- see content/about.md's comment and the
+# README's "Adding a page" section.
 
 
 @site.page("/")

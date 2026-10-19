@@ -181,6 +181,14 @@ _STDLIB_LABEL = "stdlib.ARKlight"
 # registration.
 _ACC_PREFIX = "acc."
 
+# Opt-in gate for Markdown-as-content (arklight.content.discovery):
+# binds no vocabulary by itself (there's nothing to import -- Markdown
+# authoring isn't Python names a page function calls), it's a pure
+# feature flag an entry file's preamble can carry, the same place
+# `# include <stdlib.ARKlight>` already lives. Its presence is checked
+# with `includes_markdown_authoring`, not by inspecting `bindings`.
+_MARKDOWN_LABEL = "markdown.ARKlight"
+
 # Python 3.12 tokenizes an f-string into FSTRING_START ... FSTRING_END
 # with real NAME tokens inside its `{}`; earlier versions hand back one
 # STRING token. A define must behave the same on both, so names inside
@@ -256,6 +264,15 @@ def _resolve_include_source(label: str, *, filename: str) -> dict[str, Any]:
 
         return {name: getattr(arklight, name) for name in arklight.__all__}
 
+    if label == _MARKDOWN_LABEL:
+        # Pure opt-in flag -- no names to bind. Recognised here (rather
+        # than falling through to "unrecognized") so writing it behaves
+        # like every other include: normalized, deduplicated against a
+        # second identical include, and visible to
+        # `includes_markdown_authoring` below -- not a directive that
+        # merely happens not to error.
+        return {}
+
     if label.startswith(_ACC_PREFIX):
         module_path = label[len(_ACC_PREFIX) :]
         try:
@@ -277,7 +294,8 @@ def _resolve_include_source(label: str, *, filename: str) -> dict[str, Any]:
 
     raise PreambleError(
         f"{filename}: unrecognized `# include <{label}>` -- expected "
-        f"`<{_STDLIB_LABEL}>` or `<{_ACC_PREFIX}<dotted.module.path>>`."
+        f"`<{_STDLIB_LABEL}>`, `<{_MARKDOWN_LABEL}>`, or "
+        f"`<{_ACC_PREFIX}<dotted.module.path>>`."
     )
 
 
@@ -375,6 +393,25 @@ def parse_preamble(source: str) -> list[Directive]:
                 directives.append(directive)
                 break
     return directives
+
+
+def includes_markdown_authoring(source: str) -> bool:
+    """Whether `source`'s preamble carries `# include <markdown.ARKlight>`.
+
+    Deliberately a plain Phase-1 parse (`parse_preamble`), not the full
+    `resolve_preamble_detailed` validation pipeline: the caller
+    (`arklight.compiler.pipeline.compile_site_file`) needs this answer
+    *before* deciding whether Markdown-as-content's filesystem walk
+    should even run, which is itself before `load_site` resolves the
+    entry file's preamble for real. A malformed preamble elsewhere in
+    the file is still reported in full, just later, at the normal
+    `load_site` step -- this check only ever says yes/no to the one
+    directive it's looking for.
+    """
+    return any(
+        directive.kind == "include" and directive.label == _MARKDOWN_LABEL
+        for directive in parse_preamble(source)
+    )
 
 
 # ---------------------------------------------------------------------------
