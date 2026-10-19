@@ -1,8 +1,9 @@
 """
 `markdown-simple` template for `arklight new --template markdown-simple`.
 
-Stage M5 of the Markdown-as-first-class-content landing order
-(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`). Mirrors
+Stage M5 of the Markdown-as-first-class-content landing order (see
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: Markdown as
+first-class content"). Mirrors
 `simple.py`'s "zero-thinking path" promise, but for Markdown: every
 page is a plain `.md` file under `content/`, discovered at build time
 (`arklight.content.discovery`, Stage M3) once `site.py` opts in with

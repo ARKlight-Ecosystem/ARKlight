@@ -25,8 +25,10 @@ Ties every stage together, matching the architecture doc exactly:
         -> HTML + CSS + JS + SEO Backends (arklight.backend.html /
                                  arklight.backend.css / arklight.backend.js /
                                  arklight.backend.seo -- the last of
-                                 these, Stage M9 pass, docs/Implementation/
-                                 MARKDOWN-CONTENT-ADDENDUM.md, contributes
+                                 these, Stage M9 pass -- see
+                                 docs/Foundational/DESIGN-NOTES.md's
+                                 "Design record: Markdown as
+                                 first-class content" -- contributes
                                  robots.txt/sitemap.xml/og-image.svg via
                                  render() and injects default SEO <head>
                                  tags into already-rendered HTML via
@@ -199,8 +201,9 @@ ASSETS_DIR_NAME = "assets"
 
 def default_backends() -> list[Backend]:
     """The backends a normal `arklight build` runs: HTML + CSS + JS +
-    SEO. `SEOBackend` (Stage M9 pass,
-    docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md) runs last, since
+    SEO. `SEOBackend` (Stage M9 pass, see
+    docs/Foundational/DESIGN-NOTES.md's "Design record: Markdown as
+    first-class content") runs last, since
     its `postprocess()` is what injects default `<meta
     property="og:image">`/`<meta name="author">` tags into the HTML
     `HTMLBackend` already rendered -- see `arklight.backend.seo` for
@@ -432,7 +435,8 @@ def compile_site_file(
         media_queries=site.custom_media_queries,
         experimental_usages=site.experimental_usages,
         css_var_overrides=merged_css_var_overrides,
-        # Stage M7 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # Stage M7 (see docs/Foundational/DESIGN-NOTES.md's "Design
+        # record: Markdown as first-class content"):
         # straight passthrough, same shape as `css_var_overrides`
         # above -- `Site.__init__` already validated this against
         # `MARKDOWN_PRESETS`, so nothing left to check here.
@@ -485,7 +489,8 @@ def compile_site_file(
         # validated by `validate_provider` a few lines up, in this same
         # `build` call, before this IR-build stage runs.
         provider=site.provider,
-        # Stage M9 pass (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # Stage M9 pass (see docs/Foundational/DESIGN-NOTES.md's
+        # "Design record: Markdown as first-class content"):
         # straight passthroughs of `Site(author=..., base_url=...)`,
         # same shape as `markdown_theme`/`lang` above -- already
         # validated by `Site.__init__`. `arklight.backend.seo.

@@ -1,9 +1,10 @@
 """
 `content/` discovery and route synthesis.
 
-Stage M3 of the Markdown-as-first-class-content landing order
-(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`), settling the
-parent proposal's **Q1**, **Q2** and **Q6**.
+Stage M3 of the Markdown-as-first-class-content landing order (see
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: Markdown as
+first-class content"), settling that design record's **Q1**, **Q2**
+and **Q6**.
 
 **Q1 -- where discovery lives.** This is a filesystem walk, not an AST
 scan, and it runs as its own step in `arklight.compiler.pipeline`
@@ -323,7 +324,8 @@ _DEFAULT_SITE_NAME = "arklight-site"
 
 
 def _build_nav(pages: list[ContentPage]) -> ARKNode:
-    """Stage M9 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+    """Stage M9 (see docs/Foundational/DESIGN-NOTES.md's "Design
+    record: Markdown as first-class content"):
     one `Link` per discovered page, in route order, wrapped in the
     existing `.nav` utility class (`base_stylesheet.BASE_CSS_BODY`) so
     it picks up whichever `markdown_theme` (Stage M7) preset, if any,
@@ -380,7 +382,8 @@ def synthesize_page(
         filename=page.relative_path,
         content_path=page.content_path,
         page_routes=page_routes,
-        # Stage M6 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # Stage M6 (see docs/Foundational/DESIGN-NOTES.md's "Design
+        # record: Markdown as first-class content"):
         # always on for a real, discovered Markdown page -- this is the
         # "implicitly handled by the compiler" half of that stage, as
         # opposed to Stage M8's `markdown-production` `components/`

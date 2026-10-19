@@ -5,7 +5,7 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
-## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stage `M10` of 10 (docs/tests rollup), `alpha` only
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.075`: Markdown-as-content, Stage `M10` of 10 (docs/tests rollup), `alpha` only
 
 **Shipped, unreleased.** The closing rung of the Markdown-as-content
 ladder (`M1`-`M10`), formerly staged in
@@ -47,6 +47,16 @@ and implementation addendum are retired from `docs/Proposals/`/
 surface remains explicitly out of scope and unscheduled -- a future
 follow-up, not tracked by a stage number here.
 
+With this rung landed, the whole `M1`-`M10` ladder (every entry below
+down through "Docs-only: `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`
+accepted...") is shipped on `alpha`, still pending real-world bug
+testing before release. Folded into the `v0.075` slot, sharing it with
+Project Knowledge stage 5 of 8 (build history) -- same precedent as
+`v0.041`/`v0.064`/`v0.071`'s own multi-piece slots. `pyproject.toml`'s
+version is unchanged: the slot isn't closed until Project Knowledge
+stage 5 ships too, and this ladder is still draft/unreleased pending
+that testing pass.
+
 - Docs: `docs/Foundational/AUTHORING-GUIDE.md` (Markdown-authoring
   section rewritten), `docs/Foundational/DESIGN-NOTES.md` (new
   graduated design record), `docs/README.md`/
@@ -55,7 +65,7 @@ follow-up, not tracked by a stage number here.
 - Tests: `tests/test_preamble.py`, `tests/test_content_discovery.py`
   extended; new `tests/test_markdown_end_to_end.py`.
 
-## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stage `M9` of 9, `alpha` only
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.075`: Markdown-as-content, Stage `M9` of 9, `alpha` only
 
 **Shipped, unreleased.** The last rung of
 `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`'s ladder before the
@@ -99,7 +109,7 @@ tests: `robots.txt`/`sitemap.xml`/`og-image.svg` content, the
 `Page(og_image=...)` winning, `Site(author=..., base_url=...)`
 validation).
 
-## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stage `M7` of 9, `alpha` only
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.075`: Markdown-as-content, Stage `M7` of 9, `alpha` only
 
 **Shipped, unreleased.** The `light`/`dark`/`reading` presentation
 presets for Markdown-sourced content -- three preset stylesheets
@@ -138,7 +148,7 @@ pre-`M7` release.
   line, `M7` section settled).
 - Tests: `tests/test_markdown_presets.py` (new).
 
-## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stages `M6`, `M8` of 9, `alpha` only
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.075`: Markdown-as-content, Stages `M6`, `M8` of 9, `alpha` only
 
 **Shipped, unreleased.** Two more rungs of
 `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`'s ladder, inserted
@@ -212,7 +222,7 @@ checkout, to pass) rather than code issues this patch could fix.
   AUTHORING-GUIDE.md` (new Markdown-authored-content section), this
   entry.
 
-## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stages `M1`-`M5` of 7, `alpha` only
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.075`: Markdown-as-content, Stages `M1`-`M5` of 7, `alpha` only
 
 **Shipped, unreleased.** `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`'s
 ladder, five rungs in: a restricted standard-library-only front matter
@@ -257,7 +267,7 @@ patch, neither touched by it).
   this patch -- `M1`-`M5`'s code and tests landed in four prior
   commits on `alpha`.
 
-## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md` accepted, staged as `MARKDOWN-CONTENT-ADDENDUM.md`
+## [Unreleased -- draft, version slot unconfirmed] -- `v0.075`: Docs-only: `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md` accepted, staged as `MARKDOWN-CONTENT-ADDENDUM.md`
 
 **Accepted, not built.** `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`'s
 Status line moves from "proposal" to "accepted," reasoned plainly:

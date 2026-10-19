@@ -110,7 +110,8 @@ def test_pack_plain_opt_out_produces_a_real_zip_tail(tmp_path):
         assert zf.testzip() is None
         names = set(zf.namelist())
         # robots.txt/og-image.svg are Stage M9 pass's `SEOBackend`
-        # defaults (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md) --
+        # defaults (see docs/Foundational/DESIGN-NOTES.md's "Design
+        # record: Markdown as first-class content") --
         # present in every build, so present in every pack.
         assert names == {
             "index.html", "about.html", "styles.css", "arklight.js", "sbom.txt",
@@ -174,7 +175,8 @@ def test_unpack_roundtrips_a_sealed_embedded_key_bundle(tmp_path):
 
     assert result.was_sealed is True
     # robots.txt/og-image.svg are Stage M9 pass's `SEOBackend` defaults
-    # (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md) -- present in
+    # (see docs/Foundational/DESIGN-NOTES.md's "Design record:
+    # Markdown as first-class content") -- present in
     # every build, so present in every pack/unpack round trip too.
     assert set(result.extracted_paths) == {
         "index.html", "about.html", "styles.css", "arklight.js", "sbom.txt", "assets/logo.png",

@@ -205,7 +205,8 @@ class WebsiteIR:
     # "--ark-max-width") -> value. Empty for sites that pass neither,
     # in which case `CSSBackend` falls back to its own defaults.
     css_var_overrides: dict[str, str] = field(default_factory=dict)
-    # Stage M7 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+    # Stage M7 (see docs/Foundational/DESIGN-NOTES.md's "Design
+    # record: Markdown as first-class content"):
     # straight passthrough of `Site(markdown_theme=...)` -- one of
     # `arklight.backend.css.markdown_presets.MARKDOWN_PRESETS`'s keys
     # ("light"/"dark"/"reading"), or `None` (unset). `CSSBackend`
@@ -328,7 +329,8 @@ class WebsiteIR:
     # capability (see `arklight/experimental.py`'s `raw-postprocess`
     # entry). Empty for sites that never register a ScriptExtension.
     raw_postprocessors: list = field(default_factory=list)
-    # Stage M9 pass (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+    # Stage M9 pass (see docs/Foundational/DESIGN-NOTES.md's "Design
+    # record: Markdown as first-class content"):
     # straight passthroughs of `Site(author=..., base_url=...)`, the
     # two inputs `arklight.backend.seo.SEOBackend` needs that nothing
     # else already exposed -- same shape as `markdown_theme`/`lang`
@@ -1028,8 +1030,9 @@ def build_website_ir(
     the config file.
 
     `markdown_theme` is `Site(markdown_theme=...)`'s straight
-    passthrough (Stage M7, docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md
-    -- see `WebsiteIR.markdown_theme`'s own comment). Defaults to
+    passthrough (Stage M7, see docs/Foundational/DESIGN-NOTES.md's
+    "Design record: Markdown as first-class content" -- see
+    `WebsiteIR.markdown_theme`'s own comment). Defaults to
     `None`, unchanged output for existing callers. Callers are
     expected to have already validated it against
     `arklight.backend.css.markdown_presets.MARKDOWN_PRESETS` the same
@@ -1043,8 +1046,9 @@ def build_website_ir(
     `validate_ark_ast` already has relative to this function.
 
     `author`/`base_url` are `Site(author=..., base_url=...)`'s straight
-    passthroughs (Stage M9 pass, docs/Implementation/MARKDOWN-CONTENT-
-    ADDENDUM.md -- see `WebsiteIR.author`/`WebsiteIR.base_url`'s own
+    passthroughs (Stage M9 pass, see docs/Foundational/DESIGN-NOTES.md's
+    "Design record: Markdown as first-class content" -- see
+    `WebsiteIR.author`/`WebsiteIR.base_url`'s own
     comment). Both default to `None`, unchanged meaning for existing
     callers: `arklight.backend.seo.SEOBackend` is what actually reads
     them. `Site.__init__` already validated both, same "nothing left

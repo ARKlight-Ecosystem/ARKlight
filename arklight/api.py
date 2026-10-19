@@ -50,7 +50,8 @@ from arklight.provider import ProviderDeclaration, register_provider
 # than hand-copied into a second list, so the two can never drift apart
 # as utility classes are added to the default stylesheet.
 #
-# Stage M6 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md): unioned
+# Stage M6 (see docs/Foundational/DESIGN-NOTES.md's "Design record:
+# Markdown as first-class content"): unioned
 # with `markdown_defaults.HOOK_CLASS_NAMES` -- the `ark-md-*` classes
 # `arklight.content.markdown`'s `style_hooks=True` pass attaches --
 # for the exact same reason and the exact same protection. This is the
@@ -2487,7 +2488,8 @@ class Site:
             if value is not None:
                 self._set_css_var_override(kwarg_name, var_name, value)
 
-        # Stage M7 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # Stage M7 (see docs/Foundational/DESIGN-NOTES.md's "Design
+        # record: Markdown as first-class content"):
         # a first-class Markdown-theming surface, independent of the
         # generic `css_var_overrides` plumbing above -- `light`/
         # `dark`/`reading` are curated palettes
@@ -2696,7 +2698,8 @@ class Site:
             register_provider(provider)
             self.experimental_usages.append(experimental.emit("provider-integration"))
 
-        # Stage M9 pass (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # Stage M9 pass (see docs/Foundational/DESIGN-NOTES.md's "Design
+        # record: Markdown as first-class content"):
         # the two site-wide inputs the automatic SEO defaults
         # (`arklight.backend.seo.SEOBackend`) need and nothing else did
         # already expose. Both stay `None` by default -- a site that

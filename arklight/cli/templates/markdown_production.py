@@ -1,9 +1,10 @@
 """
 `markdown-production` template for `arklight new --template markdown-production`.
 
-Stage M5 of the Markdown-as-first-class-content landing order
-(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`), answering the
-parent proposal's **Q7** ("is mixing Python-authored pages and
+Stage M5 of the Markdown-as-first-class-content landing order (see
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: Markdown as
+first-class content"), answering that design record's **Q7** ("is
+mixing Python-authored pages and
 Markdown content in one project the intended steady state?") with
 "yes": this layout scaffolds one Python-authored page (`/`, via
 `pages/home.py`, sharing `components/nav.py`/`components/footer.py`
@@ -43,7 +44,8 @@ def build(name: str) -> dict[str, str]:
         "components/__init__.py": _COMPONENTS_INIT_PY,
         "components/nav.py": _COMPONENTS_NAV_PY,
         "components/footer.py": _COMPONENTS_FOOTER_PY,
-        # Stage M8 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # Stage M8 (see docs/Foundational/DESIGN-NOTES.md's "Design
+        # record: Markdown as first-class content"):
         # this template is the one that gets this file, specifically
         # because it already scaffolds a components/ folder --
         # `markdown-simple` has nowhere equivalent to put it, so the
@@ -138,8 +140,9 @@ somewhere in this project, the same way components/nav.py and
 components/footer.py make the Python-authored side's pieces visible.
 
 Every block a content/*.md file produces gets one of these classes
-automatically (arklight.content.markdown, Stage M6 of
-docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md) -- nothing to write,
+automatically (arklight.content.markdown, Stage M6 of the design
+record in docs/Foundational/DESIGN-NOTES.md, "Design record: Markdown
+as first-class content") -- nothing to write,
 nothing to opt into:
 
     ark-md-h1 .. ark-md-h6    headings (each also gets a slugged id=,

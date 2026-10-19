@@ -1,6 +1,7 @@
 """
-Stage M7 of the Markdown-as-first-class-content landing order
-(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`): `light`/`dark`/
+Stage M7 of the Markdown-as-first-class-content landing order (see
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: Markdown as
+first-class content"): `light`/`dark`/
 `reading` presets for `Site(markdown_theme=...)`. Companion to
 `tests/test_markdown_style_hooks.py` (Stage M6, untouched by this
 stage -- the `.ark-md-*` default stylesheet those tests cover is
