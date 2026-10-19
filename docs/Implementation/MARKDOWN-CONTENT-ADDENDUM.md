@@ -1,7 +1,7 @@
 # Markdown Content Addendum: Staged Landing Order
 
-**Status:** IN PROGRESS. Ten stages (`M1`-`M10`); **`M1`-`M8` SHIPPED,
-unreleased (`alpha`)**, `M9`, `M10` PLANNED. **No version slots
+**Status:** IN PROGRESS. Ten stages (`M1`-`M10`); **`M1`-`M9` SHIPPED,
+unreleased (`alpha`)**, `M10` PLANNED. **No version slots
 reserved** -- assigned when each remaining stage is actually
 scheduled, not here. `M6` and `M8` were inserted into the ladder after
 `M1`-`M5` shipped, and `M9` (automatic nav/footer/SEO defaults) was
@@ -332,7 +332,7 @@ to put it in."
   `arklight/cli/templates/markdown_simple.py` (module docstring note
   only, no file added). `tests/test_markdown_templates.py` extended.
 
-## Stage M9 -- Automatic nav/footer/SEO defaults **(PLANNED)**
+## Stage M9 -- Automatic nav/footer/SEO defaults **(SHIPPED, unreleased)**
 
 Inserted after `M7` shipped, same reasoning that inserted `M6`/`M8`
 into the ladder: a freshly scaffolded Markdown site (`markdown-
@@ -356,14 +356,46 @@ scheduled follow-up.
   same "something sensible, not nothing" posture as the nav default
   above -- not configurable copy at this stage, just present instead
   of absent.
-- **SEO:** per-page `description` already flows from Stage M1 front
-  matter into `Page(description=...)` today; this stage adds the
-  `<head>` tags that front-matter value should have been populating
-  all along (`<meta name="description">`, `og:title`/`og:description`
-  mirroring the page's existing `title`/`description`, a self-
-  referential canonical link from the page's own route) -- no new
-  front-matter keys, just wiring the ones `M1` already parses all the
-  way to the rendered `<head>`.
+- **SEO, per-page `<head>` tags:** per-page `description` already
+  flows from Stage M1 front matter into `Page(description=...)`
+  today; this stage adds the `<head>` tags that front-matter value
+  should have been populating all along (`<meta name="description">`,
+  `og:title`/`og:description` mirroring the page's existing
+  `title`/`description`, a self-referential canonical link from the
+  page's own route) -- no new front-matter keys, just wiring the ones
+  `M1` already parses all the way to the rendered `<head>`
+  (`arklight/backend/html/head_meta.py`, gated by its own
+  `seo_opt_in` check: a page that sets none of this still renders
+  exactly as before).
+- **SEO, site-wide defaults:** three more pieces a single page's own
+  front matter can't carry, since they need the *whole site* (every
+  route, the site name, the author) rather than one page's IR node --
+  `arklight/backend/seo.py`'s `SEOBackend`, added to
+  `arklight.compiler.pipeline.default_backends()`:
+  - `robots.txt` -- always generated (`User-agent: * / Allow: /`),
+    with a `Sitemap:` line once `sitemap.xml` exists.
+  - `sitemap.xml` -- one `<url><loc>` per page route, generated only
+    when the new `Site(base_url=...)` is set (sitemap `<loc>` entries
+    must be absolute per the sitemap protocol, and there's no way to
+    derive a real origin from the build alone -- see `SEOBackend`'s
+    own docstring for why a missing `base_url` means "skip it", not
+    "guess one").
+  - `og-image.svg` -- a generated default Open Graph image (the
+    ARKlight mark, the site name, and, if the new `Site(author=...)`
+    is set, a byline), GitHub-social-preview-card style. SVG, not a
+    raster format, for the same "no image-encoding dependency exists
+    in this project" reason `arklight new`'s scaffolded
+    `assets/icon.svg` is hand-drawn SVG too -- see `SEOBackend`'s own
+    "Why SVG, not PNG" note for the tradeoff that makes (some stricter
+    link-unfurlers won't rasterize it) and why it's always overridable
+    per page (`Page(og_image=...)` wins whenever a page sets one).
+  - A default `<meta property="og:image">` (and, when `Site(author=
+    ...)` is set, `<meta name="author">`) is injected into every
+    already-rendered page via `SEOBackend.postprocess()` -- deliberately
+    *not* routed through `_render_head_meta`'s `seo_opt_in` gate like
+    the per-page tags above, since the entire point of a sitewide
+    default is reaching pages that set no SEO props of their own, not
+    just ones that already opted in.
 - **Override, explicitly out of scope for this stage:** none of the
   three defaults above gets an opt-out or a replacement surface yet
   (no `Site(nav=False)`, no custom footer component slot, no per-page
@@ -382,16 +414,25 @@ scheduled follow-up.
   a `<head>` carrying `description`/`og:title`/`og:description`/
   canonical tags sourced from that page's own front matter; a single-
   page fixture still gets a footer and SEO tags but a `.nav` with
-  exactly one (self) link, not an empty or omitted block.
+  exactly one (self) link, not an empty or omitted block. For the
+  site-wide defaults: any build (Markdown-authored or not) produces
+  `robots.txt` and `og-image.svg`, every page's `<head>` carries a
+  default `<meta property="og:image">`, `sitemap.xml` appears (with a
+  matching `Sitemap:` line in `robots.txt`) only when `Site(base_url=
+  ...)` is set, and a page with its own `Page(og_image=...)` keeps
+  that value instead of the default.
 - **Touch points:** `arklight/content/discovery.py` (nav link
   synthesis, reusing the route table `M3` already builds);
   `arklight/compiler/pipeline.py` or `arklight/ir/build.py` (where the
   synthesized nav/footer nodes and `<head>` tags actually get spliced
   into each page's IR -- exact stage to be confirmed at implementation
   time against the pipeline's existing stage boundaries);
-  `arklight/backend/html/page_render.py` (new `<head>` tag emission).
-  New test file, same naming convention as `tests/test_markdown_
-  presets.py`.
+  `arklight/backend/html/page_render.py` (new `<head>` tag emission);
+  `arklight/backend/seo.py` (new -- `SEOBackend`, the site-wide
+  defaults above); `arklight/api.py`/`arklight/ir/build.py`
+  (`Site`/`WebsiteIR`'s new `author`/`base_url` fields, `SEOBackend`'s
+  own inputs). New test files: `tests/test_seo_backend.py`, same
+  naming convention as `tests/test_markdown_presets.py`.
 
 ## Stage M10 -- Docs and tests
 
@@ -422,14 +463,14 @@ render sensibly under any preset, M10 closes every stage out). No
 stage here is scheduled against a version slot yet -- see Status
 above.
 
-`M1`-`M8` have landed on `alpha`, unreleased; full suite green
+`M1`-`M9` have landed on `alpha`, unreleased; full suite green
 including the Markdown tests (`tests/test_frontmatter.py`,
 `tests/test_markdown.py`, `tests/test_content_discovery.py`,
 `tests/test_content_assets.py`, `tests/test_markdown_templates.py`,
 `tests/test_markdown_style_hooks.py`, `tests/test_markdown_
-presets.py`). `M9` (automatic nav/footer/SEO defaults) is PLANNED, not
-yet implemented -- its own override/opt-out surface is explicitly
-deferred past M9 itself, to be scheduled as its own follow-up once M9
-ships. `M10` (docs/tests rollup, `CHANGELOG.md`/`AUTHORING-GUIDE.md`)
-stays open until `M9` ships too, since M10's own exit test wants the
-full `M1`-`M9` surface reviewed in one pass rather than piecemeal.
+presets.py`) and `M9`'s own `tests/test_seo_backend.py`. `M9`'s own
+override/opt-out surface is still explicitly deferred past M9 itself,
+to be scheduled as its own follow-up now that the default surface has
+shipped. `M10` (docs/tests rollup, `CHANGELOG.md`/`AUTHORING-GUIDE.md`)
+is next: its own exit test wants the full `M1`-`M9` surface reviewed
+in one pass, which can now happen since `M9` is done.

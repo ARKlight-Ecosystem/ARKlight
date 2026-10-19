@@ -2395,6 +2395,8 @@ class Site:
         trusted_script_origins: list[str] | None = None,
         trusted_fetch_origins: list[str] | None = None,
         provider: ProviderDeclaration | None = None,
+        author: str | None = None,
+        base_url: str | None = None,
     ) -> None:
         self.name = name
         # <html lang="..."> for every page this site builds, unless a
@@ -2693,6 +2695,48 @@ class Site:
             # visible to `arklight search <name>` in this process.
             register_provider(provider)
             self.experimental_usages.append(experimental.emit("provider-integration"))
+
+        # Stage M9 pass (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # the two site-wide inputs the automatic SEO defaults
+        # (`arklight.backend.seo.SEOBackend`) need and nothing else did
+        # already expose. Both stay `None` by default -- a site that
+        # sets neither gets the exact same `robots.txt`/default
+        # `og-image.svg` every other site gets (generic, with no
+        # `<meta name="author">` and no `sitemap.xml`), not a build
+        # error; these are opt-in *inputs* to an always-on default, not
+        # a feature flag of their own.
+        #
+        # `author`: free text, used for `<meta name="author">` (added
+        # to every page that doesn't already set one) and as the byline
+        # on the generated default `og-image.svg`. No format to
+        # validate -- same "free string" treatment `Site(name=...)`
+        # itself already gets.
+        if author is not None and (not isinstance(author, str) or not author.strip()):
+            raise ValueError(
+                f"Site(author=...) needs a non-empty string, got {author!r}."
+            )
+        self.author = author
+
+        # `base_url`: the site's real deployed origin (e.g.
+        # "https://example.com"), needed because `sitemap.xml` entries
+        # must be absolute URLs per the sitemap spec -- unlike every
+        # other reference ARKlight resolves (routes, assets), there is
+        # no way to derive an absolute URL from the build alone. `None`
+        # (the default) means `sitemap.xml` is skipped entirely rather
+        # than emitted with made-up or relative <loc> values; see
+        # `SEOBackend`'s own docstring. Validated as a bare
+        # `scheme://host` with no trailing slash and no path, so the
+        # one join point (`SEOBackend`) never has to double up a
+        # slash or guess whether the author left one on.
+        if base_url is not None:
+            if not isinstance(base_url, str) or not re.match(
+                r"^https?://[^\s/]+$", base_url
+            ):
+                raise ValueError(
+                    "Site(base_url=...) needs an absolute origin with no "
+                    f"path or trailing slash, e.g. 'https://example.com' -- got {base_url!r}."
+                )
+        self.base_url = base_url
 
     def _set_css_var_override(self, kwarg_name: str, var_name: str, value: str) -> None:
         if not isinstance(value, str) or not value.strip():

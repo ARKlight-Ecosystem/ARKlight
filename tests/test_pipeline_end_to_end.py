@@ -63,7 +63,11 @@ def test_build_writes_html_files(tmp_path):
     assert "<h1>ARKlight</h1>" in index_html
     assert "<button>Get Started</button>" in index_html
     assert "<h1>About</h1>" in about_html
-    assert len(result.written_paths) == 5  # index.html, about.html, styles.css, arklight.js, sbom.txt
+    # index.html, about.html, styles.css, arklight.js, sbom.txt,
+    # robots.txt, og-image.svg (the last two are Stage M9 pass's
+    # `SEOBackend` defaults -- docs/Implementation/MARKDOWN-CONTENT-
+    # ADDENDUM.md -- present in every build, `base_url` or not).
+    assert len(result.written_paths) == 7
     assert (out_dir / "styles.css").exists()
     assert (out_dir / "arklight.js").exists()
 
@@ -221,9 +225,11 @@ def test_build_on_stage_reports_every_stage_in_order(tmp_path):
         "Rendering backend 'html'...",
         "Rendering backend 'css'...",
         "Rendering backend 'js'...",
+        "Rendering backend 'seo'...",
         "Postprocessing backend 'html'...",
         "Postprocessing backend 'css'...",
         "Postprocessing backend 'js'...",
+        "Postprocessing backend 'seo'...",
         "Checking required assets...",
         "Asset check passed: 0 required asset(s), all present.",
         "Link check passed: 4 internal link(s), all resolve.",
