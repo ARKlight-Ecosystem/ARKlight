@@ -17,9 +17,17 @@ decorator-registered routes -- which the pipeline turns into ordinary
 to the ones `Site.build_ark_ast()` produced.
 
 **Q2 -- what triggers it.** A `.md` file existing under the `content/`
-directory next to the site's entry file. No opt-in flag. Note the
-trigger is the *Markdown files*, not the directory: ARKlight's
-`production` template already uses `content/` as a plain Python package
+directory next to the site's entry file, *and* the entry file's own
+preamble carrying `# include <markdown.ARKlight>`
+(`arklight.parser.preamble.includes_markdown_authoring`) -- the same
+"mandatory, not a comment" posture `# include <stdlib.ARKlight>` has.
+Without that include, `arklight.compiler.pipeline.compile_site_file`
+never calls `discover_content` at all; it only checks (via a cheap
+directory probe, not a full walk) whether `content/` has `.md` files
+nobody opted into, to log a pointer at the missing include rather than
+build silently as if they weren't there. Note the trigger, once opted
+in, is the *Markdown files*, not the directory: ARKlight's `production`
+template already uses `content/` as a plain Python package
 (`content/__init__.py`, `content/site_content.py`), and a project like
 that has no `.md` files in it, so this step finds nothing and the build
 is exactly what it was before this module existed.

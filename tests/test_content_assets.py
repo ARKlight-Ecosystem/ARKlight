@@ -19,7 +19,11 @@ from arklight.content.markdown import (
 )
 
 PNG = b"\x89PNG\r\n\x1a\n"
-EMPTY_SITE = "# include <stdlib.ARKlight>\n\nsite = Site()\n"
+EMPTY_SITE = (
+    "# include <stdlib.ARKlight>\n"
+    "# include <markdown.ARKlight>\n\n"
+    "site = Site()\n"
+)
 
 
 def _write(root: Path, rel: str, text: str | bytes) -> Path:
@@ -336,7 +340,7 @@ def test_missing_image_report_has_the_same_shape_as_a_python_page(tmp_path, caps
     _write(
         py_root,
         "site.py",
-        '# include <stdlib.ARKlight>\n\nsite = Site()\n\n@site.page("/")\ndef home():\n'
+        '# include <stdlib.ARKlight>\n# include <markdown.ARKlight>\n\nsite = Site()\n\n@site.page("/")\ndef home():\n'
         '    return Page(Image(src="assets/diagram.png", alt="Diagram"))\n',
     )
     with pytest.raises(CompileError):
