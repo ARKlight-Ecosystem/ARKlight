@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 
 _FENCE = re.compile(r"^(```|~~~).*?^\1", re.S | re.M)
+_INLINE_CODE = re.compile(r"(`+)(?:(?!\1).)+?\1", re.S)
 _LINK = re.compile(r"\]\((<[^>]+>|[^)\s]+)\)")
 _EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.\-]*:|#)", re.I)
 
@@ -37,6 +38,10 @@ def _markdown_files():
 
 def _broken_links(path):
     text = _FENCE.sub("", path.read_text(encoding="utf-8", errors="replace"))
+    # Inline code spans (`` `[text](url)` `` as a syntax example, not a
+    # real link) are stripped the same way fenced blocks are above --
+    # the docstring already promises this; the regex just didn't do it.
+    text = _INLINE_CODE.sub("", text)
     broken = []
     for match in _LINK.finditer(text):
         target = match.group(1).strip("<>")

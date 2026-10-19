@@ -88,7 +88,8 @@ class CSSBackend(Backend):
         # rule already does, and the newer/more specific mechanism
         # should get the final say in the cascade.
         #
-        # Stage M6 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+        # Stage M6 (see docs/Foundational/DESIGN-NOTES.md's "Design
+        # record: Markdown as first-class content"):
         # `MARKDOWN_CSS_BODY` -- default styling for the `ark-md-*`
         # classes `arklight.content.markdown`'s `style_hooks=True` pass
         # attaches -- goes right after `BASE_CSS_BODY`, same cascade

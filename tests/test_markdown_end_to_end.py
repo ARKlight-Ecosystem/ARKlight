@@ -1,5 +1,6 @@
-"""Stage M10 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md) end-to-
-end coverage: one fixture project that exercises every landed rung of
+"""Stage M10 (see docs/Foundational/DESIGN-NOTES.md's "Design record:
+Markdown as first-class content") end-to-end coverage: one fixture
+project that exercises every landed rung of
 the Markdown-as-content ladder together -- front matter (M1), the
 Markdown-to-IR parser's construct vocabulary (M2), `content/`
 discovery and route synthesis (M3), asset/link resolution (M4), the

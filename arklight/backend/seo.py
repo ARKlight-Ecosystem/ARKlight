@@ -1,7 +1,8 @@
 """
 SEO Backend.
 
-Stage M9 pass (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md): the
+Stage M9 pass (see docs/Foundational/DESIGN-NOTES.md's "Design record:
+Markdown as first-class content"): the
 "automatic ... SEO defaults" half of Stage M9 that goes beyond what
 `arklight.backend.html.head_meta._render_head_meta` can do from a
 single page's own props alone -- `robots.txt`, `sitemap.xml`, and a

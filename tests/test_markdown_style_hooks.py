@@ -1,6 +1,7 @@
 """
-Stage M6 of the Markdown-as-first-class-content landing order
-(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`): style hooks on
+Stage M6 of the Markdown-as-first-class-content landing order (see
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: Markdown as
+first-class content"): style hooks on
 Markdown-sourced IR nodes, and the default stylesheet that styles
 them. Companion to `tests/test_markdown.py` (Stage M2, untouched by
 this stage -- every assertion there keeps using a bare `parse_markdown(

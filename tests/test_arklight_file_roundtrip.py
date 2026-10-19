@@ -225,7 +225,8 @@ def test_build_from_arklight_file_by_extension(tmp_path):
     assert "<h1>About</h1>" in about_html
     # index, about, styles.css, arklight.js, sbom.txt, robots.txt,
     # og-image.svg (the last two are Stage M9 pass's `SEOBackend`
-    # defaults -- docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md --
+    # defaults -- see docs/Foundational/DESIGN-NOTES.md's "Design
+    # record: Markdown as first-class content" --
     # added to every build, `.arklight`-sourced or not).
     assert len(rebuilt_result.written_paths) == 7
 

@@ -1,6 +1,7 @@
 """
-Tests for `arklight.backend.seo.SEOBackend` -- Stage M9 pass
-(docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md): `robots.txt`,
+Tests for `arklight.backend.seo.SEOBackend` -- Stage M9 pass (see
+docs/Foundational/DESIGN-NOTES.md's "Design record: Markdown as
+first-class content"): `robots.txt`,
 `sitemap.xml`, the default `og-image.svg`, and the `<head>` tags that
 wire the image (and, when set, `Site(author=...)`) into every page.
 

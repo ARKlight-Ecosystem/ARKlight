@@ -1,9 +1,10 @@
 """
 Front matter parsing for Markdown content pages.
 
-Stage M1 of the Markdown-as-first-class-content landing order
-(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`), settling the
-parent proposal's **Q3**: "YAML-ish" was a placeholder, not a
+Stage M1 of the Markdown-as-first-class-content landing order (see
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: Markdown as
+first-class content"), settling that design record's **Q3**:
+"YAML-ish" was a placeholder, not a
 decision, and full YAML pulls in a parser this project has
 deliberately avoided everywhere else -- `arklight/cli/mdrender.py`'s
 own stated reason for never taking a Markdown dependency applies here

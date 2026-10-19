@@ -350,8 +350,9 @@ name overwrites its rules (last call wins).
 
 ## Markdown-authored content (`content/*.md`)
 
-Markdown-as-content (`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`)
-is opt-in: put `# include <markdown.ARKlight>` in `site.py`'s own
+Markdown-as-content (see `docs/Foundational/DESIGN-NOTES.md`'s "Design
+record: Markdown as first-class content") is opt-in: put
+`# include <markdown.ARKlight>` in `site.py`'s own
 preamble, alongside `# include <stdlib.ARKlight>`, the same "mandatory,
 not a comment" directive stdlib already uses. With that include
 present, every non-draft `.md` file under a `content/` directory next

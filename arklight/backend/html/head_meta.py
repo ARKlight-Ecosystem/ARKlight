@@ -61,7 +61,8 @@ def _render_head_meta(
         page that touches none of this renders exactly as before);
         og_title/og_description then fall back to title/description
 
-    Stage M9 (docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md):
+    Stage M9 (see docs/Foundational/DESIGN-NOTES.md's "Design record:
+    Markdown as first-class content"):
       a self-referential `<link rel="canonical">`, pointing at this
       page's own route, is added under the exact same opt-in gate as
       the `og_*` tags above (`description` or any `og_*` prop) rather
