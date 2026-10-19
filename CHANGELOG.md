@@ -5,6 +5,56 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stage `M10` of 10 (docs/tests rollup), `alpha` only
+
+**Shipped, unreleased.** The closing rung of the Markdown-as-content
+ladder (`M1`-`M10`), formerly staged in
+`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`, now retired as
+fully rolled up -- see `docs/Foundational/DESIGN-NOTES.md`'s graduated
+design record. `docs/Foundational/AUTHORING-GUIDE.md`'s Markdown-
+authoring section rewritten against the shipped behavior of `M1`-`M9`
+(it had drifted: still described `M7`'s presets as "a later,
+unscheduled stage" and said nothing about `M9`'s nav/footer/SEO
+defaults, even though both had already shipped). New end-to-end
+fixture project, `tests/test_markdown_end_to_end.py`, exercised
+through a real `arklight build`: front matter, every `M2` construct,
+discovery/route synthesis, asset/link resolution, the `markdown-
+production` shape, style hooks under a `markdown_theme` preset, and
+the automatic nav/footer/SEO defaults, all in one project, plus a
+negative counterpart with no pages at all.
+
+This review also surfaced a real gap, not just a docs one: unlike
+every other preamble-vocabulary feature (`# include
+<stdlib.ARKlight>` being the standing example), Markdown-as-content
+had no opt-in flag at all -- a `.md` file under `content/` turned it
+on by itself. Closed as part of this stage rather than carried
+forward as an eleventh rung: `# include <markdown.ARKlight>`
+(`arklight/parser/preamble.py`, `arklight/compiler/pipeline.py`),
+covered by its own unit tests (`tests/test_preamble.py`,
+`tests/test_content_discovery.py`) and exercised by the end-to-end
+fixture above. `content/`-discovery (Stage `M3`) now requires the
+include to be present in the entry file's own preamble; a `content/`
+directory with `.md` files but no include logs a one-line pointer at
+the missing directive instead of building (or silently skipping) them.
+
+Full suite green, including the new Markdown suite. This closes the
+ten-stage Markdown-as-content ladder in full: its accepted proposal
+and implementation addendum are retired from `docs/Proposals/`/
+`docs/Implementation/` and graduated into the settled design record
+`docs/Foundational/DESIGN-NOTES.md`; index rows updated in
+`docs/README.md`/`docs/Implementation/README.md`/
+`docs/Proposals/README.md`. `M9`'s own nav/footer/SEO override/opt-out
+surface remains explicitly out of scope and unscheduled -- a future
+follow-up, not tracked by a stage number here.
+
+- Docs: `docs/Foundational/AUTHORING-GUIDE.md` (Markdown-authoring
+  section rewritten), `docs/Foundational/DESIGN-NOTES.md` (new
+  graduated design record), `docs/README.md`/
+  `docs/Implementation/README.md`/`docs/Proposals/README.md` (index
+  rows removed for the now-retired proposal/addendum).
+- Tests: `tests/test_preamble.py`, `tests/test_content_discovery.py`
+  extended; new `tests/test_markdown_end_to_end.py`.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stage `M9` of 9, `alpha` only
 
 **Shipped, unreleased.** The last rung of
@@ -48,6 +98,45 @@ tests: `robots.txt`/`sitemap.xml`/`og-image.svg` content, the
 `base_url`-gated sitemap, default-tag injection vs. an explicit
 `Page(og_image=...)` winning, `Site(author=..., base_url=...)`
 validation).
+
+## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stage `M7` of 9, `alpha` only
+
+**Shipped, unreleased.** The `light`/`dark`/`reading` presentation
+presets for Markdown-sourced content -- three preset stylesheets
+layered on `arklight/backend/css`'s existing intrinsic layout system,
+no new layout engine and no breakpoint rules beyond what already
+exists. `light` is tuned from ARKlight's existing default stylesheet
+posture (`arklight.backend.css.base_stylesheet.BASE_CSS_BODY`), not
+restyled from scratch. `dark`'s palette is fixed, not a new design
+decision -- taken directly from `arklight/cli/mdrender.py`'s own ANSI
+constants: `#cc785c` primary accent/link, `#c4946b` secondary heading,
+`#a69780` tertiary/blockquote, `#d6a373` inline code, `#828282` table
+borders/rules, against a near-black, warm-tinted `#16140f` background
+(not a pure `#000`), confirmed at implementation time against WCAG AA
+for body text. `reading` is its own design -- a narrower measure,
+larger line-height, warm paper-toned background -- not modeled on
+anything that exists today.
+
+New `arklight/backend/css/markdown_presets.py` (sibling to
+`base_stylesheet.py`/`markdown_defaults.py`); `arklight/backend/css/
+render.py`'s `CSSBackend.render` emits the selected preset right after
+`MARKDOWN_CSS_BODY`; `WebsiteIR.markdown_theme` +
+`build_website_ir(markdown_theme=...)` (`arklight/ir/build.py`);
+`Site(markdown_theme="light"|"dark"|"reading")` kwarg
+(`arklight/api.py`), validated against the preset registry's own keys;
+a straight passthrough in `arklight/compiler/pipeline.py`. New
+`tests/test_markdown_presets.py`: a fixture page rendered under all
+three presets with zero custom CSS from the project, a contrast-ratio
+check on `dark`'s body text against `#16140f` (passes AA), and a check
+that an unset `markdown_theme` builds byte-identical output to every
+pre-`M7` release.
+
+- Code: `arklight/backend/css/markdown_presets.py` (new),
+  `arklight/backend/css/render.py`, `arklight/ir/build.py`,
+  `arklight/api.py`, `arklight/compiler/pipeline.py`.
+- Docs: `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md` (Status
+  line, `M7` section settled).
+- Tests: `tests/test_markdown_presets.py` (new).
 
 ## [Unreleased -- draft, version slot unconfirmed] -- Markdown-as-content, Stages `M6`, `M8` of 9, `alpha` only
 

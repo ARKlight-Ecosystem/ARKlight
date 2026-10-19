@@ -1,9 +1,11 @@
 """
 Markdown-to-IR parser.
 
-Stage M2 of the Markdown-as-first-class-content landing order
-(`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`) -- the core of
-`docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`. `parse_markdown` turns a
+Stage M2 of the Markdown-as-first-class-content landing order -- the
+ladder's core parsing stage; see `docs/Foundational/DESIGN-NOTES.md`'s
+"Design record: Markdown as first-class content" (the ladder's
+accepted proposal and implementation addendum, both retired once all
+ten stages shipped). `parse_markdown` turns a
 Markdown document's body into a list of `ARKNode`s built from
 `arklight.api`'s existing components -- the same component functions a
 hand-written `site.py` already calls -- so the result is an ordinary
@@ -140,8 +142,8 @@ mapping table above, and are left for a later stage if real projects
 need them. A standalone line containing nothing but one `![alt](src)`
 becomes a block-level `Image(...)`.
 
-**Style hooks (Stage M6, see
-`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`).** `style_hooks=True`
+**Style hooks (Stage M6; see `CHANGELOG.md`'s `M6` entry).**
+`style_hooks=True`
 runs a small post-pass (`_apply_style_hooks`, after the tree above is
 otherwise fully built) that attaches a stable `class_name` -- and, on
 every `Heading`, a slugged `id` -- to each block this parser produces,

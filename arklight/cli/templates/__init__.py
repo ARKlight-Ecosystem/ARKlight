@@ -23,10 +23,12 @@ Each template is a callable `name -> dict[relative_path, contents]`
   that mixes a Python-authored page with Markdown-authored content in
   one project.
 
-(`markdown-simple`/`markdown-production` are Stage M5 of
-`docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md` -- see that file,
-and `docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`, for the design this
-pair implements.)
+(`markdown-simple`/`markdown-production` are Stage M5 of the
+Markdown-as-first-class-content ladder -- see
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: Markdown as
+first-class content" for the design this pair implements; its
+accepted proposal and implementation addendum were retired once the
+ladder's ten stages all shipped.)
 
 Every template also writes an `arklight.config.py` (`templates.
 _common.ARKLIGHT_CONFIG_PY`) -- fully commented out, so it changes no

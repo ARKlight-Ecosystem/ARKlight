@@ -1,9 +1,11 @@
 """
-Markdown-as-content machinery (`docs/Proposals/MARKDOWN-CONTENT-PROPOSAL.md`,
-staged in `docs/Implementation/MARKDOWN-CONTENT-ADDENDUM.md`).
+Markdown-as-content machinery. Accepted and shipped in full as a
+ten-stage ladder (`M1`-`M10`); the design record is graduated into
+`docs/Foundational/DESIGN-NOTES.md` ("Design record: Markdown as
+first-class content"), and the stage-by-stage technical history lives
+in `CHANGELOG.md`.
 
-This package is the home for each landing-order stage (`M1`-`M7`) as it
-ships:
+This package is the home for each landing-order stage (`M1`-`M10`):
 
 - `arklight.content.frontmatter` -- Stage M1, the front matter parser.
 - `arklight.content.markdown` -- Stage M2, the Markdown-to-IR parser.
