@@ -1,9 +1,13 @@
 # Markdown Content Addendum: Staged Landing Order
 
-**Status:** IN PROGRESS. Ten stages (`M1`-`M10`); **`M1`-`M9` SHIPPED,
-unreleased (`alpha`)**, `M10` PLANNED. **No version slots
-reserved** -- assigned when each remaining stage is actually
-scheduled, not here. `M6` and `M8` were inserted into the ladder after
+**Status:** Ten stages (`M1`-`M10`), **all SHIPPED, unreleased
+(`alpha`)**. **No version slots reserved** -- assigned when a release
+actually bundles this ladder, not here. Landing `M10` also tightened
+`M3`'s own trigger: Markdown-as-content discovery now requires
+`# include <markdown.ARKlight>` in the entry file's preamble (see
+`M3`'s own section below for the updated Q2), rather than activating
+the moment a `.md` file exists under `content/` with no opt-in at
+all -- a gap `M10`'s docs/tests review surfaced directly. `M6` and `M8` were inserted into the ladder after
 `M1`-`M5` shipped, and `M9` (automatic nav/footer/SEO defaults) was
 inserted after `M7` shipped (see each stage's own section for why);
 the original docs/tests rollup kept its own content but moved down to
