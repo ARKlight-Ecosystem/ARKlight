@@ -15,6 +15,22 @@ authorization to write code against the live tree; it is authorization
 to keep discussing it until the Open Questions section is empty, at
 which point this status line should be the only thing that changes.
 
+**Amendment (this revision):** adds a fifth section, "IR Layering:
+the orthogonality rule," below, and uses it to answer Open Questions 2,
+4 and 5 from the original draft rather than leaving them open. It also
+introduces one new core concept, `Expr` (a recursive, pure, statically
+typed value IR replacing today's flat `Derive`/`Predicate` catalogs)
+and folds it into `EffectBinding` as the shape `run`'s write targets
+are allowed to compute with. The motivating constraint, stated
+directly: the IR as a whole needs to become capable of expressing
+everything a hand-written JS app expresses -- Sketchboard's 1,311-line
+`ScriptExtension` is the forcing evidence -- **without the *authoring
+surface* ever becoming an expression language** (no site author writes
+a general expression; they call closed, named Python functions that
+build one, same as today). That split is only honest if the IR itself
+never lets two different layers claim the same job -- the rest of this
+amendment is that rule, applied.
+
 **Explicit non-goal, stated up front because it's the thing most
 likely to get re-litigated by accident:** this is not a reopening of
 any already-accepted Stage 1-6 design in
@@ -95,6 +111,109 @@ authoring-surface function (present and future) **desugar** into it at
 a single, fixed point, rather than reach the core as its own IR node
 kind at all.
 
+## IR Layering: the orthogonality rule
+
+`EffectBinding` solves the *detect* axis. It doesn't, on its own, stop
+the *next* axis from sprouting duplicate representations the same way
+`detect` just did -- and the tree already shows early signs of that on
+the *value* side: `Derive`'s 74 flat kinds and `Predicate`'s 13 can't
+nest (`Derive.multiply("price", "qty")` only accepts `State` names,
+never another `DerivationRef`), so anything beyond one arithmetic step
+needs a second hand-chained `Computed(...)` with hand-authored `deps=`
+that can silently drift from what the derivation actually reads. That
+isn't a missing catalog entry; it's the same structural mistake
+`EffectBinding` already fixed on the trigger side, now showing up one
+layer over, on the value side. Closing it by adding a 75th `Derive.*`
+function doesn't fix the shape -- it's one more thing that still can't
+compose with the other 74.
+
+The fix is a general rule, not a one-off: **the IR is a pipeline of
+layers, each one answering exactly one question, and a capability is
+only ever represented in the layer that owns its question.** Two
+representations of the same concept are never allowed to coexist at
+the same layer; if a feature seems to need that, it is decomposed into
+one node per layer it genuinely touches, wired together by the
+pipeline order below -- never given a new, parallel node that
+duplicates a layer that already exists.
+
+| Layer | Owns the question | Node(s) | Reads | Writes | May call the next layer down |
+|---|---|---|---|---|---|
+| **Structure** | What does the page look like, statically? | `Page`, `Container`, `Heading`, ... (today's 90 components) | nothing (literals only) | nothing | -- |
+| **State** | What data does this page hold? | `State(name, initial)` | nothing | -- (declares storage) | -- |
+| **Expr** (new) | How is a value computed from other values? | `Expr(op, args)` -- one recursive node, closed `op` table, `args` are `Expr` \| `State` ref \| literal \| event-payload field | `State`, constants, the firing event's payload | **nothing** -- pure, no side effects, ever | another `Expr` (recursively) |
+| **Effect** | When does something happen, and what runs? | `EffectBinding(detect: DetectSpec, run: tuple[RunTarget, ...], modifiers)` | the triggering event; invokes `Expr` to compute values | `State`, via `RunTarget` | `Expr` (to compute what it writes) |
+| **Render** | How does a State change project back onto Structure? | `Show(predicate: Expr)`, `Repeat(name, template)`, `Bind(name)` | `State` (via `Expr` for `Show`'s predicate) | nothing | `Expr` (for the predicate only) |
+
+Pipeline order is the table's row order: **Structure and State are the
+substrate; Expr sits strictly below Effect (Effect's `run` computes
+values by invoking Expr, never the reverse -- an `Expr` can never
+contain an `ActionRef`/`PlatformAPIRef`, which is the type-level fact
+that keeps "pure" true); Effect sits strictly below Render (an effect
+writes `State`; Render only ever reads it back out -- Render never
+detects anything or dispatches anything itself).** A node that reads
+and writes in the same layer, or that both detects and computes, is a
+sign the design has let two layers collapse into one, which is exactly
+what the three overlaps below are, found by applying this table to the
+IR as it stands today:
+
+**Overlap 1 -- two `run` vocabularies.** `on_click="toggle"`/`"scroll-to"`
+(a closed *string* vocabulary) and `Action.*(...)` (a closed *object*
+vocabulary) both currently answer "what runs," as two unrelated
+representations. Resolution: `toggle` and `scroll-to` become
+`Action.toggle_class(...)`/`Action.scroll_to(...)`, ordinary
+`ACTION_REGISTRY` entries. One `RunTarget` vocabulary, not two parallel
+ones that both have to be checked everywhere `run` is validated or
+emitted.
+
+**Overlap 2 -- two dispatch paths for the same slot.** `PlatformAPI.*`
+calls inside `on_click=` go through the click interceptor's own
+separate `"platform:"` branch today, tracked in a separate
+`used_platform_apis` set from `used_actions` in `_collect_usage` --
+a second plumbing path for the same `run` slot `Action.*` already
+occupies. Resolution (answers **Open Question 4**): `ActionRef` and
+`PlatformAPIRef` become the two closed members of one `RunTarget`
+union, both legal entries in `EffectBinding.run`'s tuple, dispatched by
+one loop. They stay distinct *kinds* (a `PlatformAPIRef` is still
+flagged as calling outside the page's own state, which matters for the
+SBOM/capability-matrix accounting in `PLATFORM-APIS.md`) -- the fix is
+one dispatch mechanism reading a closed union, not one dispatch
+mechanism per kind.
+
+**Overlap 3 -- a trigger with no clear layer.** `on_reveal=` doesn't
+fit cleanly as written: it detects (intersection) but its `then=`
+today is restricted to `KNOWN_REVEAL_BEHAVIORS`, a third, separate
+closed vocabulary that is neither today's click behaviors nor
+`Action.*`. Resolution (answers **Open Question 5**): once Overlap 1 is
+fixed, there is exactly one `RunTarget` vocabulary, so `on_reveal=`
+stops needing its own -- it becomes
+`EffectBinding(detect=DetectSpec("intersect", "element", {}), run=(...))`
+like every other trigger, with `run` simply restricted by validation to
+the subset of `Action.*`/`PlatformAPI.*` that make sense without a user
+gesture (no `Action.fetch_json` loops on every scroll frame, say) --
+a *validation rule* on the shared vocabulary, not a parallel node kind.
+This also directly answers **Open Question 3** (scope x kind
+cross-product): once `on_reveal=` is a normal `DetectSpec("intersect",
+"element", {})` instead of a bespoke thing, the dead cells in the
+matrix shrink to exactly the ones validation already has to rule out
+case-by-case anyway (no new mechanism required either way).
+
+**Overlap 4 -- values that could become effects wearing Expr's
+clothes.** The one new risk `Expr` introduces: if `Expr` were ever
+allowed to contain a `RunTarget` (a derivation that "also" sets some
+other piece of state as a side effect, say, which is a genuinely
+tempting shortcut once `Expr` can compose), the Expr/Effect boundary
+that keeps "pure" meaningful collapses, and the IR is back to having
+two ways to cause a write. This is a hard rule, not a style
+preference, enforced at the type level: `Expr.args`'s type union
+*cannot name* `ActionRef`/`PlatformAPIRef`/`RunTarget` at all, so the
+Python type checker (and `validate.py`'s own structural check) rejects
+it before it is even a question of taste.
+
+With these four resolved, the layering is total: every existing and
+proposed IR concept has exactly one layer that owns it, and the three
+Open Questions above close as a consequence of the rule rather than as
+independent case-by-case calls.
+
 ## Precedent, named directly rather than gestured at
 
 This isn't a novel idea being proposed on no authority -- it's the
@@ -136,7 +255,8 @@ no matter how many more addenda this project writes.
 @dataclass(frozen=True)
 class EffectBinding:
     detect: DetectSpec            # the one closed, small enum below
-    run: tuple[ActionRef | PlatformAPIRef, ...]
+    run: tuple[RunTarget, ...]    # RunTarget = ActionRef | PlatformAPIRef
+                                   # (Overlap 2 -- one union, one dispatch loop)
     modifiers: tuple[str, ...]    # prevent/stop/once/debounce/throttle,
                                    # MODIFIER_REGISTRY unchanged
 
@@ -147,7 +267,28 @@ class DetectSpec:
                      # supports every scope; validated per-kind
     params: dict    # e.g. {"key": "S", "key_modifiers": ("Ctrl",)} for
                      # keydown; {"name": "celsius"} for state-change
+
+# Expr -- the IR Layering section's new value layer. ActionRef.value and
+# DerivationRef/PredicateRef (today's Derive.*/Predicate.* return types)
+# collapse into this one recursive node; Derive.multiply(...) etc. keep
+# their names and signatures as the Python-level builders, they just
+# build this instead of a flat, non-composable dataclass.
+@dataclass(frozen=True)
+class Expr:
+    op: str                               # closed table: "add", "multiply",
+                                           # "join", "if_", "map", "gt", ...
+    args: tuple["Expr | StateRef | EventField | Literal", ...]
+    # Hard rule (Overlap 4): this tuple's type can NEVER include
+    # ActionRef | PlatformAPIRef | RunTarget. That's what keeps Expr
+    # pure -- enforced by the type union itself, not by convention.
 ```
+
+`ActionRef.value` (today, `Action.set(name, value)`'s `value`) changes
+from "literal, or a bare `Bind(...)`" to "literal, `State` ref, or
+`Expr`" -- the same place `run` already was, just able to carry a
+computed value instead of only a stored or literal one. Nothing about
+where a write happens moves; only what it's allowed to compute with
+grows.
 
 `on_click=Action.increment("count")` desugars to one `EffectBinding`
 with `detect=DetectSpec("click", "element", {})`. `Hotkey("Ctrl+S",
@@ -275,34 +416,32 @@ suite, not a single big-bang rewrite:
    obviously differently from `data-ark-watch` -- a unified blob loses
    that at a glance). This is a compiled-output format decision, not
    an internal refactor, and should get its own explicit sign-off.
-3. **Is `scope` truly orthogonal to `kind`, or does the matrix have
-   dead cells?** The sketch above implies `click`×`page`,
-   `state-change`×`element`, `intersect`×`window`, etc. all
-   type-check even though none of them mean anything. Should `scope`
-   be folded into `kind` instead (five flat kinds: `click-element`,
-   `keydown-element`, `keydown-window`, `state-change-page`,
-   `intersect-element`), trading a smaller cross-product for a less
-   "elegant" enum? This is exactly the kind of premature-generality
-   trap the LLVM precedent above warns against -- true orthogonality
-   should fall out of what the cases actually need, not be imposed
-   because it looks tidier on paper.
-4. **Does `run` accepting `PlatformAPIRef` belong in the core, or is a
-   Platform API dispatch a structurally different thing wearing the
-   same clothes?** `on_click=PlatformAPI.confirm(...)` already works
-   today through the click interceptor's own `"platform:"` branch,
-   never touches `State(...)`, and `used_platform_apis` is already
-   tracked separately from `used_actions` in `_collect_usage` for
-   exactly that reason. Folding it into `EffectBinding.run` is
-   convenient but may be conflating "what detects" with "what kind of
-   thing responds," which is the same mistake this whole proposal is
-   trying to get the codebase out of on the other axis.
-5. **Does `on_reveal=` belong in this core at all?** It has no
-   `Action.*(...)` path today (`KNOWN_REVEAL_BEHAVIORS` only, no state
-   mutation), it never reads or writes `State(...)`, and folding it in
-   only works if `run` is allowed to be empty or behavior-only, which
-   none of the other four variants need. This may be a case the
-   "small orthogonal core" principle says should stay *outside* the
-   core, not a case the core was missing.
+3. **RESOLVED by "IR Layering: the orthogonality rule," Overlap 3.**
+   ~~Is `scope` truly orthogonal to `kind`, or does the matrix have
+   dead cells?~~ `on_reveal=` folding into a normal
+   `DetectSpec("intersect", "element", {})` (Question 5's resolution)
+   removes the one case that motivated asking -- the remaining dead
+   cells are exactly the ones per-`kind` validation already has to
+   enumerate regardless of whether `scope` is its own field or folded
+   into `kind`, so the cross-product costs nothing extra. Kept as
+   two fields (not five flat kinds): `scope` is genuinely reused
+   (`"element"` means the same thing for `click` and `keydown`), and
+   collapsing it would just move the repetition into `kind`'s string
+   table instead of removing it.
+4. **RESOLVED by "IR Layering: the orthogonality rule," Overlap 2.**
+   ~~Does `run` accepting `PlatformAPIRef` belong in the core?~~ Yes,
+   as the second member of a closed `RunTarget` union, not merged into
+   `ActionRef` itself -- `used_platform_apis` stays a real, separately
+   tracked fact (it matters to `PLATFORM-APIS.md`'s capability
+   accounting), it's just read off a tagged union in one dispatch loop
+   instead of requiring its own parallel interceptor branch.
+5. **RESOLVED by "IR Layering: the orthogonality rule," Overlap 3.**
+   ~~Does `on_reveal=` belong in this core at all?~~ Yes: it's
+   `DetectSpec("intersect", "element", {})` like any other trigger, and
+   `run`'s legal contents for that one `kind` are narrowed by
+   validation to behavior-safe `RunTarget`s (no `fetch_json`-class
+   actions on a scroll-triggered effect) -- a validation-time
+   restriction on the one shared vocabulary, not a second vocabulary.
 6. **Sequencing against `REI-LANGUAGE-ADDENDUM.md`.** The accepted
    (if unscheduled past its first rungs) `.rei` frontend ultimately
    targets "the ARK AST, changing nothing below it" -- which means
@@ -321,6 +460,43 @@ suite, not a single big-bang rewrite:
    same way component types already are, rather than a bespoke enum,
    for the same "closed, but a human can grep the registry to see the
    whole set" reason `ACTION_REGISTRY` already works that way.
+8. **Does `Expr` allow bounded iteration (`map`/`filter`/`reduce` over
+   a `State`-held list), and if so, is a *second* recursion-through-
+   closures form ever allowed, or does the "pure, total, no recursion"
+   line hold absolutely?** This is the one place "the IR is an
+   expression language" could quietly become "the IR is a scripting
+   language with a halting problem." Recommendation (not yet a
+   decision): bounded combinators over an already-finite list, yes, in
+   `v0.071`'s ladder sense of "earns its place"; a user-defined
+   recursive function or unbounded `while`, no -- every `Expr` must be
+   provably terminating by construction (no node kind that can refer to
+   itself), not merely terminating in practice. This is a real
+   trade-off (it caps what Sketchboard-style scene-graph folds can
+   express purely in `Expr`, some of that logic stays in `run`'s
+   `Action` step-by-step sequencing instead) and deserves the same
+   explicit sign-off Open Question 2 already requires for a different
+   reason.
+9. **Does `Computed(deps=..., derive=...)` keep hand-authored `deps=`
+   once `derive=` is a real `Expr` tree that a build-time walk can
+   already enumerate the state names from?** Keeping it as a mandatory,
+   checked assertion (build fails if `deps=` and the walked set
+   disagree) preserves today's "the author states their intent and the
+   compiler holds them to it" error-surface; dropping it is less to
+   author but removes a redundancy check that has caught real
+   mistakes before. No strong recommendation -- flagged because it is a
+   visible authoring-surface change for every existing `Computed(...)`
+   call, which `EffectBinding` itself was explicitly scoped to avoid
+   (see the non-goal in Status) and `Expr` should hold itself to the
+   same bar.
+10. **Where does `Expr`'s static type check live, and what are its
+    types?** Today's flat `Derive.*` catalog is implicitly typed per
+    function name (`list_length` only valid on a list-typed `State`);
+    a recursive `Expr` needs that check to survive composition (reject
+    `Derive.multiply(Derive.join(...), 2)` at `arklight build`, not in
+    the browser). This is new work with no existing analogue in the
+    compiler to extend -- `validate.py` has never needed a type
+    lattice before -- and should be scoped and reviewed as its own
+    sub-decision before `Expr` is staged.
 
 ## Acceptance criteria (for moving this out of "unstaged")
 
@@ -333,6 +509,16 @@ above has followed) once, and only once:
   independently re-derived the `EffectBinding`/`DetectSpec` shape, or
   an explicitly different one, from the four existing cases and agrees
   it covers them without a special case.
+- A reviewer has independently checked "IR Layering: the orthogonality
+  rule"'s table against every IR concept that exists *today* (not just
+  the ones this document names) and confirms none of them sit in two
+  rows at once -- the rule is only load-bearing if it's actually
+  exhaustive, not just applied to the four overlaps caught so far.
+- `Expr`'s purity boundary (Overlap 4) has an enforcement mechanism a
+  reviewer has actually tried to defeat, not just a type annotation
+  taken on faith -- the whole "expression language in the IR, not on
+  the authoring surface" claim rests entirely on this one boundary
+  holding under adversarial review, not routine use.
 - The migration order in "Migration posture" above has been walked
   through against the *actual* `Hotkey(...)` design work already done
   (this proposal's own Origin section) as a concrete first rung, not
