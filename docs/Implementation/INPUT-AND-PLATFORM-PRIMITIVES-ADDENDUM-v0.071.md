@@ -11,7 +11,7 @@ changes the other's scope, stage count, or ordering.
 dogfooding-driven gap reports -- two Notepad-class apps in the
 ARKlight-Ecosystem org independently hit the same ceiling -- into a
 trackable, six-stage landing order, the same role
-`JS-VOCABULARY-ADDENDUM-v0.070.md` played for the JS vocabulary
+`JS-VOCABULARY-ADDENDUM-v0.070.md` (retired -- see `docs/Foundational/DESIGN-NOTES.md`) played for the JS vocabulary
 expansion and `PLATFORM-API-IR-ADDENDUM.md` for the Platform API
 architecture. It does not re-derive first principles; it exists to
 turn "here's a set of forcing use cases" into "here's the order they
@@ -56,7 +56,7 @@ the six rows that cleared the bar.
   Stage 2). A typed hatch for hand-written widget code and user-defined-
   component slots are real gaps but are each a new subsystem the size
   of `Repeat`/`Show` when those landed, not a fragment -- they need
-  their own proposal, the same line `JS-VOCABULARY-ADDENDUM-v0.070.md`
+  their own proposal, the same line `JS-VOCABULARY-ADDENDUM-v0.070.md` (retired -- see `docs/Foundational/DESIGN-NOTES.md`)
   already drew around Tier 3/4 of its own source proposal.
 
 ## Why six stages, one milestone

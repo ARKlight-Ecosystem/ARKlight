@@ -2,7 +2,7 @@
 Tests for `v0.070` -- JS vocabulary addendum, stage 10/10, the capstone
 (see `docs/version history/v0.070.md`): `Derive.pluralize` and
 `Derive.random_int`, the two entries the addendum's "Scope filter"
-(`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`) flagged as
+(`docs/Foundational/DESIGN-NOTES.md`'s "Design record: JS vocabulary ladder") flagged as
 needing an explicit design exception before they could ship as
 written.
 

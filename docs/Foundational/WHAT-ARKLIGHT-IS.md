@@ -267,8 +267,8 @@ version-by-version breakdown):
   `docs/Foundational/PLATFORM-APIS.md`'s "`db`: one interface, a
   different engine per backend" for the full contract.
 - **The closed reactive vocabulary grew substantially**: the ~90-entry
-  `Derive.*`/`Predicate.*` catalog referenced in `docs/Implementation/
-  JS-VOCABULARY-ADDENDUM-v0.070.md` is now fully shipped end to end
+  `Derive.*`/`Predicate.*` catalog referenced in `docs/Foundational/DESIGN-NOTES.md`'s "Design record: JS vocabulary
+  ladder (v0.061-v0.070)" is now fully shipped end to end
   (math, string, list-scalar, cross-language-numeric, formatting/case,
   and predicate kinds), not just the handful that existed at
   `v0.0644`. Every kind still has a build-time Python mirror alongside

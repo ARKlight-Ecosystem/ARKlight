@@ -50,7 +50,7 @@ one of those registries into its output unconditionally, so the
 ranking pipeline's suggestions cover them too; `search_component()`
 gained its own small `_resolve_state_keyword` exact-match path for the
 first, alongside `_resolve_js_vocab` for the rest. See
-`docs/Implementation/SEARCH-KNOWLEDGE-STATE-AND-KEYWORDS-ADDENDUM.md`.
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: search knowledge base".
 
 Both `resolve_exact` and `search_component` now check
 `COMPONENT_REGISTRY` too, falling back to it only when `SCHEMA` has no
@@ -501,7 +501,8 @@ def search_component(query: str, *, limit: int = 5, near: str | None = None) -> 
     them into `arklight.search.knowledge.build_knowledge_base()`. A
     typo of e.g. `increment`, `debounce`, or `Statee` now gets a "did
     you mean" the same way a typo'd component name always has; see
-    `docs/Implementation/SEARCH-KNOWLEDGE-STATE-AND-KEYWORDS-ADDENDUM.md`.
+    `docs/Foundational/DESIGN-NOTES.md`'s "Design record: search knowledge
+    base".
     """
     if near is not None:
         default_engine().validate_near(near)

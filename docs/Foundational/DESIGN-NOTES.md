@@ -3479,3 +3479,419 @@ bearing, not an edge case.
   templates) beyond the registry gaining two new siblings.
 - A general raw-HTML-passthrough escape hatch beyond whatever Q4
   settles on.
+
+### Design record: JS vocabulary ladder (v0.061-v0.070)
+
+*Graduated from `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`,
+retired once all ten stages shipped; recoverable with
+`git show HEAD~1:docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`
+from this commit's parent.*
+
+#### Status at graduation
+
+**DONE -- all ten stages (`v0.061`-`v0.070`) shipped**, closing with the
+capstone (`pluralize` + `random_int`) as `v0.070`. The source proposal is
+still [`docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md`](../Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md);
+Tier 3 was later accepted separately and is staged in
+[`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.072.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.072.md).
+
+This entry keeps the part of the ladder that
+`docs/version history/v0.061.md` through `v0.070.md` and `CHANGELOG.md`
+do not carry -- the scope filter, why the ladder was ordered the way it
+was, and the two design exceptions. The per-rung entry lists (which
+derivations/predicates each version added) are not repeated: they live
+in those version-history files, which were updated to the shipped
+behavior as each stage landed.
+
+#### Slot sharing
+
+Two other, independently accepted pieces of work shared slots in this
+range rather than getting their own: `v0.064` also carried
+`arklight search --retrieve-doc` (see
+[the design record above](#design-record-search-retrieve-doc-mode-v0064)),
+and `v0.065`-`v0.070` also carried `Provider`'s six-rung ladder (see
+[`PROVIDER-SDK.md`](./PROVIDER-SDK.md)). Neither changed this ladder's
+scope or ordering -- unrelated work that happened to land in the same
+milestone slots, the same precedent `v0.041` already set.
+
+#### Scope filter: what was in the ladder, and what wasn't
+
+Every rung was a pure registry-fragment addition: one new file (`NAME` +
+`JS_FRAGMENT`, mirroring `sum.py`/`compare.py`'s existing shape) plus one
+registry line in `DERIVATION_REGISTRY`, `PREDICATE_REGISTRY`,
+`BEHAVIOR_REGISTRY`, or `MODIFIER_REGISTRY` -- never a new IR node, never
+a parser, never anything that touches `eval`/`new Function`. That was the
+acceptance test the ladder applied to the source proposal:
+
+- **In scope:** the proposal's Tier 1 (trivial gaps), Tier 2 (small new
+  runtime primitives), and all of §6 (the exhaustive scalar
+  derivation/predicate catalog, including §6.5's cross-language
+  additions) -- everything that's genuinely *vocabulary*, addressable by
+  adding registry entries to the existing four registries.
+- **Out of scope, on purpose:** the proposal's Tier 3 (client-side data
+  fetch, reorderable lists, sort/filter, file-upload preview -- each
+  needs a new IR node type, schema, and validation, the size of
+  `Repeat`/`Show` when those landed) and Tier 4 (general expressions,
+  WebSocket/SSE as an authored primitive, IndexedDB, client-side secrets
+  -- each either reopens the `eval`-shaped non-goal or is a new
+  subsystem, not a fragment). Nothing in this ladder authorized work on
+  either; Tier 3 was later accepted on its own (see above), Tier 4 stays
+  unaccepted.
+
+#### Why ten versions, not one -- and why in this order
+
+ARKlight already had direct precedent for landing one capability as many
+small, independently shippable stages rather than one release: `v0.054`
+(JS backend reactive core) landed as 8 `vdom-N` stages, and `v0.060`
+(user-defined components) landed as 5 `stage0`-`stage4` stages, each
+rolled up into a single milestone summary only after every stage in it
+had actually shipped. The ladder followed the same shape, ordered
+**easiest to not-so-easy**:
+
+1. Genuinely one-hour, one-file additions first (`v0.061`-`v0.062`).
+2. Small new runtime modules next (`v0.063`).
+3. The large-but-uniform scalar-derivation catalog, split by category so
+   each stage stayed reviewable (`v0.064`-`v0.067`).
+4. Cross-language additions JS has no built-in equivalent for at all,
+   which needed a little more judgment about naming/edge cases
+   (`v0.068`-`v0.069`).
+5. The two entries that needed an explicit design exception, last, so
+   review attention was concentrated where it was actually needed
+   (`v0.070`).
+
+| Stage | Covers | Shipped as |
+| --- | --- | --- |
+| `v0.061` | Math siblings (`subtract`/`divide`/`min`/`max`) | `v0.061` |
+| `v0.062` | String-casing sibling + comparison predicates | `v0.062` |
+| `v0.063` | Small new runtime primitives | `v0.063` |
+| `v0.064` | Math derivations catalog | `0.06509` |
+| `v0.065` | String derivations catalog | `0.06513` |
+| `v0.066` | Predicates catalog | `0.06517` |
+| `v0.067` | List-scalar derivations catalog | `0.06612` |
+| `v0.068` | Cross-language numeric batteries | `0.068` |
+| `v0.069` | Cross-language formatting/case batteries | `0.06615` |
+| `v0.070` | Capstone: `pluralize` + `random_int` | `v0.070` |
+
+#### The two design-exception entries
+
+Two entries in scope by the filter above still needed an explicit design
+exception before they could ship as written, and were placed last for
+exactly that reason, not because they were large.
+
+- **`random_int`** isn't a pure function of its inputs, which breaks the
+  "server-rendered `Bind` text agrees with the client recompute"
+  invariant `sum.py`'s docstring calls out. It shipped with an explicit
+  written exception: excluded from build-time pre-rendering entirely,
+  always resolved client-side only, documented in the fragment's own
+  docstring so a future contributor doesn't assume it follows `sum.py`'s
+  usual dual-implementation shape. It is also the one `kind` in the whole
+  catalog that reads zero state names -- the owning `Computed(...)`'s
+  `deps=(...)` (still required non-empty) names whatever should trigger a
+  re-roll, entirely independent of what the derivation itself reads.
+  Build time pre-fills `min` as a placeholder; `recomputeAll()`
+  overwrites it with a real roll at construction, before the first paint.
+  `arklight/backend/js/derivations/random_int.py`.
+- **`pluralize`** needs an irregular-word table, not a suffix rule, so
+  its first cut shipped as "regular plurals only, documented as such"
+  rather than pretending to be exhaustive: a small irregular-noun table
+  plus a documented regular-plural-only fallback (`+s`/`+es`). Reads an
+  ordered pair (word, count); `count == 1` returns the word unchanged,
+  everything else pluralizes it.
+  `arklight/backend/js/derivations/pluralize.py`, mirrored at build time
+  by `arklight/ir/js_string.py`'s `js_pluralize`.
+
+Both shipped together as `v0.070`, closing the ladder.
+
+
+### Design record: `ScriptExtension` syntax check (unreleased, `alpha`)
+
+*Graduated from `docs/Implementation/SCRIPT-EXTENSION-SYNTAX-CHECK-BUGFIX.md`,
+retired once the fix was implemented and verified; recoverable with
+`git show HEAD~1:docs/Implementation/SCRIPT-EXTENSION-SYNTAX-CHECK-BUGFIX.md`
+from this commit's parent.*
+
+#### Status at graduation
+
+**Implemented -- shipped, unreleased on `alpha`; no version slot assigned
+yet.** The files-changed table, test inventory and verification record
+that closed the original document moved to `CHANGELOG.md`'s
+`ScriptExtension` syntax-check entry; the user-facing behavior is in
+`docs/Foundational/EXPERIMENTAL-APIS.md`. What follows is the reasoning
+the changelog does not carry, kept as filed -- in particular why plain
+`node --check` is the wrong gate.
+
+#### 1. The bug
+
+`ScriptExtension.lower()` strips the `<script>` wrapper and `register()`
+appends the resulting text to `arklight.js`. Nothing parses it. A typo --
+an unclosed brace, a stray `}` -- compiles cleanly and ships.
+
+The failure is not local. `arklight.js` is the single runtime every page
+loads (`<script src="arklight.js" defer>`), so one syntax error in an
+extension makes the browser reject the *whole file*: nav highlighting,
+actions, state, every behavior -- not just the extension -- stops
+working, with the only symptom a console error in production. The
+experimental banner said as much ("no guarantee it's even syntactically
+valid"), but a documented hazard that a one-line check can catch is a
+bug, not a feature.
+
+Reproduction (before the fix):
+
+```python
+class Analytics(ScriptExtension):
+    script = "<script>document.addEventListener('click', (e) => {</script>"
+
+site.register_script_extension(Analytics)   # no error
+build("site.py", "out/")                    # no error; out/arklight.js is dead
+```
+
+#### 2. Why the obvious fix (`node --check`) is itself wrong
+
+The first instinct -- shell out to `node --check` on the lowered JS --
+passes the bug's own reproduction but is the wrong gate. The reason is in
+how Node implements it. All references below are to `nodejs/node` at
+`1c90519c` (shallow clone, `main`).
+
+##### 2.1 What `node --check` actually does
+
+- `--check` / `-c` sets `syntax_check_only` (`src/node_options.cc`);
+  `src/node.cc:387-388` then dispatches to
+  `internal/main/check_syntax` instead of running the file.
+- `lib/internal/main/check_syntax.js` does **not** parse the file as a
+  classic script. `checkSyntax()` (line 59) first decides a *format*:
+  - For a file, `defaultGetFormat()` (lines 64-67) looks at the extension
+    and the **nearest `package.json` `"type"`**.
+  - If that yields no format -- a `.js` file with no `"type"` -- it falls
+    back to `containsModuleSyntax(source, filename)` (lines 75-80), a
+    sniff for `import`/`export`/top-level `await`; if found, the file is
+    parsed as an **ES module** (`new ModuleWrap(...)`, line 84).
+  - Otherwise it calls `wrapSafe(...)` (line 88), which reaches
+    `compileFunctionForCJSLoader` (`lib/internal/modules/cjs/loader.js`
+    line 1900; C++ at `src/node_contextify.cc:1649`). That compiles the
+    source as the **body of a function** -- the CommonJS module wrapper.
+
+So `node --check file.js` parses as *CommonJS-function-body or ESM*,
+chosen by environment. A browser loading `<script src=... defer>` (no
+`type="module"`) parses as a **classic script**. Those are three
+different grammars.
+
+##### 2.2 The mismatch, measured
+
+Same Node (v22), same V8, run against the cases that differ. `OK` = parse
+accepted. The last column is the grammar a browser actually applies.
+
+| Source                         | `node --check` | `--check` + nearby `package.json` `"type":"module"` | classic script (browser) |
+|--------------------------------|:--------------:|:---------------------------------------------------:|:------------------------:|
+| valid classic JS               | OK  | OK  | OK  |
+| unbalanced brace               | ERR | ERR | ERR |
+| `export const a = 1;`          | **OK** | **OK** | ERR |
+| `import x from 'y';`           | **OK** | **OK** | ERR |
+| top-level `await fetch(...)`   | **OK** | **OK** | ERR |
+| top-level `return;`            | **OK** | ERR | ERR |
+| `new.target` at top level      | **OK** | ERR | ERR |
+| `with (Math) { ... }`          | OK  | **ERR** | OK  |
+| `var await = 1;`               | OK  | **ERR** | OK  |
+
+Two distinct failure modes:
+
+1. **False negatives (the dangerous one).** `export`, `import`,
+   top-level `await`, top-level `return` and `new.target` all pass
+   `node --check` and are all fatal in the browser. A developer pasting
+   a snippet from a module or a Node script -- the most likely source of
+   a hand-written extension -- gets a green build and a dead site, which
+   is exactly the bug we set out to fix.
+2. **False positives, environment-dependent.** Whether a valid sloppy
+   classic script is rejected depends on a `package.json` near the
+   checked file. `with` and `var await` are valid in a classic script
+   and invalid in a module, so the gate can fail a correct extension
+   based on directory layout the user never chose.
+
+A gate that disagrees with the real consumer in both directions is
+worse than no gate on the false-negative side, because it manufactures
+confidence.
+
+#### 3. The fix
+
+##### 3.1 Parse with the right goal
+
+Use the same V8 parser Node exposes, but request the classic-script
+goal directly via `vm.Script`, which compiles without executing and
+never consults `package.json`:
+
+```js
+const vm = require('vm'), fs = require('fs');
+new vm.Script(fs.readFileSync(process.argv[1], 'utf8'),
+              { filename: process.argv[1] });
+```
+
+invoked as `node -e <program> -- <tempfile>`. (`--eval` and `--check`
+are mutually exclusive in Node -- `src/node_options.cc:315` -- which is a
+second, minor reason the literal flag could not simply be combined with
+anything else.) The table's last column is this check's behavior: it
+agrees with the browser on every row.
+
+##### 3.2 Check at two points
+
+`check_js_syntax(js, *, label)` is called:
+
+1. **At `register()`**, on the lowered fragment alone. Fails fast, and
+   the error names the extension and uses the line numbers of the JS the
+   author actually wrote. Nothing is half-registered: a failure leaves
+   `site.raw_postprocessors` and `site.experimental_usages` untouched.
+2. **At compile time**, inside the registered postprocessor, on the
+   fully combined `arklight.js`. This catches a fragment that parses
+   fine alone but breaks the file once appended -- e.g. a top-level
+   `const` that collides with one already in the runtime is a
+   redeclaration `SyntaxError` only in the combined text. It surfaces
+   through the existing `raw postprocess function #N raised an error`
+   `CompileError` path in `arklight/compiler/pipeline.py`, before any
+   file is written.
+
+##### 3.3 Never block on tooling, always block on real errors
+
+`check_js_syntax` returns `True` (parsed), `False` (could not check) or
+raises `ScriptExtensionError` (genuine `SyntaxError`).
+
+- **No `node` on PATH, process fails to start, timeout (15 s), or a
+  non-`SyntaxError` failure** -> returns `False`; `register()` emits one
+  warning ("JS syntax was NOT checked") and the build continues. This
+  mirrors the module's existing posture for the `#include` marker: a
+  missing prerequisite is a louder warning, never a hard stop, so ARKlight
+  does not gain a Node dependency.
+- **A real `SyntaxError`** -> `ScriptExtensionError` with Node's
+  diagnostic (file:line, source line, caret, message). The temp-file path
+  is replaced with `<ExtensionName>.script`, and Node's internal stack
+  frames (`at wrapSafe (node:internal/...)`) and version footer are
+  stripped -- noise to someone fixing a typo.
+- **Opt-out:** `check_syntax = False` on the subclass skips both checks.
+
+Resulting message (broken extension):
+
+```
+CompileError: Error while running site.py: Analytics.script failed Node's
+classic-script syntax check -- the JS is not valid in a browser, so it was
+not appended to arklight.js:
+Analytics.script:4
+...
+SyntaxError: Unexpected end of input
+```
+
+#### 4. Scope and non-goals
+
+- **Syntax only.** This proves the JS parses. It says nothing about what
+  it does. The `script-extension` experimental banner still applies and
+  still warns on every build; its wording is updated to say syntax is
+  checked when Node is available and behavior is not.
+- **Not a security boundary.** Parsing is not sandboxing; the CSP-related
+  limits on `arklight.js` are unchanged.
+- **No new hard dependency.** Node stays optional.
+- **Known residual gap.** Parsing a fragment as a classic script cannot
+  tell that it was *meant* to run later than `DOMContentLoaded`, or
+  against a different global. Out of scope.
+
+
+### Design record: search knowledge base -- state keywords and closed registries (unreleased, `alpha`)
+
+*Graduated from `docs/Implementation/SEARCH-KNOWLEDGE-STATE-AND-KEYWORDS-ADDENDUM.md`,
+retired once its single stage shipped; recoverable with
+`git show HEAD~1:docs/Implementation/SEARCH-KNOWLEDGE-STATE-AND-KEYWORDS-ADDENDUM.md`
+from this commit's parent.*
+
+#### Status at graduation
+
+**Shipped, unreleased on `alpha`; no version slot assigned yet.** A
+capability fix to `arklight.search.knowledge.build_knowledge_base()` and
+`arklight.cli.search`, in the same spirit `ActionSpec.state_args`
+(`arklight/ir/schema.py`) already calls a "capability fix" elsewhere in
+this codebase: a small, additive closing of a gap in an existing
+mechanism, not a new subsystem. Stage 0 (the plan) and Stage 1 (the
+implementation) were a single rung; what shipped, and the test results,
+moved to `CHANGELOG.md`'s search-knowledge entry. The plan below is kept
+as filed -- it is the design record, including the deliberate limits.
+
+#### The gap
+
+`arklight search NAME` is backed by two independent paths:
+
+1. **Exact match** (`arklight.cli.search.resolve_exact` /
+   `_resolve_js_vocab`) -- a direct, case-insensitive lookup.
+2. **Typo-tolerant "did you mean"** (`arklight.search.engine.
+   SearchEngine.search`, the Stage 1-6 retrieval/ranking pipeline) --
+   driven entirely by `arklight.search.knowledge.
+   build_knowledge_base()`'s output.
+
+`build_knowledge_base()` has only ever scanned two sources: the
+built-in `SCHEMA` (`arklight.ir.schema`, every real `NodeSpec`) and,
+optionally, a project's own `COMPONENT_REGISTRY`. Two real,
+closed vocabularies were never part of it, and so were invisible to
+path 2 (and, for the first, to path 1 too):
+
+- **`State`/`Bind`/`Computed`/`Watch`** (`arklight.api`) -- the
+  reactive-state declarations. These were *never* given `NodeSpec`
+  entries in `SCHEMA` on purpose (`SCHEMA`'s own comment above
+  `Repeat`/`Show`: unlike renderable content, they're page-scoped
+  declarations Validation/IR-build pull out of the tree entirely), but
+  that also meant `arklight search State` -- let alone a typo like
+  `Statee` -- fell straight through to "No component named", with
+  zero suggestion. Not a corner case: these four are as core to the
+  language as any HTML component.
+- **The six other closed, compiler-validated registries** in
+  `arklight.ir.schema` (`BEHAVIOR_REGISTRY`, `REVEAL_REGISTRY`,
+  `ACTION_REGISTRY`, `MODIFIER_REGISTRY`, `DERIVATION_REGISTRY`,
+  `PREDICATE_REGISTRY`) plus `PLATFORM_API_REGISTRY`
+  (`arklight.ir.platform_api`). `arklight.cli.search._resolve_js_vocab`
+  already answers an *exact* (or dotted-prefix, e.g.
+  `Action.increment`) lookup against all seven -- but that path is a
+  separate function that never touched `knowledge.py`, so none of
+  them were ever candidates the ranking pipeline could rank. A typo of
+  `increment`, `debounce`, `toggle`, `Derive.sum`, `Predicate.truthy`,
+  or `PlatformAPI.notify` got no "did you mean" of its own --
+  `search_component`'s own docstring names this exact gap: "the
+  suggestion fallback below is still component-only."
+
+#### The fix
+
+1. `arklight.search.knowledge`: add `STATE_KEYWORDS` (the four
+   reactive-state declarations, mapped to their required argument
+   names, read off `arklight.api`'s own signatures) and fold every
+   entry of both `STATE_KEYWORDS` and the seven closed registries into
+   `build_knowledge_base()`'s output as `SymbolFact`s, unconditionally
+   (built-in, closed vocabulary -- not opt-in the way `components=`
+   is). Same "built-ins always win a name collision" rule the module
+   already documents for `SCHEMA` vs. a user component: `SCHEMA` first,
+   then state keywords, then each registry in
+   `arklight.cli.search._JS_VOCAB_SOURCES`'s existing order, each
+   skipped if the name is already claimed, then (as before) a project's
+   own `components=`.
+2. `arklight.cli.search`: add a small `_resolve_state_keyword` exact-
+   match path (mirrors `_resolve_js_vocab`'s shape, checked in the
+   same slot) plus a `_format_state_spec` formatter, so `arklight
+   search State` resolves directly instead of round-tripping through
+   the ranking pipeline just to find its own exact name. Update the
+   module's own docstring/comments that called the fuzzy fallback
+   "component-only" -- it no longer is.
+3. Tests: extend `tests/test_search_knowledge.py` (the kb is now a
+   strict superset of `SCHEMA`, not equal to it), add exact-match
+   coverage for the four state keywords in `tests/test_search.py`, and
+   add "did you mean" coverage proving a typo of a state keyword or a
+   closed-registry entry now surfaces a suggestion end to end.
+4. No change to `arklight.ir.schema`, `arklight.ir.platform_api`,
+   `arklight.search.retrieval`, or `arklight.search.ranking` -- both
+   of the latter only ever read a fact's `.tokens`, so every existing
+   `SymbolFact`-shaped consumer keeps working unmodified.
+
+#### Explicitly out of scope
+
+- `resolve_exact` (and therefore the CLI's `--accept` usage-stats
+  flag) stays component-only, unchanged. The seven closed registries
+  keep their own separate `_resolve_js_vocab` exact-match path for the
+  same reason that module's docstring already gives: there's no
+  `--accept` use case for JS vocabulary the way there is for
+  components. This fix only adds them to the *ranking* pipeline's
+  candidate pool, not to acceptance tracking.
+- No new `SymbolFact`-like dataclass. Closed-registry entries reuse
+  `SymbolFact` itself (`required_props=()`, `allow_children=False`,
+  `text_only_children=False`) the same way `component_symbol_fact`
+  already stretches it for user components -- `retrieval`/`ranking`
+  only ever read `.tokens`, so a dedicated shape would add a type with
+  no consumer that needs it.

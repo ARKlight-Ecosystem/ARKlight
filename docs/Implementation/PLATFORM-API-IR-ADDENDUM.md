@@ -6,7 +6,7 @@ maturity, not on a fixed schedule. This file turns the accepted part
 of
 [`docs/Proposals/PLATFORM-API-IR-PROPOSAL.md`](../Proposals/PLATFORM-API-IR-PROPOSAL.md)
 into a trackable landing order, the same role
-`JS-VOCABULARY-ADDENDUM-v0.070.md` plays for the JS vocabulary
+`JS-VOCABULARY-ADDENDUM-v0.070.md` (retired -- see `docs/Foundational/DESIGN-NOTES.md`) played for the JS vocabulary
 expansion proposal. It does not restate that proposal's reasoning; it
 exists to turn "here's an accepted architecture" into "here's the
 order it ships in and why the order has only two rungs, not ten."
