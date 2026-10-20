@@ -5,6 +5,29 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: proposal for component-owned structural styling
+
+**Docs-only, no code changed.** Files
+`docs/Proposals/COMPONENT-OWNED-STYLING-PROPOSAL.md`, filed as **not
+accepted, no version slot requested**, with rows in
+`docs/Proposals/README.md` and `docs/README.md`.
+
+Audit behind it, run against `alpha` at `0.070.6`: a user-defined
+component can already ship default CSS for its *root* (`component(...,
+default_style={...})`, including the `:pseudo:property` shorthand), but
+not for anything below it -- `Site.style_selector`'s `&`-nested keys and
+closed selector grammar exist only at site level. Two findings the
+audit surfaced beyond the gap itself: `default_style` rejects a nested
+dict with an error that never mentions nesting, and a component whose
+call expands to no single root (e.g. a list of siblings) builds without
+complaint while emitting a `.Name` rule nothing ever carries. The
+proposal stages three rungs -- `&`-nested keys in `default_style` rooted
+at the component's own class, a build-time warning for a `default_style`
+that can never apply, and component-owned responsive rules (possibly
+as a container-query rung instead) -- and records what it deliberately
+declines: hashed/attribute scoping classes, native `@scope` output, and
+hard isolation.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: three fully shipped `docs/Implementation/` files retired; two unreleased `alpha` fixes recorded here for the first time
 
 **Docs-only, no code behavior changed.** Retires three staging files
