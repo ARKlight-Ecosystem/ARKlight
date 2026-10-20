@@ -69,7 +69,7 @@ experimental API.** That currently means:
   guarantee either). It does refuse JS that doesn't parse: when Node
   is on PATH the lowered script is parsed as a classic script (not
   via `node --check`, whose grammar differs from a browser's -- see
-  `docs/Implementation/SCRIPT-EXTENSION-SYNTAX-CHECK-BUGFIX.md`) at
+  `docs/Foundational/DESIGN-NOTES.md`'s "Design record: ScriptExtension syntax check") at
   `register()` time and the combined `arklight.js` again at compile
   time, and a syntax error raises `ScriptExtensionError` (failing the
   build) instead of shipping a dead runtime. No Node on PATH only

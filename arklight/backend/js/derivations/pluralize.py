@@ -7,7 +7,8 @@ Reads two names -- a word and a count -- and returns the word,
 pluralized for that count: `Derive.pluralize("noun", "qty")` with
 `noun="item"`, `qty=3` -> `"items"`; `qty=1` -> `"item"` unchanged.
 One of the two entries the addendum's "Scope filter" (see
-`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`) flagged as
+`docs/Foundational/DESIGN-NOTES.md`'s "Design record: JS vocabulary
+ladder") flagged as
 needing an explicit design exception before it could ship as written:
 this ships with a small irregular-noun table (`person` -> `people`,
 `octopus` -> `octopi`, ...) plus a documented regular-plural-only

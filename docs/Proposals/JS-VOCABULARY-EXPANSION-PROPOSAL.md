@@ -3,8 +3,8 @@
 **Status:** Partially accepted. Tier 1, Tier 2, and §6 (the
 exhaustive scalar catalog, including §6.5) have been accepted and
 staged as a ten-rung implementation ladder --
-[`docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md`](../Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md)
-(`v0.061`-`v0.070`) -- **DONE**: all ten stages have shipped, stage 10
+[`docs/Foundational/DESIGN-NOTES.md`](../Foundational/DESIGN-NOTES.md#design-record-js-vocabulary-ladder-v0061-v0070)
+(`v0.061`-`v0.070`, staging file since retired) -- **DONE**: all ten stages have shipped, stage 10
 (the capstone, `pluralize` + `random_int`) landed as `v0.070`; this is
 past news, kept here only so the status line stays an accurate index.
 Tier 3 (§7) has since also been accepted and staged, as

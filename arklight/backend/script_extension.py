@@ -108,7 +108,7 @@ _NODE_CHECK_TIMEOUT_SECONDS = 15
 # classic code (`with`, `var await`) fail. `vm.Script` is the same V8
 # parser with the classic-script goal, compiles without running
 # anything, and does not consult package.json at all. See
-# docs/Implementation/SCRIPT-EXTENSION-SYNTAX-CHECK-BUGFIX.md.
+# docs/Foundational/DESIGN-NOTES.md, "Design record: ScriptExtension syntax check".
 _PARSE_AS_CLASSIC_SCRIPT_JS = (
     "const vm = require('vm'), fs = require('fs');"
     "new vm.Script(fs.readFileSync(process.argv[1], 'utf8'),"

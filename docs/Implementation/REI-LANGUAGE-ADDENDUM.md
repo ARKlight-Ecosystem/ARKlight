@@ -4,7 +4,7 @@
 This file turns the accepted
 [`docs/Proposals/REI-LANGUAGE-PROPOSAL.md`](../Proposals/REI-LANGUAGE-PROPOSAL.md)
 into a trackable, four-rung landing order, the same role
-`JS-VOCABULARY-ADDENDUM-v0.070.md` plays for the JS vocabulary
+`JS-VOCABULARY-ADDENDUM-v0.070.md` (retired -- see `docs/Foundational/DESIGN-NOTES.md`) played for the JS vocabulary
 addendum and `PROVIDER-SDK-ADDENDUM.md` plays for `Provider`. It does
 not restate that proposal's reasoning or its 2026-09-21 acceptance
 update's five resolved open questions and four language-surface

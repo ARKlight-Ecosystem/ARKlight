@@ -5,7 +5,7 @@
 This file turns the accepted
 [`PROJECT-KNOWELEDGE-PROPOSAL.md`](../Proposals/PROJECT-KNOWELEDGE-PROPOSAL.md) into a
 trackable, eight-rung landing order, the same role
-`JS-VOCABULARY-ADDENDUM-v0.070.md` plays for the JS vocabulary
+`JS-VOCABULARY-ADDENDUM-v0.070.md` (retired -- see `docs/Foundational/DESIGN-NOTES.md`) played for the JS vocabulary
 addendum and `docs/Backends/ANDROID-BACKEND-IMPLEMENTATION.md` plays
 for the Android backend's staging list. It does not restate that
 proposal's reasoning; it exists to turn "here's a suggested order"

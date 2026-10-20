@@ -5,6 +5,96 @@ follows [Keep a Changelog](https://keepachangelog.com/); versions
 follow the milestone scheme from ARCHITECTURE.md rather than strict
 SemVer.
 
+## [Unreleased -- draft, version slot unconfirmed] -- Docs-only: three fully shipped `docs/Implementation/` files retired; two unreleased `alpha` fixes recorded here for the first time
+
+**Docs-only, no code behavior changed.** Retires three staging files
+whose own status lines said they were finished, per
+`docs/Implementation/README.md`'s retirement rule ("once every stage in
+a ladder here has actually shipped ... trim or remove the file here")
+and the checklist in `docs/README.md`'s "Moving, renaming, or retiring a
+doc": outcome captured first (this entry, `docs/version history/`),
+design rationale graduated into `docs/Foundational/DESIGN-NOTES.md` as
+"Design record: ..." sections, then the files deleted and both README
+index rows removed in the same pass. Every file below is recoverable
+with `git show HEAD~1:<path>` from this commit's parent.
+
+- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` -- "Status:
+  DONE", all ten stages (`v0.061`-`v0.070`) shipped. Nothing to
+  backfill: every stage already has its own `CHANGELOG.md` entry and
+  `docs/version history/v0.061.md`-`v0.070.md`. The scope filter, ordering
+  rationale and the two design exceptions (`pluralize`, `random_int`)
+  graduated into "Design record: JS vocabulary ladder (v0.061-v0.070)".
+- `docs/Implementation/SCRIPT-EXTENSION-SYNTAX-CHECK-BUGFIX.md` and
+  `docs/Implementation/SEARCH-KNOWLEDGE-STATE-AND-KEYWORDS-ADDENDUM.md`
+  -- both shipped on `alpha` but had **no `CHANGELOG.md` entry** (the
+  addendum's own index row said so); their outcomes are recorded below,
+  and their design rationale graduated into "Design record:
+  `ScriptExtension` syntax check" and "Design record: search knowledge
+  base -- state keywords and closed registries".
+
+### `ScriptExtension` JS is now syntax-checked (shipped, unreleased on `alpha`)
+
+Bug fix. `ScriptExtension.lower()`'s JS was appended to `arklight.js`
+with no parse, so one typo made the browser reject the whole runtime
+file. `check_js_syntax(js, *, label)` now parses it with `vm.Script`
+(classic-script goal -- deliberately not `node --check`, whose
+CommonJS/ESM grammar disagrees with a browser's in both directions; see
+the design record) at `register()` time and again on the combined
+`arklight.js` at compile time. Returns `True` (parsed), `False` (could
+not check: no `node`, spawn failure, 15 s timeout -- warns once, build
+continues, so Node stays optional) or raises `ScriptExtensionError` with
+Node's diagnostic, temp path replaced by `<ExtensionName>.script`.
+`check_syntax = False` on the subclass opts out. Syntax only; the
+`script-extension` experimental banner still applies.
+
+Files: `arklight/backend/script_extension.py` (`check_js_syntax()`,
+`NODE_EXECUTABLE`, opt-out, wired into `register()` and the
+postprocessor), `arklight/experimental.py` and
+`docs/Foundational/EXPERIMENTAL-APIS.md` (banner/prose no longer claims
+the JS is wholly unchecked), `tests/test_script_extension.py` (15 new
+tests; two marker-warning tests scoped to their own warning so they pass
+with or without Node). Grammar-goal regressions cover `export`,
+`import`, top-level `await`, top-level `return` and `new.target`
+(rejected -- all pass plain `node --check`) and `with`/`var await`
+(accepted -- both fail under a module goal); a fragment is parsed and
+never executed; missing `node` warns and still builds.
+
+As recorded when it landed: `tests/test_script_extension.py` 29 passed;
+full suite green apart from `test_scaffold`/`test_version`, which need an
+editable `pip install` and failed identically on an unmodified checkout;
+end to end through `arklight.compiler.pipeline.build()`, a valid
+extension is appended to `out/arklight.js` and an unbalanced-brace one
+fails the compile writing no `arklight.js`.
+
+### `arklight search` covers `State`/`Bind`/`Computed`/`Watch` and the closed registries (shipped, unreleased on `alpha`)
+
+Capability fix. `arklight search State` (let alone a typo like `Statee`)
+fell through to "No component named", and a typo of `increment`,
+`debounce`, `Derive.sum`, `Predicate.truthy` or `PlatformAPI.notify` got
+no "did you mean": `build_knowledge_base()` only scanned `SCHEMA` and a
+project's own `COMPONENT_REGISTRY`.
+
+- `arklight/search/knowledge.py`: `STATE_KEYWORDS` (the four reactive-state
+  declarations, with their required argument names read off
+  `arklight.api`) and `_CLOSED_KEYWORD_REGISTRIES`, folded into
+  `build_knowledge_base()` unconditionally. Built-ins win a name
+  collision: `SCHEMA`, then state keywords, then each registry in
+  `_JS_VOCAB_SOURCES` order, then a project's `components=`.
+- `arklight/cli/search.py`: `_resolve_state_keyword` and
+  `_format_state_spec`, wired into `search_component()` between the
+  component exact-match branch and `_resolve_js_vocab`; docstrings that
+  called the fuzzy fallback "component-only" corrected.
+- Deliberately unchanged: `resolve_exact`/`--accept` stay component-only;
+  `arklight.ir.schema`, `arklight.ir.platform_api`,
+  `arklight.search.retrieval` and `.ranking` untouched.
+- Tests: `tests/test_search_knowledge.py` (`SCHEMA` assertion became a
+  subset check, plus new `STATE_KEYWORDS`/registry coverage),
+  `tests/test_search.py` (exact match for the four keywords; "did you
+  mean" for a typo'd keyword and a typo'd registry entry), and one more
+  pre-existing `set(facts) == set(SCHEMA)` assertion in
+  `tests/test_user_defined_components_stage1.py` given the same subset
+  fix. Recorded at landing: full suite 2343 passed, 0 failed.
+
 ## [Unreleased -- draft, version slot unconfirmed] -- `v0.075`: Markdown-as-content, Stage `M10` of 10 (docs/tests rollup), `alpha` only
 
 **Shipped, unreleased.** The closing rung of the Markdown-as-content

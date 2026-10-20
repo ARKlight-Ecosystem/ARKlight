@@ -7,7 +7,7 @@ in the `v0.071` slot. Stages 2-4 are accepted and staged here, in the
 -- until now an unsettled follow-up finding, not covered by that
 proposal's original Tier 1/Tier 2/§6 acceptance -- into a trackable
 staged landing order, the same role
-`JS-VOCABULARY-ADDENDUM-v0.070.md` played for Tier 1/Tier 2/§6. It
+`JS-VOCABULARY-ADDENDUM-v0.070.md` (retired -- see `docs/Foundational/DESIGN-NOTES.md`) played for Tier 1/Tier 2/§6. It
 does not restate that section's reasoning; it exists to turn "here's
 a follow-up finding" into "here's the order it ships in and the slots
 it ships under."
@@ -96,8 +96,9 @@ any code is written. Not started pending that sign-off. Proposal:
 - `docs/Proposals/JS-VOCABULARY-EXPANSION-PROPOSAL.md` -- source
   proposal; §7 is this ladder's catalog, §10 is the suggested
   ordering this ladder follows for stages 2-4.
-- `docs/Implementation/JS-VOCABULARY-ADDENDUM-v0.070.md` -- the
-  sibling ladder for Tier 1/Tier 2/§6, DONE as of `v0.070`.
+- `docs/Foundational/DESIGN-NOTES.md` -- design record ("JS vocabulary ladder")
+  of the sibling ladder for Tier 1/Tier 2/§6, DONE as of `v0.070`; its
+  staging file is retired.
 - `PROGRESS.md` -- Snapshot table rows for `v0.071` (stage 1) and
   `v0.072` (stages 2-4).
 - `CHANGELOG.md` -- the `list_at` entry, slotted `v0.071`.
