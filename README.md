@@ -99,3 +99,11 @@ it, so it's the only place documentation can go stale, and the only
 place you need to check.
 
 If you found a bug or have a question, please open an issue.
+
+## License
+
+<a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://www.gnu.org/graphics/gplv3-127x51.png" alt="GNU GPLv3 Image"></a>
+
+ARKlight is  licensed under the
+[GNU General Public License v3.0](https://github.com/ARKlight-Ecosystem/ARKlight/blob/main/LICENSE)
+or later. It does not extend to it's user compiled artifacts/output html, css, js files.
